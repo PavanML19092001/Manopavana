@@ -1,0 +1,855 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <!-- Favicon / Brand Tab Logo -->
+  <link rel="icon" type="image/jpeg" href="https://res.cloudinary.com/bng9wtel/image/upload/v1788614608/My%20Brand/logo2_vmzgwe.jpg" />
+  <link rel="shortcut icon" type="image/jpeg" href="https://res.cloudinary.com/bng9wtel/image/upload/v1788614608/My%20Brand/logo2_vmzgwe.jpg" />
+  <link rel="apple-touch-icon" href="https://res.cloudinary.com/bng9wtel/image/upload/v1788614608/My%20Brand/logo2_vmzgwe.jpg" />
+  <title>MANOPAVANA</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap"
+    rel="stylesheet" />
+
+  <link rel="stylesheet" href="style.css" />
+</head>
+
+<body>
+
+  <div id="topAnnouncementBar" class="top-announcement-bar">
+    <span id="announcementText">🚚 <strong>FREE Doorstep Delivery</strong> on all orders above ₹500 across Bangalore (Delivered in 48–72 hrs)</span>
+  </div>
+
+  <div id="rewardToast" class="reward-toast">
+    <div class="toast-content">
+      <span class="toast-icon">✨</span>
+      <div>
+        <strong>Bottle Scan Verified!</strong>
+        <p id="toastMessage">10% Reorder Loyalty Discount active for this fresh bottle order!</p>
+      </div>
+    </div>
+  </div>
+
+  <header class="site-header">
+    <div class="header-inner">
+      <a href="#" class="brand-link" title="MANOPAVANA">
+        <div class="logo-wrap">
+          <img src="https://res.cloudinary.com/bng9wtel/image/upload/v1788614608/My%20Brand/logo2_vmzgwe.jpg" alt="MANOPAVANA Logo" class="site-logo" />
+        </div>
+        <div class="brand-text-wrap">
+          <span class="brand-name">MANOPAVANA</span>
+          <span class="brand-tagline">Traditional wood-pressed goodness.</span>
+        </div>
+      </a>
+
+      <nav class="nav-links">
+        <a href="#products">Artisanal Oils</a>
+        <a href="#bottle-design">Bottle Design</a>
+        <a href="#combo">Value Combo</a>
+        <a href="#culinary">Good Food Starts Here</a>
+        <a href="#reviews">Customer Reviews</a>
+        <a href="#loyalty">10% QR Program</a>
+        <a href="#faqs">FAQs</a>
+      </nav>
+
+      <button id="openCartBtn" class="cart-trigger-btn" type="button">
+        <span>Cart</span>
+        <span id="cartCountBadge" class="cart-badge-count">0</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Cart Drawer -->
+  <div id="cartBackdrop" class="cart-backdrop"></div>
+  <aside id="cartDrawer" class="cart-drawer">
+    <div class="cart-header">
+      <h3>Your Artisanal Bag</h3>
+      <button id="closeCartBtn" class="close-cart-btn" type="button">&times;</button>
+    </div>
+
+    <div id="cartItemsList" class="cart-items-list"></div>
+
+    <div class="cart-footer">
+      <div class="summary-row">
+        <span>Total Items:</span>
+        <span id="cartTotalItems">0</span>
+      </div>
+      <div class="summary-row">
+        <span>Subtotal:</span>
+        <span id="cartSubtotal">₹0</span>
+      </div>
+      <div id="discountRow" class="summary-row discount-row" style="display: none;">
+        <span>Bottle Loyalty Discount (10%):</span>
+        <span id="cartDiscount">-₹0</span>
+      </div>
+      <div class="summary-row">
+        <span>Delivery (Bangalore):</span>
+        <span id="cartDeliveryCharge">₹49</span>
+      </div>
+      <div class="summary-row total-row">
+        <span>Grand Total:</span>
+        <span id="cartGrandTotal" class="summary-price">₹0</span>
+      </div>
+      <p id="shippingNote" class="shipping-note">Add ₹500+ for FREE Doorstep Delivery across Bangalore</p>
+      <button id="openCheckoutModalBtn" class="btn-checkout" type="button">
+        Proceed to Delivery & Payment →
+      </button>
+    </div>
+  </aside>
+
+  <!-- Checkout Modal -->
+  <div id="checkoutModalBackdrop" class="modal-backdrop">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>Delivery & Custom Gifting Details</h3>
+        <button id="closeModalBtn" class="close-modal-btn" type="button">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p class="modal-subtext">Enter your delivery address and customize your personalized bottle labels at zero extra charge.</p>
+
+        <div class="order-intent-wrap">
+          <label class="intent-label">Who is this order for?</label>
+          <div class="intent-pill-group">
+            <button type="button" class="intent-pill active" id="btnIntentFamily">👨‍👩‍👦 For My Home</button>
+            <button type="button" class="intent-pill" id="btnIntentGift">🎁 Gifting Someone</button>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="custName" id="lblCustName">Full Name (Your Name) *</label>
+          <input type="text" id="custName" placeholder="e.g. Ramesh Kumar" required />
+          <small class="field-error-text" id="custNameErr"></small>
+        </div>
+
+        <div class="form-group">
+          <label for="custPhone" id="lblCustPhone">WhatsApp Contact Number (10 Digits) *</label>
+          <input type="tel" id="custPhone" maxlength="10" placeholder="e.g. 9876543210" required />
+          <small class="field-error-text" id="custPhoneErr"></small>
+        </div>
+
+        <div class="form-group">
+          <label for="custLabelName">Custom Name for Bottle Label (Optional)</label>
+          <input type="text" id="custLabelName" placeholder="e.g. The Kumar Family / Amma's Kitchen" />
+          <span class="field-helper-hint">🏷️ Printed directly on the front circular bottle label badge.</span>
+        </div>
+
+        <div class="form-group" id="giftNoteGroup" style="display: none;">
+          <label for="custGiftNote">Gift Note / Message (Optional)</label>
+          <textarea id="custGiftNote" rows="2" placeholder="e.g. Wishing you good health and prosperity! - Ramesh"></textarea>
+          <span class="field-helper-hint">💌 Printed on an artisanal hanging kraft neck tag.</span>
+        </div>
+
+        <div class="form-group">
+          <label for="custAddress">Complete Street Delivery Address *</label>
+          <textarea id="custAddress" rows="2" placeholder="Flat / House No, Building, Street, Landmark" required></textarea>
+          <small class="field-error-text" id="custAddressErr"></small>
+        </div>
+
+        <div class="form-row">
+          <div class="form-col">
+            <label for="custState">State *</label>
+            <select id="custState" disabled>
+              <option value="Karnataka" selected>Karnataka</option>
+            </select>
+          </div>
+          <div class="form-col">
+            <label for="custDistrict">District *</label>
+            <select id="custDistrict" required>
+              <option value="Bengaluru Urban" selected>Bengaluru Urban</option>
+              <option value="Bengaluru Rural">Bengaluru Rural</option>
+              <option value="Bagalkote">Bagalkote</option>
+              <option value="Ballari">Ballari</option>
+              <option value="Belagavi">Belagavi</option>
+              <option value="Bidar">Bidar</option>
+              <option value="Chamarajanagara">Chamarajanagara</option>
+              <option value="Chikkaballapura">Chikkaballapura</option>
+              <option value="Chikkamagaluru">Chikkamagaluru</option>
+              <option value="Chitradurga">Chitradurga</option>
+              <option value="Dakshina Kannada">Dakshina Kannada</option>
+              <option value="Davanagere">Davanagere</option>
+              <option value="Dharwad">Dharwad</option>
+              <option value="Gadag">Gadag</option>
+              <option value="Hassan">Hassan</option>
+              <option value="Haveri">Haveri</option>
+              <option value="Kalaburagi">Kalaburagi</option>
+              <option value="Kodagu">Kodagu</option>
+              <option value="Kolar">Kolar</option>
+              <option value="Koppal">Koppal</option>
+              <option value="Mandya">Mandya</option>
+              <option value="Mysuru">Mysuru</option>
+              <option value="Raichur">Raichur</option>
+              <option value="Ramanagara">Ramanagara</option>
+              <option value="Shivamogga">Shivamogga</option>
+              <option value="Tumakuru">Tumakuru</option>
+              <option value="Udupi">Udupi</option>
+              <option value="Uttara Kannada">Uttara Kannada</option>
+              <option value="Vijayanagara">Vijayanagara</option>
+              <option value="Vijayapura">Vijayapura</option>
+              <option value="Yadgir">Yadgir</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-col">
+            <label for="custCity">City / Town / Area *</label>
+            <input type="text" id="custCity" value="Bengaluru" required />
+            <small class="field-error-text" id="custCityErr"></small>
+          </div>
+          <div class="form-col">
+            <label for="custPincode">Pincode (6 Digits) *</label>
+            <input type="text" id="custPincode" maxlength="6" placeholder="e.g. 560058" required />
+            <small class="field-error-text" id="custPincodeErr"></small>
+          </div>
+        </div>
+
+        <div class="payment-selection-wrap">
+          <label class="payment-group-label">Select Payment Method</label>
+          <div class="payment-options-grid">
+            <label class="payment-radio-card active" id="labelPayUPI">
+              <input type="radio" name="paymentMode" id="payUPI" value="UPI" checked />
+              <div class="pay-card-content">
+                <span class="pay-icon">⚡</span>
+                <div>
+                  <strong>UPI / QR Pay</strong>
+                  <small>GPay, PhonePe, Paytm</small>
+                </div>
+              </div>
+            </label>
+
+            <label class="payment-radio-card" id="labelPayCOD">
+              <input type="radio" name="paymentMode" id="payCOD" value="COD" />
+              <div class="pay-card-content">
+                <span class="pay-icon">💵</span>
+                <div>
+                  <strong>Cash on Delivery</strong>
+                  <small>Pay upon delivery</small>
+                </div>
+              </div>
+            </label>
+          </div>
+        </div>
+
+        <div id="upiPaymentBox" class="upi-payment-box">
+          <div class="upi-pay-header">
+            <span>Payable Amount:</span>
+            <strong id="upiPayableAmount">₹0</strong>
+          </div>
+
+          <div class="upi-qr-display-wrap">
+            <img id="dynamicUpiQrImg" src="" alt="Scan UPI QR Code" class="upi-qr-image" />
+            <span class="upi-scan-note">Scan with Google Pay, PhonePe, Paytm, BHIM, or Google Lens</span>
+          </div>
+
+          <div class="upi-mobile-pay-wrap">
+            <a id="mobileUpiDeepLink" href="#" class="btn-mobile-upi-pay">
+              📲 Tap to Pay via UPI App (GPay / PhonePe)
+            </a>
+          </div>
+          <p class="upi-inst-note">Once payment is complete, tap the button below to confirm your order.</p>
+        </div>
+
+        <p id="formError" class="form-error-msg"></p>
+        <p class="legal-form-note">By submitting, you agree to our Terms & Delivery Policies. Freshly extracted new bottles delivered within 48 to 72 hours across Karnataka.</p>
+        <button id="submitOrderBtn" class="btn-submit-order" type="button">
+          I Have Paid — Confirm Order on WhatsApp 💬
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Hero Video Section -->
+  <section class="hero-clean-video-section">
+    <video id="heroVideo" class="hero-clean-video" autoplay muted loop playsinline webkit-playsinline preload="auto">
+      <source src="https://res.cloudinary.com/bng9wtel/video/upload/v1788615194/master_oil.mp4" type="video/mp4" />
+    </video>
+
+    <audio id="heroBgAudio" loop preload="auto">
+      <source src="https://res.cloudinary.com/bng9wtel/video/upload/v1788614806/marada_gaana_beat.mp3" type="audio/mp3" />
+    </audio>
+
+    <button id="soundToggleBtn" class="video-sound-pill" type="button" aria-label="Toggle Sound">
+      <span id="soundIcon">🔇</span>
+      <span id="soundText">Sound Off</span>
+    </button>
+  </section>
+
+  <div class="video-cta-strip">
+    <a href="#products" class="btn-hero-scroll">Explore The Collection ↓</a>
+  </div>
+
+  <section id="about" class="brand-intro-section">
+    <div class="intro-container">
+      <span class="intro-tag">GOOD FOOD STARTS HERE</span>
+      <h2>Unrefined by Nature, Bottled Fresh</h2>
+      <p>
+        Extracted from single-origin sun-dried seeds using slow wooden press techniques. Unrefined, free from chemical
+        solvents, and sealed fresh into new bottles at our Bangalore facility to preserve natural aroma and wholesome nutrients.
+      </p>
+    </div>
+  </section>
+
+  <!-- Products Section -->
+  <section id="products" class="products-section">
+    <div class="section-title-wrap">
+      <span class="section-tag">TRADITIONAL WOOD-PRESSED OILS</span>
+      <h2>The MANOPAVANA Bottle Collection</h2>
+      <p>Tap on any bottle to inspect extraction details, packaging specs, and nutritional facts.</p>
+    </div>
+
+    <div class="product-grid" id="productGridContainer">
+      <!-- Dynamically Rendered via script.js -->
+    </div>
+  </section>
+
+  <!-- Product Detail Modal Window -->
+  <div id="productDetailModalBackdrop" class="modal-backdrop product-detail-backdrop">
+    <div class="modal-card product-detail-card">
+      <div class="modal-header">
+        <h3 id="modalProductHeaderTitle">Product Details</h3>
+        <button id="closeDetailModalBtn" class="close-modal-btn" type="button">&times;</button>
+      </div>
+      <div class="modal-body modal-detail-body" id="modalProductDetailBody">
+        <!-- Injected Dynamically via script.js -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Bottle Design Showcase -->
+  <section id="bottle-design" class="bottle-design-section">
+    <div class="section-title-wrap">
+      <span class="section-tag">FUNCTIONAL PACKAGING DESIGN</span>
+      <h2>Engineered for Daily Cooking</h2>
+      <p>Lightweight shatterproof food-grade bottle with a built-in drip-free precision pourer.</p>
+    </div>
+
+    <div class="bottle-stage-content">
+      <div class="bottle-video-wrapper">
+        <video id="bottleAutoplayVideo" class="bottle-showcase-video" loop muted playsinline preload="auto">
+          <source src="https://res.cloudinary.com/bng9wtel/video/upload/v1788614873/bottle_360.mp4" type="video/mp4" />
+        </video>
+        <img src="https://res.cloudinary.com/bng9wtel/image/upload/v1788615807/groundnut-oil.jpg" class="bottle-fallback-img" id="bottleFallbackImg" alt="MANOPAVANA Bottle" />
+        <div class="bottle-radial-glow"></div>
+      </div>
+
+      <div class="bottle-callouts-container">
+        <div class="design-feature-card">
+          <div class="feature-tag">01 • DISPENSER</div>
+          <h3>Built-In Drip-Free Flip Spout</h3>
+          <p>Single-thumb controlled pouring directly into hot pans without messy oil drippings or counter stains.</p>
+        </div>
+
+        <div class="design-feature-card">
+          <div class="feature-tag">02 • SEAL</div>
+          <h3>Leak-Proof Airtight Locking Cap</h3>
+          <p>Precision silicone-lined sealing system locks in natural seed aroma, prevents transit leaks, and keeps dust out.</p>
+        </div>
+
+        <div class="design-feature-card">
+          <div class="feature-tag">03 • BOTTLE BUILD</div>
+          <h3>Lightweight & Shatterproof Body</h3>
+          <p>Food-grade virgin plastic body with an anti-slip grip and wide stable base that won't shatter if dropped.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3-Litre Combo Section -->
+  <section id="combo" class="combo-section">
+    <div class="combo-card">
+      <div class="combo-badge">BEST VALUE • 3 ESSENTIAL OILS</div>
+
+      <div class="combo-grid-layout">
+        <div class="combo-image-col">
+          <div class="combo-poster-frame">
+            <img src="https://res.cloudinary.com/bng9wtel/image/upload/v1788615838/combo-all-labels.jpg" alt="Complete 3-Oil Variety Box Labels" class="combo-all-labels-img" />
+            <div class="combo-img-overlay-badge">3 x 1 Litre Kitchen Trio</div>
+          </div>
+        </div>
+
+        <div class="combo-info-col">
+          <span class="combo-tag">ESSENTIAL KITCHEN TRIO</span>
+          <h2>Complete Kitchen 3-Oil Essential Box (3 Litres)</h2>
+          <p class="combo-desc">
+            Equip your kitchen with South India's 3 core traditional wood-pressed oils. Includes brand-new sealed 1L Groundnut Oil, 1L Coconut Oil, and 1L Sesame Oil.
+          </p>
+          <ul class="combo-list">
+            <li>✓ Complete monthly cooking coverage for your family</li>
+            <li>✓ Free Doorstep Delivery included across Bangalore (48–72 hrs)</li>
+            <li>✓ Raw extraction with zero chemical additives or solvents</li>
+            <li>✓ Includes verified 10% repeat order QR codes on all 3 bottles</li>
+          </ul>
+          <div class="combo-pricing-wrap">
+            <div class="combo-price-block">
+              <span class="combo-price">₹1,249</span>
+              <span class="combo-original-price">₹1,347</span>
+              <small class="combo-sub-label">(₹1,124 with Bottle QR Scan)</small>
+            </div>
+            <div class="stepper-wrap-inline" id="stepper-combo-3l">
+              <button class="btn-buy-combo" data-id="combo-3l" data-title="Complete 3-Oil Essential Box (3L Trio)"
+                data-price="1249" data-img="https://res.cloudinary.com/bng9wtel/image/upload/v1788615807/groundnut-oil.jpg" type="button">
+                Add 3-Oil Bundle to Bag →
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- Culinary Showcase -->
+  <section id="culinary" class="culinary-section">
+    <div class="section-title-wrap">
+      <span class="section-tag">CULINARY ARTISTRY</span>
+      <h2>Good Food Starts Here. Better Life Follows.</h2>
+      <p>Handcrafted bottle labels and the traditional regional dishes they are crafted for.</p>
+    </div>
+
+    <div class="label-showcase-grid">
+      <div class="label-feature-card">
+        <div class="label-img-box">
+          <img src="https://res.cloudinary.com/bng9wtel/image/upload/v1788615840/label-groundnut.jpg" alt="Groundnut Oil Label" class="label-art-img" />
+        </div>
+        <div class="label-info-box">
+          <span class="pairing-badge groundnut-badge">Groundnut Pairing</span>
+          <h3>Crispy Dosas & Everyday Tiffin</h3>
+          <p>Perfect for daily South Indian cooking, golden dosas, stir-fries, and shallow frying with rich nutty aroma.</p>
+        </div>
+      </div>
+
+      <div class="label-feature-card">
+        <div class="label-img-box">
+          <img src="https://res.cloudinary.com/bng9wtel/image/upload/v1788615819/label-coconut.jpg" alt="Coconut Oil Label" class="label-art-img" />
+        </div>
+        <div class="label-info-box">
+          <span class="pairing-badge coconut-badge">Coconut Pairing</span>
+          <h3>Coastal Curries & Rice Dishes</h3>
+          <p>Unrefined aroma tailored for authentic Kerala avial, vegetable stew, and aromatic coastal curries.</p>
+        </div>
+      </div>
+
+      <div class="label-feature-card">
+        <div class="label-img-box">
+          <img src="https://res.cloudinary.com/bng9wtel/image/upload/v1788615838/label-sesame.jpg" alt="Sesame Oil Label" class="label-art-img" />
+        </div>
+        <div class="label-info-box">
+          <span class="pairing-badge sesame-badge">Sesame Pairing</span>
+          <h3>Tempering, Puliogare & Podis</h3>
+          <p>Traditional choice for authentic tamarind rice (Puliogare), idli podi mix, rasam tadka, and daily wellness.</p>
+        </div>
+      </div>
+
+      <div class="label-feature-card">
+        <div class="label-img-box">
+          <img src="https://res.cloudinary.com/bng9wtel/image/upload/v1788615816/label-mustard.jpg" alt="Mustard Oil Label" class="label-art-img" />
+        </div>
+        <div class="label-info-box">
+          <span class="pairing-badge mustard-badge">Mustard Pairing</span>
+          <h3>Rich Tawa Gravies & Baingan Bharta</h3>
+          <p>Signature pungent sharpness essential for traditional North Indian curries and artisanal pickle curing.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Customer Reviews -->
+  <section id="reviews" class="reviews-section">
+    <div class="section-title-wrap">
+      <span class="section-tag">CUSTOMER COMMUNITY</span>
+      <h2>Customer Reviews & Kitchen Experiences</h2>
+      <p>Real feedback from customers cooking with MANOPAVANA wood-pressed oils.</p>
+    </div>
+
+    <div class="reviews-container">
+      <div id="reviewsDisplayGrid" class="reviews-display-grid"></div>
+
+      <div class="feedback-form-box">
+        <h3>Write a Review</h3>
+        <p>Used our oils in your kitchen? Share your honest rating and review to help fellow home cooks.</p>
+
+        <form id="productReviewForm" class="review-form">
+          <div class="form-row">
+            <div class="form-col">
+              <label>Your Name *</label>
+              <input type="text" id="revName" placeholder="e.g. Ramesh Kumar" required />
+            </div>
+            <div class="form-col">
+              <label>Product Used *</label>
+              <select id="revProduct" required>
+                <option value="Wood-Pressed Groundnut Oil">Groundnut Oil</option>
+                <option value="Wood-Pressed Coconut Oil">Coconut Oil</option>
+                <option value="Wood-Pressed Sesame Oil">Sesame Oil</option>
+                <option value="Wood-Pressed Mustard Oil">Mustard Oil</option>
+                <option value="Complete 3-Oil Essential Box (3L)">3-Oil Essential Box (3L)</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-col">
+              <label>Rating *</label>
+              <select id="revRating" required>
+                <option value="5">★★★★★ (5/5 - Excellent)</option>
+                <option value="4">★★★★☆ (4/5 - Very Good)</option>
+                <option value="3">★★★☆☆ (3/5 - Good)</option>
+                <option value="2">★★☆☆☆ (2/5 - Fair)</option>
+                <option value="1">★☆☆☆☆ (1/5 - Poor)</option>
+              </select>
+            </div>
+            <div class="form-col">
+              <label>Bangalore Area / Order Ref (Optional)</label>
+              <input type="text" id="revLocation" placeholder="e.g. Indiranagar / #MP-4021" />
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>Your Review & Experience *</label>
+            <textarea id="revComment" rows="3" placeholder="Tell us about the aroma, taste, bottle dispenser, or cooking results..." required></textarea>
+          </div>
+
+          <button type="submit" class="btn-submit-review">
+            Post Review
+          </button>
+        </form>
+      </div>
+    </div>
+  </section>
+
+  <!-- 10% QR Reorder Loyalty Section -->
+  <section id="loyalty" class="loyalty-section">
+    <div class="loyalty-card-wrap">
+      <div class="loyalty-badge">EASY REORDER PROGRAM</div>
+      <h2>Love the Fresh Taste? Enjoy 10% OFF Every Reorder.</h2>
+      <p class="loyalty-subtext">
+        Every MANOPAVANA bottle comes with a verified reorder QR code printed directly on the label. Follow these simple steps:
+      </p>
+
+      <div class="loyalty-steps-grid">
+        <div class="loyalty-step-card">
+          <div class="step-image-box">
+            <span class="step-num-pill">Step 1</span>
+            <img 
+              src="https://res.cloudinary.com/bng9wtel/image/upload/v1788615867/step-bottle-qr.jpg" 
+              alt="Locate the bottle QR code" 
+              class="step-guide-img"
+              onerror="this.src='https://placehold.co/400x260/171412/eab308?text=1.+Find+Bottle+QR'" 
+            />
+          </div>
+          <div class="step-card-content">
+            <h4>Locate the Label QR</h4>
+            <p>Look at the circular golden badge at the base of your existing MANOPAVANA bottle.</p>
+          </div>
+        </div>
+
+        <div class="loyalty-step-card">
+          <div class="step-image-box">
+            <span class="step-num-pill">Step 2</span>
+            <img 
+              src="https://res.cloudinary.com/bng9wtel/image/upload/v1788615853/step-camera-scan.jpg" 
+              alt="Scan QR code with smartphone camera" 
+              class="step-guide-img"
+              onerror="this.src='https://placehold.co/400x260/171412/eab308?text=2.+Scan+With+Camera'" 
+            />
+          </div>
+          <div class="step-card-content">
+            <h4>Scan with Any Camera</h4>
+            <p>Open your smartphone camera or Google Lens, point at the code, and tap the link that appears.</p>
+          </div>
+        </div>
+
+        <div class="loyalty-step-card">
+          <div class="step-image-box">
+            <span class="step-num-pill">Step 3</span>
+            <img 
+              src="https://res.cloudinary.com/bng9wtel/image/upload/v1788615861/step-whatsapp-discount.jpg" 
+              alt="10% discount applied on site" 
+              class="step-guide-img"
+              onerror="this.src='https://placehold.co/400x260/171412/eab308?text=3.+10%+Discount+Active'" 
+            />
+          </div>
+          <div class="step-card-content">
+            <h4>Instant 10% Discount</h4>
+            <p>Your 10% loyalty discount unlocks immediately and applies automatically across your cart on your next bottle delivery.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="loyalty-footnote">
+        💡 <em>No app installation required. Works natively on all iOS and Android smartphone cameras.</em>
+      </div>
+    </div>
+  </section>
+
+  <!-- Extraction Benchmark -->
+  <section class="benchmark-section">
+    <div class="section-title-wrap">
+      <span class="section-tag">EXTRACTION BENCHMARK</span>
+      <h2>Why Switch to Wood-Pressed?</h2>
+      <p>Compare everyday refined supermarket oils with MANOPAVANA single-press extraction.</p>
+    </div>
+
+    <div class="comparison-table-wrap">
+      <table class="comparison-table">
+        <thead>
+          <tr>
+            <th>Quality Metric</th>
+            <th>Commercial Refined Oils</th>
+            <th class="highlight-col">MANOPAVANA Wood-Pressed</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Extraction Temperature</strong></td>
+            <td>High heat (200°C+ destroys natural vitamins)</td>
+            <td class="highlight-col"><strong>Room temperature (&lt; 45°C)</strong></td>
+          </tr>
+          <tr>
+            <td><strong>Chemical Solvents</strong></td>
+            <td>Hexane & chemical bleaches used</td>
+            <td class="highlight-col"><strong>0% Chemicals • Zero Solvents</strong></td>
+          </tr>
+          <tr>
+            <td><strong>Nutrient Retention</strong></td>
+            <td>Synthetic vitamins added back</td>
+            <td class="highlight-col"><strong>Naturally Preserved Micronutrients & Tocopherols</strong></td>
+          </tr>
+          <tr>
+            <td><strong>Filtration</strong></td>
+            <td>Artificial micro-bleaching</td>
+            <td class="highlight-col"><strong>Traditional cotton sedimentation</strong></td>
+          </tr>
+        </tbody>
+      </table>
+      <p class="quality-disclaimer">
+        *Note: Natural sedimentation and color variations may occur between batches due to traditional zero-heat wooden press extraction and unfiltered cotton settling. This is a natural hallmark of unrefined cold-pressed oil.
+      </p>
+    </div>
+  </section>
+
+  <!-- FAQ Section -->
+  <section id="faqs" class="faqs-section">
+    <div class="section-title-wrap">
+      <span class="section-tag">KNOWLEDGE BASE</span>
+      <h2>Frequently Asked Questions</h2>
+      <p>Everything you need to know about our cold-pressed cooking oils and order fulfillment.</p>
+    </div>
+
+    <div class="faq-accordion">
+      <div class="faq-item">
+        <button class="faq-question">
+          <span>What makes MANOPAVANA oils different from regular refined cooking oils?</span>
+          <span class="faq-icon">+</span>
+        </button>
+        <div class="faq-answer">
+          <p>Refined oils undergo chemical bleaching and extreme heating over 200°C. MANOPAVANA oils are crushed at room
+            temperature using traditional slow wooden presses with zero external heat, preserving natural nutrients and authentic aroma.</p>
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <button class="faq-question">
+          <span>Why is there slight natural sediment at the bottom of the bottle?</span>
+          <span class="faq-icon">+</span>
+        </button>
+        <div class="faq-answer">
+          <p>Because our oils are completely unrefined and free from chemical filtration, we allow the oil to settle naturally through micro-mesh cotton cloths. The slight sediment at the bottom is pure seed fiber, a true mark of unrefined cold-pressed oils.</p>
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <button class="faq-question">
+          <span>What is the shelf life and ideal storage for these oils?</span>
+          <span class="faq-icon">+</span>
+        </button>
+        <div class="faq-answer">
+          <p>Our cold-pressed oils maintain peak freshness for 9 to 12 months from the date of extraction. Store them in a cool, dry place away from direct sunlight and keep the bottle tightly sealed.</p>
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <button class="faq-question">
+          <span>Where do you deliver and what are the shipping charges?</span>
+          <span class="faq-icon">+</span>
+        </button>
+        <div class="faq-answer">
+          <p>We deliver exclusively across Bangalore and Karnataka. All orders above ₹500 unlock <strong>Free Doorstep Delivery</strong> (delivered within 48 to 72 hours). A standard delivery fee of ₹49 applies on orders below ₹500.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Site Footer -->
+  <footer class="site-footer">
+    <div class="footer-inner">
+      <div class="footer-col brand-col">
+        <div class="brand-logo footer-logo">
+          <span class="brand-name">MANOPAVANA</span>
+          <span class="brand-tagline">Traditional wood-pressed goodness.</span>
+        </div>
+        <p class="brand-desc">
+          Single-origin, unfiltered, zero-heat cold-pressed oils extracted through traditional wooden presses and
+          bottled at our facility in Bangalore.
+        </p>
+        <div class="reg-badges">
+          <div class="reg-item">
+            <span class="reg-label">FSSAI Registration:</span>
+            <span class="reg-val">Reg. No. 21226008004689</span>
+          </div>
+          <div class="reg-item">
+            <span class="reg-label">GSTIN:</span>
+            <span class="reg-val">29EYSPR5297E1ZE</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="footer-col links-col">
+        <h4>Navigation</h4>
+        <ul>
+          <li><a href="#products">Artisanal Oils</a></li>
+          <li><a href="#bottle-design">Bottle Design</a></li>
+          <li><a href="#combo">Value Combo</a></li>
+          <li><a href="#culinary">Good Food Starts Here</a></li>
+          <li><a href="#reviews">Customer Reviews</a></li>
+          <li><a href="#loyalty">10% QR Program</a></li>
+          <li><a href="#faqs">FAQs</a></li>
+        </ul>
+      </div>
+
+      <div class="footer-col legal-col">
+        <h4>Policies & Legal</h4>
+        <ul>
+          <li><a href="javascript:void(0)" onclick="openLegalModal('termsModal')">Terms & Conditions</a></li>
+          <li><a href="javascript:void(0)" onclick="openLegalModal('shippingModal')">Shipping & Delivery Policy</a></li>
+          <li><a href="javascript:void(0)" onclick="openLegalModal('returnsModal')">Return & Refund Policy</a></li>
+          <li><a href="javascript:void(0)" onclick="openLegalModal('privacyModal')">Privacy Policy</a></li>
+        </ul>
+      </div>
+
+      <div class="footer-col contact-col">
+        <h4>Contact & Facility</h4>
+        <div class="contact-info">
+          <div class="contact-row">
+            <span class="contact-icon">👤</span>
+            <span style="color: #d6d3d1; font-size: 0.88rem; font-weight: 600;">Manoj M R <small style="color:#a8a29e; font-weight: normal;">(Founder)</small></span>
+          </div>
+          <div class="contact-row">
+            <span class="contact-icon">✉</span>
+            <a href="mailto:manopavana@gmail.com">manopavana@gmail.com</a>
+          </div>
+          <div class="contact-row">
+            <span class="contact-icon">💬</span>
+            <div>
+              <a href="tel:+919180301917">+91 91803 01917 (WhatsApp Orders)</a><br>
+              <a href="tel:+918431023984" style="color:#a8a29e; font-size: 0.8rem;">+91 84310 23984 (Support & Billing)</a>
+            </div>
+          </div>
+          <div class="contact-row address-row">
+            <span class="contact-icon">📍</span>
+            <address>
+              118, Raghavendra Layout, Thigalarapalya,<br />
+              Peenya 2nd Stage, Bangalore, Karnataka - 560058
+            </address>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="footer-bottom">
+      <div class="footer-bottom-inner">
+        <span>© 2026 MANOPAVANA Oils. All rights reserved.</span>
+        <span>Crafted with traditional wood-pressed methods in Bangalore.</span>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Legal Modals -->
+  <div id="termsModal" class="modal-backdrop legal-backdrop">
+    <div class="modal-card legal-modal-card">
+      <div class="modal-header">
+        <h3>Terms & Conditions</h3>
+        <button class="close-modal-btn" onclick="closeLegalModal('termsModal')" type="button">&times;</button>
+      </div>
+      <div class="modal-body legal-modal-body">
+        <h4>1. Business Scope & Order Acceptance</h4>
+        <p>MANOPAVANA manufactures and retails cold-pressed edible oils operating strictly within Karnataka. Orders placed via WhatsApp represent order booking requests and become binding upon payment confirmation.</p>
+        <h4>2. Pricing & Taxes</h4>
+        <p>All prices listed on this website are in Indian Rupees (₹) and are inclusive of applicable GST (GSTIN: 29EYSPR5297E1ZE).</p>
+        <h4>3. Bottle QR Loyalty Reorder Program</h4>
+        <p>The 10% Bottle QR Loyalty discount is a promotional rebate designed for verified returning customers. Each QR code scan activates a 30-day validity window for a single checkout order. The discount applies automatically to eligible cart items and is redeemed upon final order placement. Scanning a bottle label code resets the active 30-day window for subsequent fresh bottle orders.</p>
+        <h4>4. Product Quality & Natural Variation</h4>
+        <p>Because our oils are unrefined and free from artificial colorants, natural batch-to-batch variations in aroma, color, and cotton sedimentation are expected and attest to the authenticity of the extraction.</p>
+        <h4>5. Grievance Redressal Mechanism</h4>
+        <p>In accordance with the Consumer Protection (E-Commerce) Rules, 2020, the designated Grievance Redressal Officer for MANOPAVANA is:</p>
+        <p><strong>Name:</strong> Manoj M R<br>
+        <strong>Designation:</strong> Founder & Grievance Redressal Officer<br>
+        <strong>Email:</strong> manopavana@gmail.com<br>
+        <strong>Contact:</strong> +91 91803 01917 / +91 84310 23984<br>
+        <strong>Address:</strong> 118, Raghavendra Layout, Thigalarapalya, Peenya 2nd Stage, Bangalore - 560058<br>
+        <em>All consumer grievances will be formally acknowledged within 48 business hours and redressed within 30 days of receipt.</em></p>
+      </div>
+    </div>
+  </div>
+
+  <div id="shippingModal" class="modal-backdrop legal-backdrop">
+    <div class="modal-card legal-modal-card">
+      <div class="modal-header">
+        <h3>Shipping & Delivery Policy</h3>
+        <button class="close-modal-btn" onclick="closeLegalModal('shippingModal')" type="button">&times;</button>
+      </div>
+      <div class="modal-body legal-modal-body">
+        <h4>1. Service Territory</h4>
+        <p>Doorstep delivery services are offered <strong>across Bangalore and Karnataka state</strong>.</p>
+        <h4>2. Shipping Charges</h4>
+        <p>• Orders of ₹500 and above: <strong>FREE Doorstep Delivery</strong>.<br>• Orders below ₹500: Flat ₹49 standard delivery fee.</p>
+        <h4>3. Delivery Timeline</h4>
+        <p>Orders are freshly extracted and packed, then delivered within <strong>48 to 72 business hours</strong> across Bangalore and Karnataka. Direct tracking updates and dispatch details will be shared directly via WhatsApp.</p>
+      </div>
+    </div>
+  </div>
+
+  <div id="returnsModal" class="modal-backdrop legal-backdrop">
+    <div class="modal-card legal-modal-card">
+      <div class="modal-header">
+        <h3>Return & Refund Policy</h3>
+        <button class="close-modal-btn" onclick="closeLegalModal('returnsModal')" type="button">&times;</button>
+      </div>
+      <div class="modal-body legal-modal-body">
+        <h4>1. Order Cancellation Prior to Dispatch</h4>
+        <p>Orders may be cancelled via WhatsApp (+91 91803 01917) within 4 hours of order placement or prior to courier handover. Once an order is dispatched, cancellation cannot be accepted due to food safety and transit handling protocols.</p>
+        <h4>2. Edible Goods Policy</h4>
+        <p>Due to health and food safety standards under FSSAI regulations, opened or seal-broken oil bottles are non-returnable and non-refundable.</p>
+        <h4>3. Damaged or Tampered Shipments</h4>
+        <p>If your package arrives leaked or physically damaged during transit, please notify us within 24 hours of delivery via WhatsApp (+91 91803 01917) with clear unboxing photographs or video. Upon quick verification, a free replacement bottle or full UPI refund will be issued within 2 business days.</p>
+      </div>
+    </div>
+  </div>
+
+  <div id="privacyModal" class="modal-backdrop legal-backdrop">
+    <div class="modal-card legal-modal-card">
+      <div class="modal-header">
+        <h3>Privacy Policy</h3>
+        <button class="close-modal-btn" onclick="closeLegalModal('privacyModal')" type="button">&times;</button>
+      </div>
+      <div class="modal-body legal-modal-body">
+        <h4>1. Information Collected</h4>
+        <p>We collect essential order fulfillment details including your Full Name, WhatsApp Contact Number, Delivery Address, District, and Pincode solely to process and deliver your order.</p>
+        <h4>2. Transactional Communication Consent</h4>
+        <p>By placing an order on this website, you explicitly consent to receive transactional notifications, payment acknowledgements, delivery tracking updates, and direct customer support communications via WhatsApp and SMS.</p>
+        <h4>3. Data Security & Third Parties</h4>
+        <p>Your delivery information is strictly confidential. We do not sell, rent, or share customer contact data with third-party advertising or marketing agencies.</p>
+        <h4>4. Privacy Grievances</h4>
+        <p>For any privacy inquiries or data update requests, contact our Grievance Officer: <strong>Manoj M R</strong> at <strong>manopavana@gmail.com</strong>.</p>
+      </div>
+    </div>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+
+</html>
