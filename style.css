@@ -190,17 +190,16 @@ textarea {
   align-items: center;
   gap: 8px;
   padding: 8px 14px;
-  background: rgba(33, 24, 18, 0.95);
+  background: #251710;
   border: 1.5px solid var(--gold-primary);
   border-radius: var(--radius-pill);
   color: var(--gold-light);
   font-size: 0.78rem;
   font-weight: 700;
   letter-spacing: 0.04em;
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.7), 0 0 10px rgba(229, 169, 59, 0.25);
-  transition: bottom 0.25s ease, transform var(--trans-smooth), background var(--trans-fast);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.6);
+  transition: bottom 0.25s ease, transform var(--trans-smooth);
+  transform: translateZ(0);
 }
 
 .floating-sound-pill:hover {
@@ -1446,7 +1445,7 @@ body.has-mobile-cart .floating-sound-pill {
   max-height: 100%;
   object-fit: contain;
   transition: transform var(--trans-smooth);
-  filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.7));
+  /* Removed drop-shadow filter: stops mobile GPU render crashes */
 }
 
 .product-card:hover .card-image-wrap img.product-img {
@@ -3429,9 +3428,8 @@ body.has-mobile-cart .floating-sound-pill {
   height: 100%;
   max-height: 100%;
   object-fit: contain;
-  object-position: center;
   display: block;
-  filter: drop-shadow(0 8px 18px rgba(0, 0, 0, 0.85));
+  margin: 0 auto;
   transition: transform var(--trans-fast);
 }
 
@@ -4768,11 +4766,13 @@ body.has-mobile-cart .floating-sound-pill {
 }
 
 @media screen and (max-width: 768px) {
-  /* Prevent any horizontal page shaking or overlapping elements */
+  /* Prevent browser painting failure across long scrolls */
   html, body {
-    overflow-x: hidden;
-    position: relative;
-    width: 100%;
+    overflow-x: clip !important;
+    position: static !important;
+    width: 100% !important;
+    min-height: 100% !important;
+    contain: paint;
   }
 
   /* Top announcement bar clean single view */
