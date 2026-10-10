@@ -111,8 +111,6 @@ html {
   font-size: 16px;
   scroll-behavior: smooth;
   -webkit-text-size-adjust: 100%;
-  overflow-x: clip; /* 'clip' prevents clipping children compared to 'hidden' */
-  height: 100%;
 }
 
 body {
@@ -120,17 +118,14 @@ body {
   background-color: var(--bg-core);
   color: var(--text-primary);
   line-height: 1.55;
-  overflow-x: clip;
+  width: 100%;
   position: relative;
-  min-height: 100%;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
 body.modal-open {
-  overflow: hidden !important;
-  touch-action: none;
-  height: 100%;
+  overflow: hidden;
 }
 
 a {
@@ -183,28 +178,30 @@ textarea {
    -------------------------------------------------------------------------- */
 .floating-sound-pill {
   position: fixed;
-  bottom: 30px;
-  right: 20px;
-  z-index: 998;
-  display: inline-flex;
+  bottom: 24px;
+  right: 16px;
+  z-index: 9999;
+  display: inline-flex !important;
   align-items: center;
   gap: 8px;
   padding: 8px 14px;
-  background: #251710;
+  background: #24160f !important;
   border: 1.5px solid var(--gold-primary);
   border-radius: var(--radius-pill);
   color: var(--gold-light);
   font-size: 0.78rem;
   font-weight: 700;
   letter-spacing: 0.04em;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.6);
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.85);
+  cursor: pointer;
   transition: bottom 0.25s ease, transform var(--trans-smooth);
   transform: translateZ(0);
+  -webkit-transform: translateZ(0);
 }
 
 .floating-sound-pill:hover {
-  transform: translateY(-2px) scale(1.02);
-  background: #2a1f18;
+  background: #2e1c13 !important;
+  transform: translateY(-2px);
 }
 
 .floating-sound-pill.playing {
@@ -212,9 +209,8 @@ textarea {
   color: #86efac;
 }
 
-/* When mobile cart bar is active, place sound button well above it (120px) so it NEVER overlaps View Cart */
 body.has-mobile-cart .floating-sound-pill {
-  bottom: 120px !important;
+  bottom: 90px !important;
 }
 
 .action-toast {
@@ -225,12 +221,10 @@ body.has-mobile-cart .floating-sound-pill {
   z-index: 2500;
   min-width: 320px;
   max-width: 90vw;
-  background: rgba(33, 24, 18, 0.97);
+  background: #211812;
   border: 1px solid var(--border-medium);
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-elevated);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
   opacity: 0;
   pointer-events: none;
   transition: bottom 0.35s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s ease;
@@ -295,7 +289,6 @@ body.has-mobile-cart .floating-sound-pill {
   transition: background 0.4s ease, border-color 0.4s ease, box-shadow 0.4s ease;
 }
 
-/* Highlighted top section when 10% off is claimed */
 .top-announcement-bar.loyal-banner {
   background: linear-gradient(90deg, #1c351e 0%, #29542a 50%, #1c351e 100%) !important;
   border-bottom: 2px solid #52b758 !important;
@@ -370,7 +363,7 @@ body.has-mobile-cart .floating-sound-pill {
 }
 
 /* --------------------------------------------------------------------------
-   5. UNIFIED SITE HEADER (DISTINGUISHABLE TEAK WOOD COLOR & MULTI-ROW STRUCTURE)
+   5. UNIFIED SITE HEADER
    -------------------------------------------------------------------------- */
 .site-header {
   position: sticky;
@@ -389,7 +382,6 @@ body.has-mobile-cart .floating-sound-pill {
   flex-direction: column;
 }
 
-/* Main Header Row */
 .header-main-row {
   display: flex;
   align-items: center;
@@ -409,13 +401,12 @@ body.has-mobile-cart .floating-sound-pill {
   flex-shrink: 0;
 }
 
-/* Logo: Pure Black Background with Gold Border */
 .logo-wrap {
   width: 52px;
   height: 52px;
   border-radius: 8px;
   overflow: hidden;
-  background: #000000; /* Pure black background as requested */
+  background: #000000;
   border: 2px solid var(--gold-primary);
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.8), 0 0 10px rgba(229, 169, 59, 0.4);
   display: flex;
@@ -445,7 +436,6 @@ body.has-mobile-cart .floating-sound-pill {
   font-weight: 900;
   letter-spacing: 0.08em;
   color: var(--gold-light);
-  text-shadow: 0 2px 4px rgba(0,0,0,0.85);
   line-height: 1.1;
 }
 
@@ -458,7 +448,6 @@ body.has-mobile-cart .floating-sound-pill {
   display: block;
 }
 
-/* Header Live Search Bar */
 .header-search-bar {
   flex: 1;
   max-width: 460px;
@@ -477,7 +466,7 @@ body.has-mobile-cart .floating-sound-pill {
   font-weight: 500;
   color: #ffffff;
   transition: all var(--trans-fast);
-  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.7), 0 0 8px rgba(229, 169, 59, 0.12);
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.7);
 }
 
 .header-search-bar input::placeholder {
@@ -487,11 +476,9 @@ body.has-mobile-cart .floating-sound-pill {
 .header-search-bar input:focus {
   border-color: #f5bc51;
   background: #1c100a;
-  box-shadow: 0 0 0 3px rgba(229, 169, 59, 0.35), inset 0 2px 4px rgba(0, 0, 0, 0.6);
   outline: none;
 }
 
-/* Themed Gold/Brass Search Icon */
 .header-search-bar .search-icon {
   position: absolute;
   right: 15px;
@@ -507,10 +494,8 @@ body.has-mobile-cart .floating-sound-pill {
 .header-search-bar .search-icon svg {
   display: block;
   stroke: var(--gold-primary);
-  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.5));
 }
 
-/* Header Right Actions Cluster */
 .header-right-actions {
   display: flex;
   align-items: center;
@@ -519,7 +504,6 @@ body.has-mobile-cart .floating-sound-pill {
   margin-left: auto;
 }
 
-/* Deliver To Location Pill */
 .btn-location-header {
   display: inline-flex;
   align-items: center;
@@ -565,7 +549,6 @@ body.has-mobile-cart .floating-sound-pill {
   font-weight: 800;
 }
 
-/* Login Button in Header: Relevant artisanal amber/dark teak style */
 .auth-pill-container {
   position: relative;
 }
@@ -585,14 +568,13 @@ body.has-mobile-cart .floating-sound-pill {
   cursor: pointer;
   transition: all var(--trans-fast);
   white-space: nowrap;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(229, 169, 59, 0.25);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
 }
 
 .btn-auth-pill:hover {
   border-color: #f5bc51;
   color: #ffffff;
   background: linear-gradient(135deg, #4d2e1b 0%, #2e180d 100%);
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.65), 0 0 12px rgba(229, 169, 59, 0.35);
   transform: translateY(-1px);
 }
 
@@ -644,7 +626,6 @@ body.has-mobile-cart .floating-sound-pill {
   margin-top: 4px;
 }
 
-/* Cart Trigger Button: Positioned on the far right */
 .cart-trigger-btn {
   display: inline-flex;
   align-items: center;
@@ -657,7 +638,7 @@ body.has-mobile-cart .floating-sound-pill {
   font-weight: 900;
   font-size: 0.86rem;
   letter-spacing: 0.04em;
-  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.5), 0 0 10px rgba(212, 154, 55, 0.3);
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.5);
   border: 1.5px solid #f5bc51;
   cursor: pointer;
   white-space: nowrap;
@@ -668,7 +649,6 @@ body.has-mobile-cart .floating-sound-pill {
 .cart-trigger-btn:hover {
   background: linear-gradient(135deg, #f5bc51 0%, #bf7e16 100%);
   transform: translateY(-1px);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.7), 0 0 16px rgba(245, 188, 81, 0.45);
 }
 
 .cart-badge-count {
@@ -686,7 +666,7 @@ body.has-mobile-cart .floating-sound-pill {
 }
 
 /* --------------------------------------------------------------------------
-   6. SUB-NAVBAR ROW (BELOW HEADER, STARTING FROM PURE OILS)
+   6. SUB-NAVBAR ROW
    -------------------------------------------------------------------------- */
 .sub-nav-bar {
   background: #170d07;
@@ -738,7 +718,6 @@ body.has-mobile-cart .floating-sound-pill {
   font-weight: 800;
 }
 
-/* Live Search Dropdown */
 .live-search-dropdown {
   position: absolute;
   top: calc(100% + 8px);
@@ -747,7 +726,7 @@ body.has-mobile-cart .floating-sound-pill {
   background: #241710;
   border: 1px solid var(--border-medium);
   border-radius: var(--radius-md);
-  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.75), 0 0 16px rgba(229, 169, 59, 0.2);
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.75);
   z-index: 1050;
   overflow: hidden;
   max-height: 440px;
@@ -870,9 +849,7 @@ body.has-mobile-cart .floating-sound-pill {
 .cart-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.78);
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
+  background: rgba(0, 0, 0, 0.85);
   z-index: 1100;
   opacity: 0;
   pointer-events: none;
@@ -893,7 +870,7 @@ body.has-mobile-cart .floating-sound-pill {
   height: 100vh;
   background: #1c110b;
   border-left: 1.5px solid var(--border-medium);
-  box-shadow: -8px 0 32px rgba(0, 0, 0, 0.8), 0 0 20px rgba(229, 169, 59, 0.2);
+  box-shadow: -8px 0 32px rgba(0, 0, 0, 0.8);
   z-index: 1150;
   display: flex;
   flex-direction: column;
@@ -1103,7 +1080,7 @@ body.has-mobile-cart .floating-sound-pill {
   padding: 15px;
   border-radius: var(--radius-sm);
   border: 1.5px solid #f5bc51;
-  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.65), 0 0 16px rgba(212, 154, 55, 0.35);
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.65);
   cursor: pointer;
   transition: all var(--trans-fast);
 }
@@ -1111,11 +1088,10 @@ body.has-mobile-cart .floating-sound-pill {
 .btn-checkout:hover {
   background: linear-gradient(135deg, #f5bc51 0%, #bf7e16 100%);
   transform: translateY(-1px);
-  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.8), 0 0 22px rgba(245, 188, 81, 0.5);
 }
 
 /* --------------------------------------------------------------------------
-   8. HERO SECTION (VIDEO WITH BOTTOM-LEFT TEXT SEAL)
+   8. HERO SECTION
    -------------------------------------------------------------------------- */
 .hero-royal-kitchen-section {
   position: relative;
@@ -1153,7 +1129,7 @@ body.has-mobile-cart .floating-sound-pill {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  background: rgba(42, 26, 17, 0.85);
+  background: #2a1a11;
   border: 1.5px solid var(--border-brass);
   color: var(--gold-light);
   font-size: 0.74rem;
@@ -1163,7 +1139,7 @@ body.has-mobile-cart .floating-sound-pill {
   padding: 6px 16px;
   border-radius: var(--radius-pill);
   margin-bottom: 20px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.5), 0 0 10px rgba(229, 169, 59, 0.2);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.5);
 }
 
 .heritage-gem-icon {
@@ -1178,7 +1154,6 @@ body.has-mobile-cart .floating-sound-pill {
   line-height: 1.2;
   letter-spacing: 0.02em;
   margin-bottom: 18px;
-  text-shadow: 0 2px 14px rgba(0, 0, 0, 0.6);
 }
 
 .hero-royal-lead {
@@ -1236,7 +1211,7 @@ body.has-mobile-cart .floating-sound-pill {
   padding: 14px 28px;
   border-radius: var(--radius-xs);
   border: 1.5px solid #f5bc51;
-  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.6), 0 0 14px rgba(212, 154, 55, 0.35);
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.6);
   cursor: pointer;
   transition: all var(--trans-smooth);
 }
@@ -1244,7 +1219,6 @@ body.has-mobile-cart .floating-sound-pill {
 .btn-royal-primary:hover {
   background: linear-gradient(135deg, #f5bc51 0%, #bf7e16 100%);
   transform: translateY(-2px);
-  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.75), 0 0 20px rgba(245, 188, 81, 0.5);
 }
 
 .hero-video-card-frame {
@@ -1255,7 +1229,7 @@ body.has-mobile-cart .floating-sound-pill {
   border: 2px solid var(--border-medium);
   border-radius: var(--radius-md);
   overflow: hidden;
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.85), 0 0 25px rgba(229, 169, 59, 0.15);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.85);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1279,14 +1253,13 @@ body.has-mobile-cart .floating-sound-pill {
   z-index: 2;
 }
 
-/* SEAL TEXT: Positioned to the bottom-left of the video (Logo is at right) */
 .hero-video-royal-seal {
   position: absolute;
   bottom: 12px;
   left: 12px;
   right: auto;
   z-index: 5;
-  background: rgba(20, 13, 9, 0.9);
+  background: #140d09;
   border: 1.5px solid var(--border-brass);
   color: var(--gold-light);
   padding: 5px 14px;
@@ -1294,13 +1267,11 @@ body.has-mobile-cart .floating-sound-pill {
   font-size: 0.72rem;
   font-weight: 800;
   letter-spacing: 0.08em;
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
 }
 
 /* --------------------------------------------------------------------------
-   9. PRODUCTS SECTION & CENTERED HEADERS
+   9. PRODUCTS SECTION & PRODUCT CARDS
    -------------------------------------------------------------------------- */
 .products-section {
   max-width: 1440px;
@@ -1308,7 +1279,6 @@ body.has-mobile-cart .floating-sound-pill {
   padding: 30px 24px 70px;
 }
 
-/* Wood-Pressed Pure Oils Centered Header (Requirement 13) */
 .products-header-centered {
   text-align: center;
   max-width: 760px;
@@ -1331,7 +1301,6 @@ body.has-mobile-cart .floating-sound-pill {
   line-height: 1.5;
 }
 
-/* Category Filter Bar */
 .category-filter-bar {
   display: flex;
   align-items: center;
@@ -1397,14 +1366,14 @@ body.has-mobile-cart .floating-sound-pill {
   display: flex;
   flex-direction: column;
   position: relative;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.65), inset 0 1px 0 rgba(229, 169, 59, 0.15);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.65);
   transition: transform var(--trans-smooth), box-shadow var(--trans-smooth), border-color var(--trans-fast);
 }
 
 .product-card:hover {
   transform: translateY(-4px);
   border-color: var(--gold-primary);
-  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.8), 0 0 18px rgba(229, 169, 59, 0.3);
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.8);
 }
 
 .card-badge {
@@ -1445,7 +1414,6 @@ body.has-mobile-cart .floating-sound-pill {
   max-height: 100%;
   object-fit: contain;
   transition: transform var(--trans-smooth);
-  /* Removed drop-shadow filter: stops mobile GPU render crashes */
 }
 
 .product-card:hover .card-image-wrap img.product-img {
@@ -1598,7 +1566,6 @@ body.has-mobile-cart .floating-sound-pill {
 
 .badge-reorder-perk:hover {
   background: #4a2e1d;
-  box-shadow: 0 0 8px rgba(229, 169, 59, 0.3);
   transform: scale(1.03);
 }
 
@@ -1678,14 +1645,13 @@ body.has-mobile-cart .floating-sound-pill {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5), 0 0 10px rgba(212, 154, 55, 0.25);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
   transition: all var(--trans-fast);
 }
 
 .btn-card-buynow:hover {
   background: linear-gradient(135deg, #f5bc51 0%, #bf7e16 100%);
   transform: translateY(-1px);
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.65), 0 0 16px rgba(245, 188, 81, 0.4);
 }
 
 .stepper-active-box {
@@ -1790,7 +1756,7 @@ body.has-mobile-cart .floating-sound-pill {
   background: #120a06;
   border-radius: var(--radius-lg);
   border: 1.5px solid var(--border-medium);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7), inset 0 0 40px rgba(0, 0, 0, 0.9);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7);
   padding: 24px;
 }
 
@@ -1829,7 +1795,7 @@ body.has-mobile-cart .floating-sound-pill {
 .design-feature-card:hover {
   transform: translateX(4px);
   border-color: var(--gold-primary);
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.7), 0 0 12px rgba(229, 169, 59, 0.2);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.7);
 }
 
 .feature-tag {
@@ -1855,7 +1821,7 @@ body.has-mobile-cart .floating-sound-pill {
 }
 
 /* --------------------------------------------------------------------------
-   11. VALUE COMBO COMPONENT (ALL TEXT CENTERED - REQUIREMENT 14)
+   11. VALUE COMBO COMPONENT
    -------------------------------------------------------------------------- */
 .combo-section {
   max-width: 1240px;
@@ -1869,10 +1835,9 @@ body.has-mobile-cart .floating-sound-pill {
   border-radius: var(--radius-xl);
   padding: 44px 36px 36px;
   position: relative;
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.8), 0 0 20px rgba(229, 169, 59, 0.25);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.8);
 }
 
-/* Centered Badge */
 .combo-badge {
   position: absolute;
   top: -14px;
@@ -1907,7 +1872,6 @@ body.has-mobile-cart .floating-sound-pill {
   align-items: center;
   justify-content: center;
   padding: 10px;
-  box-shadow: inset 0 2px 10px rgba(0, 0, 0, 0.6);
 }
 
 .combo-all-labels-img {
@@ -1927,7 +1891,7 @@ body.has-mobile-cart .floating-sound-pill {
   bottom: 12px;
   left: 50%;
   transform: translateX(-50%);
-  background: rgba(20, 13, 9, 0.9);
+  background: #140d09;
   border: 1px solid var(--gold-primary);
   color: var(--gold-light);
   font-size: 0.75rem;
@@ -1937,7 +1901,6 @@ body.has-mobile-cart .floating-sound-pill {
   white-space: nowrap;
 }
 
-/* ALL ESSENTIAL KITCHEN TRIO TEXT TO THE CENTER (Requirement 14) */
 .combo-info-col {
   display: flex;
   flex-direction: column;
@@ -2093,18 +2056,17 @@ body.has-mobile-cart .floating-sound-pill {
   border-radius: var(--radius-xs);
   cursor: pointer;
   border: 1.5px solid #f5bc51;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6), 0 0 12px rgba(212, 154, 55, 0.3);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6);
   transition: all var(--trans-fast);
 }
 
 .btn-fk-orange:hover {
   background: linear-gradient(135deg, #f5bc51 0%, #bf7e16 100%);
   transform: translateY(-1px);
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.75), 0 0 18px rgba(245, 188, 81, 0.45);
 }
 
 /* --------------------------------------------------------------------------
-   12. CULINARY SHOWCASE (VERTICAL CARDS TO FIT BOTTLE LABEL - REQUIREMENT 15)
+   12. CULINARY SHOWCASE
    -------------------------------------------------------------------------- */
 .culinary-section {
   max-width: 1440px;
@@ -2118,7 +2080,6 @@ body.has-mobile-cart .floating-sound-pill {
   gap: 24px;
 }
 
-/* Vertical portrait cards */
 .label-feature-card {
   background: #24160f;
   border: 1.5px solid var(--border-medium);
@@ -2135,7 +2096,6 @@ body.has-mobile-cart .floating-sound-pill {
   border-color: var(--gold-primary);
 }
 
-/* Vertical portrait aspect ratio to fit bottle labels properly */
 .label-img-box {
   width: 100%;
   aspect-ratio: 3 / 4;
@@ -2278,7 +2238,6 @@ body.has-mobile-cart .floating-sound-pill {
   color: #e5a93b;
   font-size: 1.05rem;
   letter-spacing: 3px;
-  text-shadow: 0 0 8px rgba(229, 169, 59, 0.4);
 }
 
 .btn-admin-delete {
@@ -2366,7 +2325,6 @@ body.has-mobile-cart .floating-sound-pill {
   border-color: var(--gold-primary);
   outline: none;
   background: #24160f;
-  box-shadow: 0 0 0 3px rgba(229, 169, 59, 0.2);
 }
 
 .btn-submit-review {
@@ -2500,7 +2458,7 @@ body.has-mobile-cart .floating-sound-pill {
 }
 
 /* --------------------------------------------------------------------------
-   15. BENCHMARK COMPARISON TABLE (FULLY VISIBLE ON MOBILE - REQUIREMENT 16)
+   15. BENCHMARK COMPARISON TABLE
    -------------------------------------------------------------------------- */
 .benchmark-section {
   background: #190f09;
@@ -2513,12 +2471,12 @@ body.has-mobile-cart .floating-sound-pill {
   max-width: 980px;
   margin: 0 auto;
   width: 100%;
-  overflow-x: hidden; /* Fully visible in single view without horizontal scroll */
+  overflow-x: hidden;
 }
 
 .comparison-table {
   width: 100%;
-  table-layout: fixed; /* Ensures all columns fit within viewport without overflowing */
+  table-layout: fixed;
   border-collapse: collapse;
   background: #22160f;
   border: 1.5px solid var(--border-medium);
@@ -2650,16 +2608,16 @@ body.has-mobile-cart .floating-sound-pill {
 .modal-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(15, 23, 42, 0.65);
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
+  background: rgba(10, 6, 4, 0.85);
   z-index: 1200;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 20px;
+  padding: 16px;
   opacity: 0;
   pointer-events: none;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   transition: opacity var(--trans-smooth);
 }
 
@@ -2672,12 +2630,14 @@ body.has-mobile-cart .floating-sound-pill {
   background: #1c110b;
   border: 1.5px solid var(--border-medium);
   border-radius: var(--radius-xl);
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.85), 0 0 24px rgba(229, 169, 59, 0.25);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.85);
   width: 100%;
   max-width: 620px;
-  max-height: 90vh;
+  max-height: 88vh;
   overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   position: relative;
+  margin: auto;
 }
 
 .modal-header {
@@ -2739,7 +2699,6 @@ body.has-mobile-cart .floating-sound-pill {
   border-color: var(--gold-primary);
   outline: none;
   background: #1f140d;
-  box-shadow: 0 0 0 3px rgba(229, 169, 59, 0.25);
 }
 
 .form-row {
@@ -2772,7 +2731,6 @@ body.has-mobile-cart .floating-sound-pill {
   border-color: var(--gold-primary);
   outline: none;
   background: #1f140d;
-  box-shadow: 0 0 0 3px rgba(229, 169, 59, 0.25);
 }
 
 .field-error-text {
@@ -3416,7 +3374,7 @@ body.has-mobile-cart .floating-sound-pill {
   justify-content: center;
   padding: 14px;
   border: 1.5px solid var(--border-medium);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7), inset 0 2px 10px rgba(0, 0, 0, 0.8);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7);
   position: relative;
   overflow: hidden;
   box-sizing: border-box;
@@ -3428,6 +3386,7 @@ body.has-mobile-cart .floating-sound-pill {
   height: 100%;
   max-height: 100%;
   object-fit: contain;
+  object-position: center;
   display: block;
   margin: 0 auto;
   transition: transform var(--trans-fast);
@@ -3457,7 +3416,6 @@ body.has-mobile-cart .floating-sound-pill {
 .detail-thumb-img.active {
   border-color: #f5bc51;
   background: #331f14;
-  box-shadow: 0 0 10px rgba(229, 169, 59, 0.4);
 }
 
 .detail-info-col {
@@ -3661,7 +3619,7 @@ body.has-mobile-cart .floating-sound-pill {
 }
 
 /* --------------------------------------------------------------------------
-   20B. STICKY BOTTOM ACTION BAR (ADD TO CART + BUY NOW SIDE-BY-SIDE)
+   20B. STICKY BOTTOM ACTION BAR
    -------------------------------------------------------------------------- */
 .pdp-sticky-bottom-bar {
   position: sticky;
@@ -3751,7 +3709,7 @@ body.has-mobile-cart .floating-sound-pill {
   padding: 13px 14px;
   border-radius: var(--radius-xs);
   border: 1.5px solid #f5bc51;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.6), 0 0 12px rgba(212, 154, 55, 0.3);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.6);
   cursor: pointer;
   transition: all var(--trans-fast);
   white-space: nowrap;
@@ -3764,7 +3722,6 @@ body.has-mobile-cart .floating-sound-pill {
 .btn-pdp-buy:hover {
   background: linear-gradient(135deg, #f5bc51 0%, #bf7e16 100%);
   transform: translateY(-1px);
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.75), 0 0 18px rgba(245, 188, 81, 0.45);
 }
 
 /* --------------------------------------------------------------------------
@@ -4077,7 +4034,7 @@ body.has-mobile-cart .floating-sound-pill {
   padding: 15px;
   border-radius: var(--radius-xs);
   border: 1.5px solid #f5bc51;
-  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.6), 0 0 16px rgba(212, 154, 55, 0.35);
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.6);
   cursor: pointer;
   transition: all var(--trans-smooth);
 }
@@ -4085,7 +4042,6 @@ body.has-mobile-cart .floating-sound-pill {
 .btn-submit-order:hover {
   background: linear-gradient(135deg, #f5bc51 0%, #bf7e16 100%);
   transform: translateY(-1px);
-  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.75), 0 0 22px rgba(245, 188, 81, 0.5);
 }
 
 /* --------------------------------------------------------------------------
@@ -4199,7 +4155,6 @@ body.has-mobile-cart .floating-sound-pill {
 .quiz-option-card.selected {
   border-color: var(--gold-primary);
   background: rgba(234, 179, 8, 0.1);
-  box-shadow: 0 0 10px var(--gold-glow);
 }
 
 .quiz-option-card span {
@@ -4655,7 +4610,7 @@ body.has-mobile-cart .floating-sound-pill {
 }
 
 /* --------------------------------------------------------------------------
-   25. BLINKIT-STYLE MOBILE FLOATING CART BAR
+   25. MOBILE FLOATING CART BAR
    -------------------------------------------------------------------------- */
 .mobile-cart-bar {
   display: none;
@@ -4668,7 +4623,7 @@ body.has-mobile-cart .floating-sound-pill {
   padding: 12px 20px;
   border-radius: 12px;
   border: 1.5px solid var(--border-brass);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.85), 0 0 16px rgba(212, 154, 55, 0.3);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.85);
   z-index: 990;
   align-items: center;
   justify-content: space-between;
@@ -4742,7 +4697,7 @@ body.has-mobile-cart .floating-sound-pill {
 }
 
 /* --------------------------------------------------------------------------
-   26. MOBILE RESPONSIVENESS & ZERO-GLITCH STABLE SCROLLING
+   26. MOBILE RESPONSIVENESS & TOUCH OPTIMIZATION
    -------------------------------------------------------------------------- */
 @media screen and (max-width: 1024px) {
   .product-grid {
@@ -4766,16 +4721,13 @@ body.has-mobile-cart .floating-sound-pill {
 }
 
 @media screen and (max-width: 768px) {
-  /* Prevent browser painting failure across long scrolls */
   html, body {
-    overflow-x: clip !important;
-    position: static !important;
-    width: 100% !important;
-    min-height: 100% !important;
-    contain: paint;
+    width: 100%;
+    min-height: 100%;
+    position: static;
+    overflow-x: hidden;
   }
 
-  /* Top announcement bar clean single view */
   .top-announcement-bar {
     min-height: 32px;
     padding: 6px 10px;
@@ -4786,7 +4738,6 @@ body.has-mobile-cart .floating-sound-pill {
     line-height: 1.3;
   }
 
-  /* Clean non-glitch header: Unified sticky container, children positioned naturally */
   .site-header {
     position: sticky;
     top: 0;
@@ -4806,7 +4757,6 @@ body.has-mobile-cart .floating-sound-pill {
     box-sizing: border-box;
   }
 
-  /* Row 1 left: Brand link with Logo, MANOPAVANA, and Tagline strictly below it */
   .brand-link {
     display: flex;
     align-items: center;
@@ -4838,7 +4788,6 @@ body.has-mobile-cart .floating-sound-pill {
     color: var(--gold-light);
   }
 
-  /* Strictly display tagline below MANOPAVANA */
   .brand-tagline {
     display: block !important;
     font-size: 0.58rem;
@@ -4850,12 +4799,10 @@ body.has-mobile-cart .floating-sound-pill {
     letter-spacing: 0.01em;
   }
 
-  /* Header Search & Deliver-To Cluster on mobile */
   .header-search-location-wrap {
-    display: contents; /* Allows child Deliver-To and Search bar to participate directly in the layout */
+    display: contents;
   }
 
-  /* Search bar strictly to the right of brand in Row 1 */
   .header-search-bar {
     flex: 1 1 140px;
     min-width: 130px;
@@ -4877,7 +4824,6 @@ body.has-mobile-cart .floating-sound-pill {
     right: 10px;
   }
 
-  /* Row 2: Location Deliver-To Pill on left, Login and Cart on rightmost */
   .btn-location-header {
     order: 3;
     flex: 1 1 auto;
@@ -4917,7 +4863,6 @@ body.has-mobile-cart .floating-sound-pill {
     white-space: nowrap;
   }
 
-  /* Right Actions: Login & Cart */
   .header-right-actions {
     order: 4;
     display: flex;
@@ -4976,7 +4921,6 @@ body.has-mobile-cart .floating-sound-pill {
     padding: 1px 6px;
   }
 
-  /* Sub-nav horizontal strip below */
   .sub-nav-bar {
     border-top: 1px solid rgba(229, 169, 59, 0.12);
     background: #140c07;
@@ -4992,7 +4936,6 @@ body.has-mobile-cart .floating-sound-pill {
     padding: 4px 10px;
   }
 
-  /* Hero Section Mobile */
   .hero-royal-kitchen-section {
     padding: 24px 14px 30px;
   }
@@ -5056,7 +4999,6 @@ body.has-mobile-cart .floating-sound-pill {
     padding: 4px 10px;
   }
 
-  /* Catalog Grids */
   .product-grid,
   .label-showcase-grid,
   .loyalty-steps-grid {
@@ -5075,7 +5017,6 @@ body.has-mobile-cart .floating-sound-pill {
     min-height: 280px;
   }
 
-  /* Value Combo Mobile */
   .combo-card {
     padding: 24px 16px;
   }
@@ -5105,7 +5046,6 @@ body.has-mobile-cart .floating-sound-pill {
     text-align: center;
   }
 
-  /* Comparison table 100% visible in single view on mobile (Requirement 16) */
   .benchmark-section {
     padding: 45px 12px;
   }
@@ -5142,7 +5082,6 @@ body.has-mobile-cart .floating-sound-pill {
     width: 35% !important;
   }
 
-  /* Vertical Culinary Cards Mobile */
   .label-feature-card {
     max-width: 420px;
     margin: 0 auto;
@@ -5157,7 +5096,7 @@ body.has-mobile-cart .floating-sound-pill {
     grid-template-columns: 1fr;
   }
 
-.product-detail-backdrop {
+  .product-detail-backdrop {
     position: fixed !important;
     inset: 0 !important;
     padding: 0 !important;
@@ -5245,7 +5184,6 @@ body.has-mobile-cart .floating-sound-pill {
 
   .detail-thumb-strip {
     width: 100% !important;
-    max-width: 100% !important;
     box-sizing: border-box !important;
     overflow-x: auto !important;
   }
