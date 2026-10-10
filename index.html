@@ -1,0 +1,1302 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  
+  <!-- Multi-Device Favicon & Brand Icons -->
+  <link rel="icon" type="image/png" sizes="32x32" href="https://pub-9e18bb265ecf4224ae1230cf913745ca.r2.dev/logo2.jpg" />
+  <link rel="icon" type="image/png" sizes="16x16" href="https://pub-9e18bb265ecf4224ae1230cf913745ca.r2.dev/logo2.jpg" />
+  <link rel="apple-touch-icon" sizes="180x180" href="https://pub-9e18bb265ecf4224ae1230cf913745ca.r2.dev/logo2.jpg" />
+  <link rel="shortcut icon" type="image/x-icon" href="https://pub-9e18bb265ecf4224ae1230cf913745ca.r2.dev/logo2.jpg" />
+  
+  <title>MANOPAVANA - Traditional Wood-Pressed Oils</title>
+  <meta name="description" content="Authentic wood-pressed cooking oils delivered doorstep. Cold pressed groundnut, coconut, sesame oils crafted with traditional methods." />
+  <meta property="og:title" content="MANOPAVANA - Traditional Wood-Pressed Oils" />
+  <meta property="og:description" content="Authentic wood-pressed cooking oils delivered doorstep. Cold pressed groundnut, coconut, sesame oils crafted with traditional methods." />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800;900&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+
+  <!-- Leaflet Interactive Maps CSS & JS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
+  <!-- Firebase Official Web SDK (Compat Builds) -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+
+  <link rel="stylesheet" href="/style.css" />
+</head>
+
+<body>
+
+  <!-- Background Ambient Audio Engine -->
+  <audio id="heroBgAudio" loop preload="auto">
+    <source src="https://pub-9e18bb265ecf4224ae1230cf913745ca.r2.dev/marada_gaana_beat.mp3" type="audio/mp3" />
+  </audio>
+
+  <!-- Persistent Sound Control Pill -->
+  <button id="soundToggleBtn" class="floating-sound-pill" type="button" aria-label="Toggle Sound">
+    <span id="soundIcon">🔊</span>
+    <span id="soundText">Sound On</span>
+  </button>
+
+  <!-- Notification Toast -->
+  <div id="actionToast" class="action-toast" aria-live="polite">
+    <div class="action-toast-inner">
+      <span id="actionToastIcon" class="action-toast-icon">✨</span>
+      <div class="action-toast-content">
+        <strong id="actionToastTitle">Notification</strong>
+        <p id="actionToastMessage">Action completed successfully.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Topmost Announcement Bar: Centered single line with distinguishable background -->
+  <div id="topAnnouncementBar" class="top-announcement-bar">
+    <div class="announcement-content-wrap">
+      <div class="announcement-ticker-track" id="announcementText">
+        <span class="announcement-item">🚚 <strong>FREE Doorstep Delivery across Bangalore (24–72 hours) on above 500</strong></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Unified Site Header -->
+  <header class="site-header">
+    <div class="header-inner">
+      <!-- Row 1: Brand on left, Search Bar, and Rightmost Actions -->
+      <div class="header-main-row">
+        <!-- Brand Link: Logo with black background, Name, Tagline strictly below name -->
+        <a href="#" class="brand-link" title="MANOPAVANA - Traditional Wood-Pressed Oils">
+          <div class="logo-wrap">
+            <img src="https://pub-9e18bb265ecf4224ae1230cf913745ca.r2.dev/logo2.jpg" onerror="this.src='https://pub-9e18bb265ecf4224ae1230cf913745ca.r2.dev/logo2.jpg'" alt="MANOPAVANA Logo" class="site-logo" />
+          </div>
+          <div class="brand-text-wrap">
+            <span class="brand-name">MANOPAVANA</span>
+            <span class="brand-tagline">Pure by nature, trusted for life</span>
+          </div>
+        </a>
+
+        <!-- Search & Deliver-To Cluster -->
+        <div class="header-search-location-wrap">
+          <!-- Deliver To Location Pill -->
+          <button type="button" id="headerLocationTrigger" class="btn-location-header" onclick="openLocationCheckModal()" title="Change delivery location">
+            <span class="loc-pin-icon">📍</span>
+            <div class="loc-text-col">
+              <span class="loc-sub">Deliver to</span>
+              <strong id="headerLocationLabel">Bangalore (560xxx)</strong>
+            </div>
+          </button>
+
+          <!-- Themed Search Bar with gold vector search icon -->
+          <div class="header-search-bar" id="headerSearchBar">
+            <input type="text" id="storeSearchInput" placeholder="Search Wood-Pressed Groundnut, Coconut, Sesame oil..." oninput="handleCatalogSearch(this.value)" onfocus="handleSearchFocus()" onkeydown="handleSearchKeyDown(event)" autocomplete="off" />
+            <span class="search-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="11" cy="11" r="7.5"></circle>
+                <line x1="21" y1="21" x2="16.5" y2="16.5"></line>
+              </svg>
+            </span>
+            <div id="liveSearchResults" class="live-search-dropdown" style="display: none;"></div>
+          </div>
+        </div>
+
+        <!-- Rightmost Cluster: Login Button & Cart Button -->
+        <div class="header-right-actions" id="headerRightActions">
+          <!-- Login Button with relevant background color -->
+          <div class="auth-pill-container" id="authPillContainer">
+            <button type="button" id="authPillBtn" class="btn-auth-pill" onclick="handleAuthPillClick()">
+              <span id="authPillLabel">👤 Login</span>
+            </button>
+            
+            <div id="authDropdownMenu" class="auth-dropdown-menu">
+              <div id="authUserMeta" class="auth-user-meta">Welcome to MANOPAVANA</div>
+              <a href="javascript:void(0)" onclick="openAccountDashboard('profile')">👤 My Profile</a>
+              <a href="javascript:void(0)" onclick="openAccountDashboard('orders')">📦 My Orders</a>
+              <a href="javascript:void(0)" onclick="openAccountDashboard('addresses')">📍 Delivery Address</a>
+              <a href="javascript:void(0)" onclick="openBottleClaimModal()">🏷️ 10% Loyalty QR</a>
+              <a href="javascript:void(0)" onclick="handleSignOut()" class="auth-logout-link" id="authLogoutItem" style="display:none;">🚪 Logout</a>
+            </div>
+          </div>
+
+          <!-- Cart Button: Placed at the rightmost of the navbar -->
+          <button id="openCartBtn" class="cart-trigger-btn" type="button" aria-label="Open Cart Drawer">
+            <span class="cart-icon-graphic">🛒</span>
+            <span class="cart-label-text">Cart</span>
+            <span id="cartCountBadge" class="cart-badge-count">0</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Secondary Sub-Nav Row starting from Pure Oils -->
+      <nav class="sub-nav-bar" id="subNavBar">
+        <div class="sub-nav-inner">
+          <a href="#products" class="sub-nav-link active" onclick="handleSubNavClick(event, this)">Pure Oils</a>
+          <a href="#combo" class="sub-nav-link" onclick="handleSubNavClick(event, this)">Value Combo</a>
+          <a href="#bottle-design" class="sub-nav-link" onclick="handleSubNavClick(event, this)">Bottle Design</a>
+          <a href="#culinary" class="sub-nav-link" onclick="handleSubNavClick(event, this)">Good Food Starts Here</a>
+          <a href="#reviews" class="sub-nav-link" onclick="handleSubNavClick(event, this)">Reviews</a>
+          <a href="#loyalty" class="sub-nav-link" onclick="handleSubNavClick(event, this)">10% Reorder</a>
+          <a href="#benchmark" class="sub-nav-link" onclick="handleSubNavClick(event, this)">Why Wood Pressed</a>
+          <a href="#faqs" class="sub-nav-link" onclick="handleSubNavClick(event, this)">FAQs</a>
+        </div>
+      </nav>
+    </div>
+  </header>
+
+  <!-- Cart Drawer -->
+  <div id="cartBackdrop" class="cart-backdrop"></div>
+  <aside id="cartDrawer" class="cart-drawer" aria-label="Shopping Cart">
+    <div class="cart-header">
+      <div>
+        <h3>My Cart</h3>
+        <button type="button" class="cart-loc-change-btn" onclick="openLocationCheckModal()">
+          📍 Delivery to: <strong id="cartDrawerLocLabel">Bangalore</strong> (Change)
+        </button>
+      </div>
+      <button id="closeCartBtn" class="close-cart-btn" type="button" aria-label="Close Cart">&times;</button>
+    </div>
+
+    <div id="cartItemsList" class="cart-items-list"></div>
+
+    <div class="cart-footer">
+      <!-- Free Delivery Progress Meter -->
+      <div class="free-shipping-progress-container">
+        <div class="free-shipping-label-row">
+          <span id="freeShippingStatusText">🚚 Add ₹500 for FREE Bangalore Delivery</span>
+          <span id="freeShippingPercentText">0%</span>
+        </div>
+        <div class="free-shipping-track">
+          <div id="freeShippingBarFill" class="free-shipping-bar-fill" style="width: 0%;"></div>
+        </div>
+      </div>
+
+      <div class="price-details-title">PRICE DETAILS</div>
+      <div class="summary-row">
+        <span>Price (<span id="cartTotalItems">0</span> items)</span>
+        <span id="cartSubtotal">₹0</span>
+      </div>
+      <div id="discountRow" class="summary-row discount-row" style="display: none;">
+        <span>Bottle Loyalty Discount (10%):</span>
+        <span id="cartDiscount" class="text-green">-₹0</span>
+      </div>
+      <div class="summary-row">
+        <span>Delivery Charges:</span>
+        <span id="cartDeliveryCharge" class="text-green">FREE</span>
+      </div>
+      <div class="summary-row total-row">
+        <span>Total Amount:</span>
+        <span id="cartGrandTotal" class="summary-price">₹0</span>
+      </div>
+      <p id="shippingNote" class="shipping-note text-green">Add ₹500+ for FREE Doorstep Delivery across Bangalore</p>
+      <button id="openCheckoutModalBtn" class="btn-checkout" type="button">
+        PLACE ORDER &rarr;
+      </button>
+    </div>
+  </aside>
+
+  <!-- FLIPKART-STYLE AUTH MODAL -->
+  <div id="authModalBackdrop" class="modal-backdrop">
+    <div class="modal-card fk-auth-modal-card">
+      <button class="close-modal-btn fk-auth-close" onclick="closeAuthModal()" type="button">&times;</button>
+      
+      <div class="fk-auth-sidebar">
+        <h3 id="fkAuthSidebarTitle">Login</h3>
+        <p id="fkAuthSidebarDesc">Access your orders, saved addresses, and authentic wood-pressed oils discounts.</p>
+        <div class="fk-sidebar-illustration">🌿</div>
+      </div>
+
+      <div class="fk-auth-body">
+        <button type="button" class="btn-google-auth" onclick="handleGoogleSignIn()">
+          <svg class="google-icon" viewBox="0 0 48 48">
+            <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+            <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+            <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
+            <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+          </svg>
+          Continue with Google
+        </button>
+
+        <div class="auth-divider">
+          <span>OR</span>
+        </div>
+
+        <form id="authForm" onsubmit="handleUniversalAuthSubmit(event)">
+          <div class="form-group fk-floating-group">
+            <input type="text" id="authIdentifier" class="fk-input" required autocomplete="username" placeholder=" " />
+            <label for="authIdentifier" class="fk-floating-label">Phone Number or Email Address</label>
+          </div>
+
+          <div class="form-group fk-floating-group" id="authPasswordGroup">
+            <input type="password" id="authPassword" class="fk-input" autocomplete="current-password" placeholder=" " />
+            <label for="authPassword" class="fk-floating-label">Password</label>
+            <a href="javascript:void(0)" id="linkForgotPassword" class="fk-forgot-btn" onclick="toggleAuthMode('reset')">Forgot?</a>
+          </div>
+
+          <div id="authErrorMsg" class="form-error-msg"></div>
+          <div id="authSuccessMsg" class="form-success-msg"></div>
+
+          <p class="fk-auth-terms">
+            By continuing, you agree to MANOPAVANA's <a href="javascript:void(0)" onclick="openLegalModal('termsModal')">Terms of Use</a> and <a href="javascript:void(0)" onclick="openLegalModal('privacyModal')">Privacy Policy</a>.
+          </p>
+
+          <button type="submit" id="btnAuthSubmit" class="btn-fk-orange">Continue</button>
+        </form>
+
+        <div class="fk-toggle-switch">
+          <button type="button" id="btnAuthSwitchMode" class="btn-fk-outline" onclick="toggleAuthModeAlternate()">
+            New to MANOPAVANA? Create an account
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FLIPKART-STYLE USER DASHBOARD -->
+  <div id="accountDashboardBackdrop" class="modal-backdrop">
+    <div class="modal-card fk-dashboard-card">
+      <div class="modal-header">
+        <h3 id="dashboardHeading">My Account</h3>
+        <button class="close-modal-btn" onclick="closeAccountDashboard()" type="button">&times;</button>
+      </div>
+      <div class="modal-body fk-dashboard-body">
+        <div class="fk-dash-tabs">
+          <button type="button" id="tabDashOrders" class="fk-tab-btn active" onclick="switchDashboardView('orders')">My Orders</button>
+          <button type="button" id="tabDashProfile" class="fk-tab-btn" onclick="switchDashboardView('profile')">Profile Information</button>
+          <button type="button" id="tabDashAddresses" class="fk-tab-btn" onclick="switchDashboardView('addresses')">Manage Addresses</button>
+        </div>
+
+        <!-- View 1: Orders -->
+        <div id="dashOrdersView" class="fk-tab-content">
+          <div id="dashOrdersLoading" class="orders-loading-state">
+            🔍 Fetching orders from our facility...
+          </div>
+          <div id="dashOrdersList" class="orders-scroll-list" style="display:none;"></div>
+        </div>
+
+        <!-- View 2: Profile -->
+        <div id="dashProfileView" class="fk-tab-content" style="display:none;">
+          <div class="profile-card-fk">
+            <div class="profile-header-bar">
+              <h4>Personal Information</h4>
+              <button type="button" id="btnToggleEditProfile" class="btn-edit-action" onclick="toggleProfileEditMode()">✏️ Edit Profile</button>
+            </div>
+
+            <div id="profileReadState">
+              <div class="profile-field-row">
+                <label>Full Name:</label>
+                <span id="profDisplayName">--</span>
+              </div>
+              <div class="profile-field-row">
+                <label>Phone / WhatsApp:</label>
+                <span id="profPhone">--</span>
+              </div>
+              <div class="profile-field-row">
+                <label>Email Address:</label>
+                <span id="profEmail">--</span>
+              </div>
+              <div class="profile-field-row">
+                <label>Account Status:</label>
+                <span id="profCreated">Active Member</span>
+              </div>
+              <div class="profile-badge-row">
+                <span class="badge-verified-buyer">✓ Verified Customer</span>
+                <span class="badge-loyal" id="profLoyalBadge" style="display:none;">🏷️ 10% Loyalty Active</span>
+              </div>
+            </div>
+
+            <form id="profileEditForm" style="display:none;" onsubmit="saveUserProfileChanges(event)">
+              <div class="form-group">
+                <label for="editProfName">Full Name *</label>
+                <input type="text" id="editProfName" required autocomplete="name" />
+              </div>
+              <div class="form-group">
+                <label for="editProfEmail">Email Address *</label>
+                <input type="email" id="editProfEmail" required autocomplete="email" />
+              </div>
+              <div class="form-group">
+                <label for="editProfPhone">Phone / WhatsApp Number (10 Digits) *</label>
+                <input type="tel" id="editProfPhone" maxlength="10" required autocomplete="tel" />
+              </div>
+              <div class="edit-profile-actions">
+                <button type="submit" class="btn-save-profile">Save Changes</button>
+                <button type="button" class="btn-cancel-profile" onclick="toggleProfileEditMode(false)">Cancel</button>
+              </div>
+            </form>
+          </div>
+        </div>
+
+        <!-- View 3: Addresses -->
+        <div id="dashAddressesView" class="fk-tab-content" style="display:none;">
+          <div id="savedAddressDashboardCard" class="saved-address-card">
+            <div class="saved-address-header">
+              <span class="saved-address-badge">Default Delivery Address</span>
+              <button type="button" class="btn-edit-address" onclick="openDashboardAddressForm()">✏️ Edit / Change</button>
+            </div>
+            <div class="saved-address-content">
+              <strong id="dashAddrName">No address saved yet</strong>
+              <p id="dashAddrText">Add your default Bangalore delivery address below.</p>
+              <span id="dashAddrPhone"></span>
+            </div>
+          </div>
+
+          <form id="dashAddressForm" class="dash-address-form" style="display:none;" onsubmit="saveDashboardAddress(event)">
+            <h4>Update Delivery Address</h4>
+            <div class="form-group">
+              <label for="dashInputName">Contact Full Name *</label>
+              <input type="text" id="dashInputName" required />
+            </div>
+            <div class="form-group">
+              <label for="dashInputPhone">10-Digit Mobile Number *</label>
+              <input type="tel" id="dashInputPhone" maxlength="10" required />
+            </div>
+            <div class="form-group">
+              <label for="dashInputAddress">Complete Street Address (Flat / House No, Building, Landmark) *</label>
+              <textarea id="dashInputAddress" rows="2" required></textarea>
+            </div>
+            <div class="form-row">
+              <div class="form-col">
+                <label for="dashInputCity">City *</label>
+                <input type="text" id="dashInputCity" value="Bengaluru" required />
+              </div>
+              <div class="form-col">
+                <label for="dashInputPincode">Bangalore Pincode (6 Digits) *</label>
+                <input type="text" id="dashInputPincode" maxlength="6" value="560058" required />
+              </div>
+            </div>
+            <div class="edit-profile-actions">
+              <button type="submit" class="btn-save-profile">Save Delivery Address</button>
+              <button type="button" class="btn-cancel-profile" onclick="closeDashboardAddressForm()">Cancel</button>
+            </div>
+          </form>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- Location Verification Modal -->
+  <div id="locationModalBackdrop" class="modal-backdrop">
+    <div class="modal-card fk-location-modal-card">
+      <div class="modal-header">
+        <h3>📍 Select Delivery Location</h3>
+        <button class="close-modal-btn" onclick="closeLocationCheckModal()" type="button">&times;</button>
+      </div>
+      <div class="modal-body location-modal-body">
+        <p class="location-check-sub">
+          Freshly wood-pressed, naturally settled, and packed at our Bangalore facility. Delivered in 24–72 hours across Bangalore:
+        </p>
+        
+        <div class="location-input-row">
+          <input type="text" id="pincodeCheckInput" maxlength="6" placeholder="Enter 6-digit Pincode (e.g. 560058)" />
+          <button type="button" class="btn-gps-inline" onclick="detectUserGeolocation(true)">📍 Use GPS</button>
+          <button type="button" class="btn-check-pincode" onclick="submitPincodeCheck()">Verify</button>
+        </div>
+
+        <div class="form-group map-form-group">
+          <div class="map-label-bar">
+            <span class="map-label">Drag pin to your exact building:</span>
+            <span id="onboardMapCoordsBadge" class="map-coords-badge">Centering on Bangalore</span>
+          </div>
+          <div id="onboardingMap" class="delivery-map-canvas"></div>
+        </div>
+
+        <div id="pincodeCheckResultBox" class="pincode-result-box" style="display: none;"></div>
+        
+        <div class="location-info-pills">
+          <div class="info-loc-chip">
+            <span>🏡</span>
+            <div>
+              <strong>Bangalore (560xxx)</strong>
+              <small>Doorstep Delivery (24–72h) • Direct Website Checkout</small>
+            </div>
+          </div>
+          <div class="info-loc-chip">
+            <span>🛒</span>
+            <div>
+              <strong>Rest of India</strong>
+              <small>Fulfilled securely via our Official Flipkart Store</small>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Dedicated Bottle Quiz Modal (10% Loyalty QR) -->
+  <div id="bottleQuizModalBackdrop" class="modal-backdrop">
+    <div class="modal-card onboarding-modal-card">
+      <div class="modal-header">
+        <h3>🏷️ Bottle Loyalty Discount (10% OFF)</h3>
+        <button class="close-modal-btn" onclick="closeBottleQuizModal()" type="button">&times;</button>
+      </div>
+      <div class="modal-body onboarding-modal-body">
+        <div class="onboarding-badge-icon">🏷️</div>
+        <h4>Have a MANOPAVANA Bottle at Home?</h4>
+        <p class="onboarding-subtext">
+          Select your bottle and answer the quick front-label question to unlock <strong>10% OFF</strong> across all your repeat orders for 7 days.
+        </p>
+
+        <div class="bottle-quiz-type-selector">
+          <label class="bottle-quiz-label">Select Your Bottle:</label>
+          <div class="bottle-quiz-pills">
+            <button type="button" class="quiz-bottle-pill active" id="onboardPillGroundnut" onclick="selectOnboardingQuizBottle('groundnut')">Groundnut Oil</button>
+            <button type="button" class="quiz-bottle-pill" id="onboardPillCoconut" onclick="selectOnboardingQuizBottle('coconut')">Coconut Oil</button>
+            <button type="button" class="quiz-bottle-pill" id="onboardPillSesame" onclick="selectOnboardingQuizBottle('sesame')">Sesame Oil</button>
+          </div>
+        </div>
+
+        <div class="bottle-label-quiz-stage">
+          <div class="label-hint-strip">
+            <span class="label-hint-icon">🔍</span>
+            <span id="onboardQuizHintText">Inspect your bottle label:</span>
+          </div>
+          <div class="quiz-question-box">
+            <p class="quiz-question-title" id="onboardQuizQuestionText">Loading label question...</p>
+            <div class="quiz-options-list" id="onboardQuizOptionsContainer"></div>
+          </div>
+          
+          <div class="quiz-attempt-strip">
+            <span id="onboardAttemptBadge" class="attempt-badge">⚠️ 2 chances left to claim 10% OFF</span>
+          </div>
+
+          <div id="onboardQuizFeedbackBox" class="quiz-feedback-box"></div>
+          
+          <button type="button" id="btnSubmitOnboardQuiz" class="btn-verify-quiz-submit" onclick="submitOnboardingBottleQuiz()">
+            Verify &amp; Activate 10% Discount ⚡
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FLIPKART-STYLE PRODUCT DETAIL PAGE MODAL -->
+  <div id="productDetailModalBackdrop" class="modal-backdrop product-detail-backdrop">
+    <div class="modal-card fk-product-detail-card">
+      <div class="modal-header fk-detail-header">
+        <span class="fk-brand-pill">MANOPAVANA OFFICIAL STORE</span>
+        <button id="closeDetailModalBtn" class="close-modal-btn" onclick="closeProductDetailModal()" type="button">&times;</button>
+      </div>
+      
+      <div class="modal-body fk-detail-body" id="modalProductDetailBody"></div>
+    </div>
+  </div>
+
+  <!-- Checkout Modal -->
+  <div id="checkoutModalBackdrop" class="modal-backdrop">
+    <div class="modal-card checkout-modal-card-extended">
+      <div class="modal-header">
+        <h3 id="modalCheckoutTitle">Delivery &amp; Payment Details</h3>
+        <button id="closeModalBtn" class="close-modal-btn" type="button">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div id="checkoutOrderPreview" class="checkout-order-preview"></div>
+
+        <div id="savedAddressSummaryCard" class="saved-address-card" style="display: none;">
+          <div class="saved-address-header">
+            <span class="saved-address-badge">📍 Saved Delivery Address</span>
+            <button type="button" id="btnEditSavedAddress" class="btn-edit-address" onclick="toggleEditAddress(true)">✏️ Edit / Change</button>
+          </div>
+          <div class="saved-address-content">
+            <strong id="savedAddrName">--</strong>
+            <p id="savedAddrText">--</p>
+            <span id="savedAddrPhone">--</span>
+            <div id="savedAddrGpsNotice" class="saved-gps-badge" style="display:none;">📍 Exact GPS Pin Saved</div>
+          </div>
+        </div>
+
+        <div id="deliveryFieldsContainer">
+          <div class="form-group">
+            <label for="custName" id="lblCustName">Full Name *</label>
+            <input type="text" id="custName" placeholder="e.g. Ramesh Kumar" required autocomplete="name" />
+            <small class="field-error-text" id="custNameErr"></small>
+          </div>
+
+          <div class="form-group">
+            <label for="custPhone" id="lblCustPhone">WhatsApp / Mobile Number (10 Digits) *</label>
+            <input type="tel" id="custPhone" maxlength="10" placeholder="e.g. 9876543210" required autocomplete="tel" />
+            <small class="field-error-text" id="custPhoneErr"></small>
+          </div>
+
+          <div class="form-group">
+            <div class="address-label-row">
+              <label for="custAddress">Complete Street Delivery Address *</label>
+              <button type="button" class="btn-gps-locate" onclick="detectUserGeolocation(false)" title="Use device GPS">
+                📍 Locate My Doorstep
+              </button>
+            </div>
+            <textarea id="custAddress" rows="2" placeholder="Flat / House No, Building, Street, Landmark" required autocomplete="street-address" oninput="handleAddressForwardGeocode(this.value)"></textarea>
+            <small class="field-error-text" id="custAddressErr"></small>
+          </div>
+
+          <div class="form-group map-form-group">
+            <div class="map-label-bar">
+              <span class="map-label">📍 Pinpoint Doorstep (Drag marker for exact delivery)</span>
+              <span id="mapCoordsBadge" class="map-coords-badge">Centering on Bangalore</span>
+            </div>
+            <div id="deliveryMap" class="delivery-map-canvas"></div>
+            <input type="hidden" id="custLatitude" value="12.9716" />
+            <input type="hidden" id="custLongitude" value="77.5946" />
+          </div>
+
+          <div class="form-row">
+            <div class="form-col">
+              <label for="custState">State / UT *</label>
+              <select id="custState" required><option value="">-- Select State / UT --</option></select>
+              <small class="field-error-text" id="custStateErr"></small>
+            </div>
+            <div class="form-col">
+              <label for="custDistrict">District *</label>
+              <select id="custDistrict" required><option value="">-- Select District --</option></select>
+              <small class="field-error-text" id="custDistrictErr"></small>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-col">
+              <label for="custCity">City / Town / Area *</label>
+              <input type="text" id="custCity" placeholder="e.g. Bengaluru" required autocomplete="address-level2" />
+              <small class="field-error-text" id="custCityErr"></small>
+            </div>
+            <div class="form-col">
+              <label for="custPincode">Pincode (6 Digits) *</label>
+              <input type="text" id="custPincode" maxlength="6" placeholder="e.g. 560058" required autocomplete="postal-code" />
+              <small class="field-error-text" id="custPincodeErr"></small>
+            </div>
+          </div>
+
+          <div class="save-address-row">
+            <label class="save-address-label">
+              <input type="checkbox" id="chkSaveAddress" checked />
+              <span>Save address &amp; pin for 1-click checkout on future orders</span>
+            </label>
+          </div>
+        </div>
+
+        <div class="payment-selection-wrap">
+          <label class="payment-group-label">Select Payment Method</label>
+          <div class="payment-options-grid payment-options-three">
+            <label class="payment-radio-card active" id="labelPayPhonePe">
+              <input type="radio" name="paymentMode" id="payPhonePe" value="PHONEPE" checked />
+              <div class="pay-card-content">
+                <span class="pay-icon">⚡</span>
+                <div><strong>Pay Online</strong><small>PhonePe / UPI / Cards</small></div>
+              </div>
+            </label>
+            <label class="payment-radio-card" id="labelPayCOD">
+              <input type="radio" name="paymentMode" id="payCOD" value="COD" />
+              <div class="pay-card-content">
+                <span class="pay-icon">💵</span>
+                <div><strong>Cash on Delivery</strong><small>Pay upon arrival</small></div>
+              </div>
+            </label>
+            <label class="payment-radio-card" id="labelPayWhatsApp">
+              <input type="radio" name="paymentMode" id="payWhatsApp" value="WHATSAPP" />
+              <div class="pay-card-content">
+                <span class="pay-icon">💬</span>
+                <div><strong>WhatsApp Order</strong><small>Manual checkout</small></div>
+              </div>
+            </label>
+          </div>
+        </div>
+
+        <div id="phonepePaymentInfoBox" class="phonepe-info-box">
+          <div class="pg-badge-row">
+            <span class="pg-secure-badge">🔒 256-Bit Bank Encryption</span>
+            <span class="pg-provider-badge">PhonePe Official PG</span>
+          </div>
+          <p>Instant UPI, Google Pay, PhonePe, Paytm, Debit/Credit Cards &amp; NetBanking supported via PhonePe Official Gateway.</p>
+        </div>
+
+        <p id="formError" class="form-error-msg"></p>
+        <p class="legal-form-note">By submitting, you agree to our Terms &amp; Delivery Policies. Delivered within 24 to 72 hours across Bangalore.</p>
+        <button id="submitOrderBtn" class="btn-submit-order" type="button">
+          Proceed to Pay via PhonePe ⚡
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Outside-Bangalore Intercept Modal -->
+  <div id="flipkartModalBackdrop" class="modal-backdrop flipkart-backdrop">
+    <div class="modal-card flipkart-modal-card">
+      <div class="modal-header">
+        <h3>📍 Direct Delivery Exclusive to Bangalore</h3>
+        <button class="close-modal-btn" onclick="closeFlipkartModal()" type="button">&times;</button>
+      </div>
+      <div class="modal-body flipkart-modal-body">
+        <div class="flipkart-modal-icon">🚚</div>
+        <h4>Outside Bangalore Delivery Route</h4>
+        <p>Direct doorstep delivery from our Bangalore facility is currently exclusive to <strong>Bangalore pin codes (560xxx)</strong>.</p>
+        <p>For delivery to any other district in Karnataka or across India, please order genuine batches of MANOPAVANA oils directly through our official Flipkart flagship store!</p>
+        <div class="flipkart-actions-wrap">
+          <a href="https://www.flipkart.com" target="_blank" rel="noopener noreferrer" class="btn-continue-flipkart">
+            🛒 Continue to Flipkart to Order &rarr;
+          </a>
+          <button type="button" class="btn-cancel-flipkart" onclick="closeFlipkartModal()">
+            Change to Bangalore Pincode
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Order Confirmation Modal -->
+  <div id="orderConfirmationModalBackdrop" class="modal-backdrop">
+    <div class="modal-card order-confirm-card">
+      <div class="modal-header">
+        <h3>🎉 Order Successfully Placed!</h3>
+        <button class="close-modal-btn" onclick="closeOrderConfirmationModal()" type="button">&times;</button>
+      </div>
+      <div class="modal-body order-confirm-body">
+        <div class="confirm-badge-icon">🌿</div>
+        <h4>Thank you for your order!</h4>
+        <p class="confirm-intro-text">
+          Freshly wood-pressed, settled naturally, and packed hygienically at our Bangalore facility. Delivered within <strong>24 to 72 hours</strong>.
+        </p>
+        <div class="confirm-receipt-summary" id="confirmReceiptDetails"></div>
+        <div class="confirm-actions-row">
+          <button type="button" class="btn-track-this-order" onclick="openLiveTrackingFromConfirmation()">
+            📦 Track Order Status Live &rarr;
+          </button>
+          <a id="btnWhatsAppTrackReceipt" href="#" target="_blank" rel="noopener noreferrer" class="btn-whatsapp-confirm">
+            💬 View &amp; Track on WhatsApp
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Payment Failed Modal -->
+  <div id="paymentFailedModalBackdrop" class="modal-backdrop">
+    <div class="modal-card payment-failed-card">
+      <div class="modal-header payment-failed-header">
+        <h3>⚠️ Payment Incomplete</h3>
+        <button class="close-modal-btn" onclick="closePaymentFailedModal()" type="button">&times;</button>
+      </div>
+      <div class="modal-body order-confirm-body">
+        <div class="failed-badge-icon">❌</div>
+        <h4 class="failed-title">Order Not Yet Placed</h4>
+        
+        <p class="failed-intro-text">
+          <strong id="failedModalReason" class="failed-reason-text">Payment was cancelled at the gateway.</strong>
+          No funds were deducted. Your items and delivery details are preserved so you can retry immediately.
+        </p>
+
+        <div class="confirm-receipt-summary" id="paymentFailedSummaryBox">
+          <div class="confirm-receipt-row">
+            <span>Order Reference:</span>
+            <strong id="failedModalRef">--</strong>
+          </div>
+          <div class="confirm-receipt-row">
+            <span>Gateway Status:</span>
+            <strong class="status-declined">Unpaid / Declined</strong>
+          </div>
+          <div class="confirm-receipt-row total-row">
+            <span>Items Status:</span>
+            <strong class="status-saved">Saved in Bag ✓</strong>
+          </div>
+        </div>
+
+        <div class="failed-actions-column">
+          <button type="button" class="btn-retry-phonepe" onclick="retryPaymentFromModal()">
+            ⚡ Retry Online Payment (PhonePe)
+          </button>
+          <button type="button" class="btn-switch-cod" onclick="switchToCodFromModal()">
+            💵 Switch to Cash on Delivery (COD)
+          </button>
+          <button type="button" class="btn-return-store" onclick="closePaymentFailedModal()">
+            Return to Storefront
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Traditional Royal Indian Kitchen Split Hero Section -->
+  <section id="about" class="hero-royal-kitchen-section">
+    <div class="hero-royal-container">
+      <!-- Left Column: Video Stage with TRADITIONAL WOOD PRESSED OILS text to the left bottom (Requirement 9) -->
+      <div class="hero-royal-video-col">
+        <div class="hero-video-card-frame">
+          <div class="golden-vortex-aura"></div>
+          <video id="heroVideo" class="hero-clean-video" autoplay muted loop playsinline preload="auto">
+            <source src="https://pub-9e18bb265ecf4224ae1230cf913745ca.r2.dev/master_oil.mp4" type="video/mp4" />
+          </video>
+          <img id="heroFallbackImage" src="https://pub-9e18bb265ecf4224ae1230cf913745ca.r2.dev/hero-image.png" alt="MANOPAVANA Banner" class="hero-clean-image" style="display: none;" />
+          <!-- Placed to the bottom-left because logo is at the right -->
+          <div class="hero-video-royal-seal">
+            <span class="seal-text">TRADITIONAL WOOD PRESSED OILS</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right Column: Editorial Heritage Intro -->
+      <div class="hero-royal-text-col">
+        <!-- Explore The Collection CTA placed at the top -->
+        <div class="hero-royal-cta-group hero-cta-top">
+          <a href="#products" class="btn-royal-primary">
+            <span>Explore The Collection</span>
+            <span class="btn-arrow">&rarr;</span>
+          </a>
+        </div>
+
+        <div class="hero-heritage-tag">
+          <span class="heritage-gem-icon">⚜️</span>
+          <span>GOOD FOOD STARTS HERE</span>
+        </div>
+        <h1 class="hero-royal-title">Unrefined by Nature, Bottled Fresh</h1>
+        <p class="hero-royal-lead">
+          Sourced directly from traditional wood-press artisans, settled naturally, and packed hygienically at our Bangalore facility. Free from chemical solvents, and sealed fresh into food-grade bottles to preserve natural aroma and wholesome nutrients.
+        </p>
+
+        <!-- Royal Kitchen Highlights -->
+        <div class="hero-royal-highlights">
+          <div class="hero-highlight-pill">
+            <span class="pill-icon">🪵</span>
+            <span>Marachekku Pressing</span>
+          </div>
+          <div class="hero-highlight-pill">
+            <span class="pill-icon">☀️</span>
+            <span>Natural Sedimentation</span>
+          </div>
+          <div class="hero-highlight-pill">
+            <span class="pill-icon">🏷️</span>
+            <span>Direct Bangalore Delivery</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Products Section (Wood Pressed Pure Oils placed at the center, 3 handcrafted varieties text removed - Requirement 13) -->
+  <section id="products" class="products-section">
+    <div class="products-header-centered">
+      <h2>Wood-Pressed Pure Oils</h2>
+      <p>Unrefined, Cold Chekku Extraction, Naturally Settled</p>
+    </div>
+
+    <!-- Category Pills -->
+    <div class="category-filter-bar">
+      <button type="button" class="cat-pill active" onclick="filterCatalogCategory('all', event)">
+        <span class="cat-pill-icon">✨</span> All Oils
+      </button>
+      <button type="button" class="cat-pill" onclick="filterCatalogCategory('groundnut', event)">
+        <span class="cat-pill-icon">🥜</span> Groundnut Oil
+      </button>
+      <button type="button" class="cat-pill" onclick="filterCatalogCategory('coconut', event)">
+        <span class="cat-pill-icon">🥥</span> Coconut Oil
+      </button>
+      <button type="button" class="cat-pill" onclick="filterCatalogCategory('sesame', event)">
+        <span class="cat-pill-icon">🌾</span> Sesame Oil
+      </button>
+      <button type="button" class="cat-pill" onclick="filterCatalogCategory('combo', event)">
+        <span class="cat-pill-icon">🎁</span> Value Trio Combos
+      </button>
+    </div>
+
+    <div class="product-grid" id="productGridContainer"></div>
+  </section>
+
+  <!-- Bottle Design Showcase -->
+  <section id="bottle-design" class="bottle-design-section">
+    <div class="section-title-wrap">
+      <span class="section-tag">FUNCTIONAL PACKAGING DESIGN</span>
+      <h2>Engineered for Daily Cooking</h2>
+      <p>Lightweight shatterproof food-grade bottle with a built-in drip-free precision pourer.</p>
+    </div>
+    <div class="bottle-stage-content">
+      <div class="bottle-video-wrapper">
+        <video id="bottleAutoplayVideo" class="bottle-showcase-video" loop muted playsinline preload="auto">
+          <source src="https://pub-9e18bb265ecf4224ae1230cf913745ca.r2.dev/bottle_360.mp4" type="video/mp4" />
+        </video>
+        <div class="bottle-radial-glow"></div>
+      </div>
+      <div class="bottle-callouts-container">
+        <div class="design-feature-card">
+          <div class="feature-tag">01 • DISPENSER</div>
+          <h3>Built-In Drip-Free Flip Spout</h3>
+          <p>Single-thumb controlled pouring directly into hot pans without messy oil drippings or counter stains.</p>
+        </div>
+        <div class="design-feature-card">
+          <div class="feature-tag">02 • NUTRIENT PRESERVATION</div>
+          <h3>Aroma &amp; Freshness Lock Barrier</h3>
+          <p>Airtight food-grade seal protects natural cold-pressed antioxidants, keeping the nutty aroma crisp and unoxidized from first pour to the last drop.</p>
+        </div>
+        <div class="design-feature-card">
+          <div class="feature-tag">03 • BOTTLE BUILD</div>
+          <h3>Lightweight &amp; Shatterproof Body</h3>
+          <p>Food-grade body with an anti-slip grip and wide stable base that won't shatter if dropped.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Complete Combo Section (ALL TEXT TO THE CENTRE - Requirement 14) -->
+  <section id="combo" class="combo-section">
+    <div class="combo-card">
+      <div class="combo-badge">BEST VALUE • 3 ESSENTIAL OILS</div>
+      <div class="combo-grid-layout">
+        <div class="combo-image-col">
+          <div class="combo-poster-frame" onclick="openProductDetailModal('combo-3l')">
+            <img src="https://pub-9e18bb265ecf4224ae1230cf913745ca.r2.dev/combo-all-labels.jpg" alt="Variety Box" class="combo-all-labels-img" />
+            <div class="combo-img-overlay-badge" id="comboBadgeText">3 x 1 Litre Kitchen Trio</div>
+          </div>
+        </div>
+        <!-- Centered text column -->
+        <div class="combo-info-col">
+          <span class="combo-tag">ESSENTIAL KITCHEN TRIO</span>
+          <h2 id="comboTitleHeading">Complete Kitchen 3-Oil Essential Box (3 Litres)</h2>
+          <p class="combo-desc" id="comboDescText">
+            Equip your kitchen with South India's 3 core traditional wood-pressed oils. Sourced directly from traditional wood-press artisans, settled naturally, and packed hygienically at our Bangalore packaging and distribution facility. Includes brand-new sealed 1L Groundnut Oil, 1L Coconut Oil, and 1L Sesame Oil.
+          </p>
+          <div class="combo-variant-toggle-wrap">
+            <span class="combo-variant-label">Choose Combo Volume:</span>
+            <div class="combo-variant-pills">
+              <button type="button" class="combo-size-pill active" id="btnCombo3L" onclick="selectComboVariant('combo-3l')">3L Trio (3 × 1L Bottles)</button>
+              <button type="button" class="combo-size-pill" id="btnCombo15L" onclick="selectComboVariant('combo-15l')">1.5L Starter (3 × 500ml Bottles)</button>
+            </div>
+          </div>
+          <ul class="combo-list">
+            <li>✓ Complete monthly cooking coverage for your family</li>
+            <li>✓ Free Doorstep Delivery included across Bangalore (24–72 hrs)</li>
+            <li>✓ Raw artisanal extraction with zero chemical additives or solvents</li>
+            <li>✓ Includes verified 10% repeat order QR codes on all 3 bottles</li>
+          </ul>
+          <div class="combo-pricing-wrap">
+            <div class="combo-price-block">
+              <span class="combo-price" id="comboCurrentPrice">₹1,299</span>
+              <small class="combo-sub-label" id="comboQrDiscountHint">(₹1,169 with Bottle QR Scan)</small>
+            </div>
+            <div class="fk-combo-actions">
+              <button class="btn-fk-yellow" type="button" onclick="handleDirectComboAdd()">
+                ADD TO CART
+              </button>
+              <button class="btn-fk-orange" id="btnComboBuyNowDirect" type="button" onclick="handleDirectComboBuyNow()">
+                BUY NOW
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Culinary Showcase (VERTICAL CARDS TO FIT BOTTLE LABEL - Requirement 15) -->
+  <section id="culinary" class="culinary-section">
+    <div class="section-title-wrap">
+      <span class="section-tag">CULINARY ARTISTRY</span>
+      <h2>Good Food Starts Here. Better Life Follows.</h2>
+      <p>Handcrafted bottle labels and the traditional regional dishes they are crafted for.</p>
+    </div>
+    <div class="label-showcase-grid">
+      <!-- Vertical Card 1 -->
+      <div class="label-feature-card">
+        <div class="label-img-box"><img src="https://pub-9e18bb265ecf4224ae1230cf913745ca.r2.dev/label-groundnut.jpg" alt="Groundnut" class="label-art-img" /></div>
+        <div class="label-info-box">
+          <span class="pairing-badge groundnut-badge">Groundnut Pairing</span>
+          <h3>Crispy Dosas &amp; Everyday Tiffin</h3>
+          <p>Perfect for daily cooking, golden dosas, stir-fries, and shallow frying with rich nutty aroma.</p>
+        </div>
+      </div>
+      <!-- Vertical Card 2 -->
+      <div class="label-feature-card">
+        <div class="label-img-box"><img src="https://pub-9e18bb265ecf4224ae1230cf913745ca.r2.dev/label-coconut.jpg" alt="Coconut" class="label-art-img" /></div>
+        <div class="label-info-box">
+          <span class="pairing-badge coconut-badge">Coconut Pairing</span>
+          <h3>Coastal Curries &amp; Rice Dishes</h3>
+          <p>Unrefined aroma tailored for authentic Kerala avial, vegetable stew, and aromatic coastal curries.</p>
+        </div>
+      </div>
+      <!-- Vertical Card 3 -->
+      <div class="label-feature-card">
+        <div class="label-img-box"><img src="https://pub-9e18bb265ecf4224ae1230cf913745ca.r2.dev/label-sesame.jpg" alt="Sesame" class="label-art-img" /></div>
+        <div class="label-info-box">
+          <span class="pairing-badge sesame-badge">Sesame Pairing</span>
+          <h3>Tempering, Puliogare &amp; Podis</h3>
+          <p>Traditional choice for authentic tamarind rice (Puliogare), idli podi mix, rasam tadka, and daily wellness.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Customer Reviews -->
+  <section id="reviews" class="reviews-section">
+    <div class="section-title-wrap">
+      <span class="section-tag">CUSTOMER COMMUNITY</span>
+      <h2>Customer Reviews &amp; Kitchen Experiences</h2>
+      <p>Real feedback from customers cooking with MANOPAVANA wood-pressed oils.</p>
+    </div>
+    <div class="reviews-container">
+      <div id="reviewsDisplayGrid" class="reviews-display-grid"></div>
+      <div class="feedback-form-box">
+        <h3>Write a Review</h3>
+        <p>Used our oils in your kitchen? Share your honest rating and review to help fellow home cooks.</p>
+        <form id="productReviewForm" class="review-form">
+          <div class="form-row">
+            <div class="form-col">
+              <label for="revName">Your Name *</label>
+              <input type="text" id="revName" placeholder="e.g. Ramesh Kumar" required />
+            </div>
+            <div class="form-col">
+              <label for="revProduct">Product Used *</label>
+              <select id="revProduct" required>
+                <option value="Wood-Pressed Groundnut Oil">Groundnut Oil</option>
+                <option value="Wood-Pressed Coconut Oil">Coconut Oil</option>
+                <option value="Wood-Pressed Sesame Oil">Sesame Oil</option>
+                <option value="Complete 3-Oil Essential Box (3L)">3-Oil Essential Box (3L)</option>
+                <option value="Complete 3-Oil Starter Box (1.5L)">3-Oil Starter Box (1.5L)</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-col">
+              <label for="revRating">Rating *</label>
+              <select id="revRating" required>
+                <option value="5">★★★★★ (5/5 - Excellent)</option>
+                <option value="4">★★★★☆ (4/5 - Very Good)</option>
+                <option value="3">★★★☆☆ (3/5 - Good)</option>
+                <option value="2">★★☆☆☆ (2/5 - Fair)</option>
+                <option value="1">★☆☆☆☆ (1/5 - Poor)</option>
+              </select>
+            </div>
+            <div class="form-col">
+              <label for="revLocation">Bangalore Area / Order Ref (Optional)</label>
+              <input type="text" id="revLocation" placeholder="e.g. Indiranagar / #MP-4021" />
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="revComment">Your Review &amp; Experience *</label>
+            <textarea id="revComment" rows="3" placeholder="Tell us about the aroma, taste, bottle dispenser, or cooking results..." required></textarea>
+          </div>
+          <button type="submit" class="btn-submit-review">Post Review</button>
+        </form>
+      </div>
+    </div>
+  </section>
+
+  <!-- 10% QR Reorder Loyalty Section -->
+  <section id="loyalty" class="loyalty-section">
+    <div class="loyalty-card-wrap">
+      <div class="loyalty-badge">EASY REORDER PROGRAM</div>
+      <h2>Love the Fresh Taste? Enjoy 10% OFF Every Reorder.</h2>
+      <p class="loyalty-subtext">
+        Every MANOPAVANA bottle comes with a verified reorder QR code printed directly on the label. Follow these simple steps:
+      </p>
+
+      <div class="loyalty-steps-grid">
+        <div class="loyalty-step-card">
+          <div class="step-image-box">
+            <span class="step-num-pill">Step 1</span>
+            <img src="https://pub-9e18bb265ecf4224ae1230cf913745ca.r2.dev/step-bottle-qr.jpg" alt="Locate QR" class="step-guide-img" onerror="this.src='https://placehold.co/400x260/171412/eab308?text=1.+Find+Bottle+QR'" />
+          </div>
+          <div class="step-card-content">
+            <h4>Locate the Label QR</h4>
+            <p>Look at the circular golden badge at the base of your existing MANOPAVANA bottle.</p>
+          </div>
+        </div>
+
+        <div class="loyalty-step-card">
+          <div class="step-image-box">
+            <span class="step-num-pill">Step 2</span>
+            <img src="https://pub-9e18bb265ecf4224ae1230cf913745ca.r2.dev/step-camera-scan.jpg" alt="Scan QR" class="step-guide-img" onerror="this.src='https://placehold.co/400x260/171412/eab308?text=2.+Scan+With+Camera'" />
+          </div>
+          <div class="step-card-content">
+            <h4>Scan with Any Camera</h4>
+            <p>Open your smartphone camera or Google Lens, point at the code, and tap the link that appears.</p>
+          </div>
+        </div>
+
+        <div class="loyalty-step-card">
+          <div class="step-image-box">
+            <span class="step-num-pill">Step 3</span>
+            <img src="https://pub-9e18bb265ecf4224ae1230cf913745ca.r2.dev/step-whatsapp-discount.jpg" alt="10% Discount" class="step-guide-img" onerror="this.src='https://placehold.co/400x260/171412/eab308?text=3.+10%+Discount+Active'" />
+          </div>
+          <div class="step-card-content">
+            <h4>Instant 10% Discount</h4>
+            <p>Your 10% loyalty discount unlocks immediately and applies automatically across your cart on your next bottle delivery.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="loyalty-footnote">
+        💡 <em>No app installation required. Works natively on all iOS and Android smartphone cameras.</em>
+      </div>
+    </div>
+  </section>
+
+  <!-- Extraction Benchmark: Fully visible in single view on mobile (Requirement 16) -->
+  <section id="benchmark" class="benchmark-section">
+    <div class="section-title-wrap">
+      <span class="section-tag">EXTRACTION BENCHMARK</span>
+      <h2>Why Switch to Wood-Pressed?</h2>
+      <p>Compare everyday refined supermarket oils with MANOPAVANA single-press extraction.</p>
+    </div>
+
+    <div class="comparison-table-wrap">
+      <table class="comparison-table">
+        <thead>
+          <tr>
+            <th>Quality Metric</th>
+            <th>Commercial Refined Oils</th>
+            <th class="highlight-col">MANOPAVANA Wood-Pressed</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Extraction Temp</strong></td>
+            <td>High heat (200°C+ destroys vitamins)</td>
+            <td class="highlight-col"><strong>Room temperature (&lt; 45°C)</strong></td>
+          </tr>
+          <tr>
+            <td><strong>Chemical Solvents</strong></td>
+            <td>Hexane &amp; chemical bleaches used</td>
+            <td class="highlight-col"><strong>0% Chemicals • Zero Solvents</strong></td>
+          </tr>
+          <tr>
+            <td><strong>Nutrient Retention</strong></td>
+            <td>Synthetic vitamins added back</td>
+            <td class="highlight-col"><strong>Naturally Preserved Micronutrients &amp; Tocopherols</strong></td>
+          </tr>
+          <tr>
+            <td><strong>Filtration</strong></td>
+            <td>Artificial micro-bleaching</td>
+            <td class="highlight-col"><strong>Traditional cotton sedimentation</strong></td>
+          </tr>
+        </tbody>
+      </table>
+      <p class="quality-disclaimer">
+        *Note: Natural sedimentation and color variations may occur between batches due to traditional zero-heat wooden press extraction and unfiltered cotton settling. This is a natural hallmark of unrefined cold-pressed oil.
+      </p>
+    </div>
+  </section>
+
+  <!-- FAQ Section -->
+  <section id="faqs" class="faqs-section">
+    <div class="section-title-wrap">
+      <span class="section-tag">KNOWLEDGE BASE</span>
+      <h2>Frequently Asked Questions</h2>
+      <p>Everything you need to know about our cold-pressed cooking oils and order fulfillment.</p>
+    </div>
+
+    <div class="faq-accordion">
+      <div class="faq-item">
+        <button class="faq-question">
+          <span>What makes MANOPAVANA oils different from regular refined cooking oils?</span>
+          <span class="faq-icon">+</span>
+        </button>
+        <div class="faq-answer">
+          <p>Refined oils undergo chemical bleaching and extreme heating over 200°C. MANOPAVANA oils are sourced directly from traditional wood-press artisans, settled naturally, and packed hygienically at our Bangalore facility with zero external heat or chemicals, preserving natural nutrients and authentic aroma.</p>
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <button class="faq-question">
+          <span>Why is there slight natural sediment at the bottom of the bottle?</span>
+          <span class="faq-icon">+</span>
+        </button>
+        <div class="faq-answer">
+          <p>Because our oils are completely unrefined and free from chemical filtration, we allow the oil to settle naturally through micro-mesh cotton cloths. The slight sediment at the bottom is pure seed fiber, a true mark of unrefined cold-pressed oils.</p>
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <button class="faq-question">
+          <span>What is the shelf life and ideal storage for these oils?</span>
+          <span class="faq-icon">+</span>
+        </button>
+        <div class="faq-answer">
+          <p>Our cold-pressed oils maintain peak freshness for 9 to 12 months from the packaging date. Store them in a cool, dry place away from direct sunlight and keep the bottle tightly sealed.</p>
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <button class="faq-question">
+          <span>Where do you deliver and what are the shipping charges?</span>
+          <span class="faq-icon">+</span>
+        </button>
+        <div class="faq-answer">
+          <p>Direct doorstep delivery from our packaging and distribution facility is exclusive to Bangalore (560xxx). All orders above ₹500 unlock <strong>Free Doorstep Delivery</strong> (delivered within 24 to 72 hours). A standard delivery fee of ₹49 applies on orders below ₹500. For all other locations across Karnataka and India, orders are fulfilled via our official Flipkart store!</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Site Footer -->
+  <footer class="site-footer">
+    <div class="footer-inner">
+      <div class="footer-col brand-col">
+        <div class="brand-logo footer-logo">
+          <span class="brand-name">MANOPAVANA</span>
+          <span class="brand-tagline">Traditional wood-pressed goodness.</span>
+        </div>
+        <p class="brand-desc">
+          Sourced directly from traditional wood-press artisans, settled naturally, and packed hygienically at our Bangalore facility.
+        </p>
+        <div class="reg-badges">
+          <div class="reg-item">
+            <span class="reg-label">FSSAI Registration:</span>
+            <span class="reg-val">Reg. No. 21226008004689</span>
+          </div>
+          <div class="reg-item">
+            <span class="reg-label">GSTIN:</span>
+            <span class="reg-val">29EYSPR5297E1ZE</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="footer-col links-col">
+        <h4>Navigation</h4>
+        <ul>
+          <li><a href="#products">Artisanal Oils</a></li>
+          <li><a href="#combo">Value Combo</a></li>
+          <li><a href="#bottle-design">Bottle Design</a></li>
+          <li><a href="#culinary">Good Food Starts Here</a></li>
+          <li><a href="#reviews">Customer Reviews</a></li>
+          <li><a href="#loyalty">10% QR Program</a></li>
+          <li><a href="javascript:void(0)" onclick="openAccountDashboard('orders')">Track Your Order</a></li>
+          <li><a href="#faqs">FAQs</a></li>
+        </ul>
+      </div>
+
+      <div class="footer-col legal-col">
+        <h4>Policies &amp; Legal</h4>
+        <ul>
+          <li><a href="javascript:void(0)" onclick="openLegalModal('termsModal')">Terms &amp; Conditions</a></li>
+          <li><a href="javascript:void(0)" onclick="openLegalModal('shippingModal')">Shipping &amp; Delivery Policy</a></li>
+          <li><a href="javascript:void(0)" onclick="openLegalModal('returnsModal')">Return &amp; Refund Policy</a></li>
+          <li><a href="javascript:void(0)" onclick="openLegalModal('privacyModal')">Privacy Policy</a></li>
+        </ul>
+      </div>
+
+      <div class="footer-col contact-col">
+        <h4>Contact &amp; Facility</h4>
+        <div class="contact-info">
+          <div class="contact-row">
+            <span class="contact-icon">👤</span>
+            <span class="contact-lead-name">Manoj M R <small class="contact-lead-role">(Founder)</small></span>
+          </div>
+          <div class="contact-row">
+            <span class="contact-icon">✉</span>
+            <a href="mailto:manopavana@gmail.com">manopavana@gmail.com</a>
+          </div>
+          <div class="contact-row">
+            <span class="contact-icon">💬</span>
+            <div>
+              <a href="tel:+919180301917">+91 91803 01917 (WhatsApp Orders)</a><br />
+              <a href="tel:+918431023984" class="contact-alt-phone">+91 84310 23984 (Support &amp; Billing)</a>
+            </div>
+          </div>
+          <div class="contact-row address-row">
+            <span class="contact-icon">📍</span>
+            <address>
+              Packaging &amp; Distribution Facility:<br />
+              118, Raghavendra Layout, Thigalarapalya,<br />
+              Peenya 2nd Stage, Bangalore, Karnataka - 560058
+            </address>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="footer-bottom">
+      <div class="footer-bottom-inner">
+        <span>© 2026 MANOPAVANA Oils. All rights reserved.</span>
+        <span>Sourced directly from traditional wood-press artisans, settled naturally, and packed hygienically at our Bangalore facility.</span>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Legal Modals -->
+  <div id="termsModal" class="modal-backdrop legal-backdrop">
+    <div class="modal-card legal-modal-card">
+      <div class="modal-header">
+        <h3>Terms &amp; Conditions</h3>
+        <button class="close-modal-btn" onclick="closeLegalModal('termsModal')" type="button">&times;</button>
+      </div>
+      <div class="modal-body legal-modal-body">
+        <h4>1. Business Scope &amp; Facility Disclosure</h4>
+        <p>MANOPAVANA is an artisanal repacker and distributor of wood-pressed edible oils. Oils are sourced directly from traditional wood-press artisans, settled naturally, and packed hygienically at our Bangalore packaging and distribution facility. Direct doorstep delivery is currently serviced exclusively within Bangalore (560xxx), while nationwide fulfillment is conducted through our verified Flipkart storefront.</p>
+        <h4>2. Pricing &amp; Taxes</h4>
+        <p>All prices listed on this website are in Indian Rupees (₹) and are inclusive of applicable GST (GSTIN: 29EYSPR5297E1ZE).</p>
+        <h4>3. Bottle QR Loyalty Reorder Program</h4>
+        <p>The 10% Bottle QR Loyalty discount is designed for returning customers. Each verified scan unlocks a 30-day window applying a 10% discount across all products at checkout.</p>
+        <h4>4. Product Quality &amp; Natural Variation</h4>
+        <p>Because our oils are unrefined and free from artificial colorants, natural batch-to-batch variations in aroma, color, and cotton sedimentation are expected and attest to the authenticity of traditional artisanal extraction.</p>
+        <h4>5. Grievance Redressal Mechanism</h4>
+        <p>In accordance with the Consumer Protection (E-Commerce) Rules, 2020, the designated Grievance Redressal Officer for MANOPAVANA is:</p>
+        <p><strong>Name:</strong> Manoj M R<br />
+        <strong>Designation:</strong> Founder &amp; Grievance Redressal Officer<br />
+        <strong>Email:</strong> manopavana@gmail.com<br />
+        <strong>Contact:</strong> +91 91803 01917 / +91 84310 23984<br />
+        <strong>Packaging Facility Address:</strong> 118, Raghavendra Layout, Thigalarapalya, Peenya 2nd Stage, Bangalore - 560058</p>
+      </div>
+    </div>
+  </div>
+
+  <div id="shippingModal" class="modal-backdrop legal-backdrop">
+    <div class="modal-card legal-modal-card">
+      <div class="modal-header">
+        <h3>Shipping &amp; Delivery Policy</h3>
+        <button class="close-modal-btn" onclick="closeLegalModal('shippingModal')" type="button">&times;</button>
+      </div>
+      <div class="modal-body legal-modal-body">
+        <h4>1. Shipping Charges</h4>
+        <p>• Orders of ₹500 and above: <strong>FREE Doorstep Delivery</strong> across Bangalore.<br />• Orders below ₹500: Flat ₹49 standard delivery fee.</p>
+        <h4>2. Delivery Timeline</h4>
+        <p>Orders are dispatched from our Bangalore packaging and distribution facility and delivered within <strong>24 to 72 business hours</strong> across Bangalore.</p>
+      </div>
+    </div>
+  </div>
+
+  <div id="returnsModal" class="modal-backdrop legal-backdrop">
+    <div class="modal-card legal-modal-card">
+      <div class="modal-header">
+        <h3>Return &amp; Refund Policy</h3>
+        <button class="close-modal-btn" onclick="closeLegalModal('returnsModal')" type="button">&times;</button>
+      </div>
+      <div class="modal-body legal-modal-body">
+        <h4>1. Order Cancellation</h4>
+        <p>Orders may be cancelled via WhatsApp (+91 91803 01917) within 4 hours of order placement or prior to courier handover.</p>
+        <h4>2. Edible Goods Policy</h4>
+        <p>Due to health and food safety standards under FSSAI regulations, opened or seal-broken oil bottles are non-returnable.</p>
+        <h4>3. Damaged Shipments</h4>
+        <p>If your package arrives leaked or damaged during transit, notify us within 24 hours of delivery via WhatsApp (+91 91803 01917) with unboxing photographs for an immediate replacement or full refund.</p>
+      </div>
+    </div>
+  </div>
+
+  <div id="privacyModal" class="modal-backdrop legal-backdrop">
+    <div class="modal-card legal-modal-card">
+      <div class="modal-header">
+        <h3>Privacy Policy</h3>
+        <button class="close-modal-btn" onclick="closeLegalModal('privacyModal')" type="button">&times;</button>
+      </div>
+      <div class="modal-body legal-modal-body">
+        <h4>1. Information Collected</h4>
+        <p>We collect essential order fulfillment details including Name, WhatsApp Number, Address, State, District, and Pincode solely to process and deliver your order.</p>
+        <h4>2. Transactional Communication Consent</h4>
+        <p>By placing an order, you consent to receive order updates, payment confirmations, and tracking information via WhatsApp and SMS.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Mobile Floating Cart Bar -->
+  <div id="mobileCartBar" class="mobile-cart-bar" style="display: none;" onclick="openCart()">
+    <div class="mobile-cart-bar-left">
+      <span class="mobile-cart-count" id="mobileCartCount">0 items</span>
+      <span class="mobile-cart-total" id="mobileCartTotal">₹0</span>
+    </div>
+    <button type="button" class="mobile-cart-btn">
+      View Cart &rarr;
+    </button>
+  </div>
+
+  <script src="/script.js"></script>
+</body>
+
+</html>
