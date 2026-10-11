@@ -4,13 +4,13 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  
+
   <!-- Multi-Device Favicon & Brand Icons -->
   <link rel="icon" type="image/png" sizes="32x32" href="https://pub-9e18bb265ecf4224ae1230cf913745ca.r2.dev/logo2.jpg" />
   <link rel="icon" type="image/png" sizes="16x16" href="https://pub-9e18bb265ecf4224ae1230cf913745ca.r2.dev/logo2.jpg" />
   <link rel="apple-touch-icon" sizes="180x180" href="https://pub-9e18bb265ecf4224ae1230cf913745ca.r2.dev/logo2.jpg" />
   <link rel="shortcut icon" type="image/x-icon" href="https://pub-9e18bb265ecf4224ae1230cf913745ca.r2.dev/logo2.jpg" />
-  
+
   <title>MANOPAVANA - Traditional Wood-Pressed Oils</title>
   <meta name="description" content="Authentic wood-pressed cooking oils delivered doorstep. Cold pressed groundnut, coconut, sesame oils crafted with traditional methods." />
   <meta property="og:title" content="MANOPAVANA - Traditional Wood-Pressed Oils" />
@@ -56,7 +56,7 @@
     </div>
   </div>
 
-  <!-- Topmost Announcement Bar: Centered single line with distinguishable background -->
+  <!-- Topmost Announcement Bar -->
   <div id="topAnnouncementBar" class="top-announcement-bar">
     <div class="announcement-content-wrap">
       <div class="announcement-ticker-track" id="announcementText">
@@ -68,21 +68,20 @@
   <!-- Unified Site Header -->
   <header class="site-header">
     <div class="header-inner">
-      <!-- Row 1: Brand on left, Search Bar, and Rightmost Actions -->
+      <!-- Row 1: Brand & Deliver-To on Left, Login & Cart on Right -->
       <div class="header-main-row">
-        <!-- Brand Link: Logo with black background, Name, Tagline strictly below name -->
-        <a href="#" class="brand-link" title="MANOPAVANA - Traditional Wood-Pressed Oils">
-          <div class="logo-wrap">
-            <img src="https://pub-9e18bb265ecf4224ae1230cf913745ca.r2.dev/logo2.jpg" onerror="this.src='https://pub-9e18bb265ecf4224ae1230cf913745ca.r2.dev/logo2.jpg'" alt="MANOPAVANA Logo" class="site-logo" />
-          </div>
-          <div class="brand-text-wrap">
-            <span class="brand-name">MANOPAVANA</span>
-            <span class="brand-tagline">Pure by nature, trusted for life</span>
-          </div>
-        </a>
+        <div class="header-left-cluster">
+          <!-- Brand Link -->
+          <a href="#" class="brand-link" title="MANOPAVANA - Traditional Wood-Pressed Oils">
+            <div class="logo-wrap">
+              <img src="https://pub-9e18bb265ecf4224ae1230cf913745ca.r2.dev/logo2.jpg" onerror="this.src='https://pub-9e18bb265ecf4224ae1230cf913745ca.r2.dev/logo2.jpg'" alt="MANOPAVANA Logo" class="site-logo" />
+            </div>
+            <div class="brand-text-wrap">
+              <span class="brand-name">MANOPAVANA</span>
+              <span class="brand-tagline">Pure by nature, trusted for life</span>
+            </div>
+          </a>
 
-        <!-- Search & Deliver-To Cluster -->
-        <div class="header-search-location-wrap">
           <!-- Deliver To Location Pill -->
           <button type="button" id="headerLocationTrigger" class="btn-location-header" onclick="openLocationCheckModal()" title="Change delivery location">
             <span class="loc-pin-icon">📍</span>
@@ -91,28 +90,17 @@
               <strong id="headerLocationLabel">Bangalore (560xxx)</strong>
             </div>
           </button>
-
-          <!-- Themed Search Bar with gold vector search icon -->
-          <div class="header-search-bar" id="headerSearchBar">
-            <input type="text" id="storeSearchInput" placeholder="Search Wood-Pressed Groundnut, Coconut, Sesame oil..." oninput="handleCatalogSearch(this.value)" onfocus="handleSearchFocus()" onkeydown="handleSearchKeyDown(event)" autocomplete="off" />
-            <span class="search-icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
-                <circle cx="11" cy="11" r="7.5"></circle>
-                <line x1="21" y1="21" x2="16.5" y2="16.5"></line>
-              </svg>
-            </span>
-            <div id="liveSearchResults" class="live-search-dropdown" style="display: none;"></div>
-          </div>
         </div>
 
         <!-- Rightmost Cluster: Login Button & Cart Button -->
         <div class="header-right-actions" id="headerRightActions">
-          <!-- Login Button with relevant background color -->
+          <!-- Login Button -->
           <div class="auth-pill-container" id="authPillContainer">
-            <button type="button" id="authPillBtn" class="btn-auth-pill" onclick="handleAuthPillClick()">
-              <span id="authPillLabel">👤 Login</span>
+            <button type="button" id="authPillBtn" class="btn-auth-pill" onclick="handleAuthPillClick()" aria-label="Account Login">
+              <span class="auth-icon">👤</span>
+              <span id="authPillLabel" class="auth-text">Login</span>
             </button>
-            
+
             <div id="authDropdownMenu" class="auth-dropdown-menu">
               <div id="authUserMeta" class="auth-user-meta">Welcome to MANOPAVANA</div>
               <a href="javascript:void(0)" onclick="openAccountDashboard('profile')">👤 My Profile</a>
@@ -123,7 +111,7 @@
             </div>
           </div>
 
-          <!-- Cart Button: Placed at the rightmost of the navbar -->
+          <!-- Cart Button -->
           <button id="openCartBtn" class="cart-trigger-btn" type="button" aria-label="Open Cart Drawer">
             <span class="cart-icon-graphic">🛒</span>
             <span class="cart-label-text">Cart</span>
@@ -132,19 +120,19 @@
         </div>
       </div>
 
-      <!-- Secondary Sub-Nav Row starting from Pure Oils -->
-      <nav class="sub-nav-bar" id="subNavBar">
-        <div class="sub-nav-inner">
-          <a href="#products" class="sub-nav-link active" onclick="handleSubNavClick(event, this)">Pure Oils</a>
-          <a href="#combo" class="sub-nav-link" onclick="handleSubNavClick(event, this)">Value Combo</a>
-          <a href="#bottle-design" class="sub-nav-link" onclick="handleSubNavClick(event, this)">Bottle Design</a>
-          <a href="#culinary" class="sub-nav-link" onclick="handleSubNavClick(event, this)">Good Food Starts Here</a>
-          <a href="#reviews" class="sub-nav-link" onclick="handleSubNavClick(event, this)">Reviews</a>
-          <a href="#loyalty" class="sub-nav-link" onclick="handleSubNavClick(event, this)">10% Reorder</a>
-          <a href="#benchmark" class="sub-nav-link" onclick="handleSubNavClick(event, this)">Why Wood Pressed</a>
-          <a href="#faqs" class="sub-nav-link" onclick="handleSubNavClick(event, this)">FAQs</a>
+      <!-- Row 2: Full Width Dedicated Search Row -->
+      <div class="header-search-row">
+        <div class="header-search-bar" id="headerSearchBar">
+          <input type="text" id="storeSearchInput" placeholder="Search Wood-Pressed Groundnut, Coconut, Sesame oil..." oninput="handleCatalogSearch(this.value)" onfocus="handleSearchFocus()" onkeydown="handleSearchKeyDown(event)" autocomplete="off" />
+          <span class="search-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="11" cy="11" r="7.5"></circle>
+              <line x1="21" y1="21" x2="16.5" y2="16.5"></line>
+            </svg>
+          </span>
+          <div id="liveSearchResults" class="live-search-dropdown" style="display: none;"></div>
         </div>
-      </nav>
+      </div>
     </div>
   </header>
 
@@ -203,7 +191,7 @@
   <div id="authModalBackdrop" class="modal-backdrop">
     <div class="modal-card fk-auth-modal-card">
       <button class="close-modal-btn fk-auth-close" onclick="closeAuthModal()" type="button">&times;</button>
-      
+
       <div class="fk-auth-sidebar">
         <h3 id="fkAuthSidebarTitle">Login</h3>
         <p id="fkAuthSidebarDesc">Access your orders, saved addresses, and authentic wood-pressed oils discounts.</p>
@@ -213,10 +201,10 @@
       <div class="fk-auth-body">
         <button type="button" class="btn-google-auth" onclick="handleGoogleSignIn()">
           <svg class="google-icon" viewBox="0 0 48 48">
-            <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
-            <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
-            <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
-            <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+            <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z" />
+            <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z" />
+            <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z" />
+            <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z" />
           </svg>
           Continue with Google
         </button>
@@ -358,6 +346,18 @@
               <label for="dashInputAddress">Complete Street Address (Flat / House No, Building, Landmark) *</label>
               <textarea id="dashInputAddress" rows="2" required></textarea>
             </div>
+
+            <!-- Leaflet Interactive Map for Addresses -->
+            <div class="form-group map-form-group">
+              <div class="map-label-bar">
+                <span class="map-label">📍 Pinpoint Doorstep (Drag marker to set coordinates):</span>
+                <span id="dashMapCoordsBadge" class="map-coords-badge">Centering...</span>
+              </div>
+              <div id="dashDeliveryMap" class="delivery-map-canvas"></div>
+              <input type="hidden" id="dashInputLat" value="12.9716" />
+              <input type="hidden" id="dashInputLng" value="77.5946" />
+            </div>
+
             <div class="form-row">
               <div class="form-col">
                 <label for="dashInputCity">City *</label>
@@ -374,7 +374,6 @@
             </div>
           </form>
         </div>
-
       </div>
     </div>
   </div>
@@ -390,7 +389,7 @@
         <p class="location-check-sub">
           Freshly wood-pressed, naturally settled, and packed at our Bangalore facility. Delivered in 24–72 hours across Bangalore:
         </p>
-        
+
         <div class="location-input-row">
           <input type="text" id="pincodeCheckInput" maxlength="6" placeholder="Enter 6-digit Pincode (e.g. 560058)" />
           <button type="button" class="btn-gps-inline" onclick="detectUserGeolocation(true)">📍 Use GPS</button>
@@ -406,7 +405,7 @@
         </div>
 
         <div id="pincodeCheckResultBox" class="pincode-result-box" style="display: none;"></div>
-        
+
         <div class="location-info-pills">
           <div class="info-loc-chip">
             <span>🏡</span>
@@ -459,13 +458,13 @@
             <p class="quiz-question-title" id="onboardQuizQuestionText">Loading label question...</p>
             <div class="quiz-options-list" id="onboardQuizOptionsContainer"></div>
           </div>
-          
+
           <div class="quiz-attempt-strip">
             <span id="onboardAttemptBadge" class="attempt-badge">⚠️ 2 chances left to claim 10% OFF</span>
           </div>
 
           <div id="onboardQuizFeedbackBox" class="quiz-feedback-box"></div>
-          
+
           <button type="button" id="btnSubmitOnboardQuiz" class="btn-verify-quiz-submit" onclick="submitOnboardingBottleQuiz()">
             Verify &amp; Activate 10% Discount ⚡
           </button>
@@ -481,7 +480,7 @@
         <span class="fk-brand-pill">MANOPAVANA OFFICIAL STORE</span>
         <button id="closeDetailModalBtn" class="close-modal-btn" onclick="closeProductDetailModal()" type="button">&times;</button>
       </div>
-      
+
       <div class="modal-body fk-detail-body" id="modalProductDetailBody"></div>
     </div>
   </div>
@@ -681,7 +680,7 @@
       <div class="modal-body order-confirm-body">
         <div class="failed-badge-icon">❌</div>
         <h4 class="failed-title">Order Not Yet Placed</h4>
-        
+
         <p class="failed-intro-text">
           <strong id="failedModalReason" class="failed-reason-text">Payment was cancelled at the gateway.</strong>
           No funds were deducted. Your items and delivery details are preserved so you can retry immediately.
@@ -720,7 +719,7 @@
   <!-- Traditional Royal Indian Kitchen Split Hero Section -->
   <section id="about" class="hero-royal-kitchen-section">
     <div class="hero-royal-container">
-      <!-- Left Column: Video Stage with TRADITIONAL WOOD PRESSED OILS text to the left bottom (Requirement 9) -->
+      <!-- Left Column: Video Stage -->
       <div class="hero-royal-video-col">
         <div class="hero-video-card-frame">
           <div class="golden-vortex-aura"></div>
@@ -728,7 +727,6 @@
             <source src="https://pub-9e18bb265ecf4224ae1230cf913745ca.r2.dev/master_oil.mp4" type="video/mp4" />
           </video>
           <img id="heroFallbackImage" src="https://pub-9e18bb265ecf4224ae1230cf913745ca.r2.dev/hero-image.png" alt="MANOPAVANA Banner" class="hero-clean-image" style="display: none;" />
-          <!-- Placed to the bottom-left because logo is at the right -->
           <div class="hero-video-royal-seal">
             <span class="seal-text">TRADITIONAL WOOD PRESSED OILS</span>
           </div>
@@ -737,7 +735,7 @@
 
       <!-- Right Column: Editorial Heritage Intro -->
       <div class="hero-royal-text-col">
-        <!-- Explore The Collection CTA placed at the top -->
+        <!-- Explore The Collection CTA -->
         <div class="hero-royal-cta-group hero-cta-top">
           <a href="#products" class="btn-royal-primary">
             <span>Explore The Collection</span>
@@ -745,6 +743,7 @@
           </a>
         </div>
 
+        <!-- Heritage Tag with Increased Visual Gap -->
         <div class="hero-heritage-tag">
           <span class="heritage-gem-icon">⚜️</span>
           <span>GOOD FOOD STARTS HERE</span>
@@ -773,7 +772,7 @@
     </div>
   </section>
 
-  <!-- Products Section (Wood Pressed Pure Oils placed at the center, 3 handcrafted varieties text removed - Requirement 13) -->
+  <!-- Products Section -->
   <section id="products" class="products-section">
     <div class="products-header-centered">
       <h2>Wood-Pressed Pure Oils</h2>
@@ -836,7 +835,7 @@
     </div>
   </section>
 
-  <!-- Complete Combo Section (ALL TEXT TO THE CENTRE - Requirement 14) -->
+  <!-- Complete Combo Section -->
   <section id="combo" class="combo-section">
     <div class="combo-card">
       <div class="combo-badge">BEST VALUE • 3 ESSENTIAL OILS</div>
@@ -847,7 +846,7 @@
             <div class="combo-img-overlay-badge" id="comboBadgeText">3 x 1 Litre Kitchen Trio</div>
           </div>
         </div>
-        <!-- Centered text column -->
+
         <div class="combo-info-col">
           <span class="combo-tag">ESSENTIAL KITCHEN TRIO</span>
           <h2 id="comboTitleHeading">Complete Kitchen 3-Oil Essential Box (3 Litres)</h2>
@@ -886,7 +885,7 @@
     </div>
   </section>
 
-  <!-- Culinary Showcase (VERTICAL CARDS TO FIT BOTTLE LABEL - Requirement 15) -->
+  <!-- Culinary Showcase -->
   <section id="culinary" class="culinary-section">
     <div class="section-title-wrap">
       <span class="section-tag">CULINARY ARTISTRY</span>
@@ -1029,7 +1028,7 @@
     </div>
   </section>
 
-  <!-- Extraction Benchmark: Fully visible in single view on mobile (Requirement 16) -->
+  <!-- Extraction Benchmark -->
   <section id="benchmark" class="benchmark-section">
     <div class="section-title-wrap">
       <span class="section-tag">EXTRACTION BENCHMARK</span>
