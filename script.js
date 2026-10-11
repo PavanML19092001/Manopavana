@@ -817,7 +817,7 @@
       if (isNewUser) {
         window.showActionToast("Account Created", `🎉 Welcome to MANOPAVANA, ${name}!`, "🎉", "success");
       } else {
-        window.showActionToast("Sign In Successful", `🎉 Welcome back, ${name}!`, "������", "success");
+        window.showActionToast("Sign In Successful", `🎉 Welcome back, ${name}!`, "������", "success");
       }
     } catch (err) {
       if (errBox) {
@@ -1037,11 +1037,51 @@
     }
   }
 
+  let dashLeafletMap = null;
+  let dashMapMarker = null;
+
+  function initOrUpdateDashboardMap(lat, lng) {
+    const mapElement = document.getElementById("dashDeliveryMap");
+    if (!mapElement || typeof L === "undefined") return;
+
+    if (!dashLeafletMap) {
+      dashLeafletMap = L.map("dashDeliveryMap", {
+        center: [lat, lng],
+        zoom: 14,
+        zoomControl: true,
+        scrollWheelZoom: false
+      });
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19 }).addTo(dashLeafletMap);
+      dashMapMarker = L.marker([lat, lng], { draggable: true }).addTo(dashLeafletMap);
+
+      dashMapMarker.on("dragend", function (e) {
+        const pos = e.target.getLatLng();
+        setDashMapCoords(pos.lat, pos.lng);
+      });
+      dashLeafletMap.on("click", function (e) {
+        dashMapMarker.setLatLng(e.latlng);
+        setDashMapCoords(e.latlng.lat, e.latlng.lng);
+      });
+    } else {
+      dashLeafletMap.setView([lat, lng], 14);
+      if (dashMapMarker) dashMapMarker.setLatLng([lat, lng]);
+    }
+    setDashMapCoords(lat, lng);
+    setTimeout(() => { if (dashLeafletMap) dashLeafletMap.invalidateSize(); }, 250);
+  }
+
+  function setDashMapCoords(lat, lng) {
+    const latInp = document.getElementById("dashInputLat");
+    const lngInp = document.getElementById("dashInputLng");
+    const badge = document.getElementById("dashMapCoordsBadge");
+    if(latInp) latInp.value = parseFloat(lat).toFixed(5);
+    if(lngInp) lngInp.value = parseFloat(lng).toFixed(5);
+    if(badge) badge.textContent = `GPS: ${parseFloat(lat).toFixed(4)}, ${parseFloat(lng).toFixed(4)}`;
+  }
+
   window.openDashboardAddressForm = function () {
     let saved = null;
-    try {
-      saved = JSON.parse(localStorage.getItem("manopavana_saved_delivery"));
-    } catch (e) {}
+    try { saved = JSON.parse(localStorage.getItem("manopavana_saved_delivery")); } catch (e) {}
 
     const card = document.getElementById("savedAddressDashboardCard");
     const form = document.getElementById("dashAddressForm");
@@ -1065,6 +1105,10 @@
         if (nameInp) nameInp.value = currentUser.displayName || "";
         if (phoneInp) phoneInp.value = currentUser.phone || "";
       }
+
+      const savedLat = saved && saved.latitude ? parseFloat(saved.latitude) : 12.9716;
+      const savedLng = saved && saved.longitude ? parseFloat(saved.longitude) : 77.5946;
+      initOrUpdateDashboardMap(savedLat, savedLng);
     }
   };
 
@@ -1187,6 +1231,19 @@
       const pMode = (order.paymentMode || "").toUpperCase();
       const oStat = (order.orderStatus || "").toLowerCase();
       const isUnpaid = pMode.includes("PENDING") || pMode.includes("UNPAID") || oStat.includes("incomplete") || oStat.includes("pending");
+      
+      let isExpired = false;
+      let minsLeft = 0;
+      
+      if (isUnpaid) {
+        const elapsedMins = (Date.now() - (order.timestampMs || 0)) / 60000;
+        if (elapsedMins > 10) {
+          isExpired = true;
+        } else {
+          minsLeft = Math.ceil(10 - elapsedMins);
+        }
+      }
+
       const orderPayloadAttr = escapeHtml(JSON.stringify(order));
 
       return `
@@ -1197,7 +1254,7 @@
               <span class="fk-order-meta">${escapeHtml(order.timestamp || "Recent")} • <strong>₹${escapeHtml(order.grandTotal)}</strong></span>
             </div>
             <span class="fk-order-status-badge ${isUnpaid ? 'badge-danger' : 'badge-success'}">
-              ${isUnpaid ? '⚠️ Payment Incomplete' : escapeHtml(order.orderStatus || "Placed")}
+              ${isUnpaid ? (isExpired ? '❌ Payment Failed (Expired)' : '⚠️ Payment Pending') : escapeHtml(order.orderStatus || "Placed")}
             </span>
           </div>
 
@@ -1206,20 +1263,21 @@
             <span class="fk-order-names">${escapeHtml(order.items)}</span>
           </div>
 
-          ${isUnpaid ? `
+          ${isUnpaid && !isExpired ? `
             <div class="fk-order-unpaid-box">
               <p class="fk-order-unpaid-text">
-                Payment was not completed for this order. Complete payment online or switch to Cash on Delivery:
+                ⏱ Expires in ${minsLeft} minutes. Load items back to cart to edit or complete payment.
               </p>
               <div class="fk-order-unpaid-actions">
-                <button type="button" class="btn-fk-order-action btn-fk-retry" onclick='window.retryOrderDirectly(${orderPayloadAttr}, "PHONEPE")'>
-                  ⚡ Retry via PhonePe
-                </button>
-                <button type="button" class="btn-fk-order-action btn-fk-cod" onclick='window.retryOrderDirectly(${orderPayloadAttr}, "COD")'>
-                  💵 Switch to COD
+                <button type="button" class="btn-fk-order-action btn-fk-retry" onclick='window.loadOrderToCartAndRetry(${orderPayloadAttr})'>
+                  🛒 Edit Items & Checkout
                 </button>
               </div>
             </div>
+          ` : isUnpaid && isExpired ? `
+             <div class="fk-order-unpaid-box" style="border-color:#7f1d1d; background:transparent;">
+              <p class="fk-order-unpaid-text" style="color:#ef4444; margin:0;">Time expired. This order was not completed.</p>
+             </div>
           ` : `
             <div class="track-timeline-progress">
               <div class="track-step-node node-step active">
@@ -1239,7 +1297,6 @@
                 <span class="node-lbl">Delivered</span>
               </div>
             </div>
-
             <div class="fk-order-footer">
               <strong class="fk-order-facility-tag">Facility Status:</strong>
               <span class="fk-order-facility-text">${escapeHtml(order.trackingNotes || "Sourced directly from traditional wood-press artisans, settled naturally, and packed hygienically at our Bangalore packaging and distribution facility.")}</span>
@@ -1249,6 +1306,17 @@
       `;
     }).join("");
   }
+
+  window.loadOrderToCartAndRetry = function (orderObj) {
+    window.closeAccountDashboard();
+    window.closePaymentFailedModal();
+    if (orderObj.cartItems && orderObj.cartItems.length > 0) {
+      cart = orderObj.cartItems;
+      saveCart();
+    }
+    window.openCart();
+    window.showActionToast("Cart Restored", "Items loaded! You can now edit quantities and checkout.", "🛒", "success");
+  };
 
   window.retryOrderDirectly = function (orderObj, mode) {
     window.closeAccountDashboard();
@@ -2907,6 +2975,7 @@
     const uid = currentUser.uid || ("GUEST_" + phone);
     const currentOrigin = window.location.origin + window.location.pathname;
 
+    const itemsToCheckout = checkoutSource === "buynow" && buyNowItem ? [buyNowItem] : cart;
     const orderPayload = {
       orderRef: currentOrderRef,
       firebaseUid: uid,
@@ -2916,11 +2985,8 @@
       address: `${address}, ${city}`,
       pincode: pincode,
       items: itemsSummary,
+      cartItems: itemsToCheckout, // Saves exact cart structure so user can edit it later
       grandTotal: currentCalculatedGrandTotal.toString(),
-      paymentMode: paymentMode,
-      orderStatus: paymentMode === "PHONEPE" ? "Payment Pending" : "Placed",
-      bottleCode: activeBottleCode || ""
-    };
 
     try {
       await saveOrderToFirestore(orderPayload);
@@ -3001,14 +3067,26 @@
           paymentMode: paymentMode === "COD" ? "Cash on Delivery (COD)" : "WhatsApp Manual Order"
         });
 
+        // NEW: Trigger Email Alert for COD & WhatsApp
+        if (paymentMode !== "PHONEPE") {
+          callBackend({
+            action: "send_manual_alert",
+            orderRef: currentOrderRef,
+            name: name,
+            phone: phone,
+            email: currentUser.email || "",
+            address: `${address}, ${city}`,
+            pincode: pincode,
+            items: itemsSummary,
+            amount: currentCalculatedGrandTotal,
+            latitude: latitude,
+            longitude: longitude,
+            paymentMode: paymentMode === "COD" ? "Cash on Delivery" : "WhatsApp Order"
+          });
+        }
+
         if (paymentMode === "WHATSAPP") {
           let msg = `🌿 *New Order - MANOPAVANA Wood-Pressed Oils*\n`;
-          msg += `*Ref:* #${currentOrderRef}\n*UID:* ${uid}\n`;
-          msg += `*Name:* ${name}\n*Phone:* ${phone}\n*Address:* ${address}, ${city} - ${pincode}\n`;
-          msg += `*Location:* https://www.google.com/maps/search/?api=1&query=${latitude},${longitude}\n`;
-          msg += `*Items:* ${itemsSummary}\n*Total:* ₹${currentCalculatedGrandTotal}\n*Payment:* WhatsApp Manual`;
-          window.open(`https://wa.me/${WHATSAPP_BUSINESS_NUMBER}?text=${encodeURIComponent(msg)}`, "_blank");
-        }
       }
     } catch (err) {
       console.warn("Checkout processing notice:", err);
