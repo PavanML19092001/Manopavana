@@ -1581,20 +1581,25 @@
   };
 
   function updateLocationUI() {
+    const headerLoc = document.getElementById("headerLocationLabel");
+    const headerMobileLoc = document.getElementById("headerMobileLocationLabel");
     const cartLoc = document.getElementById("cartDrawerLocLabel");
     const custPin = document.getElementById("custPincode");
     const headerLocBtn = document.getElementById("headerLocationTrigger");
 
     if (custPin) custPin.value = userSelectedPincode;
 
-    let displayLocation = userSelectedPincode
-      ? (isBangalorePincode ? `Bangalore (${userSelectedPincode})` : `${userSelectedPincode}`)
-      : "Bangalore";
+    const displayLocation = isBangalorePincode
+      ? `Bangalore (${userSelectedPincode})`
+      : `${userSelectedPincode} (Flipkart)`;
 
+    if (headerLoc) headerLoc.textContent = displayLocation;
+    if (headerMobileLoc) headerMobileLoc.textContent = displayLocation;
     if (cartLoc) cartLoc.textContent = displayLocation;
+
     if (headerLocBtn) {
-      headerLocBtn.title = `Delivery Location: ${displayLocation}`;
-      headerLocBtn.setAttribute("aria-label", `Delivery Location: ${displayLocation}`);
+      headerLocBtn.title = `Deliver to: ${displayLocation}`;
+      headerLocBtn.setAttribute("aria-label", `Deliver to: ${displayLocation}`);
     }
 
     renderProductsGrid();
