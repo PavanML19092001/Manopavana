@@ -4841,34 +4841,23 @@ body.has-mobile-cart .floating-sound-pill {
     margin-top: 2px;
   }
 
-  /* Compact Location Pill */
+/* Icon-Only Location Button on Mobile */
   .btn-location-header {
-    min-width: 0;
-    max-width: 120px;
-    flex: 1;
+    width: 34px;
     height: 34px;
-    padding: 4px 8px;
+    padding: 0;
+    flex: 0 0 auto;
     box-sizing: border-box;
     background: #180e08;
     border: 1px solid var(--border-medium);
     border-radius: 8px;
     display: inline-flex;
     align-items: center;
-    gap: 4px;
-    overflow: hidden;
+    justify-content: center;
   }
 
   .btn-location-header .loc-pin-icon {
-    font-size: 0.85rem;
-  }
-
-  .loc-short-name {
-    font-size: 0.72rem;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    color: var(--gold-light);
-    font-weight: 800;
+    font-size: 0.95rem;
   }
 
   /* Icon-Only Action Buttons */
