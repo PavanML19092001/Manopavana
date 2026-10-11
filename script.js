@@ -20,7 +20,7 @@
   // Default Bangalore Landmark Center (Vidhana Soudha corridor)
   const DEFAULT_BANGALORE_COORDS = [12.9716, 77.5946];
 
-  // Google Apps Script URL (FOR PHONEPE SECRET HANDSHAKE)
+  // Google Apps Script URL (FOR PHONEPE & NOTIFICATION HANDSHAKE)
   const GOOGLE_SCRIPT_API_URL = "https://script.google.com/macros/s/AKfycbyQ-8w0XmfJiBUm8fg_W3kBQ7XSXJTftmc6I7188L25N_dwWCKDtYwnpRJTcCii70U-/exec";
 
   // Active Firebase Configuration
@@ -65,6 +65,8 @@
   let mapMarker = null;
   let onboardMap = null;
   let onboardMarker = null;
+  let dashLeafletMap = null;
+  let dashMapMarker = null;
 
   let userSelectedPincode = localStorage.getItem("manopavana_user_pincode") || "560058";
   let isBangalorePincode = userSelectedPincode.startsWith("560");
@@ -405,7 +407,6 @@
     const iconEl = document.getElementById("actionToastIcon");
 
     if (!toast) return;
-
     if (toastTimeoutTimer) clearTimeout(toastTimeoutTimer);
 
     toast.className = "action-toast";
@@ -451,7 +452,7 @@
   }
 
   // ==========================================
-  // 5. JSONP BACKEND CALLER (FOR PHONEPE PG ONLY)
+  // 5. JSONP BACKEND CALLER
   // ==========================================
   function callBackend(params) {
     return new Promise((resolve, reject) => {
@@ -581,7 +582,7 @@
 
     if (currentUser) {
       const name = currentUser.displayName || (currentUser.email ? currentUser.email.split("@")[0] : "Customer");
-      if (authPillLabel) authPillLabel.textContent = "👤 " + name;
+      if (authPillLabel) authPillLabel.textContent = name;
       if (authUserMeta) authUserMeta.textContent = `Hello, ${name}`;
       if (custNameInput && !custNameInput.value && currentUser.displayName) {
         custNameInput.value = currentUser.displayName;
@@ -591,7 +592,7 @@
       }
       if (logoutItem) logoutItem.style.display = "block";
     } else {
-      if (authPillLabel) authPillLabel.textContent = "👤 Login";
+      if (authPillLabel) authPillLabel.textContent = "Login";
       if (authUserMeta) authUserMeta.textContent = "Welcome to MANOPAVANA";
       if (logoutItem) logoutItem.style.display = "none";
     }
@@ -817,7 +818,7 @@
       if (isNewUser) {
         window.showActionToast("Account Created", `🎉 Welcome to MANOPAVANA, ${name}!`, "🎉", "success");
       } else {
-        window.showActionToast("Sign In Successful", `🎉 Welcome back, ${name}!`, "������", "success");
+        window.showActionToast("Sign In Successful", `🎉 Welcome back, ${name}!`, "👋", "success");
       }
     } catch (err) {
       if (errBox) {
@@ -1037,9 +1038,6 @@
     }
   }
 
-  let dashLeafletMap = null;
-  let dashMapMarker = null;
-
   function initOrUpdateDashboardMap(lat, lng) {
     const mapElement = document.getElementById("dashDeliveryMap");
     if (!mapElement || typeof L === "undefined") return;
@@ -1074,9 +1072,9 @@
     const latInp = document.getElementById("dashInputLat");
     const lngInp = document.getElementById("dashInputLng");
     const badge = document.getElementById("dashMapCoordsBadge");
-    if(latInp) latInp.value = parseFloat(lat).toFixed(5);
-    if(lngInp) lngInp.value = parseFloat(lng).toFixed(5);
-    if(badge) badge.textContent = `GPS: ${parseFloat(lat).toFixed(4)}, ${parseFloat(lng).toFixed(4)}`;
+    if (latInp) latInp.value = parseFloat(lat).toFixed(5);
+    if (lngInp) lngInp.value = parseFloat(lng).toFixed(5);
+    if (badge) badge.textContent = `GPS: ${parseFloat(lat).toFixed(4)}, ${parseFloat(lng).toFixed(4)}`;
   }
 
   window.openDashboardAddressForm = function () {
@@ -1127,6 +1125,8 @@
     const address = document.getElementById("dashInputAddress")?.value.trim();
     const city = document.getElementById("dashInputCity")?.value.trim() || "Bengaluru";
     const pincode = document.getElementById("dashInputPincode")?.value.trim() || "560058";
+    const latitude = document.getElementById("dashInputLat")?.value || DEFAULT_BANGALORE_COORDS[0];
+    const longitude = document.getElementById("dashInputLng")?.value || DEFAULT_BANGALORE_COORDS[1];
 
     if (!name || phone.length < 10 || !address || pincode.length !== 6) {
       alert("Please fill in all address fields completely.");
@@ -1141,8 +1141,8 @@
       state: "Karnataka",
       district: "Bengaluru Urban",
       pincode,
-      latitude: DEFAULT_BANGALORE_COORDS[0],
-      longitude: DEFAULT_BANGALORE_COORDS[1]
+      latitude,
+      longitude
     };
 
     localStorage.setItem("manopavana_saved_delivery", JSON.stringify(payload));
@@ -1297,6 +1297,7 @@
                 <span class="node-lbl">Delivered</span>
               </div>
             </div>
+
             <div class="fk-order-footer">
               <strong class="fk-order-facility-tag">Facility Status:</strong>
               <span class="fk-order-facility-text">${escapeHtml(order.trackingNotes || "Sourced directly from traditional wood-press artisans, settled naturally, and packed hygienically at our Bangalore packaging and distribution facility.")}</span>
@@ -1588,11 +1589,11 @@
     if (custPin) custPin.value = userSelectedPincode;
 
     if (isBangalorePincode) {
-      if (headerLoc) headerLoc.innerHTML = `Deliver to: <strong>Bangalore (${userSelectedPincode})</strong>`;
+      if (headerLoc) headerLoc.innerHTML = `Bangalore (${userSelectedPincode})`;
       if (headerMobileLoc) headerMobileLoc.textContent = `Bangalore (${userSelectedPincode})`;
       if (cartLoc) cartLoc.textContent = `Bangalore (${userSelectedPincode})`;
     } else {
-      if (headerLoc) headerLoc.innerHTML = `Deliver to: <strong>${userSelectedPincode} (Flipkart)</strong>`;
+      if (headerLoc) headerLoc.innerHTML = `${userSelectedPincode} (Flipkart)`;
       if (headerMobileLoc) headerMobileLoc.textContent = `${userSelectedPincode} (Flipkart)`;
       if (cartLoc) cartLoc.textContent = `${userSelectedPincode} (Flipkart)`;
     }
@@ -2353,7 +2354,7 @@
       }
     }
 
-    // Floating Mobile Cart Bar (Ensuring body tag has class to prevent sound button overlap!)
+    // Floating Mobile Cart Bar
     const mobileCartBar = document.getElementById("mobileCartBar");
     if (mobileCartBar) {
       if (totalCount > 0) {
@@ -2657,7 +2658,6 @@
       .map((imgSrc, idx) => `<img src="${imgSrc}" class="detail-thumb-img ${idx === 0 ? "active" : ""}" onclick="switchDetailMainImage('${imgSrc}', this)" alt="Label View ${idx + 1}" loading="lazy" decoding="async" />`)
       .join("");
 
-    // Removed "Lab Certified" text completely (Requirement 7)
     const effectivePrice = isLoyaltyDiscountValid() ? Math.round(selectedSizeData.price * 0.9) : selectedSizeData.price;
 
     body.innerHTML = `
@@ -2700,7 +2700,6 @@
         <div class="detail-nutrition-grid">${nutritionBoxes}</div>
       </div>
 
-      <!-- Sticky bottom bar: Add to Cart and Buy Now next to each other -->
       <div class="pdp-sticky-bottom-bar">
         <div class="pdp-bottom-price-box">
           <span class="pdp-bottom-price-label">Price (${selectedSizeData.badge}):</span>
@@ -2899,6 +2898,7 @@
         address: orderData.address,
         pincode: orderData.pincode,
         items: orderData.items,
+        cartItems: orderData.cartItems || [],
         grandTotal: orderData.grandTotal,
         paymentMode: orderData.paymentMode,
         orderStatus: orderData.orderStatus,
@@ -2954,10 +2954,11 @@
     }
 
     let itemsSummary = "";
+    const itemsToCheckout = checkoutSource === "buynow" && buyNowItem ? [buyNowItem] : cart;
+
     if (checkoutSource === "retry" && retryOrderData) {
       itemsSummary = retryOrderData.items;
     } else {
-      const itemsToCheckout = checkoutSource === "buynow" && buyNowItem ? [buyNowItem] : cart;
       itemsSummary = itemsToCheckout.map((i) => `${i.title} (x${i.quantity})`).join(", ");
     }
 
@@ -2975,7 +2976,6 @@
     const uid = currentUser.uid || ("GUEST_" + phone);
     const currentOrigin = window.location.origin + window.location.pathname;
 
-    const itemsToCheckout = checkoutSource === "buynow" && buyNowItem ? [buyNowItem] : cart;
     const orderPayload = {
       orderRef: currentOrderRef,
       firebaseUid: uid,
@@ -2985,8 +2985,12 @@
       address: `${address}, ${city}`,
       pincode: pincode,
       items: itemsSummary,
-      cartItems: itemsToCheckout, // Saves exact cart structure so user can edit it later
+      cartItems: itemsToCheckout,
       grandTotal: currentCalculatedGrandTotal.toString(),
+      paymentMode: paymentMode,
+      orderStatus: paymentMode === "PHONEPE" ? "Payment Pending" : "Placed",
+      bottleCode: activeBottleCode || ""
+    };
 
     try {
       await saveOrderToFirestore(orderPayload);
@@ -3037,6 +3041,7 @@
           phone: phone,
           email: currentUser.email || "",
           items: itemsSummary,
+          cartItems: itemsToCheckout,
           grandTotal: currentCalculatedGrandTotal.toString(),
           paymentMode: paymentMode,
           orderStatus: "Placed",
@@ -3053,6 +3058,22 @@
         }
         localStorage.setItem("manopavana_local_orders", JSON.stringify(localOrdersHistory));
 
+        // Trigger email notification for manual COD/WhatsApp orders
+        callBackend({
+          action: "send_manual_alert",
+          orderRef: currentOrderRef,
+          name: name,
+          phone: phone,
+          email: currentUser.email || "",
+          address: `${address}, ${city}`,
+          pincode: pincode,
+          items: itemsSummary,
+          amount: currentCalculatedGrandTotal,
+          latitude: latitude,
+          longitude: longitude,
+          paymentMode: paymentMode === "COD" ? "Cash on Delivery" : "WhatsApp Order"
+        });
+
         if (checkoutSource === "cart") {
           cart = [];
           localStorage.removeItem("manopavana_cart");
@@ -3067,26 +3088,14 @@
           paymentMode: paymentMode === "COD" ? "Cash on Delivery (COD)" : "WhatsApp Manual Order"
         });
 
-        // NEW: Trigger Email Alert for COD & WhatsApp
-        if (paymentMode !== "PHONEPE") {
-          callBackend({
-            action: "send_manual_alert",
-            orderRef: currentOrderRef,
-            name: name,
-            phone: phone,
-            email: currentUser.email || "",
-            address: `${address}, ${city}`,
-            pincode: pincode,
-            items: itemsSummary,
-            amount: currentCalculatedGrandTotal,
-            latitude: latitude,
-            longitude: longitude,
-            paymentMode: paymentMode === "COD" ? "Cash on Delivery" : "WhatsApp Order"
-          });
-        }
-
         if (paymentMode === "WHATSAPP") {
           let msg = `🌿 *New Order - MANOPAVANA Wood-Pressed Oils*\n`;
+          msg += `*Ref:* #${currentOrderRef}\n*UID:* ${uid}\n`;
+          msg += `*Name:* ${name}\n*Phone:* ${phone}\n*Address:* ${address}, ${city} - ${pincode}\n`;
+          msg += `*Location:* https://www.google.com/maps/search/?api=1&query=${latitude},${longitude}\n`;
+          msg += `*Items:* ${itemsSummary}\n*Total:* ₹${currentCalculatedGrandTotal}\n*Payment:* WhatsApp Manual`;
+          window.open(`https://wa.me/${WHATSAPP_BUSINESS_NUMBER}?text=${encodeURIComponent(msg)}`, "_blank");
+        }
       }
     } catch (err) {
       console.warn("Checkout processing notice:", err);
@@ -3341,7 +3350,6 @@
         announcementText.innerHTML = `🏷 <strong>Bottle Scan Verified:</strong> 10% Loyalty Discount Active! <span class="countdown-pill">⏱ ${formatted}</span>`;
         topBar.classList.add("loyal-banner");
       } else {
-        // Centered single delivery text as requested (Requirement 2)
         announcementText.innerHTML = `<span class="announcement-item">🚚 <strong>FREE Doorstep Delivery across Bangalore (24–72 hours) on above 500</strong></span>`;
         topBar.classList.remove("loyal-banner");
         clearInterval(countdownTimerInterval);
@@ -3355,36 +3363,6 @@
   // ==========================================
   // 21. DOM INITIALIZATION
   // ==========================================
-  window.handleSubNavClick = function (evt, linkEl) {
-    document.querySelectorAll(".sub-nav-link").forEach((l) => l.classList.remove("active"));
-    if (linkEl) linkEl.classList.add("active");
-  };
-
-  function initSubNavObserver() {
-    const sectionIds = ["products", "combo", "bottle-design", "culinary", "reviews", "loyalty", "benchmark", "faqs"];
-    const sections = sectionIds.map((id) => document.getElementById(id)).filter(Boolean);
-    const links = document.querySelectorAll(".sub-nav-link");
-
-    if (!window.IntersectionObserver) return;
-
-    const observer = new IntersectionObserver((entries) => {
-      entries.forEach((entry) => {
-        if (entry.isIntersecting) {
-          const currentId = entry.target.id;
-          links.forEach((l) => {
-            const href = l.getAttribute("href") || "";
-            if (href === "#" + currentId) {
-              links.forEach((other) => other.classList.remove("active"));
-              l.classList.add("active");
-            }
-          });
-        }
-      });
-    }, { threshold: 0.25, rootMargin: "-70px 0px -40% 0px" });
-
-    sections.forEach((sec) => observer.observe(sec));
-  }
-
   document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("soundToggleBtn")?.addEventListener("click", toggleAudio);
     initVideoAutoplay();
@@ -3545,7 +3523,6 @@
     populateStatesDropdown();
     updateLocationUI();
     initLoyaltyFromStorage();
-    initSubNavObserver();
     renderProductsGrid();
     renderCart();
     renderReviews();
