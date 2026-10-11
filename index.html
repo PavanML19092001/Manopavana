@@ -83,13 +83,10 @@
           </a>
 
           <!-- Deliver To Location Pill -->
-          <button type="button" id="headerLocationTrigger" class="btn-location-header" onclick="openLocationCheckModal()" title="Change delivery location">
-            <span class="loc-pin-icon">📍</span>
-            <div class="loc-text-col">
-              <span class="loc-sub">Deliver to</span>
-              <strong id="headerLocationLabel">Bangalore (560xxx)</strong>
-            </div>
-          </button>
+          <button type="button" id="headerLocationTrigger" class="btn-location-header" onclick="openLocationCheckModal()" title="Select Delivery Location">
+  <span class="loc-pin-icon" aria-hidden="true">📍</span>
+  <span id="headerLocationLabel" class="loc-short-name">Set location</span>
+</button>
         </div>
 
         <!-- Rightmost Cluster: Login Button & Cart Button -->
@@ -112,11 +109,18 @@
           </div>
 
           <!-- Cart Button -->
-          <button id="openCartBtn" class="cart-trigger-btn" type="button" aria-label="Open Cart Drawer">
-            <span class="cart-icon-graphic">🛒</span>
-            <span class="cart-label-text">Cart</span>
-            <span id="cartCountBadge" class="cart-badge-count">0</span>
-          </button>
+          <!-- Cart Button with Sharp Vector SVG -->
+<button id="openCartBtn" class="cart-trigger-btn" type="button" aria-label="Open Cart Drawer">
+  <span class="cart-icon-graphic" aria-hidden="true">
+    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="9" cy="21" r="1"></circle>
+      <circle cx="20" cy="21" r="1"></circle>
+      <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
+    </svg>
+  </span>
+  <span class="cart-label-text">Cart</span>
+  <span id="cartCountBadge" class="cart-badge-count">0</span>
+</button>
         </div>
       </div>
 
