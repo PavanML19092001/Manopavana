@@ -21,8 +21,13 @@
   const DEFAULT_BANGALORE_COORDS = [12.9716, 77.5946];
 
   // Google Apps Script URL (FOR PHONEPE & NOTIFICATION HANDSHAKE)
-  const GOOGLE_SCRIPT_API_URL = "https://script.google.com/macros/s/AKfycbyQ-8w0XmfJiBUm8fg_W3kBQ7XSXJTftmc6I7188L25N_dwWCKDtYwnpRJTcCii70U-/exec";
-
+// Remove: const GOOGLE_SCRIPT_API_URL = "...";
+const BACKEND_API_URL = "/api";
+const EMAILJS_CONFIG = {
+  SERVICE_ID: "YOUR_EMAILJS_SERVICE_ID",   // Replace with your Service ID from Step 2
+  TEMPLATE_ID: "YOUR_EMAILJS_TEMPLATE_ID"  // Replace with your Template ID from Step 2
+};
+  
   // Active Firebase Configuration
   const firebaseConfig = {
     apiKey: "AIzaSyBZ2h7B82XvIR2ffT2E5g9MHp1M7QPO9K4",
@@ -345,6 +350,31 @@
       "North West Delhi", "Shahdara", "South Delhi", "South East Delhi", "South West Delhi", "West Delhi"
     ]
   };
+
+  function sendOrderEmailNotification(orderData) {
+  if (typeof emailjs === "undefined") {
+    console.warn("EmailJS SDK is not loaded.");
+    return;
+  }
+
+  const templateParams = {
+    order_ref: orderData.orderRef,
+    customer_name: orderData.customerName || orderData.name,
+    phone: orderData.phone,
+    email: orderData.email || "N/A",
+    address: orderData.address,
+    pincode: orderData.pincode,
+    items: orderData.items,
+    amount: orderData.grandTotal || orderData.amount,
+    payment_mode: orderData.paymentMode,
+    latitude: orderData.latitude || "",
+    longitude: orderData.longitude || ""
+  };
+
+  emailjs.send(EMAILJS_CONFIG.SERVICE_ID, EMAILJS_CONFIG.TEMPLATE_ID, templateParams)
+    .then(() => console.log("Confirmation email successfully sent."))
+    .catch((err) => console.warn("Email dispatch error:", err));
+}
 
   function populateStatesDropdown() {
     const stateSelect = document.getElementById("custState");
@@ -3003,56 +3033,41 @@
         sessionStorage.setItem("manopavana_pending_checkout_source", checkoutSource);
         sessionStorage.setItem("manopavana_pending_order_ref", currentOrderRef);
 
-        const response = await callBackend({
-          action: "create_phonepe_order",
-          orderRef: currentOrderRef,
-          firebaseUid: uid,
-          amount: currentCalculatedGrandTotal,
-          name: name,
-          phone: phone,
-          email: currentUser.email || "",
-          address: `${address}, ${city}`,
-          state: state,
-          district: district,
-          pincode: pincode,
-          items: itemsSummary,
-          bottleCode: activeBottleCode || "",
-          latitude: latitude,
-          longitude: longitude,
-          redirectBaseUrl: currentOrigin
+        const res = await fetch(`${BACKEND_API_URL}?action=create_order`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            orderRef: currentOrderRef,
+            amount: currentCalculatedGrandTotal,
+            phone: phone,
+            redirectBaseUrl: currentOrigin
+          })
         });
 
+        const response = await res.json();
+
         if (response && response.status === "SUCCESS" && response.redirectUrl) {
-          const targetUrl = String(response.redirectUrl).trim();
-          if (targetUrl.indexOf("script.google.com") !== -1 || targetUrl.indexOf("script.googleusercontent.com") !== -1) {
-            alert("PhonePe Gateway session could not be established. Please select 'Cash on Delivery' or 'WhatsApp Order'.");
-            return;
-          }
-          window.location.href = targetUrl;
+          window.location.href = response.redirectUrl;
           return;
         } else {
-          const errDetail = (response && response.message) ? response.message : "Unable to initiate PhonePe session.";
-          alert("Payment Error: " + errDetail + "\n\nPlease try Cash on Delivery or WhatsApp Order.");
+          alert("Payment Error: " + (response.message || "Unable to start payment.") + "\nPlease try Cash on Delivery or WhatsApp.");
           return;
         }
       } else {
-        const orderSnapshot = {
-          timestamp: new Date().toLocaleDateString("en-IN", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }),
-          timestampMs: Date.now(),
+        // Cash on Delivery & WhatsApp Manual Orders
+        sendOrderEmailNotification({
           orderRef: currentOrderRef,
-          firebaseUid: uid,
           customerName: name,
           phone: phone,
           email: currentUser.email || "",
+          address: `${address}, ${city}`,
+          pincode: pincode,
           items: itemsSummary,
-          cartItems: itemsToCheckout,
-          grandTotal: currentCalculatedGrandTotal.toString(),
-          paymentMode: paymentMode,
-          orderStatus: "Placed",
-          trackingNotes: "Sourced directly from traditional wood-press artisans, settled naturally, and packed hygienically at our Bangalore packaging and distribution facility.",
+          grandTotal: currentCalculatedGrandTotal,
+          paymentMode: paymentMode === "COD" ? "Cash on Delivery" : "WhatsApp Manual Order",
           latitude: latitude,
           longitude: longitude
-        };
+        });
 
         const existingIdx = localOrdersHistory.findIndex(o => o.orderRef === currentOrderRef);
         if (existingIdx !== -1) {
@@ -3368,9 +3383,9 @@
   // 21. DOM INITIALIZATION
   // ==========================================
   document.addEventListener("DOMContentLoaded", () => {
+    // Audio engine & ambient autoplay triggers
     document.getElementById("soundToggleBtn")?.addEventListener("click", toggleAudio);
     initVideoAutoplay();
-
     tryImmediateAudioPlayback();
 
     const enableAudioOnGesture = () => {
@@ -3382,6 +3397,7 @@
     };
     ["click", "touchend"].forEach((e) => window.addEventListener(e, enableAudioOnGesture, { passive: true }));
 
+    // Drawer and Modal Open/Close Controls
     document.getElementById("openCartBtn")?.addEventListener("click", window.openCart);
     document.getElementById("closeCartBtn")?.addEventListener("click", window.closeCart);
     document.getElementById("cartBackdrop")?.addEventListener("click", window.closeCart);
@@ -3405,18 +3421,21 @@
     document.getElementById("closeModalBtn")?.addEventListener("click", window.closeCheckoutModal);
     document.getElementById("closeDetailModalBtn")?.addEventListener("click", window.closeProductDetailModal);
 
+    // Payment Mode Switchers
     document.getElementById("payPhonePe")?.addEventListener("change", updatePaymentModeUI);
     document.getElementById("payCOD")?.addEventListener("change", updatePaymentModeUI);
     document.getElementById("payWhatsApp")?.addEventListener("change", updatePaymentModeUI);
 
     document.getElementById("submitOrderBtn")?.addEventListener("click", handleCheckoutSubmission);
 
+    // Numeric-Only Input Sanitizers
     ["custPhone", "custPincode", "pincodeCheckInput", "editProfPhone", "dashInputPhone"].forEach((id) => {
       document.getElementById(id)?.addEventListener("input", (e) => {
         e.target.value = e.target.value.replace(/\D/g, "");
       });
     });
 
+    // Customer Review Form Submission
     document.getElementById("productReviewForm")?.addEventListener("submit", (e) => {
       e.preventDefault();
       const name = document.getElementById("revName")?.value.trim();
@@ -3446,6 +3465,7 @@
       window.showActionToast("Review Submitted", "✨ Thank you! Your review has been posted.", "✨", "success");
     });
 
+    // FAQ Accordion Toggle Handlers
     document.querySelectorAll(".faq-question").forEach((button) => {
       button.addEventListener("click", () => {
         const item = button.parentElement;
@@ -3455,7 +3475,9 @@
       });
     });
 
-    // Verify PhonePe Return
+    // ==========================================
+    // PhonePe Payment Return Verification (Cloudflare /api)
+    // ==========================================
     const urlParams = new URLSearchParams(window.location.search);
     const incomingOrderRef = urlParams.get("orderRef");
     const incomingStatus = (urlParams.get("status") || "").toLowerCase();
@@ -3469,20 +3491,22 @@
         sessionStorage.removeItem("manopavana_pending_order_ref");
         window.history.replaceState({}, document.title, window.location.pathname);
       } else {
-        window.showActionToast("Checking Status", "Verifying with PhonePe... ⏳", "⏳", "info");
+        window.showActionToast("Checking Status", "Verifying payment with PhonePe... ⏳", "⏳", "info");
 
         let handled = false;
         const cutoffTimer = setTimeout(() => {
           if (!handled) {
             handled = true;
-            window.showPaymentFailedModal(incomingOrderRef, "Payment was not confirmed by the bank. Order not yet placed.");
+            window.showPaymentFailedModal(incomingOrderRef, "Payment confirmation timed out.");
             sessionStorage.removeItem("manopavana_pending_checkout_source");
             sessionStorage.removeItem("manopavana_pending_order_ref");
             window.history.replaceState({}, document.title, window.location.pathname);
           }
-        }, 2500);
+        }, 5000);
 
-        callBackend({ action: "verify_payment", orderRef: incomingOrderRef })
+        // Queries Cloudflare Pages Function at /api
+        fetch(`${BACKEND_API_URL}?action=verify_order&orderRef=${encodeURIComponent(incomingOrderRef)}`)
+          .then((res) => res.json())
           .then((verification) => {
             if (handled) return;
             clearTimeout(cutoffTimer);
@@ -3497,24 +3521,31 @@
                 }, { merge: true }).catch(() => {});
               }
 
+              // Fire real-time order email notification via EmailJS
+              let matchedOrder = localOrdersHistory.find((o) => o.orderRef === incomingOrderRef);
+              if (matchedOrder && typeof sendOrderEmailNotification === "function") {
+                sendOrderEmailNotification(matchedOrder);
+              }
+
               if (savedCheckoutSource === "cart") {
                 cart = [];
                 localStorage.removeItem("manopavana_cart");
                 renderCart();
               }
+
               showOrderConfirmationModal({
                 orderRef: incomingOrderRef,
                 paymentMode: "PhonePe Online (Verified)"
               });
             } else {
-              window.showPaymentFailedModal(incomingOrderRef, verification.reason || "Payment was cancelled or declined by bank.");
+              window.showPaymentFailedModal(incomingOrderRef, verification.reason || "Payment declined by bank.");
             }
           })
           .catch(() => {
             if (handled) return;
             clearTimeout(cutoffTimer);
             handled = true;
-            window.showPaymentFailedModal(incomingOrderRef, "Payment was not confirmed. Connection dropped.");
+            window.showPaymentFailedModal(incomingOrderRef, "Payment connection dropped.");
           })
           .finally(() => {
             sessionStorage.removeItem("manopavana_pending_checkout_source");
@@ -3524,6 +3555,7 @@
       }
     }
 
+    // Baseline Layout & UI Initializers
     populateStatesDropdown();
     updateLocationUI();
     initLoyaltyFromStorage();
