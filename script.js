@@ -1,6 +1,6 @@
 // ==========================================
 // MANOPAVANA - ARTISANAL WOOD-PRESSED OILS (BANGALORE)
-// PRODUCTION CLIENT SCRIPT (script.js) - CLOUDFLARE PAGES & EMAILJS
+// PRODUCTION CLIENT SCRIPT (script.js)
 // ==========================================
 
 (function () {
@@ -20,7 +20,7 @@
   // Default Bangalore Landmark Center (Vidhana Soudha corridor)
   const DEFAULT_BANGALORE_COORDS = [12.9716, 77.5946];
 
-  // Cloudflare Pages API Route & EmailJS Setup
+  // Cloudflare Pages API Endpoint & EmailJS Credentials
   const BACKEND_API_URL = "/api";
   const EMAILJS_CONFIG = {
     SERVICE_ID: "service_c6el9r8",
@@ -72,7 +72,7 @@
   let dashLeafletMap = null;
   let dashMapMarker = null;
 
-  let userSelectedPincode = localStorage.getItem("manopavana_user_pincode") || "560058";
+  let userSelectedPincode = localStorage.getItem("manopavana_user_pincode") || "";
   let isBangalorePincode = userSelectedPincode.startsWith("560");
 
   let activeBottleCode = localStorage.getItem("manopavana_bottle_code") || null;
@@ -350,6 +350,13 @@
     ]
   };
 
+  function sanitizeAmount(val) {
+    if (typeof val === "number" && !isNaN(val)) return val;
+    const cleaned = String(val || "0").replace(/[^0-9.]/g, "");
+    const num = parseFloat(cleaned);
+    return isNaN(num) ? 0 : num;
+  }
+
   function populateStatesDropdown() {
     const stateSelect = document.getElementById("custState");
     const districtSelect = document.getElementById("custDistrict");
@@ -442,7 +449,7 @@
       address: orderData.address || "N/A",
       pincode: orderData.pincode || "560058",
       items: orderData.items || "N/A",
-      amount: orderData.grandTotal || orderData.amount || 0,
+      amount: sanitizeAmount(orderData.grandTotal || orderData.amount || 0),
       payment_mode: orderData.paymentMode || "Direct Order",
       latitude: orderData.latitude || DEFAULT_BANGALORE_COORDS[0],
       longitude: orderData.longitude || DEFAULT_BANGALORE_COORDS[1]
@@ -846,7 +853,6 @@
   // 6. UNIVERSAL 1-CLICK ADDRESS SYNC & GEOCODING
   // ==========================================
   function applyAddressEverywhere(addrData) {
-    // 1. Persist to local storage
     localStorage.setItem("manopavana_saved_delivery", JSON.stringify(addrData));
     if (addrData.pincode) {
       localStorage.setItem("manopavana_user_pincode", addrData.pincode);
@@ -855,7 +861,7 @@
       updateLocationUI();
     }
 
-    // 2. Auto-populate Checkout fields
+    // Auto-fill Checkout
     const custName = document.getElementById("custName");
     const custPhone = document.getElementById("custPhone");
     const custAddress = document.getElementById("custAddress");
@@ -882,7 +888,7 @@
       custDistrict.value = addrData.district;
     }
 
-    // 3. Auto-populate Dashboard fields
+    // Auto-fill Dashboard
     const dashName = document.getElementById("dashInputName");
     const dashPhone = document.getElementById("dashInputPhone");
     const dashAddress = document.getElementById("dashInputAddress");
@@ -899,11 +905,9 @@
     if (dashLat && addrData.latitude) dashLat.value = addrData.latitude;
     if (dashLng && addrData.longitude) dashLng.value = addrData.longitude;
 
-    // 4. Update Saved Card previews
     renderDashboardSavedAddress();
     loadSavedDeliveryDetails();
 
-    // 5. Update Firebase customer record if logged in
     if (db && currentUser) {
       db.collection("customers").doc(currentUser.uid).set({
         defaultAddress: addrData
@@ -1186,7 +1190,7 @@
       if (phoneEl) phoneEl.textContent = `📞 +91 ${saved.phone}`;
     } else {
       if (nameEl) nameEl.textContent = "No address saved yet";
-      if (textEl) textEl.textContent = "Click Edit / Change to add your default Bangalore doorstep address.";
+      if (textEl) textEl.textContent = "Click Edit / Change to set your delivery address.";
       if (phoneEl) phoneEl.textContent = "";
     }
   }
@@ -1290,7 +1294,7 @@
 
     applyAddressEverywhere(payload);
     window.closeDashboardAddressForm();
-    window.showActionToast("Address Saved", "📍 Delivery address saved and updated across all sections!", "🏡", "success");
+    window.showActionToast("Address Saved", "📍 Delivery address saved and synchronized!", "🏡", "success");
   };
 
   async function fetchUserOrderHistory() {
@@ -1399,7 +1403,7 @@
           ${isUnpaid && !isExpired ? `
             <div class="fk-order-unpaid-box">
               <p class="fk-order-unpaid-text">
-                ⏱ Expires in ${minsLeft} minutes. Complete your payment online or switch to COD:
+                ⏱ Payment incomplete. You have ${minsLeft} mins left to complete payment:
               </p>
               <div class="fk-order-unpaid-actions">
                 <button type="button" class="btn-fk-order-action btn-fk-retry" onclick='window.loadOrderToCartAndRetry(${orderPayloadAttr})'>
@@ -1409,7 +1413,7 @@
             </div>
           ` : isUnpaid && isExpired ? `
              <div class="fk-order-unpaid-box" style="border-color:#7f1d1d; background:transparent;">
-              <p class="fk-order-unpaid-text" style="color:#ef4444; margin:0;">Time expired (10 mins passed). Order marked as Failed.</p>
+              <p class="fk-order-unpaid-text" style="color:#ef4444; margin:0;">Payment time expired (10 mins passed). Order marked as Failed.</p>
              </div>
           ` : `
             <div class="track-timeline-progress">
@@ -1445,21 +1449,15 @@
     window.closeAccountDashboard();
     window.closePaymentFailedModal();
 
-    // 1. Restore exact items back into cart
+    // 1. Restore exact items into cart so user can edit quantities, add or remove items freely
     if (orderObj.cartItems && orderObj.cartItems.length > 0) {
       cart = orderObj.cartItems;
       saveCart();
     }
 
-    // 2. Open checkout directly with the order details so they can edit or proceed
-    checkoutSource = "cart";
-    buyNowItem = null;
-    retryOrderData = orderObj;
-    currentOrderRef = orderObj.orderRef;
-    currentCalculatedGrandTotal = parseFloat(orderObj.grandTotal) || 0;
-
-    openCheckoutModalUI();
-    window.showActionToast("Order Restored", "⚡ Items loaded! You can modify items or proceed to pay.", "🛒", "info");
+    // 2. Open Cart drawer directly so the user can easily review or edit items before checking out
+    window.openCart();
+    window.showActionToast("Cart Restored", "⚡ Items loaded! You can modify your items or proceed to checkout.", "🛒", "info");
   };
 
   // ==========================================
@@ -1595,13 +1593,19 @@
   };
 
   // ==========================================
-  // 9. LOCATION & PINCODE CHECKER MODAL
+  // 9. MANDATORY LOCATION MODAL & PINCODE
   // ==========================================
-  window.openLocationCheckModal = function () {
+  window.openLocationCheckModal = function (isMandatory = false) {
     const modal = document.getElementById("locationModalBackdrop");
     const pinInput = document.getElementById("pincodeCheckInput");
     const resultBox = document.getElementById("pincodeCheckResultBox");
+    const closeBtn = modal?.querySelector(".close-modal-btn");
+
     if (!modal) return;
+
+    if (closeBtn) {
+      closeBtn.style.display = isMandatory ? "none" : "block";
+    }
 
     if (pinInput) pinInput.value = userSelectedPincode;
     if (resultBox) resultBox.style.display = "none";
@@ -1675,13 +1679,14 @@
     userSelectedPincode = enteredPin;
     isBangalorePincode = enteredPin.startsWith("560");
     localStorage.setItem("manopavana_user_pincode", enteredPin);
+    localStorage.setItem("manopavana_location_selected", "true");
     updateLocationUI();
 
     if (isBangalorePincode) {
       resultBox.className = "pincode-result-box success";
       resultBox.innerHTML = `<strong>✅ Delivering to Bangalore (${enteredPin})</strong>Direct doorstep delivery in 24–72 hours from our facility. Free on ₹500+ orders.`;
       resultBox.style.display = "block";
-      setTimeout(window.closeLocationCheckModal, 1300);
+      setTimeout(window.closeLocationCheckModal, 1100);
     } else {
       resultBox.className = "pincode-result-box warning";
       resultBox.innerHTML = `<strong>📍 Outside Bangalore (${enteredPin})</strong>Direct doorstep delivery is exclusive to Bangalore (560xxx). Orders for your location are fulfilled securely via our <strong>Official Flipkart Store</strong>.<br><br>
@@ -1697,11 +1702,11 @@
     const custPin = document.getElementById("custPincode");
     const headerLocBtn = document.getElementById("headerLocationTrigger");
 
-    if (custPin) custPin.value = userSelectedPincode;
+    if (custPin && userSelectedPincode) custPin.value = userSelectedPincode;
 
-    const displayLocation = isBangalorePincode
-      ? `Bangalore (${userSelectedPincode})`
-      : `${userSelectedPincode} (Flipkart)`;
+    const displayLocation = userSelectedPincode
+      ? (isBangalorePincode ? `Bangalore (${userSelectedPincode})` : `${userSelectedPincode} (Flipkart)`)
+      : "Bangalore";
 
     if (cartLoc) cartLoc.textContent = displayLocation;
     if (headerLocBtn) {
@@ -2232,7 +2237,7 @@
     if (existing) {
       existing.quantity += 1;
     } else {
-      cart.push({ id, title, price: parseInt(price, 10), img, quantity: 1 });
+      cart.push({ id, title, price: sanitizeAmount(price), img, quantity: 1 });
     }
     saveCart();
     window.showActionToast("Added to Bag", `🛒 Added ${title} to your bag.`, "🛒", "success");
@@ -2278,7 +2283,7 @@
 
   function renderCart() {
     const totalCount = cart.reduce((sum, item) => sum + item.quantity, 0);
-    const subtotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+    const subtotal = cart.reduce((sum, item) => sum + sanitizeAmount(item.price) * item.quantity, 0);
 
     let discountAmount = 0;
     const isLoyal = isLoyaltyDiscountValid();
@@ -2697,7 +2702,7 @@
     }
     checkoutSource = "buynow";
     retryOrderData = null;
-    buyNowItem = { id, title, price: parseInt(price, 10), quantity: 1, img };
+    buyNowItem = { id, title, price: sanitizeAmount(price), quantity: 1, img };
     window.closeProductDetailModal();
     promptLoginOrOpenCheckout();
   };
@@ -2768,16 +2773,17 @@
     const items = checkoutSource === "buynow" && buyNowItem ? [buyNowItem] : cart;
 
     items.forEach((item) => {
-      subtotal += item.price * item.quantity;
+      const cleanPrice = sanitizeAmount(item.price);
+      subtotal += cleanPrice * item.quantity;
       itemsCount += item.quantity;
       previewHTML += `
         <div class="checkout-preview-item">
           <img src="${item.img}" class="checkout-preview-thumb" alt="${escapeHtml(item.title)}" onerror="this.src='https://placehold.co/50x60/171412/eab308?text=Bottle'" />
           <div class="checkout-preview-info">
             <strong>${escapeHtml(item.title)}</strong>
-            <span>Qty: ${item.quantity} × ₹${item.price}</span>
+            <span>Qty: ${item.quantity} × ₹${cleanPrice}</span>
           </div>
-          <div class="checkout-preview-cost">₹${(item.price * item.quantity).toLocaleString("en-IN")}</div>
+          <div class="checkout-preview-cost">₹${(cleanPrice * item.quantity).toLocaleString("en-IN")}</div>
         </div>
       `;
     });
@@ -2842,7 +2848,7 @@
         pincode: orderData.pincode,
         items: orderData.items,
         cartItems: orderData.cartItems || [],
-        grandTotal: orderData.grandTotal,
+        grandTotal: sanitizeAmount(orderData.grandTotal).toString(),
         paymentMode: orderData.paymentMode,
         orderStatus: orderData.orderStatus,
         bottleCode: orderData.bottleCode || "",
@@ -2888,7 +2894,6 @@
 
     if (errBox) errBox.style.display = "none";
 
-    // Auto-update across all address models
     applyAddressEverywhere({
       name, phone, address, state, district, city, pincode, latitude, longitude
     });
@@ -2915,8 +2920,9 @@
 
     const uid = currentUser.uid || ("GUEST_" + phone);
     const currentOrigin = window.location.origin + window.location.pathname;
+    const finalNumericTotal = sanitizeAmount(currentCalculatedGrandTotal);
 
-    // DEFINING ORDERSNAPSHOT EARLY TO PREVENT REFERENCE ERRORS
+    // Initialized early to guarantee existence in all code branches
     const orderSnapshot = {
       timestamp: new Date().toLocaleDateString("en-IN", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }),
       timestampMs: Date.now(),
@@ -2929,7 +2935,7 @@
       pincode: pincode,
       items: itemsSummary,
       cartItems: itemsToCheckout,
-      grandTotal: currentCalculatedGrandTotal.toString(),
+      grandTotal: finalNumericTotal.toString(),
       paymentMode: paymentMode,
       orderStatus: paymentMode === "PHONEPE" ? "Payment Pending" : "Placed",
       bottleCode: activeBottleCode || "",
@@ -2945,13 +2951,12 @@
         sessionStorage.setItem("manopavana_pending_checkout_source", checkoutSource);
         sessionStorage.setItem("manopavana_pending_order_ref", currentOrderRef);
 
-        // ENSURE ACCURATE PAISE CONVERSION: amount in Rupees passed cleanly to Cloudflare /api
         const res = await fetch(`${BACKEND_API_URL}?action=create_order`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             orderRef: currentOrderRef,
-            amount: parseFloat(currentCalculatedGrandTotal),
+            amount: finalNumericTotal,
             phone: phone,
             redirectBaseUrl: currentOrigin
           })
@@ -2967,7 +2972,7 @@
           return;
         }
       } else {
-        // Save local orders history
+        // Save to local storage
         const existingIdx = localOrdersHistory.findIndex(o => o.orderRef === currentOrderRef);
         if (existingIdx !== -1) {
           localOrdersHistory[existingIdx] = orderSnapshot;
@@ -2976,7 +2981,7 @@
         }
         localStorage.setItem("manopavana_local_orders", JSON.stringify(localOrdersHistory));
 
-        // Fire EmailJS Notification
+        // Trigger EmailJS alert
         sendOrderEmailNotification({
           orderRef: currentOrderRef,
           customerName: name,
@@ -2985,7 +2990,7 @@
           address: `${address}, ${city}`,
           pincode: pincode,
           items: itemsSummary,
-          grandTotal: currentCalculatedGrandTotal,
+          grandTotal: finalNumericTotal,
           paymentMode: paymentMode === "COD" ? "Cash on Delivery" : "WhatsApp Manual Order",
           latitude: latitude,
           longitude: longitude
@@ -3010,7 +3015,7 @@
           msg += `*Ref:* #${currentOrderRef}\n*UID:* ${uid}\n`;
           msg += `*Name:* ${name}\n*Phone:* ${phone}\n*Address:* ${address}, ${city} - ${pincode}\n`;
           msg += `*Location:* https://www.google.com/maps/search/?api=1&query=${latitude},${longitude}\n`;
-          msg += `*Items:* ${itemsSummary}\n*Total:* ₹${currentCalculatedGrandTotal}\n*Payment:* WhatsApp Manual`;
+          msg += `*Items:* ${itemsSummary}\n*Total:* ₹${finalNumericTotal}\n*Payment:* WhatsApp Manual`;
           window.open(`https://wa.me/${WHATSAPP_BUSINESS_NUMBER}?text=${encodeURIComponent(msg)}`, "_blank");
         }
       }
@@ -3112,7 +3117,7 @@
       window.loadOrderToCartAndRetry(matched);
     } else {
       window.closePaymentFailedModal();
-      openCheckoutModalUI();
+      window.openCart();
     }
   };
 
@@ -3128,15 +3133,44 @@
     }
 
     if (matched) {
-      window.loadOrderToCartAndRetry(matched);
-      const cRadio = document.getElementById("payCOD");
-      if (cRadio) cRadio.checked = true;
-      updatePaymentModeUI();
+      // 1. Immediately update the existing failed order in Firestore so it doesn't linger as Incomplete
+      if (db) {
+        db.collection("orders").doc(matched.orderRef).set({
+          paymentMode: "COD",
+          orderStatus: "Placed",
+          updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        }, { merge: true }).catch(() => {});
+      }
+
+      // 2. Update local order history
+      matched.paymentMode = "COD";
+      matched.orderStatus = "Placed";
+      const idx = localOrdersHistory.findIndex(o => o.orderRef === matched.orderRef);
+      if (idx !== -1) localOrdersHistory[idx] = matched;
+      localStorage.setItem("manopavana_local_orders", JSON.stringify(localOrdersHistory));
+
+      // 3. Send email and show success confirmation modal
+      sendOrderEmailNotification({
+        orderRef: matched.orderRef,
+        customerName: matched.customerName,
+        phone: matched.phone,
+        email: matched.email || "",
+        address: matched.address,
+        pincode: matched.pincode,
+        items: matched.items,
+        grandTotal: sanitizeAmount(matched.grandTotal),
+        paymentMode: "Cash on Delivery",
+        latitude: matched.latitude,
+        longitude: matched.longitude
+      });
+
+      showOrderConfirmationModal({
+        orderRef: matched.orderRef,
+        customerName: matched.customerName,
+        paymentMode: "Cash on Delivery (COD)"
+      });
     } else {
-      const cRadio = document.getElementById("payCOD");
-      if (cRadio) cRadio.checked = true;
-      updatePaymentModeUI();
-      openCheckoutModalUI();
+      window.openCart();
     }
   };
 
@@ -3366,7 +3400,9 @@
       });
     });
 
-    // Verify PhonePe Return
+    // ==========================================
+    // PhonePe Payment Return Verification (Cloudflare /api)
+    // ==========================================
     const urlParams = new URLSearchParams(window.location.search);
     const incomingOrderRef = urlParams.get("orderRef");
     const incomingStatus = (urlParams.get("status") || "").toLowerCase();
@@ -3409,7 +3445,7 @@
                 }, { merge: true }).catch(() => {});
               }
 
-              let matchedOrder = localOrdersHistory.find(o => o.orderRef === incomingOrderRef);
+              let matchedOrder = localOrdersHistory.find((o) => o.orderRef === incomingOrderRef);
               if (matchedOrder) {
                 sendOrderEmailNotification(matchedOrder);
               }
@@ -3419,12 +3455,13 @@
                 localStorage.removeItem("manopavana_cart");
                 renderCart();
               }
+
               showOrderConfirmationModal({
                 orderRef: incomingOrderRef,
                 paymentMode: "PhonePe Online (Verified)"
               });
             } else {
-              window.showPaymentFailedModal(incomingOrderRef, verification.reason || "Payment was cancelled or declined.");
+              window.showPaymentFailedModal(incomingOrderRef, verification.reason || "Payment declined by bank.");
             }
           })
           .catch(() => {
@@ -3441,6 +3478,7 @@
       }
     }
 
+    // Baseline Layout & UI Initializers
     populateStatesDropdown();
     updateLocationUI();
     initLoyaltyFromStorage();
@@ -3448,5 +3486,12 @@
     renderCart();
     renderReviews();
     initFirebaseAuth();
+
+    // Enforce location selection modal on first visit if not selected
+    if (!localStorage.getItem("manopavana_location_selected") && !userSelectedPincode) {
+      setTimeout(() => {
+        window.openLocationCheckModal(true);
+      }, 400);
+    }
   });
 })();
