@@ -450,20 +450,32 @@ body.has-mobile-cart .floating-sound-pill {
 
 .brand-name {
   font-family: var(--font-serif);
-  font-size: 1.35rem;
+  font-size: 1.65rem;
   font-weight: 900;
   letter-spacing: 0.08em;
   color: var(--gold-light);
-  line-height: 1.1;
+  line-height: 1.05;
 }
 
 .brand-tagline {
-  font-size: 0.72rem;
+  font-size: 0.85rem;
   font-weight: 700;
   color: var(--gold-primary);
   letter-spacing: 0.04em;
-  margin-top: 2px;
+  margin-top: 3px;
   display: block;
+}
+
+.loc-short-name {
+  font-size: 0.82rem;
+  font-weight: 800;
+  color: var(--gold-light);
+  white-space: nowrap;
+}
+
+.cart-icon-graphic svg {
+  display: block;
+  stroke: #140d09;
 }
 
 .header-search-bar {
@@ -4798,8 +4810,8 @@ body.has-mobile-cart .floating-sound-pill {
   }
 
   .logo-wrap {
-    width: 38px;
-    height: 38px;
+    width: 40px;
+    height: 40px;
     padding: 2px;
     border-radius: 6px;
   }
@@ -4812,7 +4824,7 @@ body.has-mobile-cart .floating-sound-pill {
   }
 
   .brand-name {
-    font-size: 0.92rem !important;
+    font-size: 1.15rem !important;
     font-weight: 900;
     line-height: 1.1;
     white-space: nowrap;
@@ -4821,16 +4833,18 @@ body.has-mobile-cart .floating-sound-pill {
 
   .brand-tagline {
     display: block !important;
-    font-size: 0.5rem !important;
+    font-size: 0.62rem !important;
     font-weight: 700;
     color: var(--gold-primary);
     white-space: nowrap;
-    line-height: 1.1;
-    margin-top: 1px;
+    line-height: 1.15;
+    margin-top: 2px;
   }
 
+  /* Compact Location Pill */
   .btn-location-header {
     min-width: 0;
+    max-width: 120px;
     flex: 1;
     height: 34px;
     padding: 4px 8px;
@@ -4845,19 +4859,16 @@ body.has-mobile-cart .floating-sound-pill {
   }
 
   .btn-location-header .loc-pin-icon {
-    font-size: 0.8rem;
+    font-size: 0.85rem;
   }
 
-  .btn-location-header .loc-sub {
-    font-size: 0.58rem;
-  }
-
-  .btn-location-header strong {
-    font-size: 0.68rem;
-    max-width: 95px;
+  .loc-short-name {
+    font-size: 0.72rem;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    color: var(--gold-light);
+    font-weight: 800;
   }
 
   /* Icon-Only Action Buttons */
@@ -4875,8 +4886,8 @@ body.has-mobile-cart .floating-sound-pill {
 
   .btn-auth-pill, 
   .cart-trigger-btn {
-    padding: 6px 8px;
-    min-width: 36px;
+    padding: 0;
+    width: 38px;
     height: 34px;
     justify-content: center;
     box-sizing: border-box;
@@ -4884,6 +4895,13 @@ body.has-mobile-cart .floating-sound-pill {
     display: inline-flex;
     align-items: center;
     position: relative;
+  }
+
+  .cart-icon-graphic svg {
+    width: 18px;
+    height: 18px;
+    display: block;
+    stroke: #140d09;
   }
 
   .cart-trigger-btn .cart-badge-count {
