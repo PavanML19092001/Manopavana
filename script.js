@@ -1588,15 +1588,18 @@
 
     if (custPin) custPin.value = userSelectedPincode;
 
-    if (isBangalorePincode) {
-      if (headerLoc) headerLoc.innerHTML = `Bangalore (${userSelectedPincode})`;
-      if (headerMobileLoc) headerMobileLoc.textContent = `Bangalore (${userSelectedPincode})`;
-      if (cartLoc) cartLoc.textContent = `Bangalore (${userSelectedPincode})`;
-    } else {
-      if (headerLoc) headerLoc.innerHTML = `${userSelectedPincode} (Flipkart)`;
-      if (headerMobileLoc) headerMobileLoc.textContent = `${userSelectedPincode} (Flipkart)`;
-      if (cartLoc) cartLoc.textContent = `${userSelectedPincode} (Flipkart)`;
+    let displayLocation = "Set location";
+    if (userSelectedPincode) {
+      if (isBangalorePincode) {
+        displayLocation = `Bangalore ${userSelectedPincode}`;
+      } else {
+        displayLocation = userSelectedPincode;
+      }
     }
+
+    if (headerLoc) headerLoc.textContent = displayLocation;
+    if (headerMobileLoc) headerMobileLoc.textContent = displayLocation;
+    if (cartLoc) cartLoc.textContent = displayLocation;
 
     renderProductsGrid();
     renderComboSection();
