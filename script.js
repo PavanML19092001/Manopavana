@@ -1,6 +1,6 @@
 // ==========================================
 // MANOPAVANA - ARTISANAL WOOD-PRESSED OILS (BANGALORE)
-// PRODUCTION CLIENT SCRIPT (script.js) - FIRESTORE DIRECT
+// PRODUCTION CLIENT SCRIPT (script.js) - CLOUDFLARE PAGES & EMAILJS
 // ==========================================
 
 (function () {
@@ -20,14 +20,13 @@
   // Default Bangalore Landmark Center (Vidhana Soudha corridor)
   const DEFAULT_BANGALORE_COORDS = [12.9716, 77.5946];
 
-  // Google Apps Script URL (FOR PHONEPE & NOTIFICATION HANDSHAKE)
-// Remove: const GOOGLE_SCRIPT_API_URL = "...";
-const BACKEND_API_URL = "/api";
-const EMAILJS_CONFIG = {
-  SERVICE_ID: "service_c6el9r8",   // Replace with your Service ID from Step 2
-  TEMPLATE_ID: "template_zcdzrbl"  // Replace with your Template ID from Step 2
-};
-  
+  // Cloudflare Pages API Route & EmailJS Setup
+  const BACKEND_API_URL = "/api";
+  const EMAILJS_CONFIG = {
+    SERVICE_ID: "service_c6el9r8",
+    TEMPLATE_ID: "template_zcdzrbl"
+  };
+
   // Active Firebase Configuration
   const firebaseConfig = {
     apiKey: "AIzaSyBZ2h7B82XvIR2ffT2E5g9MHp1M7QPO9K4",
@@ -351,31 +350,6 @@ const EMAILJS_CONFIG = {
     ]
   };
 
-  function sendOrderEmailNotification(orderData) {
-  if (typeof emailjs === "undefined") {
-    console.warn("EmailJS SDK is not loaded.");
-    return;
-  }
-
-  const templateParams = {
-    order_ref: orderData.orderRef,
-    customer_name: orderData.customerName || orderData.name,
-    phone: orderData.phone,
-    email: orderData.email || "N/A",
-    address: orderData.address,
-    pincode: orderData.pincode,
-    items: orderData.items,
-    amount: orderData.grandTotal || orderData.amount,
-    payment_mode: orderData.paymentMode,
-    latitude: orderData.latitude || "",
-    longitude: orderData.longitude || ""
-  };
-
-  emailjs.send(EMAILJS_CONFIG.SERVICE_ID, EMAILJS_CONFIG.TEMPLATE_ID, templateParams)
-    .then(() => console.log("Confirmation email successfully sent."))
-    .catch((err) => console.warn("Email dispatch error:", err));
-}
-
   function populateStatesDropdown() {
     const stateSelect = document.getElementById("custState");
     const districtSelect = document.getElementById("custDistrict");
@@ -428,7 +402,7 @@ const EMAILJS_CONFIG = {
   }
 
   // ==========================================
-  // 4. ACTION TOAST & ERROR TRANSLATOR
+  // 4. ACTION TOAST & EMAILJS NOTIFIER
   // ==========================================
   window.showActionToast = function (title, message, icon = "✨", type = "info") {
     const toast = document.getElementById("actionToast");
@@ -453,6 +427,35 @@ const EMAILJS_CONFIG = {
       toast.classList.remove("show");
     }, 4000);
   };
+
+  function sendOrderEmailNotification(orderData) {
+    if (typeof emailjs === "undefined") {
+      console.warn("EmailJS SDK is not loaded.");
+      return;
+    }
+
+    const templateParams = {
+      order_ref: orderData.orderRef || "N/A",
+      customer_name: orderData.customerName || orderData.name || "Customer",
+      phone: orderData.phone || "N/A",
+      email: orderData.email || "N/A",
+      address: orderData.address || "N/A",
+      pincode: orderData.pincode || "560058",
+      items: orderData.items || "N/A",
+      amount: orderData.grandTotal || orderData.amount || 0,
+      payment_mode: orderData.paymentMode || "Direct Order",
+      latitude: orderData.latitude || DEFAULT_BANGALORE_COORDS[0],
+      longitude: orderData.longitude || DEFAULT_BANGALORE_COORDS[1]
+    };
+
+    emailjs.send(EMAILJS_CONFIG.SERVICE_ID, EMAILJS_CONFIG.TEMPLATE_ID, templateParams)
+      .then(() => {
+        console.log("Email notification dispatched to manopavana@gmail.com");
+      })
+      .catch((err) => {
+        console.warn("EmailJS notification error:", err);
+      });
+  }
 
   function getFriendlyAuthErrorMessage(err) {
     if (!err) return "An unexpected error occurred. Please try again.";
@@ -482,47 +485,7 @@ const EMAILJS_CONFIG = {
   }
 
   // ==========================================
-  // 5. JSONP BACKEND CALLER
-  // ==========================================
-  function callBackend(params) {
-    return new Promise((resolve, reject) => {
-      const callbackName = "jsonp_cb_" + Math.round(100000 * Math.random());
-      let script = null;
-      let timer = null;
-
-      window[callbackName] = function (data) {
-        clearTimeout(timer);
-        delete window[callbackName];
-        if (script && script.parentNode) script.parentNode.removeChild(script);
-        resolve(data);
-      };
-
-      const queryString = Object.keys(params)
-        .map((k) => encodeURIComponent(k) + "=" + encodeURIComponent(params[k]))
-        .join("&");
-
-      script = document.createElement("script");
-      script.src = `${GOOGLE_SCRIPT_API_URL}?${queryString}&callback=${callbackName}`;
-
-      script.onerror = function () {
-        clearTimeout(timer);
-        delete window[callbackName];
-        if (script && script.parentNode) script.parentNode.removeChild(script);
-        reject(new Error("Unable to connect to gateway controller."));
-      };
-
-      timer = setTimeout(function () {
-        delete window[callbackName];
-        if (script && script.parentNode) script.parentNode.removeChild(script);
-        reject(new Error("Server response timed out. Action cached locally."));
-      }, 15000);
-
-      document.body.appendChild(script);
-    });
-  }
-
-  // ==========================================
-  // 6. FIREBASE AUTH & UNIVERSAL LOGIN
+  // 5. FIREBASE AUTH & UNIVERSAL LOGIN
   // ==========================================
   function initFirebaseAuth() {
     try {
@@ -880,6 +843,166 @@ const EMAILJS_CONFIG = {
   });
 
   // ==========================================
+  // 6. UNIVERSAL 1-CLICK ADDRESS SYNC & GEOCODING
+  // ==========================================
+  function applyAddressEverywhere(addrData) {
+    // 1. Persist to local storage
+    localStorage.setItem("manopavana_saved_delivery", JSON.stringify(addrData));
+    if (addrData.pincode) {
+      localStorage.setItem("manopavana_user_pincode", addrData.pincode);
+      userSelectedPincode = addrData.pincode;
+      isBangalorePincode = addrData.pincode.startsWith("560");
+      updateLocationUI();
+    }
+
+    // 2. Auto-populate Checkout fields
+    const custName = document.getElementById("custName");
+    const custPhone = document.getElementById("custPhone");
+    const custAddress = document.getElementById("custAddress");
+    const custCity = document.getElementById("custCity");
+    const custState = document.getElementById("custState");
+    const custDistrict = document.getElementById("custDistrict");
+    const custPincode = document.getElementById("custPincode");
+    const custLat = document.getElementById("custLatitude");
+    const custLng = document.getElementById("custLongitude");
+
+    if (custName && addrData.name) custName.value = addrData.name;
+    if (custPhone && addrData.phone) custPhone.value = addrData.phone;
+    if (custAddress && addrData.address) custAddress.value = addrData.address;
+    if (custCity && addrData.city) custCity.value = addrData.city;
+    if (custPincode && addrData.pincode) custPincode.value = addrData.pincode;
+    if (custLat && addrData.latitude) custLat.value = addrData.latitude;
+    if (custLng && addrData.longitude) custLng.value = addrData.longitude;
+
+    if (custState && addrData.state) {
+      custState.value = addrData.state;
+      populateDistrictsForState(addrData.state);
+    }
+    if (custDistrict && addrData.district) {
+      custDistrict.value = addrData.district;
+    }
+
+    // 3. Auto-populate Dashboard fields
+    const dashName = document.getElementById("dashInputName");
+    const dashPhone = document.getElementById("dashInputPhone");
+    const dashAddress = document.getElementById("dashInputAddress");
+    const dashCity = document.getElementById("dashInputCity");
+    const dashPincode = document.getElementById("dashInputPincode");
+    const dashLat = document.getElementById("dashInputLat");
+    const dashLng = document.getElementById("dashInputLng");
+
+    if (dashName && addrData.name) dashName.value = addrData.name;
+    if (dashPhone && addrData.phone) dashPhone.value = addrData.phone;
+    if (dashAddress && addrData.address) dashAddress.value = addrData.address;
+    if (dashCity && addrData.city) dashCity.value = addrData.city;
+    if (dashPincode && addrData.pincode) dashPincode.value = addrData.pincode;
+    if (dashLat && addrData.latitude) dashLat.value = addrData.latitude;
+    if (dashLng && addrData.longitude) dashLng.value = addrData.longitude;
+
+    // 4. Update Saved Card previews
+    renderDashboardSavedAddress();
+    loadSavedDeliveryDetails();
+
+    // 5. Update Firebase customer record if logged in
+    if (db && currentUser) {
+      db.collection("customers").doc(currentUser.uid).set({
+        defaultAddress: addrData
+      }, { merge: true }).catch(() => {});
+    }
+  }
+
+  function reverseGeocodeOpenStreetMap(lat, lng) {
+    const coordsString = `${parseFloat(lat).toFixed(4)}, ${parseFloat(lng).toFixed(4)}`;
+    const badge1 = document.getElementById("mapCoordsBadge");
+    const badge2 = document.getElementById("dashMapCoordsBadge");
+    const badge3 = document.getElementById("onboardMapCoordsBadge");
+    if (badge1) badge1.textContent = `GPS: ${coordsString}`;
+    if (badge2) badge2.textContent = `GPS: ${coordsString}`;
+    if (badge3) badge3.textContent = `GPS: ${coordsString}`;
+
+    fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (!data || !data.address) return;
+        const addr = data.address;
+        const pin = addr.postcode ? addr.postcode.replace(/\D/g, "").slice(0, 6) : "560058";
+        const city = addr.city || addr.town || addr.suburb || addr.neighbourhood || "Bengaluru";
+        const state = addr.state || "Karnataka";
+        const street = data.display_name ? data.display_name.split(",").slice(0, 3).join(",").trim() : "";
+
+        let currentSaved = {};
+        try {
+          currentSaved = JSON.parse(localStorage.getItem("manopavana_saved_delivery")) || {};
+        } catch (e) {
+          currentSaved = {};
+        }
+
+        const updatedPayload = {
+          name: currentSaved.name || (currentUser ? currentUser.displayName : ""),
+          phone: currentSaved.phone || (currentUser ? currentUser.phone : ""),
+          address: street || currentSaved.address || "",
+          city: city,
+          state: state,
+          district: addr.state_district || "Bengaluru Urban",
+          pincode: pin,
+          latitude: parseFloat(lat).toFixed(5),
+          longitude: parseFloat(lng).toFixed(5)
+        };
+
+        applyAddressEverywhere(updatedPayload);
+      })
+      .catch((e) => console.warn("Reverse geocode notice:", e));
+  }
+
+  window.detectUserGeolocation = function (isOnboarding = false) {
+    const btn = isOnboarding ? document.querySelector(".btn-gps-inline") : document.querySelector(".btn-gps-locate");
+    const origText = btn ? btn.innerHTML : "";
+
+    if (!navigator.geolocation) {
+      alert("Geolocation is not supported by your current browser.");
+      return;
+    }
+
+    if (btn) btn.innerHTML = "⏳ Locating...";
+
+    const handleSuccess = (pos) => {
+      const lat = pos.coords.latitude;
+      const lng = pos.coords.longitude;
+
+      if (isOnboarding) {
+        initOrUpdateOnboardingMap(lat, lng);
+      } else {
+        initOrUpdateDeliveryMap(lat, lng);
+      }
+      reverseGeocodeOpenStreetMap(lat, lng);
+
+      if (btn) btn.innerHTML = "✅ Located!";
+      setTimeout(() => { if (btn) btn.innerHTML = origText; }, 2000);
+    };
+
+    const handleFail = () => {
+      navigator.geolocation.getCurrentPosition(
+        handleSuccess,
+        (err) => {
+          let errDetail = "Could not retrieve exact location. Please drag the pin on the map.";
+          if (err.code === 1) {
+            errDetail = "Location permission denied. Please allow location access.";
+          }
+          alert(errDetail);
+          if (btn) btn.innerHTML = origText;
+        },
+        { enableHighAccuracy: false, timeout: 15000, maximumAge: 300000 }
+      );
+    };
+
+    navigator.geolocation.getCurrentPosition(
+      handleSuccess,
+      handleFail,
+      { enableHighAccuracy: true, timeout: 6000, maximumAge: 60000 }
+    );
+  };
+
+  // ==========================================
   // 7. USER DASHBOARD & ADDRESS MANAGEMENT
   // ==========================================
   window.openAccountDashboard = function (initialTab = "orders") {
@@ -1084,27 +1207,17 @@ const EMAILJS_CONFIG = {
 
       dashMapMarker.on("dragend", function (e) {
         const pos = e.target.getLatLng();
-        setDashMapCoords(pos.lat, pos.lng);
+        reverseGeocodeOpenStreetMap(pos.lat, pos.lng);
       });
       dashLeafletMap.on("click", function (e) {
         dashMapMarker.setLatLng(e.latlng);
-        setDashMapCoords(e.latlng.lat, e.latlng.lng);
+        reverseGeocodeOpenStreetMap(e.latlng.lat, e.latlng.lng);
       });
     } else {
       dashLeafletMap.setView([lat, lng], 14);
       if (dashMapMarker) dashMapMarker.setLatLng([lat, lng]);
     }
-    setDashMapCoords(lat, lng);
     setTimeout(() => { if (dashLeafletMap) dashLeafletMap.invalidateSize(); }, 250);
-  }
-
-  function setDashMapCoords(lat, lng) {
-    const latInp = document.getElementById("dashInputLat");
-    const lngInp = document.getElementById("dashInputLng");
-    const badge = document.getElementById("dashMapCoordsBadge");
-    if (latInp) latInp.value = parseFloat(lat).toFixed(5);
-    if (lngInp) lngInp.value = parseFloat(lng).toFixed(5);
-    if (badge) badge.textContent = `GPS: ${parseFloat(lat).toFixed(4)}, ${parseFloat(lng).toFixed(4)}`;
   }
 
   window.openDashboardAddressForm = function () {
@@ -1134,8 +1247,8 @@ const EMAILJS_CONFIG = {
         if (phoneInp) phoneInp.value = currentUser.phone || "";
       }
 
-      const savedLat = saved && saved.latitude ? parseFloat(saved.latitude) : 12.9716;
-      const savedLng = saved && saved.longitude ? parseFloat(saved.longitude) : 77.5946;
+      const savedLat = saved && saved.latitude ? parseFloat(saved.latitude) : DEFAULT_BANGALORE_COORDS[0];
+      const savedLng = saved && saved.longitude ? parseFloat(saved.longitude) : DEFAULT_BANGALORE_COORDS[1];
       initOrUpdateDashboardMap(savedLat, savedLng);
     }
   };
@@ -1147,7 +1260,7 @@ const EMAILJS_CONFIG = {
     if (form) form.style.display = "none";
   };
 
-  window.saveDashboardAddress = async function (e) {
+  window.saveDashboardAddress = function (e) {
     if (e && e.preventDefault) e.preventDefault();
 
     const name = document.getElementById("dashInputName")?.value.trim();
@@ -1175,19 +1288,9 @@ const EMAILJS_CONFIG = {
       longitude
     };
 
-    localStorage.setItem("manopavana_saved_delivery", JSON.stringify(payload));
-
-    if (db && currentUser) {
-      try {
-        await db.collection("customers").doc(currentUser.uid).set({
-          defaultAddress: payload
-        }, { merge: true });
-      } catch (err) {}
-    }
-
-    renderDashboardSavedAddress();
+    applyAddressEverywhere(payload);
     window.closeDashboardAddressForm();
-    window.showActionToast("Address Saved", "📍 Delivery address saved successfully!", "🏡", "success");
+    window.showActionToast("Address Saved", "📍 Delivery address saved and updated across all sections!", "🏡", "success");
   };
 
   async function fetchUserOrderHistory() {
@@ -1296,17 +1399,17 @@ const EMAILJS_CONFIG = {
           ${isUnpaid && !isExpired ? `
             <div class="fk-order-unpaid-box">
               <p class="fk-order-unpaid-text">
-                ⏱ Expires in ${minsLeft} minutes. Load items back to cart to edit or complete payment.
+                ⏱ Expires in ${minsLeft} minutes. Complete your payment online or switch to COD:
               </p>
               <div class="fk-order-unpaid-actions">
                 <button type="button" class="btn-fk-order-action btn-fk-retry" onclick='window.loadOrderToCartAndRetry(${orderPayloadAttr})'>
-                  🛒 Edit Items & Checkout
+                  ⚡ Retry Payment
                 </button>
               </div>
             </div>
           ` : isUnpaid && isExpired ? `
              <div class="fk-order-unpaid-box" style="border-color:#7f1d1d; background:transparent;">
-              <p class="fk-order-unpaid-text" style="color:#ef4444; margin:0;">Time expired. This order was not completed.</p>
+              <p class="fk-order-unpaid-text" style="color:#ef4444; margin:0;">Time expired (10 mins passed). Order marked as Failed.</p>
              </div>
           ` : `
             <div class="track-timeline-progress">
@@ -1341,33 +1444,22 @@ const EMAILJS_CONFIG = {
   window.loadOrderToCartAndRetry = function (orderObj) {
     window.closeAccountDashboard();
     window.closePaymentFailedModal();
+
+    // 1. Restore exact items back into cart
     if (orderObj.cartItems && orderObj.cartItems.length > 0) {
       cart = orderObj.cartItems;
       saveCart();
     }
-    window.openCart();
-    window.showActionToast("Cart Restored", "Items loaded! You can now edit quantities and checkout.", "🛒", "success");
-  };
 
-  window.retryOrderDirectly = function (orderObj, mode) {
-    window.closeAccountDashboard();
-    window.closePaymentFailedModal();
-
-    checkoutSource = "retry";
+    // 2. Open checkout directly with the order details so they can edit or proceed
+    checkoutSource = "cart";
     buyNowItem = null;
     retryOrderData = orderObj;
     currentOrderRef = orderObj.orderRef;
     currentCalculatedGrandTotal = parseFloat(orderObj.grandTotal) || 0;
 
-    if (mode === "PHONEPE") {
-      const pRadio = document.getElementById("payPhonePe");
-      if (pRadio) pRadio.checked = true;
-    } else {
-      const cRadio = document.getElementById("payCOD");
-      if (cRadio) cRadio.checked = true;
-    }
-
     openCheckoutModalUI();
+    window.showActionToast("Order Restored", "⚡ Items loaded! You can modify items or proceed to pay.", "🛒", "info");
   };
 
   // ==========================================
@@ -1551,30 +1643,20 @@ const EMAILJS_CONFIG = {
       onboardMarker.on("dragend", function (e) {
         const pos = e.target.getLatLng();
         reverseGeocodeOpenStreetMap(pos.lat, pos.lng);
-        setOnboardMapCoordinates(pos.lat, pos.lng);
       });
 
       onboardMap.on("click", function (e) {
         onboardMarker.setLatLng(e.latlng);
         reverseGeocodeOpenStreetMap(e.latlng.lat, e.latlng.lng);
-        setOnboardMapCoordinates(e.latlng.lat, e.latlng.lng);
       });
     } else {
       onboardMap.setView([lat, lng], 14);
       if (onboardMarker) onboardMarker.setLatLng([lat, lng]);
     }
 
-    setOnboardMapCoordinates(lat, lng);
     setTimeout(() => {
       if (onboardMap) onboardMap.invalidateSize();
     }, 250);
-  }
-
-  function setOnboardMapCoordinates(lat, lng) {
-    const coordsBadge = document.getElementById("onboardMapCoordsBadge");
-    if (coordsBadge) {
-      coordsBadge.textContent = `GPS: ${parseFloat(lat).toFixed(4)}, ${parseFloat(lng).toFixed(4)}`;
-    }
   }
 
   window.submitPincodeCheck = function () {
@@ -1611,8 +1693,6 @@ const EMAILJS_CONFIG = {
   };
 
   function updateLocationUI() {
-    const headerLoc = document.getElementById("headerLocationLabel");
-    const headerMobileLoc = document.getElementById("headerMobileLocationLabel");
     const cartLoc = document.getElementById("cartDrawerLocLabel");
     const custPin = document.getElementById("custPincode");
     const headerLocBtn = document.getElementById("headerLocationTrigger");
@@ -1623,10 +1703,7 @@ const EMAILJS_CONFIG = {
       ? `Bangalore (${userSelectedPincode})`
       : `${userSelectedPincode} (Flipkart)`;
 
-    if (headerLoc) headerLoc.textContent = displayLocation;
-    if (headerMobileLoc) headerMobileLoc.textContent = displayLocation;
     if (cartLoc) cartLoc.textContent = displayLocation;
-
     if (headerLocBtn) {
       headerLocBtn.title = `Deliver to: ${displayLocation}`;
       headerLocBtn.setAttribute("aria-label", `Deliver to: ${displayLocation}`);
@@ -1977,114 +2054,21 @@ const EMAILJS_CONFIG = {
 
       mapMarker.on("dragend", function (e) {
         const position = e.target.getLatLng();
-        setMapCoordinates(position.lat, position.lng);
+        reverseGeocodeOpenStreetMap(position.lat, position.lng);
       });
 
       leafletMap.on("click", function (e) {
         mapMarker.setLatLng(e.latlng);
-        setMapCoordinates(e.latlng.lat, e.latlng.lng);
+        reverseGeocodeOpenStreetMap(e.latlng.lat, e.latlng.lng);
       });
     } else {
       leafletMap.setView([lat, lng], 14);
       if (mapMarker) mapMarker.setLatLng([lat, lng]);
     }
 
-    setMapCoordinates(lat, lng);
     setTimeout(() => {
       if (leafletMap) leafletMap.invalidateSize();
     }, 250);
-  }
-
-  function setMapCoordinates(lat, lng) {
-    const latInput = document.getElementById("custLatitude");
-    const lngInput = document.getElementById("custLongitude");
-    const coordsBadge = document.getElementById("mapCoordsBadge");
-
-    const roundLat = parseFloat(lat).toFixed(5);
-    const roundLng = parseFloat(lng).toFixed(5);
-
-    if (latInput) latInput.value = roundLat;
-    if (lngInput) lngInput.value = roundLng;
-    if (coordsBadge) coordsBadge.textContent = `GPS: ${roundLat}, ${roundLng}`;
-  }
-
-  window.detectUserGeolocation = function (isOnboarding = false) {
-    const btn = isOnboarding ? document.querySelector(".btn-gps-inline") : document.querySelector(".btn-gps-locate");
-    const origText = btn ? btn.innerHTML : "";
-
-    if (!navigator.geolocation) {
-      alert("Geolocation is not supported by your current browser.");
-      return;
-    }
-
-    if (btn) btn.innerHTML = "⏳ Locating...";
-
-    const handleSuccess = (pos) => {
-      const lat = pos.coords.latitude;
-      const lng = pos.coords.longitude;
-
-      if (isOnboarding) {
-        initOrUpdateOnboardingMap(lat, lng);
-        reverseGeocodeOpenStreetMap(lat, lng);
-      } else {
-        initOrUpdateDeliveryMap(lat, lng);
-        reverseGeocodeOpenStreetMap(lat, lng);
-      }
-
-      if (btn) btn.innerHTML = "✅ Located!";
-      setTimeout(() => { if (btn) btn.innerHTML = origText; }, 2000);
-    };
-
-    const handleFail = () => {
-      navigator.geolocation.getCurrentPosition(
-        handleSuccess,
-        (err) => {
-          let errDetail = "Could not retrieve exact location. Please drag the pin on the map.";
-          if (err.code === 1) {
-            errDetail = "Location permission denied. Please allow location access.";
-          }
-          alert(errDetail);
-          if (btn) btn.innerHTML = origText;
-        },
-        { enableHighAccuracy: false, timeout: 15000, maximumAge: 300000 }
-      );
-    };
-
-    navigator.geolocation.getCurrentPosition(
-      handleSuccess,
-      handleFail,
-      { enableHighAccuracy: true, timeout: 6000, maximumAge: 60000 }
-    );
-  };
-
-  function reverseGeocodeOpenStreetMap(lat, lng) {
-    fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`)
-      .then((res) => res.json())
-      .then((data) => {
-        if (!data || !data.address) return;
-        const addr = data.address;
-        const pin = addr.postcode || "";
-        const city = addr.city || addr.town || addr.suburb || addr.neighbourhood || "Bengaluru";
-
-        const custCity = document.getElementById("custCity");
-        const custPin = document.getElementById("custPincode");
-        const pinModalInput = document.getElementById("pincodeCheckInput");
-        const custAddress = document.getElementById("custAddress");
-
-        if (custCity && !custCity.value) custCity.value = city;
-        if (pin && /^\d{6}$/.test(pin)) {
-          if (custPin) custPin.value = pin;
-          if (pinModalInput) pinModalInput.value = pin;
-          userSelectedPincode = pin;
-          isBangalorePincode = pin.startsWith("560");
-          updateLocationUI();
-        }
-
-        if (custAddress && !custAddress.value && data.display_name) {
-          custAddress.value = data.display_name.split(",").slice(0, 3).join(",").trim();
-        }
-      })
-      .catch((e) => console.warn("Reverse geocode notice:", e));
   }
 
   window.handleAddressForwardGeocode = function (query) {
@@ -2102,6 +2086,7 @@ const EMAILJS_CONFIG = {
             const lat = parseFloat(results[0].lat);
             const lon = parseFloat(results[0].lon);
             initOrUpdateDeliveryMap(lat, lon);
+            reverseGeocodeOpenStreetMap(lat, lon);
           }
         })
         .catch(err => console.warn("Forward geocode notice:", err));
@@ -2121,23 +2106,6 @@ const EMAILJS_CONFIG = {
 
     const summaryCard = document.getElementById("savedAddressSummaryCard");
     const fieldsContainer = document.getElementById("deliveryFieldsContainer");
-
-    if (checkoutSource === "retry" && retryOrderData) {
-      const custName = document.getElementById("custName");
-      const custPhone = document.getElementById("custPhone");
-      const custAddress = document.getElementById("custAddress");
-      const custPincode = document.getElementById("custPincode");
-
-      if (custName && retryOrderData.customerName) custName.value = retryOrderData.customerName;
-      if (custPhone && retryOrderData.phone) custPhone.value = retryOrderData.phone;
-      if (custAddress && retryOrderData.address) custAddress.value = retryOrderData.address;
-      if (custPincode && retryOrderData.pincode) custPincode.value = retryOrderData.pincode;
-
-      if (summaryCard) summaryCard.style.display = "none";
-      if (fieldsContainer) fieldsContainer.style.display = "block";
-      initOrUpdateDeliveryMap();
-      return;
-    }
 
     if (saved && saved.name && saved.phone && saved.address) {
       const custName = document.getElementById("custName");
@@ -2441,38 +2409,6 @@ const EMAILJS_CONFIG = {
   window.selectProductCardSize = function (productKey, size) {
     activeProductCardSizes[productKey] = size;
     renderProductsGrid();
-  };
-
-  window.filterCatalogCategory = function (category, evt) {
-    document.querySelectorAll(".cat-pill").forEach((p) => p.classList.remove("active"));
-    if (evt && evt.currentTarget) {
-      evt.currentTarget.classList.add("active");
-    }
-
-    const productCards = document.querySelectorAll("#productGridContainer .product-card");
-    const comboSection = document.getElementById("combo");
-
-    if (category === "all") {
-      productCards.forEach((c) => (c.style.display = "flex"));
-      if (comboSection) comboSection.style.display = "block";
-      document.getElementById("products")?.scrollIntoView({ behavior: "smooth" });
-    } else if (category === "combo") {
-      productCards.forEach((c) => (c.style.display = "none"));
-      if (comboSection) {
-        comboSection.style.display = "block";
-        comboSection.scrollIntoView({ behavior: "smooth" });
-      }
-    } else {
-      if (comboSection) comboSection.style.display = "none";
-      productCards.forEach((c) => {
-        if (c.dataset.key === category) {
-          c.style.display = "flex";
-        } else {
-          c.style.display = "none";
-        }
-      });
-      document.getElementById("products")?.scrollIntoView({ behavior: "smooth" });
-    }
   };
 
   function renderStepperButtonHTML(id, title, price, img, quantity) {
@@ -2787,7 +2723,7 @@ const EMAILJS_CONFIG = {
     const titleEl = document.getElementById("modalCheckoutTitle");
     if (titleEl) {
       if (checkoutSource === "retry" && retryOrderData) {
-        titleEl.textContent = `Verify & Complete Payment: #${retryOrderData.orderRef}`;
+        titleEl.textContent = `Order Checkout: #${retryOrderData.orderRef}`;
       } else if (checkoutSource === "buynow" && buyNowItem) {
         titleEl.textContent = `Delivery & Payment: ${buyNowItem.title}`;
       } else {
@@ -2824,33 +2760,6 @@ const EMAILJS_CONFIG = {
   function updateCheckoutFinancials() {
     const preview = document.getElementById("checkoutOrderPreview");
     if (!preview) return;
-
-    if (checkoutSource === "retry" && retryOrderData) {
-      currentCalculatedGrandTotal = parseFloat(retryOrderData.grandTotal) || 0;
-      currentOrderRef = retryOrderData.orderRef;
-
-      preview.innerHTML = `
-        <div class="retry-order-summary-box">
-          <div class="retry-summary-head">
-            <span class="retry-tag">📋 Retrying Order Reference</span>
-            <strong class="retry-ref">#${escapeHtml(retryOrderData.orderRef)}</strong>
-          </div>
-          <div class="retry-summary-field">
-            <strong>Items to be Paid:</strong>
-            <div class="retry-val">${escapeHtml(retryOrderData.items)}</div>
-          </div>
-          <div class="retry-summary-field">
-            <strong>Delivery Destination:</strong>
-            <div class="retry-val-sub">${escapeHtml(retryOrderData.address || "Bangalore")} (${escapeHtml(retryOrderData.pincode || "560058")})</div>
-          </div>
-          <div class="retry-summary-total">
-            <span>Locked Grand Total:</span>
-            <strong>₹${currentCalculatedGrandTotal.toLocaleString("en-IN")}</strong>
-          </div>
-        </div>
-      `;
-      return;
-    }
 
     let subtotal = 0;
     let itemsCount = 0;
@@ -2962,7 +2871,6 @@ const EMAILJS_CONFIG = {
     const pincode = document.getElementById("custPincode")?.value.trim();
     const latitude = document.getElementById("custLatitude")?.value || DEFAULT_BANGALORE_COORDS[0];
     const longitude = document.getElementById("custLongitude")?.value || DEFAULT_BANGALORE_COORDS[1];
-    const chkSave = document.getElementById("chkSaveAddress")?.checked;
     const errBox = document.getElementById("formError");
 
     if (!name || phone.length < 10 || !address || pincode.length !== 6) {
@@ -2980,17 +2888,15 @@ const EMAILJS_CONFIG = {
 
     if (errBox) errBox.style.display = "none";
 
-    if (chkSave) {
-      const deliveryPayload = {
-        name, phone, address, state, district, city, pincode, latitude, longitude
-      };
-      localStorage.setItem("manopavana_saved_delivery", JSON.stringify(deliveryPayload));
-    }
+    // Auto-update across all address models
+    applyAddressEverywhere({
+      name, phone, address, state, district, city, pincode, latitude, longitude
+    });
 
     let itemsSummary = "";
     const itemsToCheckout = checkoutSource === "buynow" && buyNowItem ? [buyNowItem] : cart;
 
-    if (checkoutSource === "retry" && retryOrderData) {
+    if (checkoutSource === "retry" && retryOrderData && (!itemsToCheckout || itemsToCheckout.length === 0)) {
       itemsSummary = retryOrderData.items;
     } else {
       itemsSummary = itemsToCheckout.map((i) => `${i.title} (x${i.quantity})`).join(", ");
@@ -3010,7 +2916,10 @@ const EMAILJS_CONFIG = {
     const uid = currentUser.uid || ("GUEST_" + phone);
     const currentOrigin = window.location.origin + window.location.pathname;
 
-    const orderPayload = {
+    // DEFINING ORDERSNAPSHOT EARLY TO PREVENT REFERENCE ERRORS
+    const orderSnapshot = {
+      timestamp: new Date().toLocaleDateString("en-IN", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }),
+      timestampMs: Date.now(),
       orderRef: currentOrderRef,
       firebaseUid: uid,
       customerName: name,
@@ -3023,22 +2932,26 @@ const EMAILJS_CONFIG = {
       grandTotal: currentCalculatedGrandTotal.toString(),
       paymentMode: paymentMode,
       orderStatus: paymentMode === "PHONEPE" ? "Payment Pending" : "Placed",
-      bottleCode: activeBottleCode || ""
+      bottleCode: activeBottleCode || "",
+      trackingNotes: "Sourced directly from traditional wood-press artisans, settled naturally, and packed hygienically at our Bangalore packaging and distribution facility.",
+      latitude: latitude,
+      longitude: longitude
     };
 
     try {
-      await saveOrderToFirestore(orderPayload);
+      await saveOrderToFirestore(orderSnapshot);
 
       if (paymentMode === "PHONEPE") {
         sessionStorage.setItem("manopavana_pending_checkout_source", checkoutSource);
         sessionStorage.setItem("manopavana_pending_order_ref", currentOrderRef);
 
+        // ENSURE ACCURATE PAISE CONVERSION: amount in Rupees passed cleanly to Cloudflare /api
         const res = await fetch(`${BACKEND_API_URL}?action=create_order`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             orderRef: currentOrderRef,
-            amount: currentCalculatedGrandTotal,
+            amount: parseFloat(currentCalculatedGrandTotal),
             phone: phone,
             redirectBaseUrl: currentOrigin
           })
@@ -3050,11 +2963,20 @@ const EMAILJS_CONFIG = {
           window.location.href = response.redirectUrl;
           return;
         } else {
-          alert("Payment Error: " + (response.message || "Unable to start payment.") + "\nPlease try Cash on Delivery or WhatsApp.");
+          alert("Payment Error: " + (response.message || "Unable to initiate PhonePe session.") + "\nPlease try Cash on Delivery or WhatsApp.");
           return;
         }
       } else {
-        // Cash on Delivery & WhatsApp Manual Orders
+        // Save local orders history
+        const existingIdx = localOrdersHistory.findIndex(o => o.orderRef === currentOrderRef);
+        if (existingIdx !== -1) {
+          localOrdersHistory[existingIdx] = orderSnapshot;
+        } else {
+          localOrdersHistory.unshift(orderSnapshot);
+        }
+        localStorage.setItem("manopavana_local_orders", JSON.stringify(localOrdersHistory));
+
+        // Fire EmailJS Notification
         sendOrderEmailNotification({
           orderRef: currentOrderRef,
           customerName: name,
@@ -3067,30 +2989,6 @@ const EMAILJS_CONFIG = {
           paymentMode: paymentMode === "COD" ? "Cash on Delivery" : "WhatsApp Manual Order",
           latitude: latitude,
           longitude: longitude
-        });
-
-        const existingIdx = localOrdersHistory.findIndex(o => o.orderRef === currentOrderRef);
-        if (existingIdx !== -1) {
-          localOrdersHistory[existingIdx] = orderSnapshot;
-        } else {
-          localOrdersHistory.unshift(orderSnapshot);
-        }
-        localStorage.setItem("manopavana_local_orders", JSON.stringify(localOrdersHistory));
-
-        // Trigger email notification for manual COD/WhatsApp orders
-        callBackend({
-          action: "send_manual_alert",
-          orderRef: currentOrderRef,
-          name: name,
-          phone: phone,
-          email: currentUser.email || "",
-          address: `${address}, ${city}`,
-          pincode: pincode,
-          items: itemsSummary,
-          amount: currentCalculatedGrandTotal,
-          latitude: latitude,
-          longitude: longitude,
-          paymentMode: paymentMode === "COD" ? "Cash on Delivery" : "WhatsApp Order"
         });
 
         if (checkoutSource === "cart") {
@@ -3202,8 +3100,6 @@ const EMAILJS_CONFIG = {
   };
 
   window.retryPaymentFromModal = async function () {
-    window.closePaymentFailedModal();
-
     let matched = localOrdersHistory.find(o => o.orderRef === lastFailedOrderRef);
     if (!matched && db && lastFailedOrderRef) {
       try {
@@ -3213,11 +3109,9 @@ const EMAILJS_CONFIG = {
     }
 
     if (matched) {
-      window.retryOrderDirectly(matched, "PHONEPE");
+      window.loadOrderToCartAndRetry(matched);
     } else {
-      const pRadio = document.getElementById("payPhonePe");
-      if (pRadio) pRadio.checked = true;
-      updatePaymentModeUI();
+      window.closePaymentFailedModal();
       openCheckoutModalUI();
     }
   };
@@ -3234,7 +3128,10 @@ const EMAILJS_CONFIG = {
     }
 
     if (matched) {
-      window.retryOrderDirectly(matched, "COD");
+      window.loadOrderToCartAndRetry(matched);
+      const cRadio = document.getElementById("payCOD");
+      if (cRadio) cRadio.checked = true;
+      updatePaymentModeUI();
     } else {
       const cRadio = document.getElementById("payCOD");
       if (cRadio) cRadio.checked = true;
@@ -3383,7 +3280,6 @@ const EMAILJS_CONFIG = {
   // 21. DOM INITIALIZATION
   // ==========================================
   document.addEventListener("DOMContentLoaded", () => {
-    // Audio engine & ambient autoplay triggers
     document.getElementById("soundToggleBtn")?.addEventListener("click", toggleAudio);
     initVideoAutoplay();
     tryImmediateAudioPlayback();
@@ -3397,7 +3293,6 @@ const EMAILJS_CONFIG = {
     };
     ["click", "touchend"].forEach((e) => window.addEventListener(e, enableAudioOnGesture, { passive: true }));
 
-    // Drawer and Modal Open/Close Controls
     document.getElementById("openCartBtn")?.addEventListener("click", window.openCart);
     document.getElementById("closeCartBtn")?.addEventListener("click", window.closeCart);
     document.getElementById("cartBackdrop")?.addEventListener("click", window.closeCart);
@@ -3421,21 +3316,18 @@ const EMAILJS_CONFIG = {
     document.getElementById("closeModalBtn")?.addEventListener("click", window.closeCheckoutModal);
     document.getElementById("closeDetailModalBtn")?.addEventListener("click", window.closeProductDetailModal);
 
-    // Payment Mode Switchers
     document.getElementById("payPhonePe")?.addEventListener("change", updatePaymentModeUI);
     document.getElementById("payCOD")?.addEventListener("change", updatePaymentModeUI);
     document.getElementById("payWhatsApp")?.addEventListener("change", updatePaymentModeUI);
 
     document.getElementById("submitOrderBtn")?.addEventListener("click", handleCheckoutSubmission);
 
-    // Numeric-Only Input Sanitizers
     ["custPhone", "custPincode", "pincodeCheckInput", "editProfPhone", "dashInputPhone"].forEach((id) => {
       document.getElementById(id)?.addEventListener("input", (e) => {
         e.target.value = e.target.value.replace(/\D/g, "");
       });
     });
 
-    // Customer Review Form Submission
     document.getElementById("productReviewForm")?.addEventListener("submit", (e) => {
       e.preventDefault();
       const name = document.getElementById("revName")?.value.trim();
@@ -3465,7 +3357,6 @@ const EMAILJS_CONFIG = {
       window.showActionToast("Review Submitted", "✨ Thank you! Your review has been posted.", "✨", "success");
     });
 
-    // FAQ Accordion Toggle Handlers
     document.querySelectorAll(".faq-question").forEach((button) => {
       button.addEventListener("click", () => {
         const item = button.parentElement;
@@ -3475,9 +3366,7 @@ const EMAILJS_CONFIG = {
       });
     });
 
-    // ==========================================
-    // PhonePe Payment Return Verification (Cloudflare /api)
-    // ==========================================
+    // Verify PhonePe Return
     const urlParams = new URLSearchParams(window.location.search);
     const incomingOrderRef = urlParams.get("orderRef");
     const incomingStatus = (urlParams.get("status") || "").toLowerCase();
@@ -3502,9 +3391,8 @@ const EMAILJS_CONFIG = {
             sessionStorage.removeItem("manopavana_pending_order_ref");
             window.history.replaceState({}, document.title, window.location.pathname);
           }
-        }, 5000);
+        }, 6000);
 
-        // Queries Cloudflare Pages Function at /api
         fetch(`${BACKEND_API_URL}?action=verify_order&orderRef=${encodeURIComponent(incomingOrderRef)}`)
           .then((res) => res.json())
           .then((verification) => {
@@ -3521,9 +3409,8 @@ const EMAILJS_CONFIG = {
                 }, { merge: true }).catch(() => {});
               }
 
-              // Fire real-time order email notification via EmailJS
-              let matchedOrder = localOrdersHistory.find((o) => o.orderRef === incomingOrderRef);
-              if (matchedOrder && typeof sendOrderEmailNotification === "function") {
+              let matchedOrder = localOrdersHistory.find(o => o.orderRef === incomingOrderRef);
+              if (matchedOrder) {
                 sendOrderEmailNotification(matchedOrder);
               }
 
@@ -3532,13 +3419,12 @@ const EMAILJS_CONFIG = {
                 localStorage.removeItem("manopavana_cart");
                 renderCart();
               }
-
               showOrderConfirmationModal({
                 orderRef: incomingOrderRef,
                 paymentMode: "PhonePe Online (Verified)"
               });
             } else {
-              window.showPaymentFailedModal(incomingOrderRef, verification.reason || "Payment declined by bank.");
+              window.showPaymentFailedModal(incomingOrderRef, verification.reason || "Payment was cancelled or declined.");
             }
           })
           .catch(() => {
@@ -3555,7 +3441,6 @@ const EMAILJS_CONFIG = {
       }
     }
 
-    // Baseline Layout & UI Initializers
     populateStatesDropdown();
     updateLocationUI();
     initLoyaltyFromStorage();
