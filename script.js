@@ -1581,25 +1581,21 @@
   };
 
   function updateLocationUI() {
-    const headerLoc = document.getElementById("headerLocationLabel");
-    const headerMobileLoc = document.getElementById("headerMobileLocationLabel");
     const cartLoc = document.getElementById("cartDrawerLocLabel");
     const custPin = document.getElementById("custPincode");
+    const headerLocBtn = document.getElementById("headerLocationTrigger");
 
     if (custPin) custPin.value = userSelectedPincode;
 
-    let displayLocation = "Set location";
-    if (userSelectedPincode) {
-      if (isBangalorePincode) {
-        displayLocation = `Bangalore ${userSelectedPincode}`;
-      } else {
-        displayLocation = userSelectedPincode;
-      }
-    }
+    let displayLocation = userSelectedPincode
+      ? (isBangalorePincode ? `Bangalore (${userSelectedPincode})` : `${userSelectedPincode}`)
+      : "Bangalore";
 
-    if (headerLoc) headerLoc.textContent = displayLocation;
-    if (headerMobileLoc) headerMobileLoc.textContent = displayLocation;
     if (cartLoc) cartLoc.textContent = displayLocation;
+    if (headerLocBtn) {
+      headerLocBtn.title = `Delivery Location: ${displayLocation}`;
+      headerLocBtn.setAttribute("aria-label", `Delivery Location: ${displayLocation}`);
+    }
 
     renderProductsGrid();
     renderComboSection();
