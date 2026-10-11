@@ -24,8 +24,8 @@
 // Remove: const GOOGLE_SCRIPT_API_URL = "...";
 const BACKEND_API_URL = "/api";
 const EMAILJS_CONFIG = {
-  SERVICE_ID: "YOUR_EMAILJS_SERVICE_ID",   // Replace with your Service ID from Step 2
-  TEMPLATE_ID: "YOUR_EMAILJS_TEMPLATE_ID"  // Replace with your Template ID from Step 2
+  SERVICE_ID: "service_c6el9r8",   // Replace with your Service ID from Step 2
+  TEMPLATE_ID: "template_zcdzrbl"  // Replace with your Template ID from Step 2
 };
   
   // Active Firebase Configuration
