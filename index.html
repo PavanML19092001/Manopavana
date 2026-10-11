@@ -68,7 +68,7 @@
   <!-- Unified Site Header -->
   <header class="site-header">
     <div class="header-inner">
-      <!-- Row 1: Brand & Deliver-To on Left, Login & Cart on Right -->
+      <!-- Row 1: Brand on Left, [Location -> Login -> Cart] on Right -->
       <div class="header-main-row">
         <div class="header-left-cluster">
           <!-- Brand Link -->
@@ -81,16 +81,19 @@
               <span class="brand-tagline">Pure by nature, trusted for life</span>
             </div>
           </a>
-
-          <!-- Deliver To Location Pill -->
-          <!-- Location Trigger (Icon Only) -->
-<button type="button" id="headerLocationTrigger" class="btn-location-header" onclick="openLocationCheckModal()" title="Select Delivery Location" aria-label="Select Delivery Location">
-  <span class="loc-pin-icon" aria-hidden="true">📍</span>
-</button>
         </div>
 
-        <!-- Rightmost Cluster: Login Button & Cart Button -->
+        <!-- Right Cluster: Location Pill -> Login -> Cart -->
         <div class="header-right-actions" id="headerRightActions">
+          <!-- Location Button (Full details on Desktop, Icon-only on Mobile) -->
+          <button type="button" id="headerLocationTrigger" class="btn-location-header" onclick="openLocationCheckModal()" title="Change delivery location" aria-label="Change delivery location">
+            <span class="loc-pin-icon" aria-hidden="true">📍</span>
+            <div class="loc-text-col">
+              <span class="loc-sub">Deliver to</span>
+              <strong id="headerLocationLabel">Bangalore (560xxx)</strong>
+            </div>
+          </button>
+
           <!-- Login Button -->
           <div class="auth-pill-container" id="authPillContainer">
             <button type="button" id="authPillBtn" class="btn-auth-pill" onclick="handleAuthPillClick()" aria-label="Account Login">
