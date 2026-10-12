@@ -1,0 +1,6 @@
+{
+  "name": "MANOPAVANA - Artisanal Wood-Pressed Oils",
+  "description": "Authentic Marachekku wood-pressed groundnut, coconut, and sesame oils from Bengaluru. Pure, unrefined, zero chemical solvents.",
+  "requestFramePermissions": ["geolocation"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

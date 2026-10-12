@@ -1,0 +1,123 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 500" width="100%" height="100%">
+  <defs>
+    <linearGradient id="goldBorderGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#F5D982" />
+      <stop offset="22%" stop-color="#C79633" />
+      <stop offset="48%" stop-color="#F2D177" />
+      <stop offset="78%" stop-color="#BA8824" />
+      <stop offset="100%" stop-color="#E7C05C" />
+    </linearGradient>
+    <linearGradient id="goldStrokeGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#DBAC49" />
+      <stop offset="50%" stop-color="#C59733" />
+      <stop offset="100%" stop-color="#AB7C1E" />
+    </linearGradient>
+  </defs>
+
+  <!-- Outer Solid Gold Metallic Border Frame -->
+  <rect x="0" y="0" width="500" height="500" fill="url(#goldBorderGrad)" />
+
+  <!-- Clean Pure White Inner Canvas -->
+  <rect x="32" y="32" width="436" height="436" fill="#FFFFFF" />
+
+  <!-- Monogram Group Centered -->
+  <g id="manopavana-monogram">
+    <!-- 1. TOP BOTANICAL LEAF -->
+    <!-- Leaf Green Outer Contour -->
+    <path
+      d="M 248 236 C 234 186 210 146 250 96 C 290 146 266 186 252 236 Z"
+      fill="none"
+      stroke="#164A35"
+      stroke-width="12"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    />
+    <!-- Leaf Center Golden Vein -->
+    <path
+      d="M 250 98 C 255 142 252 188 248 236"
+      fill="none"
+      stroke="url(#goldStrokeGrad)"
+      stroke-width="7"
+      stroke-linecap="round"
+    />
+
+    <!-- 2. LEFT ARCH OF 'M' -->
+    <!-- Outer Green Stroke -->
+    <path
+      d="M 116 368 C 122 368 126 360 128 346 L 130 252 C 130 202 162 178 198 196 C 220 207 236 238 246 270"
+      fill="none"
+      stroke="#164A35"
+      stroke-width="14"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    />
+    <!-- Inner Gold Parallel Stroke -->
+    <path
+      d="M 132 368 C 138 368 142 360 144 346 L 146 252 C 146 214 168 196 195 210 C 212 219 226 244 235 273"
+      fill="none"
+      stroke="url(#goldStrokeGrad)"
+      stroke-width="8"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    />
+
+    <!-- 3. CENTER OIL DROPLET LOOP -->
+    <!-- Outer Green Droplet Path -->
+    <path
+      d="M 246 270 C 252 308 242 338 234 352 C 228 364 234 372 246 372 C 260 372 272 355 272 328 C 272 298 262 278 258 266"
+      fill="none"
+      stroke="#164A35"
+      stroke-width="14"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    />
+    <!-- Inner Gold Droplet Path -->
+    <path
+      d="M 240 278 C 246 308 238 330 234 344 C 231 352 236 358 244 358 C 254 358 262 344 262 326 C 262 302 255 284 250 274"
+      fill="none"
+      stroke="url(#goldStrokeGrad)"
+      stroke-width="8"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    />
+
+    <!-- 4. RIGHT ARCH OF 'M' & 'P' BOWL -->
+    <!-- Right Outer Green Leg & Foot -->
+    <path
+      d="M 258 266 C 266 232 284 195 320 195 C 352 195 368 222 368 260 L 368 346 C 370 360 374 368 384 368"
+      fill="none"
+      stroke="#164A35"
+      stroke-width="14"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    />
+    <!-- Right Outer Gold Leg -->
+    <path
+      d="M 352 275 L 352 346 C 354 360 358 368 368 368"
+      fill="none"
+      stroke="url(#goldStrokeGrad)"
+      stroke-width="8"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    />
+
+    <!-- P Loop Inner Green Path -->
+    <path
+      d="M 258 266 C 268 236 290 198 324 198 C 354 198 370 220 370 246 C 370 274 346 296 314 296 C 286 296 274 274 272 252"
+      fill="none"
+      stroke="#164A35"
+      stroke-width="13"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    />
+    <!-- P Loop Inner Gold Path -->
+    <path
+      d="M 268 270 C 276 244 294 212 322 212 C 344 212 355 226 355 244 C 355 264 336 282 312 282 C 290 282 282 266 280 250"
+      fill="none"
+      stroke="url(#goldStrokeGrad)"
+      stroke-width="8"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    />
+  </g>
+</svg>
