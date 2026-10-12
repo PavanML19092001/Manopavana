@@ -3,37 +3,35 @@
  * Route: /api or /functions/api
  */
 
-const PHONEPE_CONFIG = {
-  CLIENT_ID: "SU2609091606384536532802",
-  CLIENT_VERSION: "1",
-  CLIENT_SECRET: "4c8a116b-8cfc-46ad-beda-1572fe0acc2f",
-  MERCHANT_ID: "M22I0LXKSWR86",
-  AUTH_URL: "https://api.phonepe.com/apis/identity-manager/v1/oauth/token",
-  PAY_URL: "https://api.phonepe.com/apis/pg/checkout/v2/pay",
-  STATUS_URL: "https://api.phonepe.com/apis/pg/checkout/v2/order",
-  PRODUCTION_ORIGIN: "https://manopavana.com",
-};
-
-// In-memory token cache for serverless edge execution
+// In-memory token cache across warm serverless requests
 let cachedToken = null;
 let tokenExpiresAt = 0;
 
 /**
- * Fetch or reuse in-memory OAuth v2 Bearer token (valid 20 minutes / 1200s)
+ * Fetch or reuse OAuth v2 Bearer token from PhonePe identity manager
  */
-async function getOAuthToken() {
+async function getOAuthToken(env) {
   const now = Date.now();
   if (cachedToken && tokenExpiresAt > now + 60000) {
     return cachedToken;
   }
 
+  const clientId = env.PHONEPE_CLIENT_ID;
+  const clientSecret = env.PHONEPE_CLIENT_SECRET;
+  const clientVersion = env.PHONEPE_CLIENT_VERSION || "1";
+  const authUrl = env.PHONEPE_AUTH_URL || "https://api.phonepe.com/apis/identity-manager/v1/oauth/token";
+
+  if (!clientId || !clientSecret) {
+    throw new Error("Missing PHONEPE_CLIENT_ID or PHONEPE_CLIENT_SECRET in environment variables.");
+  }
+
   const params = new URLSearchParams();
-  params.append("client_id", PHONEPE_CONFIG.CLIENT_ID);
-  params.append("client_version", PHONEPE_CONFIG.CLIENT_VERSION);
-  params.append("client_secret", PHONEPE_CONFIG.CLIENT_SECRET);
+  params.append("client_id", clientId);
+  params.append("client_version", clientVersion);
+  params.append("client_secret", clientSecret);
   params.append("grant_type", "client_credentials");
 
-  const response = await fetch(PHONEPE_CONFIG.AUTH_URL, {
+  const response = await fetch(authUrl, {
     method: "POST",
     headers: {
       "Content-Type": "application/x-www-form-urlencoded",
@@ -48,7 +46,7 @@ async function getOAuthToken() {
 
   const data = await response.json();
   const token = data.access_token || data.token;
-  const expiresIn = data.expires_in || 1200; // default 20 minutes
+  const expiresIn = data.expires_in || 1200;
 
   cachedToken = token;
   tokenExpiresAt = Date.now() + expiresIn * 1000;
@@ -72,7 +70,7 @@ function jsonResponse(payload, status = 200) {
 }
 
 export async function onRequest(context) {
-  const { request } = context;
+  const { request, env } = context;
 
   if (request.method === "OPTIONS") {
     return new Response(null, {
@@ -84,7 +82,15 @@ export async function onRequest(context) {
   const url = new URL(request.url);
   const action = url.searchParams.get("action");
 
+  // Read endpoints & configuration from Cloudflare environment variables
+  const PAY_URL = env.PHONEPE_PAY_URL || "https://api.phonepe.com/apis/pg/checkout/v2/pay";
+  const STATUS_URL = env.PHONEPE_STATUS_URL || "https://api.phonepe.com/apis/pg/checkout/v2/order";
+  const PRODUCTION_ORIGIN = env.PRODUCTION_ORIGIN || "https://manopavana.com";
+
   try {
+    /* -------------------------------------------------------------
+     * ACTION: create_order (Initiate PG v2 payment)
+     * ------------------------------------------------------------- */
     if (request.method === "POST" && action === "create_order") {
       let body = {};
       try {
@@ -106,34 +112,39 @@ export async function onRequest(context) {
 
       let token;
       try {
-        token = await getOAuthToken();
+        token = await getOAuthToken(env);
       } catch (authErr) {
-        console.error("PhonePe OAuth Error:", authErr);
-        // Fallback or detailed error response
         return jsonResponse({
           status: "FAILED",
           message: "Unable to authenticate with payment provider",
-          details: authErr.message
+          details: authErr.message,
         }, 502);
       }
 
-      const redirectUrl = `${redirectBaseUrl || PHONEPE_CONFIG.PRODUCTION_ORIGIN}/?orderRef=${encodeURIComponent(orderRef)}`;
+      const cleanPhone = phone ? String(phone).replace(/\D/g, "").slice(-10) : "";
+      const baseOrigin = redirectBaseUrl || PRODUCTION_ORIGIN;
+      const redirectUrl = `${baseOrigin}/?orderRef=${encodeURIComponent(orderRef)}`;
 
+      // Official PhonePe PG v2 checkout payload schema
       const checkoutPayload = {
-        merchantId: PHONEPE_CONFIG.MERCHANT_ID,
-        merchantTransactionId: orderRef,
-        merchantUserId: phone ? `USR_${phone}` : `USR_${Date.now()}`,
+        merchantOrderId: orderRef,
         amount: amountInPaise,
-        redirectUrl: redirectUrl,
-        redirectMode: "REDIRECT",
-        callbackUrl: `${PHONEPE_CONFIG.PRODUCTION_ORIGIN}/api?action=webhook`,
-        mobileNumber: phone ? String(phone).replace(/\D/g, "").slice(-10) : undefined,
-        paymentInstrument: {
-          type: "PAY_PAGE",
+        expireAfter: 1200,
+        paymentFlow: {
+          type: "PG_CHECKOUT",
+          merchantUrls: {
+            redirectUrl: redirectUrl,
+          },
         },
       };
 
-      const payResponse = await fetch(PHONEPE_CONFIG.PAY_URL, {
+      if (cleanPhone) {
+        checkoutPayload.metaInfo = {
+          udf1: cleanPhone,
+        };
+      }
+
+      const payResponse = await fetch(PAY_URL, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -144,21 +155,18 @@ export async function onRequest(context) {
 
       const payData = await payResponse.json();
 
-      if (!payResponse.ok || payData.code !== "PAYMENT_INITIATED" && payData.success !== true) {
-        const errorMsg = payData.message || "Payment initiation failed";
+      if (!payResponse.ok) {
         return jsonResponse({
           status: "FAILED",
-          message: errorMsg,
-          raw: payData
-        }, 400);
+          message: payData.message || "Payment initiation failed",
+          raw: payData,
+        }, payResponse.status);
       }
 
-      const instrumentResponse = payData.data?.instrumentResponse;
       const checkoutRedirect =
-        instrumentResponse?.redirectInfo?.url ||
         payData.redirectUrl ||
-        instrumentResponse?.redirectUrl ||
-        payData.data?.redirectUrl;
+        payData.data?.redirectUrl ||
+        payData.data?.instrumentResponse?.redirectInfo?.url;
 
       if (!checkoutRedirect) {
         return jsonResponse({
@@ -176,26 +184,28 @@ export async function onRequest(context) {
       });
     }
 
+    /* -------------------------------------------------------------
+     * ACTION: verify_order (Check transaction status)
+     * ------------------------------------------------------------- */
     if (request.method === "GET" && action === "verify_order") {
       const orderRef = url.searchParams.get("orderRef");
       if (!orderRef) {
-        return jsonResponse({ status: "FAILED", message: "Missing orderRef query parameter" }, 400);
+        return jsonResponse({ status: "FAILED", message: "Missing orderRef parameter" }, 400);
       }
 
       let token;
       try {
-        token = await getOAuthToken();
+        token = await getOAuthToken(env);
       } catch (authErr) {
-        console.error("PhonePe OAuth Error:", authErr);
         return jsonResponse({
           status: "FAILED",
           orderRef,
           paymentStatus: "FAILED",
-          reason: "Auth token acquisition failed: " + authErr.message
+          reason: "Auth token acquisition failed: " + authErr.message,
         }, 502);
       }
 
-      const statusEndpoint = `${PHONEPE_CONFIG.STATUS_URL}/${PHONEPE_CONFIG.MERCHANT_ID}/${orderRef}/status`;
+      const statusEndpoint = `${STATUS_URL}/${orderRef}/status?details=false`;
       const verifyResponse = await fetch(statusEndpoint, {
         method: "GET",
         headers: {
@@ -205,20 +215,19 @@ export async function onRequest(context) {
       });
 
       const verifyData = await verifyResponse.json();
-      const code = verifyData.code || "";
-      const state = verifyData.data?.state || "";
+      const state = verifyData.state || verifyData.data?.state || "";
 
-      if (code === "PAYMENT_SUCCESS" || state === "COMPLETED" || state === "SUCCESS") {
+      if (state === "COMPLETED" || state === "SUCCESS") {
         return jsonResponse({
           status: "SUCCESS",
           paymentStatus: "COMPLETED",
           orderRef,
-          data: verifyData.data,
+          data: verifyData,
         });
       } else {
         return jsonResponse({
           status: "FAILED",
-          paymentStatus: "FAILED",
+          paymentStatus: state || "FAILED",
           orderRef,
           reason: verifyData.message || "Payment not completed or failed",
           data: verifyData,
@@ -228,13 +237,12 @@ export async function onRequest(context) {
 
     return jsonResponse({
       status: "FAILED",
-      message: `Unsupported action or method: ${request.method} ${action || "(none)"}`
+      message: `Unsupported action or method: ${request.method} ${action || "(none)"}`,
     }, 404);
   } catch (err) {
-    console.error("Cloudflare Edge Function Error:", err);
     return jsonResponse({
       status: "ERROR",
-      message: err.message || "Internal Edge Error"
+      message: err.message || "Internal Edge Error",
     }, 500);
   }
 }
