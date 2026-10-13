@@ -208,35 +208,31 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     sessionStorage.removeItem("manopavana_admin_auth");
   };
 
-  // 1. User-scoped Cart State
+  // 1. User-scoped Cart & Authentication State
   const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(null);
   const [isLoginModalOpen, setLoginModalOpen] = useState(false);
 
-  // Helper to determine active cart storage key
-  const getActiveCartKey = (user: FirebaseUser | null) => {
-    return user?.uid ? `manopavana_cart_${user.uid}` : "manopavana_cart_guest";
-  };
+  // Tracks if the active user's cart has finished loading from disk/DB to prevent premature overwrite
+  const isCartInitializedRef = useRef(false);
+  const currentUidRef = useRef<string | null>(null);
 
   const [cart, setCart] = useState<CartItem[]>(() => {
     try {
-      // Initialize with active user cart if exists, otherwise guest cart
-      const initialKey = "manopavana_cart_guest";
-      const saved = localStorage.getItem(initialKey);
+      const saved = localStorage.getItem("manopavana_cart_guest");
       return saved ? JSON.parse(saved) : [];
     } catch {
       return [];
     }
   });
 
-  // Track currently active user ID to avoid saving into wrong cart during user switch
-  const activeUserUidRef = useRef<string | null>(null);
-
+  // Sync cart only AFTER the current user's cart has been loaded
   useEffect(() => {
+    if (!isCartInitializedRef.current) return;
     try {
-      const key = currentUser?.uid ? `manopavana_cart_${currentUser.uid}` : "manopavana_cart_guest";
-      localStorage.setItem(key, JSON.stringify(cart));
+      const storageKey = currentUser?.uid ? `manopavana_cart_${currentUser.uid}` : "manopavana_cart_guest";
+      localStorage.setItem(storageKey, JSON.stringify(cart));
 
-      // Also sync user's cart into Firestore so it follows them across browsers & devices
+      // Sync to Firestore for logged in customer so cart follows them
       if (currentUser?.uid) {
         setDoc(
           doc(db, "customers", currentUser.uid),
@@ -278,10 +274,10 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   };
 
-  // 2. Address & Location Guard
+  // 2. Address & Location State (Strictly User-Scoped)
   const [address, setAddress] = useState<Address>(() => {
     try {
-      const saved = localStorage.getItem("manopavana_address");
+      const saved = localStorage.getItem("manopavana_address_guest");
       return saved ? JSON.parse(saved) : DEFAULT_ADDRESS;
     } catch {
       return DEFAULT_ADDRESS;
@@ -290,20 +286,17 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const [isLocationModalOpen, setLocationModalOpen] = useState(false);
 
-  // Check on first mount if location exists in localStorage
-  // The location modal must NOT open on page refresh if an address has already been saved.
+  // Check on first mount if valid location exists in localStorage
   useEffect(() => {
     try {
-      const saved = localStorage.getItem("manopavana_address");
+      const saved = localStorage.getItem(currentUser?.uid ? `manopavana_address_${currentUser.uid}` : "manopavana_address_guest");
       if (saved) {
         const parsed = JSON.parse(saved);
         if (parsed && parsed.addressLine1?.trim() && parsed.pincode?.trim()) {
-          // Valid address already saved! DO NOT open modal. Auto-populate store.
           setAddress(parsed);
           return;
         }
       }
-      // Only trigger location modal on initial arrival if NO address is saved
       setLocationModalOpen(true);
     } catch {
       setLocationModalOpen(true);
@@ -313,14 +306,16 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const updateAddress = (newFields: Partial<Address>) => {
     setAddress((prev) => {
       const updated = { ...prev, ...newFields };
-      // Check if Bangalore pincode (starts with 560)
       const cleanPin = (updated.pincode || "").trim();
-      const isBangalore = cleanPin.startsWith("560") ||
+      const isBangalore =
+        cleanPin.startsWith("560") ||
         (updated.district || "").toLowerCase().includes("bengaluru") ||
         (updated.district || "").toLowerCase().includes("bangalore");
       const full: Address = { ...updated, isBangalore };
+
       try {
-        localStorage.setItem("manopavana_address", JSON.stringify(full));
+        const addressKey = currentUser?.uid ? `manopavana_address_${currentUser.uid}` : "manopavana_address_guest";
+        localStorage.setItem(addressKey, JSON.stringify(full));
       } catch {
         // ignore
       }
@@ -346,23 +341,42 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   /**
    * Reverse geocodes device GPS coordinates into full delivery address
-   * and auto-populates the address globally across the app.
+   * with intelligent district resolution and crash-safe handling.
    */
   const reverseGeocodeAndSaveAddress = async (lat: number, lng: number): Promise<Partial<Address> | null> => {
     try {
-      const resp = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`,
-        {
-          headers: {
-            "Accept-Language": "en",
-          },
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+
+      let data: any = null;
+
+      // 1. First try server-side proxy route to avoid CORS or Nominatim rate limits
+      try {
+        const serverResp = await fetch(`/api?action=reverse_geocode&lat=${lat}&lng=${lng}`);
+        if (serverResp.ok) {
+          data = await serverResp.json();
         }
-      );
-      if (!resp.ok) return null;
-      const data = await resp.json();
+      } catch {
+        // fallback
+      }
+
+      // 2. Direct Nominatim fallback if server proxy was unavailable
+      if (!data || !data.address) {
+        const directResp = await fetch(
+          `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`,
+          {
+            headers: {
+              "Accept-Language": "en",
+            },
+          }
+        );
+        if (directResp.ok) {
+          data = await directResp.json();
+        }
+      }
+
       if (!data || !data.address) return null;
 
-      const addr = data.address;
+      const addr = data.address || {};
       const postcode = (addr.postcode || "").replace(/\D/g, "").slice(0, 6);
 
       const parts = [
@@ -372,7 +386,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         addr.neighbourhood || addr.suburb || addr.residential || addr.quarter,
       ].filter(Boolean);
       const street = parts.join(", ") || (data.display_name ? data.display_name.split(",").slice(0, 3).join(", ") : "");
-
       const landmark = addr.amenity || addr.shop || addr.landmark || "";
 
       // Match canonical state
@@ -389,42 +402,119 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
       const availableDistricts = INDIAN_STATES_DISTRICTS[state] || INDIAN_STATES_DISTRICTS["Karnataka"];
 
-      const isBLR =
-        postcode.startsWith("560") ||
-        (data.display_name && (data.display_name.toLowerCase().includes("bengaluru") || data.display_name.toLowerCase().includes("bangalore"))) ||
-        (addr.city && addr.city.toLowerCase().includes("bengaluru")) ||
-        (addr.county && addr.county.toLowerCase().includes("bengaluru"));
+      // Comprehensive district text blob
+      const combinedText = (
+        JSON.stringify(addr) + " " + (data.display_name || "")
+      ).toLowerCase();
 
+      let isBLR = false;
       let district = "Bengaluru Urban";
-      if (isBLR) {
+
+      // 1. Bengaluru / Bangalore detection
+      if (
+        postcode.startsWith("560") ||
+        combinedText.includes("bengaluru") ||
+        combinedText.includes("bangalore") ||
+        combinedText.includes("peenya") ||
+        combinedText.includes("whitefield") ||
+        combinedText.includes("koramangala") ||
+        combinedText.includes("indiranagar") ||
+        combinedText.includes("jayanagar") ||
+        combinedText.includes("electronic city") ||
+        combinedText.includes("hebbal") ||
+        combinedText.includes("yelahanka") ||
+        combinedText.includes("rajajinagar") ||
+        combinedText.includes("yeshwanthpur") ||
+        combinedText.includes("malleshwaram")
+      ) {
+        isBLR = true;
         if (
           postcode.startsWith("562") ||
-          (addr.county && addr.county.toLowerCase().includes("rural")) ||
-          (addr.district && addr.district.toLowerCase().includes("rural"))
+          combinedText.includes("rural") ||
+          combinedText.includes("devanahalli") ||
+          combinedText.includes("nelamangala") ||
+          combinedText.includes("doddaballapur") ||
+          combinedText.includes("hoskote")
         ) {
           district = "Bengaluru Rural";
         } else {
           district = "Bengaluru Urban";
         }
-      } else {
-        const candidates = [
-          addr.state_district,
-          addr.county,
-          addr.district,
-          addr.city,
-        ].filter(Boolean);
+      } else if (state === "Karnataka") {
+        // 2. Karnataka District Alias Mapping
+        const kaAliases: Record<string, string> = {
+          mysore: "Mysuru",
+          mysuru: "Mysuru",
+          belgaum: "Belagavi",
+          belagavi: "Belagavi",
+          bellary: "Ballari",
+          ballari: "Ballari",
+          shimoga: "Shivamogga",
+          shivamogga: "Shivamogga",
+          tumkur: "Tumakuru",
+          tumakuru: "Tumakuru",
+          mangalore: "Dakshina Kannada",
+          mangaluru: "Dakshina Kannada",
+          udupi: "Udupi",
+          gulbarga: "Kalaburagi",
+          kalaburagi: "Kalaburagi",
+          bijapur: "Vijayapura",
+          vijayapura: "Vijayapura",
+          chikmagalur: "Chikkamagaluru",
+          chikkamagaluru: "Chikkamagaluru",
+          dharwad: "Dharwad",
+          hubli: "Dharwad",
+          ramnagar: "Ramanagara",
+          ramanagara: "Ramanagara",
+          hassan: "Hassan",
+          mandya: "Mandya",
+          kolar: "Kolar",
+          chikkaballapur: "Chikkaballapura",
+          chikkaballapura: "Chikkaballapura",
+          davangere: "Davanagere",
+          davanagere: "Davanagere",
+          bagalkot: "Bagalkote",
+          bagalkote: "Bagalkote",
+          bidar: "Bidar",
+          chitradurga: "Chitradurga",
+          gadag: "Gadag",
+          haveri: "Haveri",
+          koppal: "Koppal",
+          raichur: "Raichur",
+          yadgir: "Yadgir",
+        };
 
-        let foundDistrict = "";
-        for (const cand of candidates) {
-          const match = availableDistricts.find(
-            (d: string) => d.toLowerCase() === cand.toLowerCase() || cand.toLowerCase().includes(d.toLowerCase()) || d.toLowerCase().includes(cand.toLowerCase())
-          );
-          if (match) {
-            foundDistrict = match;
+        let found = "";
+        for (const [alias, canonical] of Object.entries(kaAliases)) {
+          if (combinedText.includes(alias)) {
+            found = canonical;
             break;
           }
         }
-        district = foundDistrict || availableDistricts[0] || "Bengaluru Urban";
+        // If not found in aliases, match against canonical district list
+        if (!found) {
+          for (const d of availableDistricts) {
+            if (combinedText.includes(d.toLowerCase())) {
+              found = d;
+              break;
+            }
+          }
+        }
+        // Safe fallback: NEVER Bagalkote unless explicitly mentioned! Default to Bengaluru Urban
+        district = found || "Bengaluru Urban";
+        if (district.toLowerCase().includes("bengaluru")) {
+          isBLR = true;
+        }
+      } else {
+        // 3. Pan-India state districts
+        let found = "";
+        for (const d of availableDistricts) {
+          if (combinedText.includes(d.toLowerCase())) {
+            found = d;
+            break;
+          }
+        }
+        district = found || availableDistricts[0] || "Bengaluru Urban";
       }
 
       const partial: Partial<Address> = {
@@ -447,12 +537,15 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   };
 
-  // 3. Firebase Auth State & Login Sync
+  // 3. Firebase Auth State & Login Sync (Strict User Isolation)
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      // Temporarily halt cart auto-saving while we load this user's data
+      isCartInitializedRef.current = false;
+      currentUidRef.current = user?.uid || null;
       setCurrentUser(user);
+
       if (user) {
-        // Load user-specific cart
         try {
           const userKey = `manopavana_cart_${user.uid}`;
           const localSaved = localStorage.getItem(userKey);
@@ -466,7 +559,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             }
           }
 
-          // If user had items in guest cart before logging in and their user cart is empty, carry them over
+          // If user had items in guest cart before logging in and user cart is empty, carry them over
           if (loadedCart.length === 0) {
             const guestSaved = localStorage.getItem("manopavana_cart_guest");
             if (guestSaved) {
@@ -480,25 +573,55 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
           setCart(loadedCart);
 
+          // Load user's private address
+          let userAddr: Address | null = null;
           if (profile && (profile as any).savedAddress) {
-            const saved = (profile as any).savedAddress as Partial<Address>;
-            if (saved.addressLine1 || saved.phone || saved.fullName) {
-              updateAddress(saved);
+            userAddr = (profile as any).savedAddress;
+          } else {
+            const localAddrSaved = localStorage.getItem(`manopavana_address_${user.uid}`);
+            if (localAddrSaved) {
+              userAddr = JSON.parse(localAddrSaved);
             }
           }
+
+          if (userAddr) {
+            setAddress(userAddr);
+          } else {
+            // Fresh address initialized with user's own identity (no previous user details)
+            const cleanUserAddr: Address = {
+              ...DEFAULT_ADDRESS,
+              fullName: user.displayName || "",
+              email: user.email || "",
+              phone: user.phoneNumber || "",
+            };
+            setAddress(cleanUserAddr);
+          }
         } catch (e) {
-          console.warn("Error loading user-scoped cart:", e);
+          console.warn("Error loading user-scoped state:", e);
+        } finally {
+          isCartInitializedRef.current = true;
         }
       } else {
-        // When user logs out, switch to guest cart
+        // User logged out: switch strictly to guest session with clean user details
         try {
           const guestSaved = localStorage.getItem("manopavana_cart_guest");
           setCart(guestSaved ? JSON.parse(guestSaved) : []);
+
+          const guestAddrSaved = localStorage.getItem("manopavana_address_guest");
+          if (guestAddrSaved) {
+            setAddress(JSON.parse(guestAddrSaved));
+          } else {
+            setAddress(DEFAULT_ADDRESS);
+          }
         } catch {
           setCart([]);
+          setAddress(DEFAULT_ADDRESS);
+        } finally {
+          isCartInitializedRef.current = true;
         }
       }
     });
+
     return () => unsubscribe();
   }, []);
 
@@ -510,20 +633,24 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     } catch (err) {
       console.warn("Firebase signout error:", err);
     }
+    isCartInitializedRef.current = false;
+    currentUidRef.current = null;
     setCurrentUser(null);
     localStorage.removeItem("manopavana_active_user");
     sessionStorage.removeItem("manopavana_admin_auth");
     setIsAdminAuthenticated(false);
 
-    // Switch to clean guest cart on logout
+    // Reset address & cart to clean guest state
+    setAddress(DEFAULT_ADDRESS);
     try {
       const guestSaved = localStorage.getItem("manopavana_cart_guest");
       setCart(guestSaved ? JSON.parse(guestSaved) : []);
     } catch {
       setCart([]);
     }
+    isCartInitializedRef.current = true;
 
-    showToast("👋 You have logged out successfully.");
+    showToast("👋 You have signed out. User session cleared.");
   };
 
   // 4. Loyalty Program

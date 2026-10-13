@@ -190,9 +190,9 @@ export const AccountPage: React.FC = () => {
     return idx >= 0 ? idx : 0;
   };
 
-  // MANDATORY AUTHENTICATION GATE:
-  // If user is not logged in, require them to log in to access orders and tracking
-  if (!currentUser) {
+  // If user is not logged in, but has an active order to track (from Checkout redirect or search lookup):
+  // allow them to view and track their order! Only show the login gate if no order is selected.
+  if (!currentUser && !targetRef && !guestLookedUpOrder && visibleOrders.length === 0) {
     return (
       <div
         className={`w-full min-h-[calc(100vh-80px)] py-16 flex items-center justify-center transition-colors box-border ${
@@ -213,16 +213,54 @@ export const AccountPage: React.FC = () => {
                 isDark ? "text-[#FAF4EA]" : "text-[#1F120A]"
               }`}
             >
-              Sign In to Track Orders
+              Customer Account & Tracking
             </h1>
             <p
               className={`text-xs sm:text-sm leading-relaxed ${
                 isDark ? "text-[#D8C8B8]" : "text-[#5C4230]"
               }`}
             >
-              Your order history, live parcel tracking, and invoices are private to your account. Please log in or register with your phone number or Google account to view and track your orders.
+              Sign in to manage your saved delivery address and view your complete order history.
             </p>
           </div>
+
+          {/* Quick Order Lookup for Guests */}
+          <form onSubmit={handleLookupOrder} className="space-y-3 pt-2 text-left">
+            <label className={`block text-xs font-semibold ${isDark ? "text-[#D8C8B8]" : "text-[#5C4230]"}`}>
+              Track Order without Logging In:
+            </label>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                placeholder="e.g. MV-123456"
+                value={lookupInputRef}
+                onChange={(e) => setLookupInputRef(e.target.value)}
+                className={`flex-1 px-3.5 py-2.5 text-xs rounded-xl focus:outline-none focus:ring-2 focus:ring-[#E08F35] ${
+                  isDark
+                    ? "bg-[#150D07] border border-[#362114] text-[#FAF4EA]"
+                    : "bg-[#FAF7F2] border border-[#DDD1BE] text-[#24140A]"
+                }`}
+              />
+              <button
+                type="submit"
+                disabled={lookupLoading}
+                className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-[#D49A37] to-[#B87C24] text-[#140D09] font-bold text-xs shadow-md cursor-pointer hover:brightness-110"
+              >
+                {lookupLoading ? "..." : "Track"}
+              </button>
+            </div>
+            {lookupError && (
+              <p className="text-xs text-red-500 font-semibold">{lookupError}</p>
+            )}
+          </form>
+
+          <div className="relative flex items-center justify-center py-1">
+            <div className="w-full border-t border-[#3A2417]" />
+            <span className={`absolute px-2.5 text-[10px] uppercase font-bold tracking-wider ${isDark ? "bg-[#1C120B] text-[#A88D77]" : "bg-white text-[#8C7A6B]"}`}>
+              Or Sign In
+            </span>
+          </div>
+
           <button
             type="button"
             onClick={() => setLoginModalOpen(true)}

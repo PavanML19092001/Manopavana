@@ -42,6 +42,7 @@ export const CheckoutPage: React.FC = () => {
     reverseGeocodeAndSaveAddress,
     saveOrder,
     clearCart,
+    setOrderSuccessRef,
     showToast,
     setLoginModalOpen,
     getOrder,
@@ -78,10 +79,22 @@ export const CheckoutPage: React.FC = () => {
   const [district, setDistrict] = useState(address.district || "Bengaluru Urban");
   const [pincode, setPincode] = useState(address.pincode || "560058");
   const [coords, setCoords] = useState<[number, number]>([
-    address.lat || 12.9716,
-    address.lng || 77.5946,
+    Number.isFinite(address.lat) ? (address.lat as number) : 12.9716,
+    Number.isFinite(address.lng) ? (address.lng as number) : 77.5946,
   ]);
   const [isLocating, setIsLocating] = useState(false);
+
+  const safeUpdateMapCenter = (lat: number, lng: number, zoom = 14) => {
+    if (!mapInstanceRef.current || !markerRef.current) return;
+    try {
+      if (Number.isFinite(lat) && Number.isFinite(lng)) {
+        mapInstanceRef.current.setView([lat, lng], zoom);
+        markerRef.current.setLatLng([lat, lng]);
+      }
+    } catch (e) {
+      console.warn("Map view notice:", e);
+    }
+  };
 
   // Auto-sync form state whenever address is updated globally anywhere across the app
   useEffect(() => {
@@ -93,12 +106,11 @@ export const CheckoutPage: React.FC = () => {
       if (address.state) setState(address.state);
       if (address.district) setDistrict(address.district);
       if (address.pincode) setPincode(address.pincode);
-      if (address.lat && address.lng) {
-        setCoords([address.lat, address.lng]);
-        if (mapInstanceRef.current && markerRef.current) {
-          mapInstanceRef.current.setView([address.lat, address.lng], 15);
-          markerRef.current.setLatLng([address.lat, address.lng]);
-        }
+      if (Number.isFinite(address.lat) && Number.isFinite(address.lng)) {
+        const lat = address.lat as number;
+        const lng = address.lng as number;
+        setCoords([lat, lng]);
+        safeUpdateMapCenter(lat, lng, 15);
       }
     }
   }, [address]);
@@ -325,23 +337,22 @@ export const CheckoutPage: React.FC = () => {
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
         try {
-          const c: [number, number] = [pos.coords.latitude, pos.coords.longitude];
-          setCoords(c);
-          if (mapInstanceRef.current && markerRef.current) {
-            try {
-              mapInstanceRef.current.setView(c, 15);
-              markerRef.current.setLatLng(c);
-            } catch {}
-          }
-          showToast("📍 GPS coordinates retrieved! Auto-filling address...");
-          const partial = await reverseGeocodeAndSaveAddress(c[0], c[1]);
-          if (partial) {
-            if (partial.addressLine1) setAddressLine1(partial.addressLine1);
-            if (partial.pincode) setPincode(partial.pincode);
-            if (partial.state) setState(partial.state);
-            if (partial.district) setDistrict(partial.district);
-            if (partial.landmark) setLandmark(partial.landmark);
-            showToast("📍 Address & pincode auto-populated from GPS!");
+          const lat = pos.coords.latitude;
+          const lng = pos.coords.longitude;
+          if (Number.isFinite(lat) && Number.isFinite(lng)) {
+            const c: [number, number] = [lat, lng];
+            setCoords(c);
+            safeUpdateMapCenter(lat, lng, 15);
+            showToast("📍 GPS coordinates retrieved! Auto-filling address...");
+            const partial = await reverseGeocodeAndSaveAddress(lat, lng);
+            if (partial) {
+              if (partial.addressLine1) setAddressLine1(partial.addressLine1);
+              if (partial.pincode) setPincode(partial.pincode);
+              if (partial.state) setState(partial.state);
+              if (partial.district) setDistrict(partial.district);
+              if (partial.landmark) setLandmark(partial.landmark);
+              showToast("📍 Address & district auto-populated from GPS!");
+            }
           }
         } catch (e) {
           console.warn("GPS error:", e);
@@ -364,23 +375,29 @@ export const CheckoutPage: React.FC = () => {
     if (methodChoice) setPaymentMethod(methodChoice);
 
     if (checkoutItems.length === 0) {
-      showToast("Your checkout bag is empty. Please add items to order.");
+      showToast("Your checkout bag is currently empty. Tap an oil bottle below to add it!");
       return;
     }
 
-    if (!fullName.trim() || !phone.trim() || !addressLine1.trim() || !pincode.trim()) {
-      showToast("Please fill in your Name, 10-digit WhatsApp number, and Delivery Street Address.");
+    if (!fullName.trim()) {
+      showToast("Please enter the recipient full name.");
+      return;
+    }
+
+    const cleanPhone = phone.trim().replace(/\D/g, "").slice(-10);
+    if (cleanPhone.length !== 10) {
+      showToast("Please enter a valid 10-digit WhatsApp phone number.");
+      return;
+    }
+
+    if (!addressLine1.trim()) {
+      showToast("Please enter your flat / house / street delivery address.");
       return;
     }
 
     const cleanPin = pincode.trim().replace(/\D/g, "").slice(0, 6);
     if (cleanPin.length !== 6) {
-      showToast("Please enter a valid 6-digit Indian pincode.");
-      return;
-    }
-    const cleanPhone = phone.trim().replace(/\D/g, "").slice(-10);
-    if (cleanPhone.length !== 10) {
-      showToast("Please enter a valid 10-digit mobile number.");
+      showToast("Please enter a valid 6-digit Indian postal pincode.");
       return;
     }
 
@@ -455,7 +472,8 @@ export const CheckoutPage: React.FC = () => {
         } catch {}
 
         await saveOrder(newOrder);
-        await sendOrderConfirmationEmail(newOrder);
+        // Non-blocking email dispatch
+        sendOrderConfirmationEmail(newOrder).catch((e) => console.warn("Email alert notice:", e));
 
         if (isBuyNowMode) {
           clearBuyNow();
@@ -463,6 +481,7 @@ export const CheckoutPage: React.FC = () => {
           clearCart();
         }
 
+        setOrderSuccessRef(orderRef);
         showToast("🎉 Order placed successfully with Cash on Delivery!");
         navigate(`/account?order=${orderRef}`);
       } catch (err) {
@@ -547,13 +566,13 @@ export const CheckoutPage: React.FC = () => {
           const errorMsg =
             data.message ||
             data.raw?.message ||
-            "Unable to connect to payment gateway right now. You can switch to Cash on Delivery (COD) instantly!";
+            "PhonePe Payment Gateway is busy. You can complete your order instantly with Cash on Delivery (COD)!";
           setPaymentError(errorMsg);
           showToast(errorMsg);
         }
       } catch (err: unknown) {
         console.error("Payment Initiation Request Error:", err);
-        const errorMsg = "Could not contact payment gateway. Please select Cash on Delivery to place your order.";
+        const errorMsg = "Could not contact payment gateway. You can place your order with Cash on Delivery (COD) instantly!";
         setPaymentError(errorMsg);
         showToast(errorMsg);
       } finally {
@@ -863,7 +882,7 @@ export const CheckoutPage: React.FC = () => {
                     Delivery Geolocation Pin (OpenStreetMap):
                   </span>
                   <span className="text-[11px] font-mono">
-                    {coords[0].toFixed(4)}, {coords[1].toFixed(4)}
+                    {Number(coords?.[0] || 12.9716).toFixed(4)}, {Number(coords?.[1] || 77.5946).toFixed(4)}
                   </span>
                 </div>
                 <div
@@ -1146,29 +1165,70 @@ export const CheckoutPage: React.FC = () => {
                 </div>
               )}
 
-              {/* If checkout bag is empty, display instant re-add option */}
+              {/* If checkout bag is empty, display instant product selection */}
               {checkoutItems.length === 0 && (
-                <div className="p-4 rounded-xl bg-amber-950/40 border border-amber-600/40 text-center space-y-2">
+                <div className="p-4 rounded-xl bg-amber-950/40 border border-amber-600/40 text-center space-y-3">
                   <p className="text-xs font-bold text-amber-200">Your checkout bag is currently empty.</p>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      addToCart({
-                        id: "groundnut-1L",
-                        productId: "groundnut",
-                        title: "Wood-Pressed Groundnut Oil",
-                        subtitle: "Marachekku Pure • 1L",
-                        variant: "1L",
-                        price: 399,
-                        regularPrice: 399,
-                        image: "/public/images/products/groundnut-light.png",
-                      }, 1);
-                      showToast("Added 1L Groundnut Oil to bag!");
-                    }}
-                    className="px-4 py-2 bg-gradient-to-r from-[#D49A37] to-[#B87C24] text-[#140D09] text-xs font-bold rounded-xl shadow-md cursor-pointer hover:brightness-110"
-                  >
-                    + Add 1L Groundnut Oil to Bag
-                  </button>
+                  <p className="text-[11px] text-[#D6BEAA]">Choose an authentic wood-pressed oil to order instantly:</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        addToCart({
+                          id: "groundnut-1L",
+                          productId: "groundnut",
+                          title: "Wood-Pressed Groundnut Oil",
+                          subtitle: "Marachekku Pure • 1L",
+                          variant: "1L",
+                          price: 399,
+                          regularPrice: 399,
+                          image: "/public/images/products/groundnut-light.png",
+                        }, 1);
+                        showToast("Added 1L Groundnut Oil to bag!");
+                      }}
+                      className="px-2.5 py-2 bg-black/40 hover:bg-black/60 border border-amber-500/40 text-amber-300 text-[11px] font-bold rounded-lg shadow-sm cursor-pointer transition-colors"
+                    >
+                      + Groundnut 1L (₹399)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        addToCart({
+                          id: "coconut-1L",
+                          productId: "coconut",
+                          title: "Wood-Pressed Coconut Oil",
+                          subtitle: "Marachekku Pure • 1L",
+                          variant: "1L",
+                          price: 499,
+                          regularPrice: 499,
+                          image: "/public/images/products/coconut-light.png",
+                        }, 1);
+                        showToast("Added 1L Coconut Oil to bag!");
+                      }}
+                      className="px-2.5 py-2 bg-black/40 hover:bg-black/60 border border-amber-500/40 text-amber-300 text-[11px] font-bold rounded-lg shadow-sm cursor-pointer transition-colors"
+                    >
+                      + Coconut 1L (₹499)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        addToCart({
+                          id: "sesame-1L",
+                          productId: "sesame",
+                          title: "Wood-Pressed Sesame Oil",
+                          subtitle: "Marachekku Pure • 1L",
+                          variant: "1L",
+                          price: 499,
+                          regularPrice: 499,
+                          image: "/public/images/products/sesame-light.png",
+                        }, 1);
+                        showToast("Added 1L Sesame Oil to bag!");
+                      }}
+                      className="px-2.5 py-2 bg-black/40 hover:bg-black/60 border border-amber-500/40 text-amber-300 text-[11px] font-bold rounded-lg shadow-sm cursor-pointer transition-colors"
+                    >
+                      + Sesame 1L (₹499)
+                    </button>
+                  </div>
                 </div>
               )}
 
@@ -1177,7 +1237,7 @@ export const CheckoutPage: React.FC = () => {
                 {/* 1. Pay Online Button */}
                 <button
                   type="button"
-                  disabled={isProcessing || checkoutItems.length === 0}
+                  disabled={isProcessing}
                   onClick={() => handlePlaceOrder(undefined, "phonepe")}
                   className="w-full py-4 px-4 rounded-xl bg-gradient-to-r from-[#D49A37] via-[#F5BC51] to-[#BF7E16] text-[#140D09] font-black font-serif text-xs uppercase tracking-wider shadow-[0_4px_20px_rgba(212,154,55,0.4)] border border-[#FFD885] hover:brightness-110 active:scale-[0.99] disabled:opacity-50 transition-all flex items-center justify-center gap-2 cursor-pointer"
                 >
@@ -1197,7 +1257,7 @@ export const CheckoutPage: React.FC = () => {
                 {/* 2. Cash on Delivery Button */}
                 <button
                   type="button"
-                  disabled={isProcessing || checkoutItems.length === 0}
+                  disabled={isProcessing}
                   onClick={() => handlePlaceOrder(undefined, "cod")}
                   className="w-full py-3.5 px-4 rounded-xl bg-[#5E3210] hover:bg-[#43230A] border border-[#7D451B] text-white font-bold text-xs uppercase tracking-wider shadow-md hover:brightness-105 active:scale-[0.99] disabled:opacity-50 transition-all flex items-center justify-center gap-2 cursor-pointer"
                 >

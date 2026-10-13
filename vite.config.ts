@@ -170,6 +170,31 @@ export default defineConfig(() => {
                 return;
               }
 
+              if (req.method === 'GET' && action === 'reverse_geocode') {
+                const lat = url.searchParams.get('lat');
+                const lng = url.searchParams.get('lng');
+                if (!lat || !lng) {
+                  res.statusCode = 400;
+                  res.end(JSON.stringify({ error: 'Missing coordinates' }));
+                  return;
+                }
+                try {
+                  const geoResp = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`, {
+                    headers: {
+                      'User-Agent': 'Manopavana-Oils/1.0 (manopavana@gmail.com)',
+                      'Accept-Language': 'en',
+                    },
+                  });
+                  const geoData = await geoResp.json();
+                  res.statusCode = 200;
+                  res.end(JSON.stringify(geoData));
+                } catch (e: any) {
+                  res.statusCode = 500;
+                  res.end(JSON.stringify({ error: e?.message || 'Geocoding failed' }));
+                }
+                return;
+              }
+
               /* -------------------------------------------------------------
                * DELHIVERY LOGISTICS INTEGRATION
                * Token: 6d43e07bee414f88473e757d0fd9e1134e1afc9a

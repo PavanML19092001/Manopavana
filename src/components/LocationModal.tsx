@@ -123,6 +123,7 @@ export const LocationModal: React.FC = () => {
 
   const reverseGeocode = async (lat: number, lon: number) => {
     try {
+      if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
       const partial = await reverseGeocodeAndSaveAddress(lat, lon);
       if (partial) {
         if (partial.addressLine1) setAddressLine1(partial.addressLine1);
@@ -148,15 +149,17 @@ export const LocationModal: React.FC = () => {
         try {
           const lat = pos.coords.latitude;
           const lng = pos.coords.longitude;
-          setCoords([lat, lng]);
-          if (mapInstanceRef.current && markerRef.current) {
-            try {
-              mapInstanceRef.current.setView([lat, lng], 15);
-              markerRef.current.setLatLng([lat, lng]);
-            } catch {}
+          if (Number.isFinite(lat) && Number.isFinite(lng)) {
+            setCoords([lat, lng]);
+            if (mapInstanceRef.current && markerRef.current) {
+              try {
+                mapInstanceRef.current.setView([lat, lng], 15);
+                markerRef.current.setLatLng([lat, lng]);
+              } catch {}
+            }
+            showToast("📍 GPS coordinates retrieved! Auto-filling address...");
+            await reverseGeocode(lat, lng);
           }
-          showToast("📍 GPS coordinates retrieved! Auto-filling address...");
-          await reverseGeocode(lat, lng);
         } catch (e) {
           console.warn("GPS handling error:", e);
         } finally {
@@ -301,7 +304,7 @@ export const LocationModal: React.FC = () => {
                 Interactive OpenStreetMap (Drag pin to fine-tune):
               </span>
               <span className="text-[11px] text-[#A88D77] font-mono">
-                {coords[0].toFixed(4)}, {coords[1].toFixed(4)}
+                {Number(coords?.[0] || 12.9716).toFixed(4)}, {Number(coords?.[1] || 77.5946).toFixed(4)}
               </span>
             </div>
             <div
