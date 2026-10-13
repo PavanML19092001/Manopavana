@@ -471,6 +471,17 @@ export async function onRequest(context) {
       });
     }
 
+    // 4. Delhivery Webhook Push Notification Handler
+    if (request.method === "POST" && action === "delhivery_webhook") {
+      try {
+        const webhookData = await request.json().catch(() => ({}));
+        console.log("[DELHIVERY WEBHOOK RECEIVED]", webhookData);
+        return jsonResponse({ status: "SUCCESS", received: true });
+      } catch {
+        return jsonResponse({ status: "ACKNOWLEDGED" });
+      }
+    }
+
     return jsonResponse({
       status: "FAILED",
       message: `Unsupported action or method: ${request.method} ${action || "(none)"}`,

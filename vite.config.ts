@@ -464,6 +464,24 @@ export default defineConfig(() => {
                 return;
               }
 
+              // 4. Delhivery Webhook Push Notification Handler
+              if (req.method === 'POST' && action === 'delhivery_webhook') {
+                let bodyStr = '';
+                req.on('data', chunk => { bodyStr += chunk; });
+                req.on('end', async () => {
+                  try {
+                    const webhookData = JSON.parse(bodyStr || '{}');
+                    console.log('[DELHIVERY WEBHOOK RECEIVED]', webhookData);
+                    res.statusCode = 200;
+                    res.end(JSON.stringify({ status: 'SUCCESS', received: true }));
+                  } catch (e: any) {
+                    res.statusCode = 200;
+                    res.end(JSON.stringify({ status: 'ACKNOWLEDGED' }));
+                  }
+                });
+                return;
+              }
+
               res.statusCode = 200;
               res.end(JSON.stringify({ status: 'ONLINE', service: 'MANOPAVANA Edge PG & Delhivery Logistics' }));
               return;

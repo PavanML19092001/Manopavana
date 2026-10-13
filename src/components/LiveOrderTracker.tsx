@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { Order, OrderStatus } from "../types";
 import { BUSINESS_CONFIG } from "../constants";
+import { useStore } from "../context/StoreContext";
 
 interface LiveOrderTrackerProps {
   order: Order;
@@ -40,6 +41,7 @@ export const LiveOrderTracker: React.FC<LiveOrderTrackerProps> = ({
   order,
   themeMode = "light",
 }) => {
+  const { updateOrderDetails } = useStore();
   const isDark = themeMode === "dark";
   const [showAllScans, setShowAllScans] = useState(false);
   const [delhiveryScans, setDelhiveryScans] = useState<DelhiveryScan[]>([]);
@@ -71,14 +73,27 @@ export const LiveOrderTracker: React.FC<LiveOrderTrackerProps> = ({
       const data = await res.json();
       
       const pkg = data.data?.ShipmentData?.[0]?.Shipment;
-      if (pkg && pkg.Scans && Array.isArray(pkg.Scans)) {
-        const sortedScans = [...pkg.Scans].map((s: any) => ({
-          scanDateTime: s.ScanDetail?.ScanDateTime || s.ScanDateTime,
-          scanLocation: s.ScanDetail?.ScannedLocation || s.ScannedLocation,
-          scanType: s.ScanDetail?.ScanType || s.Scan || s.ScanType,
-          instructions: s.ScanDetail?.Instructions || s.Instructions,
-        }));
-        setDelhiveryScans(sortedScans);
+      if (pkg) {
+        // Auto-sync order status if Delhivery confirms delivery
+        const statusStr = String(pkg.Status?.Status || "").toLowerCase();
+        if (statusStr.includes("delivered") && order.orderStatus !== "Delivered") {
+          updateOrderDetails(order.orderRef, { orderStatus: "Delivered" });
+        } else if (
+          (statusStr.includes("transit") || statusStr.includes("out for delivery") || statusStr.includes("dispatched")) &&
+          order.orderStatus === "Placed"
+        ) {
+          updateOrderDetails(order.orderRef, { orderStatus: "Dispatched" });
+        }
+
+        if (pkg.Scans && Array.isArray(pkg.Scans)) {
+          const sortedScans = [...pkg.Scans].map((s: any) => ({
+            scanDateTime: s.ScanDetail?.ScanDateTime || s.ScanDateTime,
+            scanLocation: s.ScanDetail?.ScannedLocation || s.ScannedLocation,
+            scanType: s.ScanDetail?.ScanType || s.Scan || s.ScanType,
+            instructions: s.ScanDetail?.Instructions || s.Instructions,
+          }));
+          setDelhiveryScans(sortedScans);
+        }
       }
     } catch (e: any) {
       console.warn("Could not load Delhivery scans:", e?.message);

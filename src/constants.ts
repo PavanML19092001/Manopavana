@@ -245,7 +245,49 @@ export const INDIAN_STATES_DISTRICTS: Record<string, string[]> = {
     "Kulgam", "Kupwara", "Poonch", "Pulwama", "Rajouri", "Ramban", "Reasi", "Samba", "Shopian", "Srinagar", "Udhampur"
   ],
   Chandigarh: ["Chandigarh"],
-  Puducherry: ["Puducherry", "Karaikal", "Mahe", "Yanam"]
+  Puducherry: ["Puducherry", "Karaikal", "Mahe", "Yanam"],
+  "Arunachal Pradesh": [
+    "Anjaw", "Changlang", "Dibang Valley", "East Kameng", "East Siang", "Itanagar", "Kamle",
+    "Kra Daadi", "Kurung Kumey", "Lepa Rada", "Lohit", "Longding", "Lower Dibang Valley",
+    "Lower Siang", "Lower Subansiri", "Namsai", "Pakke Kessang", "Papum Pare", "Shi Yomi",
+    "Siang", "Tawang", "Tirap", "Upper Siang", "Upper Subansiri", "West Kameng", "West Siang"
+  ],
+  Manipur: [
+    "Bishnupur", "Chandel", "Churachandpur", "Imphal East", "Imphal West", "Jiribam",
+    "Kakching", "Kamjong", "Kangpokpi", "Noney", "Pherzawl", "Senapati", "Tamenglong",
+    "Tengnoupal", "Thoubal", "Ukhrul"
+  ],
+  Meghalaya: [
+    "East Garo Hills", "East Jaintia Hills", "East Khasi Hills", "Eastern West Khasi Hills",
+    "North Garo Hills", "Ri Bhoi", "South Garo Hills", "South West Garo Hills",
+    "South West Khasi Hills", "West Garo Hills", "West Jaintia Hills", "West Khasi Hills"
+  ],
+  Mizoram: [
+    "Aizawl", "Champhai", "Hnahthial", "Khawzawl", "Kolasib", "Lawngtlai", "Lunglei",
+    "Mamit", "Saitual", "Serchhip", "Siaha"
+  ],
+  Nagaland: [
+    "Chümoukedima", "Dimapur", "Kiphire", "Kohima", "Longleng", "Mokokchung", "Mon",
+    "Niuland", "Noklak", "Peren", "Phek", "Shamator", "Tseminyü", "Tuensang", "Wokha", "Zünheboto"
+  ],
+  Sikkim: [
+    "Gangtok", "Gyalshing", "Mangan", "Namchi", "Pakyong", "Soreng"
+  ],
+  Tripura: [
+    "Dhalai", "Gomati", "Khowai", "North Tripura", "Sepahijala", "South Tripura", "Unakoti", "West Tripura"
+  ],
+  "Andaman and Nicobar Islands": [
+    "Nicobar", "North and Middle Andaman", "South Andaman"
+  ],
+  "Dadra and Nagar Haveli and Daman and Diu": [
+    "Dadra and Nagar Haveli", "Daman", "Diu"
+  ],
+  Ladakh: [
+    "Kargil", "Leh"
+  ],
+  Lakshadweep: [
+    "Lakshadweep"
+  ]
 };
 
 export const PACKAGING_FEATURES = {
