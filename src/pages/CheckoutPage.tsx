@@ -280,6 +280,30 @@ export const CheckoutPage: React.FC = () => {
             icon: customIcon,
           }).addTo(map);
 
+          // Allow clicking directly anywhere on the map to pinpoint delivery spot
+          map.on("click", async (e: L.LeafletMouseEvent) => {
+            try {
+              const { lat, lng } = e.latlng;
+              if (Number.isFinite(lat) && Number.isFinite(lng)) {
+                setCoords([lat, lng]);
+                marker.setLatLng([lat, lng]);
+                updateAddress({ lat, lng });
+                showToast("📍 Pin placed on map! Updating address...");
+                const partial = await reverseGeocodeAndSaveAddress(lat, lng);
+                if (partial) {
+                  if (partial.addressLine1) setAddressLine1(partial.addressLine1);
+                  if (partial.pincode) setPincode(partial.pincode);
+                  if (partial.state) setState(partial.state);
+                  if (partial.district) setDistrict(partial.district);
+                  if (partial.landmark) setLandmark(partial.landmark);
+                  showToast("📍 Address & district auto-populated from pin!");
+                }
+              }
+            } catch (err) {
+              console.warn("Map click notice:", err);
+            }
+          });
+
           marker.on("dragend", async () => {
             try {
               const latLng = marker.getLatLng();
@@ -423,7 +447,7 @@ export const CheckoutPage: React.FC = () => {
     };
     updateAddress(finalAddress);
 
-    const finalCustomerUid = currentUser?.uid || undefined;
+    const finalCustomerUid = currentUser?.uid || null;
 
     if (effectiveMethod === "cod") {
       setIsProcessing(true);
@@ -459,7 +483,7 @@ export const CheckoutPage: React.FC = () => {
           courier: isBLR ? "MANOPAVANA Peenya Express Carrier" : "Delhivery Express Logistics",
           customerUid: finalCustomerUid,
           customerPhone: cleanPhone,
-          customerEmail: customerEmail || undefined,
+          customerEmail: customerEmail || null,
           isBuyNow: isBuyNowMode,
         };
 
@@ -521,7 +545,7 @@ export const CheckoutPage: React.FC = () => {
         courier: isBLR ? "MANOPAVANA Peenya Express Carrier" : "Delhivery Express Logistics",
         customerUid: finalCustomerUid,
         customerPhone: cleanPhone,
-        customerEmail: customerEmail || undefined,
+        customerEmail: customerEmail || null,
         isBuyNow: isBuyNowMode,
       };
 
@@ -879,7 +903,7 @@ export const CheckoutPage: React.FC = () => {
                   }`}
                 >
                   <span className={`font-semibold ${isDark ? "text-[#FAF4EA]" : "text-[#3D2514]"}`}>
-                    Delivery Geolocation Pin (OpenStreetMap):
+                    Delivery Geolocation Pin (Click map or drag pin to choose location):
                   </span>
                   <span className="text-[11px] font-mono">
                     {Number(coords?.[0] || 12.9716).toFixed(4)}, {Number(coords?.[1] || 77.5946).toFixed(4)}
@@ -1012,10 +1036,10 @@ export const CheckoutPage: React.FC = () => {
                           isDark ? "text-[#FAF4EA]" : "text-[#23150C]"
                         }`}
                       >
-                        <span>Cash on Delivery (Bengaluru only)</span>
+                        <span>Cash on Delivery (Doorstep Cash / UPI QR)</span>
                       </span>
                       <p className={`text-[11px] mt-0.5 ${isDark ? "text-[#D6C4B0]" : "text-[#5C402D]"}`}>
-                        Pay cash or scan UPI QR upon doorstep arrival
+                        Pay cash or scan UPI QR upon arrival (Available for all Bengaluru & Pan-India deliveries)
                       </p>
                     </div>
                   </div>
@@ -1107,7 +1131,7 @@ export const CheckoutPage: React.FC = () => {
                     isDark ? "text-[#D6C4B0]" : "text-[#5C402D]"
                   }`}
                 >
-                  <span>Bangalore Doorstep Delivery</span>
+                  <span>{isBangalore ? "Bangalore Doorstep Delivery" : "Pan-India Express Delivery (Delhivery)"}</span>
                   <span
                     className={`font-bold ${
                       isDark ? "text-[#FAF4EA]" : "text-[#23150C]"
@@ -1232,47 +1256,47 @@ export const CheckoutPage: React.FC = () => {
                 </div>
               )}
 
-              {/* Direct Clickable Order Action Buttons */}
-              <div className="space-y-2.5 pt-1">
-                {/* 1. Pay Online Button */}
-                <button
-                  type="button"
-                  disabled={isProcessing}
-                  onClick={() => handlePlaceOrder(undefined, "phonepe")}
-                  className="w-full py-4 px-4 rounded-xl bg-gradient-to-r from-[#D49A37] via-[#F5BC51] to-[#BF7E16] text-[#140D09] font-black font-serif text-xs uppercase tracking-wider shadow-[0_4px_20px_rgba(212,154,55,0.4)] border border-[#FFD885] hover:brightness-110 active:scale-[0.99] disabled:opacity-50 transition-all flex items-center justify-center gap-2 cursor-pointer"
-                >
-                  {isProcessing && paymentMethod === "phonepe" ? (
-                    <>
-                      <RefreshCw className="w-4 h-4 animate-spin text-[#140D09]" />
-                      <span>Connecting to PhonePe PG...</span>
-                    </>
-                  ) : (
-                    <>
-                      <CreditCard className="w-4 h-4 text-[#140D09]" />
-                      <span>Pay Online ₹{checkoutTotal} (UPI / Cards / NetBanking)</span>
-                    </>
-                  )}
-                </button>
-
-                {/* 2. Cash on Delivery Button */}
-                <button
-                  type="button"
-                  disabled={isProcessing}
-                  onClick={() => handlePlaceOrder(undefined, "cod")}
-                  className="w-full py-3.5 px-4 rounded-xl bg-[#5E3210] hover:bg-[#43230A] border border-[#7D451B] text-white font-bold text-xs uppercase tracking-wider shadow-md hover:brightness-105 active:scale-[0.99] disabled:opacity-50 transition-all flex items-center justify-center gap-2 cursor-pointer"
-                >
-                  {isProcessing && paymentMethod === "cod" ? (
-                    <>
-                      <RefreshCw className="w-4 h-4 animate-spin text-amber-200" />
-                      <span>Placing Cash on Delivery Order...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Banknote className="w-4 h-4 text-emerald-300" />
-                      <span>Place Order with Cash on Delivery (₹{checkoutTotal})</span>
-                    </>
-                  )}
-                </button>
+              {/* Single Unified Order Action Button matching selected payment method */}
+              <div className="pt-1">
+                {paymentMethod === "phonepe" ? (
+                  <button
+                    type="button"
+                    disabled={isProcessing}
+                    onClick={() => handlePlaceOrder(undefined, "phonepe")}
+                    className="w-full py-4 px-4 rounded-xl bg-gradient-to-r from-[#D49A37] via-[#F5BC51] to-[#BF7E16] text-[#140D09] font-black font-serif text-xs uppercase tracking-wider shadow-[0_4px_20px_rgba(212,154,55,0.4)] border border-[#FFD885] hover:brightness-110 active:scale-[0.99] disabled:opacity-50 transition-all flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    {isProcessing ? (
+                      <>
+                        <RefreshCw className="w-4 h-4 animate-spin text-[#140D09]" />
+                        <span>Connecting to PhonePe PG...</span>
+                      </>
+                    ) : (
+                      <>
+                        <CreditCard className="w-4 h-4 text-[#140D09]" />
+                        <span>Pay Online ₹{checkoutTotal} (UPI / Cards / NetBanking)</span>
+                      </>
+                    )}
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    disabled={isProcessing}
+                    onClick={() => handlePlaceOrder(undefined, "cod")}
+                    className="w-full py-4 px-4 rounded-xl bg-[#5E3210] hover:bg-[#43230A] border border-[#7D451B] text-white font-black font-serif text-xs uppercase tracking-wider shadow-[0_4px_20px_rgba(94,50,16,0.4)] hover:brightness-110 active:scale-[0.99] disabled:opacity-50 transition-all flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    {isProcessing ? (
+                      <>
+                        <RefreshCw className="w-4 h-4 animate-spin text-amber-200" />
+                        <span>Placing Cash on Delivery Order...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Banknote className="w-4 h-4 text-emerald-300" />
+                        <span>Place Order with Cash on Delivery (₹{checkoutTotal})</span>
+                      </>
+                    )}
+                  </button>
+                )}
               </div>
 
               <div

@@ -52,9 +52,16 @@ export const AccountPage: React.FC = () => {
   const isDark = themeMode === "dark";
 
   const visibleOrders = React.useMemo(() => {
-    return orders.filter(
-      (o) => (o.orderStatus as string) !== "Replaced by COD"
-    );
+    const seen = new Set<string>();
+    const res: Order[] = [];
+    for (const o of orders) {
+      const key = o.orderRef || o.id;
+      if (key && !seen.has(key)) {
+        seen.add(key);
+        res.push(o);
+      }
+    }
+    return res;
   }, [orders]);
 
   const [guestLookedUpOrder, setGuestLookedUpOrder] = useState<Order | null>(null);

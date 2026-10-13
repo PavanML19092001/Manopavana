@@ -241,6 +241,29 @@ async function linkPastOrdersToCustomer(userUid: string, phone: string, email: s
 }
 
 /**
+ * Sanitize object for Firestore to guarantee zero 'undefined' value errors
+ */
+export function cleanFirestoreObject(obj: any): any {
+  if (obj === undefined) return null;
+  if (obj === null) return null;
+  if (typeof obj !== "object") return obj;
+  if (Array.isArray(obj)) {
+    return obj.map(cleanFirestoreObject);
+  }
+  const cleaned: Record<string, any> = {};
+  for (const [key, val] of Object.entries(obj)) {
+    if (val === undefined) {
+      cleaned[key] = null;
+    } else if (val && typeof val === "object" && !Array.isArray(val) && !(val instanceof Date) && !(val as any)._methodName) {
+      cleaned[key] = cleanFirestoreObject(val);
+    } else {
+      cleaned[key] = val;
+    }
+  }
+  return cleaned;
+}
+
+/**
  * Save order document in Firestore 'orders' collection
  */
 export async function saveOrderToFirestore(order: Order, userUid?: string) {
@@ -249,14 +272,17 @@ export async function saveOrderToFirestore(order: Order, userUid?: string) {
     const cleanPhone = extractCleanPhone(order.shippingAddress?.phone);
     const cleanEmail = (order.shippingAddress?.email || "").toLowerCase().trim();
 
-    await setDoc(orderDocRef, {
+    const rawPayload = {
       ...order,
       customerUid: userUid || order.customerUid || null,
       customerPhone: cleanPhone || null,
       customerEmail: cleanEmail || null,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
-    });
+    };
+
+    const sanitizedPayload = cleanFirestoreObject(rawPayload);
+    await setDoc(orderDocRef, sanitizedPayload);
 
     if (userUid) {
       const customerRef = doc(db, "customers", userUid);
@@ -264,7 +290,7 @@ export async function saveOrderToFirestore(order: Order, userUid?: string) {
         customerRef,
         {
           totalOrders: increment(1),
-          totalSpent: increment(order.total),
+          totalSpent: increment(order.total || 0),
           lastOrderRef: order.orderRef,
           lastOrderAt: serverTimestamp(),
         },

@@ -148,9 +148,9 @@ export interface Order {
   trackingNumber?: string;
   courier?: string;
   notes?: string;
-  customerUid?: string;
-  customerPhone?: string;
-  customerEmail?: string;
+  customerUid?: string | null;
+  customerPhone?: string | null;
+  customerEmail?: string | null;
   isBuyNow?: boolean;
 }
 

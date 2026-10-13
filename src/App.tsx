@@ -248,15 +248,17 @@ export default function App() {
             />
           </Routes>
         </main>
-
-        <Footer />
-        <AudioPlayer />
-        <LocationModal />
-        <LoyaltyQuizModal />
-        <LoginModal />
-        <PaymentFailedModal />
-        <OrderSuccessModal />
       </ErrorBoundary>
+
+      <Footer />
+      <AudioPlayer />
+      <ErrorBoundary>
+        <LocationModal />
+      </ErrorBoundary>
+      <LoyaltyQuizModal />
+      <LoginModal />
+      <PaymentFailedModal />
+      <OrderSuccessModal />
 
       {/* Floating Global Toast Notification */}
       {toastMessage && (

@@ -91,10 +91,26 @@ export const LocationModal: React.FC = () => {
             icon: customIcon,
           }).addTo(map);
 
+          // Allow choosing location by clicking directly anywhere on the map
+          map.on("click", async (e: L.LeafletMouseEvent) => {
+            try {
+              const { lat, lng } = e.latlng;
+              if (Number.isFinite(lat) && Number.isFinite(lng)) {
+                setCoords([lat, lng]);
+                marker.setLatLng([lat, lng]);
+                showToast("📍 Pin placed! Auto-filling address...");
+                await reverseGeocode(lat, lng);
+              }
+            } catch (err) {
+              console.warn("Map click notice:", err);
+            }
+          });
+
           marker.on("dragend", async () => {
             try {
               const latLng = marker.getLatLng();
               setCoords([latLng.lat, latLng.lng]);
+              showToast("📍 Pin moved! Auto-filling address...");
               await reverseGeocode(latLng.lat, latLng.lng);
             } catch (e) {
               console.warn("Marker drag notice:", e);
@@ -227,6 +243,9 @@ export const LocationModal: React.FC = () => {
       lng: coords[1],
       isBangalore: isBLR,
     });
+    try {
+      localStorage.setItem("manopavana_address_saved", "true");
+    } catch {}
     setLocationModalOpen(false);
     showToast(
       isBLR
@@ -301,7 +320,7 @@ export const LocationModal: React.FC = () => {
             <div className="flex items-center justify-between text-xs text-[#A88D77]">
               <span className="font-semibold text-[#D6BEAA] flex items-center gap-1.5">
                 <MapPin className="w-3.5 h-3.5 text-[#F5BC51]" />
-                Interactive OpenStreetMap (Drag pin to fine-tune):
+                Interactive OpenStreetMap (Click anywhere on map or drag pin to select):
               </span>
               <span className="text-[11px] text-[#A88D77] font-mono">
                 {Number(coords?.[0] || 12.9716).toFixed(4)}, {Number(coords?.[1] || 77.5946).toFixed(4)}
