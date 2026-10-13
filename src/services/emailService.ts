@@ -8,23 +8,51 @@ import { Order } from "../types";
  */
 export async function sendOrderConfirmationEmail(order: Order) {
   try {
-    const itemsSummary = order.items
-      .map((item) => `${item.title} (${item.variant}) x ${item.quantity} = ₹${item.price * item.quantity}`)
-      .join("\n");
+    const itemsSummary =
+      order.items && order.items.length > 0
+        ? order.items
+            .map(
+              (item) =>
+                `• ${item.title} (${item.variant}) x ${item.quantity} = ₹${item.price * item.quantity}`
+            )
+            .join("\n")
+        : "Order item details recorded in portal";
+
+    const customerName =
+      order.shippingAddress?.fullName?.trim() || "Valued Customer";
+    const customerPhone =
+      order.shippingAddress?.phone?.trim() || "N/A";
+    const addressLine = order.shippingAddress?.addressLine1 || "";
+    const district = order.shippingAddress?.district || "Bengaluru";
+    const state = order.shippingAddress?.state || "Karnataka";
+    const pincode = order.shippingAddress?.pincode || "";
+    const deliveryAddress = `${addressLine}, ${district}, ${state} - ${pincode}`.replace(/^,\s*/, "");
+    const landmark = order.shippingAddress?.landmark || "N/A";
+
+    const paymentMethodLabel =
+      order.paymentMethod === "cod"
+        ? "CASH ON DELIVERY (COD)"
+        : "ONLINE PAYMENT (COMPLETED)";
+
+    const mapsLink =
+      order.shippingAddress?.lat && order.shippingAddress?.lng
+        ? `https://www.google.com/maps?q=${order.shippingAddress.lat},${order.shippingAddress.lng}`
+        : "https://www.google.com/maps?q=12.9716,77.5946";
 
     const templateParams = {
       to_email: EMAILJS_CONFIG.TARGET_EMAIL,
       order_ref: order.orderRef,
-      order_date: order.date,
-      customer_name: order.shippingAddress.fullName || "Customer",
-      customer_phone: order.shippingAddress.phone,
-      delivery_address: `${order.shippingAddress.addressLine1}, ${order.shippingAddress.district}, ${order.shippingAddress.state} - ${order.shippingAddress.pincode}`,
-      landmark: order.shippingAddress.landmark || "N/A",
+      order_date: order.date || new Date().toLocaleString("en-IN"),
+      customer_name: customerName,
+      customer_phone: customerPhone,
+      delivery_address: deliveryAddress,
+      landmark: landmark,
       items_summary: itemsSummary,
       total_amount: `₹${order.total}`,
-      payment_method: order.paymentMethod.toUpperCase(),
-      payment_status: order.paymentStatus,
-      is_bangalore: order.shippingAddress.isBangalore ? "Yes (Peenya Direct)" : "Pan-India",
+      payment_method: paymentMethodLabel,
+      payment_status: order.paymentStatus || "COMPLETED",
+      is_bangalore: order.shippingAddress?.isBangalore ? "Yes (Peenya Direct)" : "Pan-India",
+      maps_link: mapsLink,
     };
 
     const res = await emailjs.send(

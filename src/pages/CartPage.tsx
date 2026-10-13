@@ -447,7 +447,7 @@ export const CartPage: React.FC = () => {
                 </div>
                 <div className="flex items-center gap-2">
                   <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                  <span>100% Secure Payment via PhonePe Official Gateway</span>
+                  <span>100% Secure Online Payment (UPI, Cards, NetBanking) & Cash on Delivery</span>
                 </div>
               </div>
             </div>

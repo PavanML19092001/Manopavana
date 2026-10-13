@@ -47,6 +47,12 @@ interface StoreContextType {
   freeShippingProgress: number;
   freeShippingShortfall: number;
 
+  // Buy Now direct checkout (leaves regular cart intact)
+  buyNowItem: CartItem | null;
+  setBuyNowItem: (item: CartItem | null) => void;
+  startBuyNow: (item: Omit<CartItem, "quantity">, qty?: number) => void;
+  clearBuyNow: () => void;
+
   // Catalog Products & Combos (synchronized with live CMS prices and stock)
   products: Product[];
   combos: ComboProduct[];
@@ -185,6 +191,35 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       // ignore
     }
   }, [cart]);
+
+  // Buy Now direct checkout state (persists across page reloads without touching cart)
+  const [buyNowItem, setBuyNowItem] = useState<CartItem | null>(() => {
+    try {
+      const saved = sessionStorage.getItem("manopavana_buynow_item");
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
+
+  const startBuyNow = (item: Omit<CartItem, "quantity">, qty = 1) => {
+    const directItem: CartItem = { ...item, quantity: qty };
+    setBuyNowItem(directItem);
+    try {
+      sessionStorage.setItem("manopavana_buynow_item", JSON.stringify(directItem));
+    } catch {
+      // ignore
+    }
+  };
+
+  const clearBuyNow = () => {
+    setBuyNowItem(null);
+    try {
+      sessionStorage.removeItem("manopavana_buynow_item");
+    } catch {
+      // ignore
+    }
+  };
 
   // 2. Address & Location Guard
   const [address, setAddress] = useState<Address>(() => {
@@ -411,21 +446,49 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   };
 
-  // 6. Orders Management (Zero seeded orders - strictly empty initially)
-  const [orders, setOrders] = useState<Order[]>([]);
+  // 6. Orders Management - Initialize from localStorage to NEVER lose orders across page refresh
+  const [orders, setOrders] = useState<Order[]>(() => {
+    try {
+      const saved = localStorage.getItem("manopavana_orders");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch {
+      // ignore
+    }
+    return [];
+  });
+
+  // Automatically sync orders to localStorage whenever updated
+  useEffect(() => {
+    try {
+      localStorage.setItem("manopavana_orders", JSON.stringify(orders));
+    } catch {
+      // ignore
+    }
+  }, [orders]);
 
   // Subscribe to real Firestore orders: all orders for store admin, or user-specific orders
   useEffect(() => {
     if (!currentUser) {
-      setOrders([]);
+      // DO NOT wipe local orders! Users who placed orders without login must see their orders!
       return;
     }
 
     if (currentUser.email === "manopavana@gmail.com") {
       const unsubscribe = subscribeAllOrders((allOrders) => {
-        if (allOrders) {
-          const sorted = [...allOrders].sort((a, b) => b.timestamp - a.timestamp);
-          setOrders(sorted);
+        if (allOrders && allOrders.length > 0) {
+          setOrders((prev) => {
+            const map = new Map<string, Order>();
+            allOrders.forEach((o) => map.set(o.orderRef || o.id, o));
+            prev.forEach((o) => {
+              if (!map.has(o.orderRef || o.id)) map.set(o.orderRef || o.id, o);
+            });
+            return Array.from(map.values()).sort(
+              (a, b) => (b.timestamp || 0) - (a.timestamp || 0)
+            );
+          });
         }
       });
       return () => unsubscribe();
@@ -435,9 +498,17 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       currentUser.uid,
       address.phone,
       (firestoreOrders) => {
-        if (firestoreOrders) {
-          const sorted = [...firestoreOrders].sort((a, b) => b.timestamp - a.timestamp);
-          setOrders(sorted);
+        if (firestoreOrders && firestoreOrders.length > 0) {
+          setOrders((prev) => {
+            const map = new Map<string, Order>();
+            firestoreOrders.forEach((o) => map.set(o.orderRef || o.id, o));
+            prev.forEach((o) => {
+              if (!map.has(o.orderRef || o.id)) map.set(o.orderRef || o.id, o);
+            });
+            return Array.from(map.values()).sort(
+              (a, b) => (b.timestamp || 0) - (a.timestamp || 0)
+            );
+          });
         }
       }
     );
@@ -459,10 +530,36 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     await saveOrderToFirestore(newOrder, currentUser?.uid);
   };
 
-  const getOrder = (refOrId: string) => {
-    return orders.find(
+  const getOrder = (refOrId: string): Order | undefined => {
+    const memoryMatch = orders.find(
       (o) => o.id === refOrId || o.orderRef === refOrId || o.trackingNumber === refOrId
     );
+    if (memoryMatch) return memoryMatch;
+
+    try {
+      const stored = localStorage.getItem("manopavana_orders");
+      if (stored) {
+        const list: Order[] = JSON.parse(stored);
+        const match = list.find(
+          (o) => o.id === refOrId || o.orderRef === refOrId || o.trackingNumber === refOrId
+        );
+        if (match) return match;
+      }
+    } catch {
+      // ignore
+    }
+
+    try {
+      const pendingRaw = localStorage.getItem("pending_order_data");
+      if (pendingRaw) {
+        const p: Order = JSON.parse(pendingRaw);
+        if (p.id === refOrId || p.orderRef === refOrId) return p;
+      }
+    } catch {
+      // ignore
+    }
+
+    return undefined;
   };
 
   const updateOrderStatus = async (orderId: string, status: Order["orderStatus"]) => {
@@ -488,49 +585,90 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [orderSuccessRef, setOrderSuccessRef] = useState<string | null>(null);
 
   const loadOrderToCartAndRetry = (order: Order) => {
-    setCart(order.items);
-    updateAddress(order.shippingAddress);
+    if (order.items && order.items.length > 0) {
+      setCart(order.items);
+      try {
+        localStorage.setItem("manopavana_cart", JSON.stringify(order.items));
+      } catch {
+        // ignore
+      }
+    }
+    if (order.shippingAddress) {
+      updateAddress(order.shippingAddress);
+    }
     showToast("Restored items back into your active bag!");
   };
 
   const switchOrderToCOD = async (orderRef: string) => {
-    const target = orders.find((o) => o.orderRef === orderRef);
-    const updated: Order = target
-      ? {
-          ...target,
-          paymentMethod: "cod",
-          paymentMode: "COD",
-          paymentStatus: "COMPLETED",
-          orderStatus: "Placed",
-        }
-      : {
-          id: `ORD-${Date.now().toString().slice(-4)}`,
-          orderRef,
-          date: "Just now",
-          timestamp: Date.now(),
-          timestampMs: Date.now(),
-          items: [...cart],
-          subtotal,
-          discount,
-          shippingFee,
-          total,
-          paymentMethod: "cod",
-          paymentMode: "COD",
-          paymentStatus: "COMPLETED",
-          orderStatus: "Placed",
-          shippingAddress: address,
-        };
-
-    setOrders((prev) =>
-      prev.map((o) => (o.orderRef === orderRef ? updated : o))
-    );
-    try {
-      localStorage.setItem("manopavana_orders", JSON.stringify(
-        orders.map((o) => (o.orderRef === orderRef ? updated : o))
-      ));
-    } catch {
-      // ignore
+    let target = getOrder(orderRef);
+    if (!target && paymentFailedOrder?.orderRef === orderRef) {
+      target = paymentFailedOrder;
     }
+    if (!target) {
+      try {
+        const pendingRaw = localStorage.getItem("pending_order_data");
+        if (pendingRaw) target = JSON.parse(pendingRaw);
+      } catch {
+        // ignore
+      }
+    }
+
+    const itemsToUse =
+      target?.items && target.items.length > 0
+        ? target.items
+        : cart.length > 0
+        ? [...cart]
+        : buyNowItem
+        ? [buyNowItem]
+        : [];
+
+    const finalSubtotal =
+      target?.subtotal ??
+      itemsToUse.reduce((acc, c) => acc + c.price * c.quantity, 0);
+    const finalDiscount = target?.discount ?? 0;
+    const finalShipping =
+      target?.shippingFee ??
+      (finalSubtotal >= cmsConfig.freeShippingThreshold ? 0 : cmsConfig.standardShippingFee);
+    const finalTotal =
+      target?.total ?? (finalSubtotal - finalDiscount + finalShipping);
+    const finalShippingAddress = target?.shippingAddress || address;
+
+    const updated: Order = {
+      id: target?.id || `ORD-${Date.now().toString().slice(-4)}`,
+      orderRef,
+      date: target?.date || "Just now",
+      timestamp: target?.timestamp || Date.now(),
+      timestampMs: target?.timestampMs || Date.now(),
+      items: itemsToUse,
+      subtotal: finalSubtotal,
+      discount: finalDiscount,
+      shippingFee: finalShipping,
+      total: finalTotal,
+      paymentMethod: "cod",
+      paymentMode: "COD",
+      paymentStatus: "COMPLETED",
+      orderStatus: "Placed",
+      shippingAddress: finalShippingAddress,
+      trackingNumber: target?.trackingNumber || `MV-BLR-${Math.floor(10000 + Math.random() * 90000)}`,
+      courier: "MANOPAVANA Peenya Express Carrier",
+    };
+
+    setOrders((prev) => {
+      const exists = prev.some((o) => o.orderRef === orderRef);
+      const nextList = exists
+        ? prev.map((o) => (o.orderRef === orderRef ? updated : o))
+        : [updated, ...prev];
+      try {
+        localStorage.setItem("manopavana_orders", JSON.stringify(nextList));
+      } catch {
+        // ignore
+      }
+      return nextList;
+    });
+
+    localStorage.removeItem("pending_order_ref");
+    localStorage.removeItem("pending_order_timestamp");
+    localStorage.removeItem("pending_order_data");
 
     await updateFirestoreOrderStatus(orderRef, {
       paymentMethod: "cod",
@@ -538,9 +676,12 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       paymentStatus: "COMPLETED",
       orderStatus: "Placed",
     });
+    await saveOrderToFirestore(updated, currentUser?.uid);
 
     await sendOrderConfirmationEmail(updated);
     clearCart();
+    clearBuyNow();
+    setOrderSuccessRef(orderRef);
     showToast("Switched order to Cash on Delivery (COD) successfully!");
   };
 
@@ -883,6 +1024,10 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         total,
         freeShippingProgress,
         freeShippingShortfall,
+        buyNowItem,
+        setBuyNowItem,
+        startBuyNow,
+        clearBuyNow,
         products,
         combos,
         address,

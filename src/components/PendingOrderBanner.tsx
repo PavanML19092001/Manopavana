@@ -89,7 +89,7 @@ export const PendingOrderBanner: React.FC = () => {
 
     setPendingRef(null);
     setSecondsRemaining(0);
-    showToast("PhonePe payment session expired (10 minutes). Items restored to your bag.");
+    showToast("Online payment session expired (10 minutes). Items restored to your bag.");
   };
 
   useEffect(() => {
@@ -149,7 +149,7 @@ export const PendingOrderBanner: React.FC = () => {
 
         clearCart();
         setOrderSuccessRef(pendingRef);
-        showToast("Payment verified via PhonePe! Order placed.");
+        showToast("Online payment verified! Order placed.");
       } else {
         // Not yet completed or cancelled
         let orderObj = getOrder(pendingRef);
@@ -164,7 +164,7 @@ export const PendingOrderBanner: React.FC = () => {
         if (orderObj) {
           setPaymentFailedOrder(orderObj);
         } else {
-          showToast(`PhonePe Status: ${data.reason || "Payment pending or not confirmed yet"}`);
+          showToast(`Payment Status: ${data.reason || "Payment pending or not confirmed yet"}`);
         }
       }
     } catch (e) {
@@ -176,15 +176,15 @@ export const PendingOrderBanner: React.FC = () => {
   };
 
   const handleCancelAndReorder = async () => {
-    if (confirm("Are you sure you want to cancel this pending PhonePe payment and restore items to your bag?")) {
+    if (confirm("Are you sure you want to cancel this pending online payment and restore items to your bag?")) {
       await handleExpire(pendingRef);
-      showToast("Pending PhonePe payment cancelled. Cart restored.");
+      showToast("Pending online payment cancelled. Cart restored.");
     }
   };
 
   return (
     <aside
-      aria-label="Pending PhonePe Payment Notification"
+      aria-label="Pending Online Payment Notification"
       className="bg-gradient-to-r from-[#3D2514] via-[#5E3210] to-[#3D2514] border-b-2 border-amber-400/80 text-white shadow-xl sticky top-0 z-40 transition-all animate-fade-in"
     >
       <div className="max-w-7xl mx-auto px-4 py-2.5 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
@@ -194,7 +194,7 @@ export const PendingOrderBanner: React.FC = () => {
           </span>
           <div>
             <span className="font-bold text-amber-300">
-              ⚡ PhonePe Payment In Progress:{" "}
+              ⚡ Online Payment In Progress:{" "}
             </span>
             <span className="font-mono text-white/90">Order #{pendingRef}</span>
             <span className="mx-2 text-white/40">|</span>

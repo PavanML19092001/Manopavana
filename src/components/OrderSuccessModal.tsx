@@ -54,8 +54,8 @@ export const OrderSuccessModal: React.FC = () => {
           <div className="p-4 rounded-2xl bg-[#1C110B] border border-[#4A301E] space-y-2">
             <div className="flex items-center justify-between font-bold text-[#FDF6EC]">
               <span>Payment Mode:</span>
-              <span className="text-emerald-400 bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-800/40 font-mono">
-                PHONEPE_PAID
+              <span className="text-emerald-400 bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-800/40 font-mono text-[11px]">
+                {order?.paymentMethod === "cod" ? "CASH ON DELIVERY (COD)" : "ONLINE PAYMENT (PAID)"}
               </span>
             </div>
             {order && (

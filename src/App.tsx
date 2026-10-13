@@ -38,6 +38,7 @@ export default function App() {
     toastMessage,
     getOrder,
     clearCart,
+    clearBuyNow,
     setOrderSuccessRef,
     setPaymentFailedOrder,
     showToast,
@@ -108,8 +109,9 @@ export default function App() {
 
           // 3. Clear cart and open Order Confirmation Modal with reference number
           clearCart();
+          clearBuyNow();
           setOrderSuccessRef(ref);
-          showToast("Payment verified via PhonePe! Order placed.");
+          showToast("Payment verified online! Order placed.");
         } else {
           // FAILED / PENDING / DECLINED / USER_CANCELLED
           await updateFirestoreOrderStatus(ref, {

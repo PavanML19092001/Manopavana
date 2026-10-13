@@ -230,7 +230,11 @@ export const AccountPage: React.FC = () => {
                             : "bg-amber-100 text-amber-900"
                         }`}
                       >
-                        {activeOrder.paymentStatus}
+                        {activeOrder.paymentMethod === "cod"
+                          ? "Cash on Delivery"
+                          : activeOrder.paymentStatus === "COMPLETED" || (activeOrder.paymentStatus as string) === "PHONEPE_PAID"
+                          ? "Online Paid"
+                          : "Online Pending"}
                       </span>
                     </div>
                     <p

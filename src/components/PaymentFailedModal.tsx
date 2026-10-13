@@ -73,7 +73,7 @@ export const PaymentFailedModal: React.FC = () => {
             </span>
             <div>
               <h2 id="failed-modal-title" className="text-base font-bold font-serif text-red-300">
-                PhonePe Payment Incomplete
+                Online Payment Incomplete
               </h2>
               <p className="text-[11px] text-[#A88D77]">
                 Order Ref: <span className="font-mono font-bold text-[#FFD885]">{paymentFailedOrder.orderRef}</span>
@@ -137,7 +137,7 @@ export const PaymentFailedModal: React.FC = () => {
           </div>
 
           <p className="text-[11px] text-[#A88D77] leading-relaxed">
-            The PhonePe transaction was cancelled or not confirmed by your bank. You can instantly retry with a fresh PhonePe checkout session, or switch this order directly to Cash on Delivery.
+            The online payment transaction was cancelled or not confirmed by your bank. You can instantly retry with a fresh online payment session, or switch this order directly to Cash on Delivery.
           </p>
 
           {/* Action Buttons */}
@@ -150,7 +150,7 @@ export const PaymentFailedModal: React.FC = () => {
                   className="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-[#D49A37] via-[#F5BC51] to-[#BF7E16] text-[#140D09] font-serif font-black tracking-wider uppercase shadow-[0_4px_20px_rgba(212,154,55,0.35)] border border-[#FFD885] transition-all flex items-center justify-center gap-2 cursor-pointer hover:brightness-110"
                 >
                   <RefreshCw className="w-4 h-4 text-[#140D09]" />
-                  <span>⚡ Retry Payment with PhonePe</span>
+                  <span>⚡ Retry Online Payment</span>
                 </button>
 
                 <button

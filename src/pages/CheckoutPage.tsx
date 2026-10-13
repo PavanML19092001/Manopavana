@@ -31,10 +31,10 @@ export const CheckoutPage: React.FC = () => {
   const {
     cart,
     addToCart,
-    subtotal,
-    discount,
-    shippingFee,
-    total,
+    buyNowItem,
+    clearBuyNow,
+    cmsConfig,
+    loyalty,
     address,
     updateAddress,
     saveOrder,
@@ -47,6 +47,24 @@ export const CheckoutPage: React.FC = () => {
   } = useStore();
 
   const isDark = themeMode === "dark";
+
+  // Check if Buy Now direct mode is active (ordering single item without touching cart)
+  const isBuyNowMode = searchParams.get("mode") === "buynow" && buyNowItem !== null;
+  const checkoutItems = isBuyNowMode && buyNowItem ? [buyNowItem] : cart;
+
+  const checkoutSubtotal = checkoutItems.reduce((acc, curr) => acc + curr.price * curr.quantity, 0);
+  const checkoutDiscount = loyalty.isActive
+    ? Math.round((checkoutSubtotal * loyalty.discountPercent) / 100)
+    : 0;
+  const checkoutDiscountedSubtotal = checkoutSubtotal - checkoutDiscount;
+  const checkoutShippingFee =
+    checkoutItems.length === 0
+      ? 0
+      : checkoutDiscountedSubtotal >= (cmsConfig?.freeShippingThreshold || BUSINESS_CONFIG.FREE_SHIPPING_THRESHOLD)
+      ? 0
+      : (cmsConfig?.standardShippingFee || BUSINESS_CONFIG.STANDARD_SHIPPING_FEE);
+  const checkoutTotal =
+    checkoutItems.length === 0 ? 0 : checkoutDiscountedSubtotal + checkoutShippingFee;
 
   // Address Form State
   const [fullName, setFullName] = useState(address.fullName);
@@ -61,8 +79,8 @@ export const CheckoutPage: React.FC = () => {
     address.lng || 77.5946,
   ]);
 
-  // Payment method
-  const [paymentMethod, setPaymentMethod] = useState<"phonepe" | "cod" | "whatsapp">("phonepe");
+  // Payment method: "phonepe" (Online Payment) or "cod" (Cash on Delivery)
+  const [paymentMethod, setPaymentMethod] = useState<"phonepe" | "cod">("phonepe");
   const [isProcessing, setIsProcessing] = useState(false);
   const [paymentError, setPaymentError] = useState<string | null>(null);
   const [lastAttemptedOrder, setLastAttemptedOrder] = useState<Order | null>(null);
@@ -98,8 +116,9 @@ export const CheckoutPage: React.FC = () => {
             });
           }
 
-          showToast("Payment verified via PhonePe! Order confirmed.");
+          showToast("Payment verified online! Order confirmed.");
           clearCart();
+          clearBuyNow();
           navigate(`/account?order=${ref}`);
           return;
         }
@@ -107,7 +126,7 @@ export const CheckoutPage: React.FC = () => {
 
       // Incomplete or cancelled payment handling
       setPaymentError(
-        "PhonePe transaction was not completed or was cancelled. Your items are safe. Click Retry Payment below to proceed."
+        "Online transaction was not completed or was cancelled. Your items are safe. You can retry with Online Payment or switch to Cash on Delivery."
       );
       // Retrieve stored pending order
       const existing = getOrder(ref);
@@ -116,7 +135,7 @@ export const CheckoutPage: React.FC = () => {
       }
     } catch (e) {
       console.warn("Verification notice:", e);
-      setPaymentError("Could not verify PhonePe payment. You can retry with PhonePe, COD or WhatsApp.");
+      setPaymentError("Could not verify online payment status. You can retry with Online Payment or select Cash on Delivery.");
     } finally {
       setIsProcessing(false);
     }
@@ -234,8 +253,8 @@ export const CheckoutPage: React.FC = () => {
   const handlePlaceOrder = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (cart.length === 0) {
-      showToast("Your cart is empty. Add items first.");
+    if (checkoutItems.length === 0) {
+      showToast("Your checkout bag is empty. Add items first.");
       navigate("/");
       return;
     }
@@ -279,41 +298,6 @@ export const CheckoutPage: React.FC = () => {
     };
     updateAddress(finalAddress);
 
-    if (paymentMethod === "whatsapp") {
-      const orderRef = `MV-${Date.now().toString().slice(-6)}`;
-      const newOrder: Order = {
-        id: `ORD-${Date.now().toString().slice(-4)}`,
-        orderRef,
-        date: "Just now",
-        timestamp: Date.now(),
-        timestampMs: Date.now(),
-        items: [...cart],
-        subtotal,
-        discount,
-        shippingFee,
-        total,
-        paymentMethod: "whatsapp",
-        paymentMode: "WHATSAPP",
-        paymentStatus: "COMPLETED",
-        orderStatus: "Placed",
-        shippingAddress: finalAddress,
-        trackingNumber: `MV-BLR-${Math.floor(10000 + Math.random() * 90000)}`,
-        courier: "MANOPAVANA Peenya Express Carrier",
-      };
-
-      await saveOrder(newOrder);
-      await sendOrderConfirmationEmail(newOrder);
-      clearCart();
-
-      const itemLines = cart
-        .map((i) => `• ${i.title} (${i.variant}) x ${i.quantity} = ₹${i.price * i.quantity}`)
-        .join("%0A");
-      const waText = `*NEW ORDER ON MANOPAVANA*%0A*Order Ref:* ${orderRef}%0A*Customer:* ${fullName}%0A*Phone:* ${phone}%0A*Address:* ${addressLine1}, Bengaluru - ${pincode}%0A%0A*Items:*%0A${itemLines}%0A%0A*Total Amount:* ₹${total}%0A*Delivery:* Bengaluru Doorstep Delivery%0A%0APlease confirm my order and send dispatch tracking.`;
-
-      window.location.href = `https://wa.me/${BUSINESS_CONFIG.PHONE_RAW}?text=${waText}`;
-      return;
-    }
-
     if (paymentMethod === "cod") {
       const orderRef = `MV-${Date.now().toString().slice(-6)}`;
       const newOrder: Order = {
@@ -322,11 +306,11 @@ export const CheckoutPage: React.FC = () => {
         date: "Just now",
         timestamp: Date.now(),
         timestampMs: Date.now(),
-        items: [...cart],
-        subtotal,
-        discount,
-        shippingFee,
-        total,
+        items: [...checkoutItems],
+        subtotal: checkoutSubtotal,
+        discount: checkoutDiscount,
+        shippingFee: checkoutShippingFee,
+        total: checkoutTotal,
         paymentMethod: "cod",
         paymentMode: "COD",
         paymentStatus: "COMPLETED",
@@ -338,7 +322,14 @@ export const CheckoutPage: React.FC = () => {
 
       await saveOrder(newOrder);
       await sendOrderConfirmationEmail(newOrder);
-      clearCart();
+
+      // If direct Buy Now session, clear only buyNowItem so regular bag items remain untouched
+      if (isBuyNowMode) {
+        clearBuyNow();
+      } else {
+        clearCart();
+      }
+
       showToast("Order placed successfully with Cash on Delivery!");
       navigate(`/account?order=${orderRef}`);
       return;
@@ -351,18 +342,17 @@ export const CheckoutPage: React.FC = () => {
       // 1. Strictly generate orderRef format: MP_timestamp_random
       const phonePeOrderRef = "MP_" + Date.now() + "_" + Math.floor(100 + Math.random() * 900);
 
-      // 1. Do NOT mark the order as "Placed" or "Paid" locally
       const pendingOrder: Order = {
         id: `ORD-${Date.now().toString().slice(-4)}`,
         orderRef: phonePeOrderRef,
         date: "Just now",
         timestamp: Date.now(),
         timestampMs: Date.now(),
-        items: [...cart],
-        subtotal,
-        discount,
-        shippingFee,
-        total,
+        items: [...checkoutItems],
+        subtotal: checkoutSubtotal,
+        discount: checkoutDiscount,
+        shippingFee: checkoutShippingFee,
+        total: checkoutTotal,
         paymentMethod: "phonepe",
         paymentMode: "PHONEPE",
         paymentStatus: "PENDING",
@@ -374,7 +364,6 @@ export const CheckoutPage: React.FC = () => {
 
       setLastAttemptedOrder(pendingOrder);
 
-      // 4. Save pending_order_ref, pending_order_timestamp (Date.now()), and pending_order_data in localStorage
       localStorage.setItem("pending_order_ref", phonePeOrderRef);
       localStorage.setItem("pending_order_timestamp", Date.now().toString());
       localStorage.setItem("pending_order_data", JSON.stringify(pendingOrder));
@@ -385,7 +374,6 @@ export const CheckoutPage: React.FC = () => {
       try {
         const origin = window.location.origin;
 
-        // 2 & 3. Send POST request to /api?action=create_order with amount converted to Paise >= 100 on edge
         const resp = await fetch("/api?action=create_order", {
           method: "POST",
           headers: {
@@ -393,7 +381,7 @@ export const CheckoutPage: React.FC = () => {
           },
           body: JSON.stringify({
             orderRef: phonePeOrderRef,
-            amount: total,
+            amount: checkoutTotal,
             phone: phone,
             redirectBaseUrl: origin,
           }),
@@ -401,25 +389,26 @@ export const CheckoutPage: React.FC = () => {
 
         const data = await resp.json();
 
-        // 5. When backend returns SUCCESS with redirectUrl, execute full window redirect without refreshing
         if (resp.ok && data.status === "SUCCESS" && data.redirectUrl) {
+          if (isBuyNowMode) {
+            clearBuyNow();
+          }
           window.location.href = data.redirectUrl;
           return;
         } else {
-          // 6. If backend fails or returns an error, show clear error banner and do NOT place the order
           const errorMsg =
             data.message ||
             data.raw?.message ||
-            "Unable to initiate transaction with PhonePe payment gateway. Please try again or select Cash on Delivery.";
+            "Unable to initiate transaction with payment gateway. Please try again or select Cash on Delivery.";
           setPaymentError(errorMsg);
           showToast(errorMsg);
         }
       } catch (err: unknown) {
-        console.error("PhonePe Initiation Request Error:", err);
+        console.error("Payment Initiation Request Error:", err);
         const errorMsg =
           err instanceof Error
             ? err.message
-            : "Connection error contacting PhonePe gateway. Please verify network or select Cash on Delivery.";
+            : "Connection error contacting payment gateway. Please verify network or select Cash on Delivery.";
         setPaymentError(errorMsg);
         showToast(errorMsg);
       } finally {
@@ -447,6 +436,37 @@ export const CheckoutPage: React.FC = () => {
             Pinpoint Bengaluru delivery coordinates and choose payment method
           </p>
         </div>
+
+        {/* Direct Buy indicator banner */}
+        {isBuyNowMode && buyNowItem && (
+          <div className="p-4 rounded-2xl bg-gradient-to-r from-amber-950/70 to-[#361E10] border-2 border-[#E08F35]/70 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs text-amber-200 shadow-md">
+            <div className="flex items-center gap-3">
+              <span className="px-2.5 py-1 rounded-lg bg-[#E08F35] text-black font-black text-[10px] tracking-wider uppercase">
+                Direct Buy
+              </span>
+              <div>
+                <p className="font-bold text-white">
+                  Ordering {buyNowItem.title} ({buyNowItem.variant}) only
+                </p>
+                <p className="text-[11px] text-[#D6C4B0] mt-0.5">
+                  Your regular bag ({cart.length} item{cart.length === 1 ? "" : "s"}) remains safely preserved.
+                </p>
+              </div>
+            </div>
+            {cart.length > 0 && (
+              <button
+                type="button"
+                onClick={() => {
+                  clearBuyNow();
+                  navigate("/checkout");
+                }}
+                className="px-3 py-1.5 rounded-lg bg-black/40 hover:bg-black/60 border border-amber-500/40 text-amber-300 font-bold text-xs transition-colors shrink-0 cursor-pointer"
+              >
+                Checkout Full Bag Instead ({cart.length}) →
+              </button>
+            )}
+          </div>
+        )}
 
         {/* Failure recovery banner */}
         {paymentError && (
@@ -765,7 +785,7 @@ export const CheckoutPage: React.FC = () => {
               </div>
 
               <div className="space-y-3">
-                {/* Option 1: PhonePe Official */}
+                {/* Option 1: Online Payment (UPI, Cards, NetBanking, Wallets) */}
                 <label
                   className={`p-4 rounded-xl border flex items-start justify-between cursor-pointer transition-all ${
                     paymentMethod === "phonepe"
@@ -791,13 +811,13 @@ export const CheckoutPage: React.FC = () => {
                           isDark ? "text-[#FAF4EA]" : "text-[#23150C]"
                         }`}
                       >
-                        <span>PhonePe Official PG (UPI, Cards, NetBanking)</span>
+                        <span>Online Payment (UPI, Cards, NetBanking, Wallets)</span>
                         <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded">
                           Recommended
                         </span>
                       </span>
                       <p className={`text-[11px] mt-0.5 ${isDark ? "text-[#D6C4B0]" : "text-[#5C402D]"}`}>
-                        Instant 256-bit bank-grade encryption via PhonePe Gateway
+                        Instant bank-grade encrypted checkout via UPI, Cards, NetBanking & Wallets
                       </p>
                     </div>
                   </div>
@@ -833,47 +853,11 @@ export const CheckoutPage: React.FC = () => {
                         <span>Cash on Delivery (Bengaluru only)</span>
                       </span>
                       <p className={`text-[11px] mt-0.5 ${isDark ? "text-[#D6C4B0]" : "text-[#5C402D]"}`}>
-                        Pay cash or scan QR upon doorstep arrival
+                        Pay cash or scan UPI QR upon doorstep arrival
                       </p>
                     </div>
                   </div>
                   <Banknote className="w-4 h-4 text-[#8C7A6B] shrink-0" />
-                </label>
-
-                {/* Option 3: WhatsApp Direct */}
-                <label
-                  className={`p-4 rounded-xl border flex items-start justify-between cursor-pointer transition-all ${
-                    paymentMethod === "whatsapp"
-                      ? isDark
-                        ? "bg-amber-950/40 border-[#E08F35] ring-2 ring-[#E08F35]/30"
-                        : "bg-amber-50/70 border-[#E08F35] ring-2 ring-[#E08F35]/30"
-                      : isDark
-                      ? "border-[#362114] hover:border-[#4D2E1A]"
-                      : "border-[#E8DEC8] hover:border-[#DDD1BE]"
-                  }`}
-                >
-                  <div className="flex items-start gap-3">
-                    <input
-                      type="radio"
-                      name="payment"
-                      checked={paymentMethod === "whatsapp"}
-                      onChange={() => setPaymentMethod("whatsapp")}
-                      className="mt-1 text-[#E08F35] focus:ring-[#E08F35]"
-                    />
-                    <div>
-                      <span
-                        className={`text-xs font-bold flex items-center gap-2 ${
-                          isDark ? "text-[#FAF4EA]" : "text-[#23150C]"
-                        }`}
-                      >
-                        <span>WhatsApp Direct Instant Order</span>
-                      </span>
-                      <p className={`text-[11px] mt-0.5 ${isDark ? "text-[#D6C4B0]" : "text-[#5C402D]"}`}>
-                        Order directly with founder Manoj M R via WhatsApp
-                      </p>
-                    </div>
-                  </div>
-                  <MessageCircle className="w-4 h-4 text-emerald-500 shrink-0" />
                 </label>
               </div>
             </div>
@@ -891,11 +875,11 @@ export const CheckoutPage: React.FC = () => {
                   isDark ? "text-[#FAF4EA] border-[#2D1B10]" : "text-[#23150C] border-[#EFE8DC]"
                 }`}
               >
-                Items to Dispatch ({cart.length})
+                Items to Dispatch ({checkoutItems.length})
               </h2>
 
               <div className="space-y-3 max-h-60 overflow-y-auto pr-1">
-                {cart.map((item) => (
+                {checkoutItems.map((item) => (
                   <div key={item.id} className="flex items-center justify-between text-xs">
                     <div className="flex items-center gap-2">
                       <img
@@ -945,14 +929,14 @@ export const CheckoutPage: React.FC = () => {
                       isDark ? "text-[#FAF4EA]" : "text-[#23150C]"
                     }`}
                   >
-                    ₹{subtotal}
+                    ₹{checkoutSubtotal}
                   </span>
                 </div>
 
-                {discount > 0 && (
+                {checkoutDiscount > 0 && (
                   <div className="flex items-center justify-between text-emerald-600 font-medium">
                     <span>10% Bottle QR Loyalty Discount</span>
-                    <span className="font-bold">-₹{discount}</span>
+                    <span className="font-bold">-₹{checkoutDiscount}</span>
                   </div>
                 )}
 
@@ -967,7 +951,7 @@ export const CheckoutPage: React.FC = () => {
                       isDark ? "text-[#FAF4EA]" : "text-[#23150C]"
                     }`}
                   >
-                    {shippingFee === 0 ? "FREE" : `₹${shippingFee}`}
+                    {checkoutShippingFee === 0 ? "FREE" : `₹${checkoutShippingFee}`}
                   </span>
                 </div>
 
@@ -988,28 +972,28 @@ export const CheckoutPage: React.FC = () => {
                       isDark ? "text-amber-300" : "text-[#C8751B]"
                     }`}
                   >
-                    ₹{total}
+                    ₹{checkoutTotal}
                   </span>
                 </div>
               </div>
 
               <button
                 type="submit"
-                disabled={isProcessing || cart.length === 0}
+                disabled={isProcessing || checkoutItems.length === 0}
                 className="w-full py-4 rounded-xl bg-[#5E3210] hover:bg-[#43230A] disabled:opacity-50 text-white font-black text-xs shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
               >
                 {isProcessing ? (
                   <>
                     <RefreshCw className="w-4 h-4 animate-spin text-amber-300" />
-                    <span>Connecting with PhonePe Gateway...</span>
+                    <span>Connecting to Secure Payment Gateway...</span>
                   </>
                 ) : (
                   <>
                     <ShieldCheck className="w-4 h-4 text-amber-300" />
                     <span>
-                      {paymentMethod === "whatsapp"
-                        ? "Send Order via WhatsApp"
-                        : `Confirm & Pay ₹${total}`}
+                      {paymentMethod === "cod"
+                        ? `Place Order with Cash on Delivery (₹${checkoutTotal})`
+                        : `Confirm & Pay Online ₹${checkoutTotal}`}
                     </span>
                   </>
                 )}

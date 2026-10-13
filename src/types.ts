@@ -140,8 +140,8 @@ export interface Order {
   discount: number;
   shippingFee: number;
   total: number;
-  paymentMethod: "phonepe" | "cod" | "whatsapp";
-  paymentMode?: "PHONEPE" | "PHONEPE_PAID" | "COD" | "WHATSAPP" | string;
+  paymentMethod: "online" | "phonepe" | "cod" | "whatsapp";
+  paymentMode?: "ONLINE" | "PHONEPE" | "PHONEPE_PAID" | "COD" | "WHATSAPP" | string;
   paymentStatus: "PENDING" | "COMPLETED" | "FAILED" | "PHONEPE_PAID" | string;
   orderStatus: OrderStatus;
   shippingAddress: Address;

@@ -45,6 +45,7 @@ export const HomePage: React.FC = () => {
   const {
     cart,
     addToCart,
+    startBuyNow,
     updateQuantity,
     openLoyaltyQuiz,
     cmsConfig,
@@ -147,21 +148,21 @@ export const HomePage: React.FC = () => {
     const variant = selectedVariants[product.id] || "1L";
     const price = product.prices[variant];
     const mrp = product.mrp[variant];
-    addToCart({
-      id: `${product.id}-${variant}`,
-      productId: product.id,
-      title: product.name,
-      subtitle: `Marachekku Pure • ${variant}`,
-      variant,
-      price,
-      regularPrice: mrp,
-      image: THEMED_PRODUCT_IMAGES[product.id]?.light || product.images[0] || product.labelImage,
-    });
-    if (!currentUser) {
-      setLoginModalOpen(true);
-    } else {
-      navigate("/checkout");
-    }
+    const image = THEMED_PRODUCT_IMAGES[product.id]?.light || product.images[0] || product.labelImage;
+    startBuyNow(
+      {
+        id: `${product.id}-${variant}`,
+        productId: product.id,
+        title: product.name,
+        subtitle: `Marachekku Pure • ${variant}`,
+        variant,
+        price,
+        regularPrice: mrp,
+        image,
+      },
+      1
+    );
+    navigate("/checkout?mode=buynow");
   };
 
   const handleAddCombo = (combo: (typeof COMBOS)[0]) => {

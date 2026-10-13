@@ -21,7 +21,7 @@ import { BottleVolume } from "../types";
 export const ProductPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { addToCart, updateQuantity, cart, openLoyaltyQuiz, loyalty, products, themeMode } = useStore();
+  const { addToCart, updateQuantity, cart, startBuyNow, openLoyaltyQuiz, loyalty, products, themeMode } = useStore();
 
   const isDark = themeMode === "dark";
 
@@ -69,10 +69,20 @@ export const ProductPage: React.FC = () => {
   };
 
   const handleBuyNow = () => {
-    if (!cartItem) {
-      handleAddToCart();
-    }
-    navigate("/checkout");
+    startBuyNow(
+      {
+        id: cartItemId,
+        productId: product.id,
+        title: product.name,
+        subtitle: `Marachekku Pure • ${selectedVolume}`,
+        variant: selectedVolume,
+        price,
+        regularPrice: mrp,
+        image: product.images[selectedImageIndex] || product.images[0],
+      },
+      currentQuantity > 0 ? currentQuantity : 1
+    );
+    navigate("/checkout?mode=buynow");
   };
 
   return (
