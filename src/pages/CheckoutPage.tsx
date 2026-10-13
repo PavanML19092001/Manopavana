@@ -238,48 +238,67 @@ export const CheckoutPage: React.FC = () => {
   useEffect(() => {
     const timer = setTimeout(() => {
       if (!mapContainerRef.current) return;
-      if (!mapInstanceRef.current) {
-        const map = L.map(mapContainerRef.current, {
-          center: coords,
-          zoom: 14,
-          attributionControl: false,
-        });
+      try {
+        if ((mapContainerRef.current as any)._leaflet_id && !mapInstanceRef.current) {
+          (mapContainerRef.current as any)._leaflet_id = null;
+        }
 
-        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-          maxZoom: 19,
-        }).addTo(map);
+        if (!mapInstanceRef.current) {
+          const map = L.map(mapContainerRef.current, {
+            center: coords,
+            zoom: 14,
+            attributionControl: false,
+          });
 
-        const customIcon = L.divIcon({
-          className: "checkout-leaflet-marker",
-          html: `<div style="background-color:#5E3210; width:26px; height:26px; border-radius:50%; border:3px solid #FFF; box-shadow:0 4px 10px rgba(0,0,0,0.3); display:flex; align-items:center; justify-content:center;">
-                  <div style="background:#E08F35; width:10px; height:10px; border-radius:50%;"></div>
-                </div>`,
-          iconSize: [26, 26],
-          iconAnchor: [13, 13],
-        });
+          L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+            maxZoom: 19,
+          }).addTo(map);
 
-        const marker = L.marker(coords, {
-          draggable: true,
-          icon: customIcon,
-        }).addTo(map);
+          const customIcon = L.divIcon({
+            className: "checkout-leaflet-marker",
+            html: `<div style="background-color:#5E3210; width:26px; height:26px; border-radius:50%; border:3px solid #FFF; box-shadow:0 4px 10px rgba(0,0,0,0.3); display:flex; align-items:center; justify-content:center;">
+                    <div style="background:#E08F35; width:10px; height:10px; border-radius:50%;"></div>
+                  </div>`,
+            iconSize: [26, 26],
+            iconAnchor: [13, 13],
+          });
 
-        marker.on("dragend", async () => {
-          const latLng = marker.getLatLng();
-          setCoords([latLng.lat, latLng.lng]);
-          updateAddress({ lat: latLng.lat, lng: latLng.lng });
-          const partial = await reverseGeocodeAndSaveAddress(latLng.lat, latLng.lng);
-          if (partial) {
-            if (partial.addressLine1) setAddressLine1(partial.addressLine1);
-            if (partial.pincode) setPincode(partial.pincode);
-            if (partial.state) setState(partial.state);
-            if (partial.district) setDistrict(partial.district);
-            if (partial.landmark) setLandmark(partial.landmark);
-            showToast("📍 Pin dragged! Street address & district updated.");
-          }
-        });
+          const marker = L.marker(coords, {
+            draggable: true,
+            icon: customIcon,
+          }).addTo(map);
 
-        mapInstanceRef.current = map;
-        markerRef.current = marker;
+          marker.on("dragend", async () => {
+            try {
+              const latLng = marker.getLatLng();
+              setCoords([latLng.lat, latLng.lng]);
+              updateAddress({ lat: latLng.lat, lng: latLng.lng });
+              const partial = await reverseGeocodeAndSaveAddress(latLng.lat, latLng.lng);
+              if (partial) {
+                if (partial.addressLine1) setAddressLine1(partial.addressLine1);
+                if (partial.pincode) setPincode(partial.pincode);
+                if (partial.state) setState(partial.state);
+                if (partial.district) setDistrict(partial.district);
+                if (partial.landmark) setLandmark(partial.landmark);
+                showToast("📍 Pin dragged! Street address & district updated.");
+              }
+            } catch (e) {
+              console.warn("Marker drag notice:", e);
+            }
+          });
+
+          mapInstanceRef.current = map;
+          markerRef.current = marker;
+        } else {
+          try {
+            mapInstanceRef.current.setView(coords, 14);
+            if (markerRef.current) {
+              markerRef.current.setLatLng(coords);
+            }
+          } catch {}
+        }
+      } catch (err) {
+        console.warn("Map setup notice:", err);
       }
     }, 200);
 
@@ -305,23 +324,30 @@ export const CheckoutPage: React.FC = () => {
     setIsLocating(true);
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
-        const c: [number, number] = [pos.coords.latitude, pos.coords.longitude];
-        setCoords(c);
-        if (mapInstanceRef.current && markerRef.current) {
-          mapInstanceRef.current.setView(c, 15);
-          markerRef.current.setLatLng(c);
+        try {
+          const c: [number, number] = [pos.coords.latitude, pos.coords.longitude];
+          setCoords(c);
+          if (mapInstanceRef.current && markerRef.current) {
+            try {
+              mapInstanceRef.current.setView(c, 15);
+              markerRef.current.setLatLng(c);
+            } catch {}
+          }
+          showToast("📍 GPS coordinates retrieved! Auto-filling address...");
+          const partial = await reverseGeocodeAndSaveAddress(c[0], c[1]);
+          if (partial) {
+            if (partial.addressLine1) setAddressLine1(partial.addressLine1);
+            if (partial.pincode) setPincode(partial.pincode);
+            if (partial.state) setState(partial.state);
+            if (partial.district) setDistrict(partial.district);
+            if (partial.landmark) setLandmark(partial.landmark);
+            showToast("📍 Address & pincode auto-populated from GPS!");
+          }
+        } catch (e) {
+          console.warn("GPS error:", e);
+        } finally {
+          setIsLocating(false);
         }
-        showToast("📍 GPS coordinates retrieved! Auto-filling address...");
-        const partial = await reverseGeocodeAndSaveAddress(c[0], c[1]);
-        if (partial) {
-          if (partial.addressLine1) setAddressLine1(partial.addressLine1);
-          if (partial.pincode) setPincode(partial.pincode);
-          if (partial.state) setState(partial.state);
-          if (partial.district) setDistrict(partial.district);
-          if (partial.landmark) setLandmark(partial.landmark);
-          showToast("📍 Address & pincode auto-populated from GPS!");
-        }
-        setIsLocating(false);
       },
       (err) => {
         console.warn("Geolocation warning:", err.message);
@@ -332,25 +358,18 @@ export const CheckoutPage: React.FC = () => {
     );
   };
 
-  const handlePlaceOrder = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handlePlaceOrder = async (e?: React.FormEvent, methodChoice?: "phonepe" | "cod") => {
+    if (e) e.preventDefault();
+    const effectiveMethod = methodChoice || paymentMethod;
+    if (methodChoice) setPaymentMethod(methodChoice);
 
     if (checkoutItems.length === 0) {
-      showToast("Your checkout bag is empty. Add items first.");
-      navigate("/");
-      return;
-    }
-
-    // MANDATORY AUTHENTICATION GUARD:
-    // Only logged-in users can place orders so orders are strictly linked to their account
-    if (!currentUser) {
-      showToast("Please log in or sign up first to place your order.");
-      setLoginModalOpen(true);
+      showToast("Your checkout bag is empty. Please add items to order.");
       return;
     }
 
     if (!fullName.trim() || !phone.trim() || !addressLine1.trim() || !pincode.trim()) {
-      showToast("Please fill in all required shipping address details.");
+      showToast("Please fill in your Name, 10-digit WhatsApp number, and Delivery Street Address.");
       return;
     }
 
@@ -387,63 +406,78 @@ export const CheckoutPage: React.FC = () => {
     };
     updateAddress(finalAddress);
 
-    if (paymentMethod === "cod") {
-      // If there was an incomplete online payment attempt, mark it replaced so orders never show twice!
-      const prevPendingRef = localStorage.getItem("pending_order_ref") || lastAttemptedOrder?.orderRef;
-      if (prevPendingRef) {
-        updateFirestoreOrderStatus(prevPendingRef, {
-          orderStatus: "Replaced by COD" as any,
-          paymentStatus: "REPLACED",
-        }).catch(() => {});
+    const finalCustomerUid = currentUser?.uid || undefined;
+
+    if (effectiveMethod === "cod") {
+      setIsProcessing(true);
+      try {
+        const prevPendingRef = localStorage.getItem("pending_order_ref") || lastAttemptedOrder?.orderRef;
+        if (prevPendingRef) {
+          updateFirestoreOrderStatus(prevPendingRef, {
+            orderStatus: "Replaced by COD" as any,
+            paymentStatus: "REPLACED",
+          }).catch(() => {});
+        }
+
+        const orderRef = `MV-${Date.now().toString().slice(-6)}`;
+        const newOrder: Order = {
+          id: `ORD-${Date.now().toString().slice(-4)}`,
+          orderRef,
+          date: new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata" }),
+          timestamp: Date.now(),
+          timestampMs: Date.now(),
+          items: [...checkoutItems],
+          subtotal: checkoutSubtotal,
+          discount: checkoutDiscount,
+          shippingFee: checkoutShippingFee,
+          total: checkoutTotal,
+          paymentMethod: "cod",
+          paymentMode: "COD",
+          paymentStatus: "COMPLETED",
+          orderStatus: "Placed",
+          shippingAddress: finalAddress,
+          trackingNumber: isBLR
+            ? `MV-BLR-${Math.floor(10000 + Math.random() * 90000)}`
+            : `MV-DLH-${Math.floor(10000 + Math.random() * 90000)}`,
+          courier: isBLR ? "MANOPAVANA Peenya Express Carrier" : "Delhivery Express Logistics",
+          customerUid: finalCustomerUid,
+          customerPhone: cleanPhone,
+          customerEmail: customerEmail || undefined,
+          isBuyNow: isBuyNowMode,
+        };
+
+        try {
+          const guestRefs: string[] = JSON.parse(localStorage.getItem("manopavana_guest_order_ids") || "[]");
+          if (!guestRefs.includes(orderRef)) {
+            guestRefs.push(orderRef);
+            localStorage.setItem("manopavana_guest_order_ids", JSON.stringify(guestRefs));
+          }
+        } catch {}
+
+        await saveOrder(newOrder);
+        await sendOrderConfirmationEmail(newOrder);
+
+        if (isBuyNowMode) {
+          clearBuyNow();
+        } else {
+          clearCart();
+        }
+
+        showToast("🎉 Order placed successfully with Cash on Delivery!");
+        navigate(`/account?order=${orderRef}`);
+      } catch (err) {
+        console.warn("COD placement error:", err);
+        showToast("Order could not be saved. Please try again.");
+      } finally {
+        setIsProcessing(false);
       }
-
-      const orderRef = `MV-${Date.now().toString().slice(-6)}`;
-      const newOrder: Order = {
-        id: `ORD-${Date.now().toString().slice(-4)}`,
-        orderRef,
-        date: new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata" }),
-        timestamp: Date.now(),
-        timestampMs: Date.now(),
-        items: [...checkoutItems],
-        subtotal: checkoutSubtotal,
-        discount: checkoutDiscount,
-        shippingFee: checkoutShippingFee,
-        total: checkoutTotal,
-        paymentMethod: "cod",
-        paymentMode: "COD",
-        paymentStatus: "COMPLETED",
-        orderStatus: "Placed",
-        shippingAddress: finalAddress,
-        trackingNumber: isBLR
-          ? `MV-BLR-${Math.floor(10000 + Math.random() * 90000)}`
-          : `MV-DLH-${Math.floor(10000 + Math.random() * 90000)}`,
-        courier: isBLR ? "MANOPAVANA Peenya Express Carrier" : "Delhivery Express Logistics",
-        customerUid: currentUser.uid,
-        customerPhone: cleanPhone,
-        customerEmail: customerEmail || undefined,
-        isBuyNow: isBuyNowMode,
-      };
-
-      await saveOrder(newOrder);
-      await sendOrderConfirmationEmail(newOrder);
-
-      // If direct Buy Now session, clear ONLY buyNowItem so regular bag items remain untouched!
-      if (isBuyNowMode) {
-        clearBuyNow();
-      } else {
-        clearCart();
-      }
-
-      showToast("Order placed successfully with Cash on Delivery!");
-      navigate(`/account?order=${orderRef}`);
       return;
     }
 
-    if (paymentMethod === "phonepe") {
+    if (effectiveMethod === "phonepe") {
       setIsProcessing(true);
       setPaymentError(null);
 
-      // 1. Strictly generate orderRef format: MP_timestamp_random
       const phonePeOrderRef = "MP_" + Date.now() + "_" + Math.floor(100 + Math.random() * 900);
 
       const pendingOrder: Order = {
@@ -466,7 +500,7 @@ export const CheckoutPage: React.FC = () => {
           ? `MV-BLR-${Math.floor(10000 + Math.random() * 90000)}`
           : `MV-DLH-${Math.floor(10000 + Math.random() * 90000)}`,
         courier: isBLR ? "MANOPAVANA Peenya Express Carrier" : "Delhivery Express Logistics",
-        customerUid: currentUser.uid,
+        customerUid: finalCustomerUid,
         customerPhone: cleanPhone,
         customerEmail: customerEmail || undefined,
         isBuyNow: isBuyNowMode,
@@ -474,11 +508,18 @@ export const CheckoutPage: React.FC = () => {
 
       setLastAttemptedOrder(pendingOrder);
 
+      try {
+        const guestRefs: string[] = JSON.parse(localStorage.getItem("manopavana_guest_order_ids") || "[]");
+        if (!guestRefs.includes(phonePeOrderRef)) {
+          guestRefs.push(phonePeOrderRef);
+          localStorage.setItem("manopavana_guest_order_ids", JSON.stringify(guestRefs));
+        }
+      } catch {}
+
       localStorage.setItem("pending_order_ref", phonePeOrderRef);
       localStorage.setItem("pending_order_timestamp", Date.now().toString());
       localStorage.setItem("pending_order_data", JSON.stringify(pendingOrder));
 
-      // Persist as pending order in Firestore
       await saveOrder(pendingOrder);
 
       try {
@@ -492,7 +533,7 @@ export const CheckoutPage: React.FC = () => {
           body: JSON.stringify({
             orderRef: phonePeOrderRef,
             amount: checkoutTotal,
-            phone: phone,
+            phone: cleanPhone,
             redirectBaseUrl: origin,
           }),
         });
@@ -500,23 +541,19 @@ export const CheckoutPage: React.FC = () => {
         const data = await resp.json();
 
         if (resp.ok && data.status === "SUCCESS" && data.redirectUrl) {
-          // Do NOT clear buyNowItem here; only clear upon verified completion
           window.location.href = data.redirectUrl;
           return;
         } else {
           const errorMsg =
             data.message ||
             data.raw?.message ||
-            "Unable to initiate transaction with payment gateway. Please try again or select Cash on Delivery.";
+            "Unable to connect to payment gateway right now. You can switch to Cash on Delivery (COD) instantly!";
           setPaymentError(errorMsg);
           showToast(errorMsg);
         }
       } catch (err: unknown) {
         console.error("Payment Initiation Request Error:", err);
-        const errorMsg =
-          err instanceof Error
-            ? err.message
-            : "Connection error contacting payment gateway. Please verify network or select Cash on Delivery.";
+        const errorMsg = "Could not contact payment gateway. Please select Cash on Delivery to place your order.";
         setPaymentError(errorMsg);
         showToast(errorMsg);
       } finally {
@@ -759,6 +796,9 @@ export const CheckoutPage: React.FC = () => {
                         : "bg-[#FAF7F2] border border-[#DDD1BE] text-[#23150C]"
                     }`}
                   >
+                    {!((INDIAN_STATES_DISTRICTS[state] || []).includes(district)) && district && (
+                      <option value={district}>{district}</option>
+                    )}
                     {(INDIAN_STATES_DISTRICTS[state] || []).map((d) => (
                       <option key={d} value={d}>
                         {d}
@@ -1080,48 +1120,100 @@ export const CheckoutPage: React.FC = () => {
                 </div>
               </div>
 
-              {/* Login requirement banner if user is not logged in */}
-              {!currentUser && (
-                <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-900 dark:text-amber-200 text-xs space-y-2">
-                  <div className="flex items-center gap-2 font-bold">
-                    <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
-                    <span>Login Required to Place Order</span>
+              {/* Optional user account note - non-blocking */}
+              {!currentUser ? (
+                <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/25 flex items-center justify-between text-xs text-amber-900 dark:text-amber-200">
+                  <div className="flex items-center gap-2">
+                    <User className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                    <span className="text-[11px]">
+                      Guest Checkout: Orders tracked via your WhatsApp number.
+                    </span>
                   </div>
-                  <p className="text-[11px] opacity-90 leading-relaxed">
-                    Please log in or sign up before completing checkout. Your orders, live courier tracking, and invoices are securely tied to your registered account.
-                  </p>
                   <button
                     type="button"
                     onClick={() => setLoginModalOpen(true)}
-                    className="w-full py-2.5 rounded-lg bg-[#5E3210] hover:bg-[#43230A] text-white font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-xs transition-all"
+                    className="text-[11px] font-bold underline hover:text-amber-300 cursor-pointer shrink-0 ml-2"
                   >
-                    <User className="w-3.5 h-3.5 text-amber-300" />
-                    <span>Log In / Sign Up to Continue</span>
+                    Log In
+                  </button>
+                </div>
+              ) : (
+                <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/25 flex items-center gap-2 text-xs text-emerald-800 dark:text-emerald-300">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                  <span className="text-[11px] font-medium">
+                    Ordering as: <strong>{currentUser.displayName || currentUser.email || "Valued Customer"}</strong>
+                  </span>
+                </div>
+              )}
+
+              {/* If checkout bag is empty, display instant re-add option */}
+              {checkoutItems.length === 0 && (
+                <div className="p-4 rounded-xl bg-amber-950/40 border border-amber-600/40 text-center space-y-2">
+                  <p className="text-xs font-bold text-amber-200">Your checkout bag is currently empty.</p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      addToCart({
+                        id: "groundnut-1L",
+                        productId: "groundnut",
+                        title: "Wood-Pressed Groundnut Oil",
+                        subtitle: "Marachekku Pure • 1L",
+                        variant: "1L",
+                        price: 399,
+                        regularPrice: 399,
+                        image: "/public/images/products/groundnut-light.png",
+                      }, 1);
+                      showToast("Added 1L Groundnut Oil to bag!");
+                    }}
+                    className="px-4 py-2 bg-gradient-to-r from-[#D49A37] to-[#B87C24] text-[#140D09] text-xs font-bold rounded-xl shadow-md cursor-pointer hover:brightness-110"
+                  >
+                    + Add 1L Groundnut Oil to Bag
                   </button>
                 </div>
               )}
 
-              <button
-                type="submit"
-                disabled={isProcessing || checkoutItems.length === 0}
-                className="w-full py-4 rounded-xl bg-[#5E3210] hover:bg-[#43230A] disabled:opacity-50 text-white font-black text-xs shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
-              >
-                {isProcessing ? (
-                  <>
-                    <RefreshCw className="w-4 h-4 animate-spin text-amber-300" />
-                    <span>Connecting to Secure Payment Gateway...</span>
-                  </>
-                ) : (
-                  <>
-                    <ShieldCheck className="w-4 h-4 text-amber-300" />
-                    <span>
-                      {paymentMethod === "cod"
-                        ? `Place Order with Cash on Delivery (₹${checkoutTotal})`
-                        : `Confirm & Pay Online ₹${checkoutTotal}`}
-                    </span>
-                  </>
-                )}
-              </button>
+              {/* Direct Clickable Order Action Buttons */}
+              <div className="space-y-2.5 pt-1">
+                {/* 1. Pay Online Button */}
+                <button
+                  type="button"
+                  disabled={isProcessing || checkoutItems.length === 0}
+                  onClick={() => handlePlaceOrder(undefined, "phonepe")}
+                  className="w-full py-4 px-4 rounded-xl bg-gradient-to-r from-[#D49A37] via-[#F5BC51] to-[#BF7E16] text-[#140D09] font-black font-serif text-xs uppercase tracking-wider shadow-[0_4px_20px_rgba(212,154,55,0.4)] border border-[#FFD885] hover:brightness-110 active:scale-[0.99] disabled:opacity-50 transition-all flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  {isProcessing && paymentMethod === "phonepe" ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 animate-spin text-[#140D09]" />
+                      <span>Connecting to PhonePe PG...</span>
+                    </>
+                  ) : (
+                    <>
+                      <CreditCard className="w-4 h-4 text-[#140D09]" />
+                      <span>Pay Online ₹{checkoutTotal} (UPI / Cards / NetBanking)</span>
+                    </>
+                  )}
+                </button>
+
+                {/* 2. Cash on Delivery Button */}
+                <button
+                  type="button"
+                  disabled={isProcessing || checkoutItems.length === 0}
+                  onClick={() => handlePlaceOrder(undefined, "cod")}
+                  className="w-full py-3.5 px-4 rounded-xl bg-[#5E3210] hover:bg-[#43230A] border border-[#7D451B] text-white font-bold text-xs uppercase tracking-wider shadow-md hover:brightness-105 active:scale-[0.99] disabled:opacity-50 transition-all flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  {isProcessing && paymentMethod === "cod" ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 animate-spin text-amber-200" />
+                      <span>Placing Cash on Delivery Order...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Banknote className="w-4 h-4 text-emerald-300" />
+                      <span>Place Order with Cash on Delivery (₹{checkoutTotal})</span>
+                    </>
+                  )}
+                </button>
+              </div>
 
               <div
                 className={`text-[10px] space-y-1 text-center pt-2 ${

@@ -64,17 +64,24 @@ export default defineConfig(() => {
                     const token = await getPhonePeToken();
                     const redirectUrl = `${parsed.redirectBaseUrl || 'https://manopavana.com'}/?orderRef=${encodeURIComponent(orderRef)}`;
 
-                    const payload = {
-                      merchantId: "M22I0LXKSWR86",
-                      merchantTransactionId: orderRef,
-                      merchantUserId: parsed.phone ? `USR_${parsed.phone}` : `USR_${Date.now()}`,
+                    const checkoutPayload: any = {
+                      merchantOrderId: orderRef,
                       amount: amountInPaise,
-                      redirectUrl: redirectUrl,
-                      redirectMode: "REDIRECT",
-                      callbackUrl: `https://manopavana.com/api?action=webhook`,
-                      mobileNumber: parsed.phone ? String(parsed.phone).replace(/\D/g, "").slice(-10) : undefined,
-                      paymentInstrument: { type: "PAY_PAGE" },
+                      expireAfter: 1200,
+                      paymentFlow: {
+                        type: "PG_CHECKOUT",
+                        merchantUrls: {
+                          redirectUrl: redirectUrl,
+                        },
+                      },
                     };
+
+                    if (parsed.phone) {
+                      const cleanP = String(parsed.phone).replace(/\D/g, "").slice(-10);
+                      if (cleanP) {
+                        checkoutPayload.metaInfo = { udf1: cleanP };
+                      }
+                    }
 
                     const payResp = await fetch("https://api.phonepe.com/apis/pg/checkout/v2/pay", {
                       method: "POST",
@@ -82,16 +89,15 @@ export default defineConfig(() => {
                         "Content-Type": "application/json",
                         "Authorization": `O-Bearer ${token}`,
                       },
-                      body: JSON.stringify(payload),
+                      body: JSON.stringify(checkoutPayload),
                     });
 
                     const payData = await payResp.json();
-                    const instrumentResponse = payData.data?.instrumentResponse;
                     const checkoutRedirect =
-                      instrumentResponse?.redirectInfo?.url ||
                       payData.redirectUrl ||
-                      instrumentResponse?.redirectUrl ||
-                      payData.data?.redirectUrl;
+                      payData.data?.redirectUrl ||
+                      payData.data?.instrumentResponse?.redirectInfo?.url ||
+                      payData.instrumentResponse?.redirectInfo?.url;
 
                     if (!payResp.ok || (!checkoutRedirect && payData.code !== "PAYMENT_INITIATED")) {
                       res.statusCode = 400;
@@ -128,7 +134,7 @@ export default defineConfig(() => {
 
                 try {
                   const token = await getPhonePeToken();
-                  const verifyResp = await fetch(`https://api.phonepe.com/apis/pg/checkout/v2/order/M22I0LXKSWR86/${orderRef}/status`, {
+                  const verifyResp = await fetch(`https://api.phonepe.com/apis/pg/checkout/v2/order/${orderRef}/status?details=false`, {
                     method: 'GET',
                     headers: {
                       'Content-Type': 'application/json',
@@ -137,7 +143,7 @@ export default defineConfig(() => {
                   });
                   const verifyData = await verifyResp.json();
                   const code = verifyData.code || '';
-                  const state = verifyData.data?.state || '';
+                  const state = verifyData.state || verifyData.data?.state || '';
 
                   if (code === 'PAYMENT_SUCCESS' || state === 'COMPLETED' || state === 'SUCCESS') {
                     res.statusCode = 200;
@@ -145,13 +151,13 @@ export default defineConfig(() => {
                       status: 'SUCCESS',
                       paymentStatus: 'COMPLETED',
                       orderRef,
-                      data: verifyData.data,
+                      data: verifyData.data || verifyData,
                     }));
                   } else {
                     res.statusCode = 200;
                     res.end(JSON.stringify({
                       status: 'FAILED',
-                      paymentStatus: 'FAILED',
+                      paymentStatus: state || 'FAILED',
                       orderRef,
                       reason: verifyData.message || 'Payment not completed',
                       data: verifyData,

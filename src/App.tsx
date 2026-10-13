@@ -31,6 +31,44 @@ function ScrollToTop() {
   return null;
 }
 
+export class ErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  { hasError: boolean; error: Error | null }
+> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    console.warn("ErrorBoundary captured error:", error, errorInfo);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-[50vh] flex items-center justify-center p-6 bg-[#FAF6F0] text-[#24140A] text-center">
+          <div className="max-w-md p-6 bg-white rounded-2xl shadow-xl border border-[#D49A37]/40 space-y-4">
+            <h2 className="text-lg font-bold font-serif text-[#5E3210]">Something interrupted this view</h2>
+            <p className="text-xs text-[#7A5E48]">The page has been safely preserved. Click below to continue.</p>
+            <button
+              onClick={() => {
+                this.setState({ hasError: false, error: null });
+                window.location.reload();
+              }}
+              className="px-5 py-2.5 rounded-xl bg-[#5E3210] text-white text-xs font-bold hover:bg-[#43230A] transition-colors cursor-pointer shadow-md"
+            >
+              Continue / Refresh
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 export default function App() {
   const {
     currentUser,
@@ -190,33 +228,35 @@ export default function App() {
       <PendingOrderBanner />
       <Navbar />
 
-      <main className="w-full max-w-full overflow-x-hidden flex-1 box-border">
-        <Routes>
-          <Route path="/" element={<HomePage />} />
-          <Route path="/product/:id" element={<ProductPage />} />
-          <Route path="/cart" element={<CartPage />} />
-          <Route path="/checkout" element={<CheckoutPage />} />
-          <Route path="/account" element={<AccountPage />} />
-          <Route
-            path="/admin"
-            element={
-              currentUser?.email === "manopavana@gmail.com" ? (
-                <AdminPage />
-              ) : (
-                <Navigate to="/" replace />
-              )
-            }
-          />
-        </Routes>
-      </main>
+      <ErrorBoundary>
+        <main className="w-full max-w-full overflow-x-hidden flex-1 box-border">
+          <Routes>
+            <Route path="/" element={<HomePage />} />
+            <Route path="/product/:id" element={<ProductPage />} />
+            <Route path="/cart" element={<CartPage />} />
+            <Route path="/checkout" element={<CheckoutPage />} />
+            <Route path="/account" element={<AccountPage />} />
+            <Route
+              path="/admin"
+              element={
+                currentUser?.email === "manopavana@gmail.com" ? (
+                  <AdminPage />
+                ) : (
+                  <Navigate to="/" replace />
+                )
+              }
+            />
+          </Routes>
+        </main>
 
-      <Footer />
-      <AudioPlayer />
-      <LocationModal />
-      <LoyaltyQuizModal />
-      <LoginModal />
-      <PaymentFailedModal />
-      <OrderSuccessModal />
+        <Footer />
+        <AudioPlayer />
+        <LocationModal />
+        <LoyaltyQuizModal />
+        <LoginModal />
+        <PaymentFailedModal />
+        <OrderSuccessModal />
+      </ErrorBoundary>
 
       {/* Floating Global Toast Notification */}
       {toastMessage && (

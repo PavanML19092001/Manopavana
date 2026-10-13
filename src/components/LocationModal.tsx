@@ -51,7 +51,9 @@ export const LocationModal: React.FC = () => {
   useEffect(() => {
     if (!isLocationModalOpen) {
       if (mapInstanceRef.current) {
-        mapInstanceRef.current.remove();
+        try {
+          mapInstanceRef.current.remove();
+        } catch {}
         mapInstanceRef.current = null;
       }
       return;
@@ -59,51 +61,65 @@ export const LocationModal: React.FC = () => {
 
     const timer = setTimeout(() => {
       if (!mapContainerRef.current) return;
-      if (!mapInstanceRef.current) {
-        const map = L.map(mapContainerRef.current, {
-          center: coords,
-          zoom: 13,
-          attributionControl: false,
-        });
-
-        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-          maxZoom: 19,
-        }).addTo(map);
-
-        const customIcon = L.divIcon({
-          className: "custom-leaflet-marker",
-          html: `<div style="background-color:#E08F35; width:28px; height:28px; border-radius:50%; border:3px solid #FFF; box-shadow:0 4px 10px rgba(0,0,0,0.3); display:flex; align-items:center; justify-content:center;">
-                  <div style="background:#5E3210; width:10px; height:10px; border-radius:50%;"></div>
-                </div>`,
-          iconSize: [28, 28],
-          iconAnchor: [14, 14],
-        });
-
-        const marker = L.marker(coords, {
-          draggable: true,
-          icon: customIcon,
-        }).addTo(map);
-
-        marker.on("dragend", async () => {
-          const latLng = marker.getLatLng();
-          setCoords([latLng.lat, latLng.lng]);
-          await reverseGeocode(latLng.lat, latLng.lng);
-        });
-
-        mapInstanceRef.current = map;
-        markerRef.current = marker;
-      } else {
-        mapInstanceRef.current.setView(coords, 13);
-        if (markerRef.current) {
-          markerRef.current.setLatLng(coords);
+      try {
+        if ((mapContainerRef.current as any)._leaflet_id && !mapInstanceRef.current) {
+          (mapContainerRef.current as any)._leaflet_id = null;
         }
+
+        if (!mapInstanceRef.current) {
+          const map = L.map(mapContainerRef.current, {
+            center: coords,
+            zoom: 13,
+            attributionControl: false,
+          });
+
+          L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+            maxZoom: 19,
+          }).addTo(map);
+
+          const customIcon = L.divIcon({
+            className: "custom-leaflet-marker",
+            html: `<div style="background-color:#E08F35; width:28px; height:28px; border-radius:50%; border:3px solid #FFF; box-shadow:0 4px 10px rgba(0,0,0,0.3); display:flex; align-items:center; justify-content:center;">
+                    <div style="background:#5E3210; width:10px; height:10px; border-radius:50%;"></div>
+                  </div>`,
+            iconSize: [28, 28],
+            iconAnchor: [14, 14],
+          });
+
+          const marker = L.marker(coords, {
+            draggable: true,
+            icon: customIcon,
+          }).addTo(map);
+
+          marker.on("dragend", async () => {
+            try {
+              const latLng = marker.getLatLng();
+              setCoords([latLng.lat, latLng.lng]);
+              await reverseGeocode(latLng.lat, latLng.lng);
+            } catch (e) {
+              console.warn("Marker drag notice:", e);
+            }
+          });
+
+          mapInstanceRef.current = map;
+          markerRef.current = marker;
+        } else {
+          try {
+            mapInstanceRef.current.setView(coords, 13);
+            if (markerRef.current) {
+              markerRef.current.setLatLng(coords);
+            }
+          } catch {}
+        }
+      } catch (err) {
+        console.warn("Map setup notice:", err);
       }
     }, 150);
 
     return () => {
       clearTimeout(timer);
     };
-  }, [isLocationModalOpen, coords]);
+  }, [isLocationModalOpen]);
 
   const reverseGeocode = async (lat: number, lon: number) => {
     try {
@@ -111,8 +127,8 @@ export const LocationModal: React.FC = () => {
       if (partial) {
         if (partial.addressLine1) setAddressLine1(partial.addressLine1);
         if (partial.pincode) setPincode(partial.pincode);
-        if (partial.district) setDistrict(partial.district);
         if (partial.state) setState(partial.state);
+        if (partial.district) setDistrict(partial.district);
         if (partial.landmark) setLandmark(partial.landmark);
         showToast("📍 Address auto-populated from pin location!");
       }
@@ -129,16 +145,23 @@ export const LocationModal: React.FC = () => {
     setIsLocating(true);
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
-        const lat = pos.coords.latitude;
-        const lng = pos.coords.longitude;
-        setCoords([lat, lng]);
-        if (mapInstanceRef.current && markerRef.current) {
-          mapInstanceRef.current.setView([lat, lng], 15);
-          markerRef.current.setLatLng([lat, lng]);
+        try {
+          const lat = pos.coords.latitude;
+          const lng = pos.coords.longitude;
+          setCoords([lat, lng]);
+          if (mapInstanceRef.current && markerRef.current) {
+            try {
+              mapInstanceRef.current.setView([lat, lng], 15);
+              markerRef.current.setLatLng([lat, lng]);
+            } catch {}
+          }
+          showToast("📍 GPS coordinates retrieved! Auto-filling address...");
+          await reverseGeocode(lat, lng);
+        } catch (e) {
+          console.warn("GPS handling error:", e);
+        } finally {
+          setIsLocating(false);
         }
-        showToast("📍 GPS coordinates retrieved! Auto-filling address...");
-        await reverseGeocode(lat, lng);
-        setIsLocating(false);
       },
       (err) => {
         console.warn("Geolocation warning:", err.message);
@@ -401,6 +424,11 @@ export const LocationModal: React.FC = () => {
                   onChange={(e) => setDistrict(e.target.value)}
                   className="w-full px-3.5 py-2.5 text-xs bg-[#120A06] border border-[#4A301E] rounded-xl focus:outline-none focus:border-[#D49A37] focus:ring-1 focus:ring-[#D49A37]/50 text-[#FDF6EC]"
                 >
+                  {!currentDistricts.includes(district) && district && (
+                    <option value={district} className="bg-[#140D09] text-[#FDF6EC]">
+                      {district}
+                    </option>
+                  )}
                   {currentDistricts.map((d) => (
                     <option key={d} value={d} className="bg-[#140D09] text-[#FDF6EC]">
                       {d}

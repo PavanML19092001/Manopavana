@@ -16,6 +16,7 @@ import {
   PRODUCTS,
   COMBOS,
   MEDIA_ASSETS,
+  INDIAN_STATES_DISTRICTS,
 } from "../constants";
 import {
   auth,
@@ -207,23 +208,46 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     sessionStorage.removeItem("manopavana_admin_auth");
   };
 
-  // 1. Cart State
+  // 1. User-scoped Cart State
+  const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(null);
+  const [isLoginModalOpen, setLoginModalOpen] = useState(false);
+
+  // Helper to determine active cart storage key
+  const getActiveCartKey = (user: FirebaseUser | null) => {
+    return user?.uid ? `manopavana_cart_${user.uid}` : "manopavana_cart_guest";
+  };
+
   const [cart, setCart] = useState<CartItem[]>(() => {
     try {
-      const saved = localStorage.getItem("manopavana_cart");
+      // Initialize with active user cart if exists, otherwise guest cart
+      const initialKey = "manopavana_cart_guest";
+      const saved = localStorage.getItem(initialKey);
       return saved ? JSON.parse(saved) : [];
     } catch {
       return [];
     }
   });
 
+  // Track currently active user ID to avoid saving into wrong cart during user switch
+  const activeUserUidRef = useRef<string | null>(null);
+
   useEffect(() => {
     try {
-      localStorage.setItem("manopavana_cart", JSON.stringify(cart));
+      const key = currentUser?.uid ? `manopavana_cart_${currentUser.uid}` : "manopavana_cart_guest";
+      localStorage.setItem(key, JSON.stringify(cart));
+
+      // Also sync user's cart into Firestore so it follows them across browsers & devices
+      if (currentUser?.uid) {
+        setDoc(
+          doc(db, "customers", currentUser.uid),
+          { cart, updatedAt: serverTimestamp() },
+          { merge: true }
+        ).catch(() => {});
+      }
     } catch {
       // ignore
     }
-  }, [cart]);
+  }, [cart, currentUser?.uid]);
 
   // Buy Now direct checkout state (persists across page reloads without touching cart)
   const [buyNowItem, setBuyNowItem] = useState<CartItem | null>(() => {
@@ -350,15 +374,64 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       const street = parts.join(", ") || (data.display_name ? data.display_name.split(",").slice(0, 3).join(", ") : "");
 
       const landmark = addr.amenity || addr.shop || addr.landmark || "";
-      const district = addr.city_district || addr.district || addr.county || addr.city || "Bengaluru Urban";
-      const state = addr.state || "Karnataka";
-      const isBLR = postcode.startsWith("560") || district.toLowerCase().includes("bengaluru") || district.toLowerCase().includes("bangalore");
+
+      // Match canonical state
+      let state = addr.state || "Karnataka";
+      const stateKeys = Object.keys(INDIAN_STATES_DISTRICTS);
+      const matchedState = stateKeys.find(
+        (s) => s.toLowerCase() === state.toLowerCase() || state.toLowerCase().includes(s.toLowerCase())
+      );
+      if (matchedState) {
+        state = matchedState;
+      } else if (!stateKeys.includes(state)) {
+        state = "Karnataka";
+      }
+
+      const availableDistricts = INDIAN_STATES_DISTRICTS[state] || INDIAN_STATES_DISTRICTS["Karnataka"];
+
+      const isBLR =
+        postcode.startsWith("560") ||
+        (data.display_name && (data.display_name.toLowerCase().includes("bengaluru") || data.display_name.toLowerCase().includes("bangalore"))) ||
+        (addr.city && addr.city.toLowerCase().includes("bengaluru")) ||
+        (addr.county && addr.county.toLowerCase().includes("bengaluru"));
+
+      let district = "Bengaluru Urban";
+      if (isBLR) {
+        if (
+          postcode.startsWith("562") ||
+          (addr.county && addr.county.toLowerCase().includes("rural")) ||
+          (addr.district && addr.district.toLowerCase().includes("rural"))
+        ) {
+          district = "Bengaluru Rural";
+        } else {
+          district = "Bengaluru Urban";
+        }
+      } else {
+        const candidates = [
+          addr.state_district,
+          addr.county,
+          addr.district,
+          addr.city,
+        ].filter(Boolean);
+
+        let foundDistrict = "";
+        for (const cand of candidates) {
+          const match = availableDistricts.find(
+            (d: string) => d.toLowerCase() === cand.toLowerCase() || cand.toLowerCase().includes(d.toLowerCase()) || d.toLowerCase().includes(cand.toLowerCase())
+          );
+          if (match) {
+            foundDistrict = match;
+            break;
+          }
+        }
+        district = foundDistrict || availableDistricts[0] || "Bengaluru Urban";
+      }
 
       const partial: Partial<Address> = {
         lat,
         lng,
         addressLine1: street || undefined,
-        pincode: postcode || undefined,
+        pincode: postcode || (isBLR ? "560058" : undefined),
         landmark: landmark || undefined,
         district,
         state,
@@ -374,20 +447,55 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   };
 
-  // 3. Firebase Auth State & Login Modal
-  const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(null);
-  const [isLoginModalOpen, setLoginModalOpen] = useState(false);
-
+  // 3. Firebase Auth State & Login Sync
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setCurrentUser(user);
       if (user) {
-        const profile = await syncCustomerDoc(user);
-        if (profile && (profile as any).savedAddress) {
-          const saved = (profile as any).savedAddress as Partial<Address>;
-          if (saved.addressLine1 || saved.phone || saved.fullName) {
-            updateAddress(saved);
+        // Load user-specific cart
+        try {
+          const userKey = `manopavana_cart_${user.uid}`;
+          const localSaved = localStorage.getItem(userKey);
+          let loadedCart: CartItem[] = localSaved ? JSON.parse(localSaved) : [];
+
+          // Also check Firestore customer profile
+          const profile = await syncCustomerDoc(user);
+          if (profile && Array.isArray((profile as any).cart) && (profile as any).cart.length > 0) {
+            if (loadedCart.length === 0) {
+              loadedCart = (profile as any).cart;
+            }
           }
+
+          // If user had items in guest cart before logging in and their user cart is empty, carry them over
+          if (loadedCart.length === 0) {
+            const guestSaved = localStorage.getItem("manopavana_cart_guest");
+            if (guestSaved) {
+              const guestCart = JSON.parse(guestSaved);
+              if (Array.isArray(guestCart) && guestCart.length > 0) {
+                loadedCart = guestCart;
+                localStorage.removeItem("manopavana_cart_guest");
+              }
+            }
+          }
+
+          setCart(loadedCart);
+
+          if (profile && (profile as any).savedAddress) {
+            const saved = (profile as any).savedAddress as Partial<Address>;
+            if (saved.addressLine1 || saved.phone || saved.fullName) {
+              updateAddress(saved);
+            }
+          }
+        } catch (e) {
+          console.warn("Error loading user-scoped cart:", e);
+        }
+      } else {
+        // When user logs out, switch to guest cart
+        try {
+          const guestSaved = localStorage.getItem("manopavana_cart_guest");
+          setCart(guestSaved ? JSON.parse(guestSaved) : []);
+        } catch {
+          setCart([]);
         }
       }
     });
@@ -396,20 +504,25 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const logoutUser = async () => {
     try {
-      // 1. Firebase Auth Sign-out
       if (auth) {
         await signOut(auth);
       }
     } catch (err) {
       console.warn("Firebase signout error:", err);
     }
-    // 2. Clear stored user session states
     setCurrentUser(null);
     localStorage.removeItem("manopavana_active_user");
     sessionStorage.removeItem("manopavana_admin_auth");
     setIsAdminAuthenticated(false);
 
-    // 3. Show success notification
+    // Switch to clean guest cart on logout
+    try {
+      const guestSaved = localStorage.getItem("manopavana_cart_guest");
+      setCart(guestSaved ? JSON.parse(guestSaved) : []);
+    } catch {
+      setCart([]);
+    }
+
     showToast("👋 You have logged out successfully.");
   };
 

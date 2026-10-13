@@ -46,13 +46,13 @@ export const PHONEPE_CONFIG = {
 };
 
 export const FIREBASE_CONFIG = {
-  apiKey: "AIzaSyBZ2h7B82XvIR2ffT2E5g9MHp1M7QPO9K4",
-  authDomain: "manopavana-d399e.firebaseapp.com",
-  projectId: "manopavana-d399e",
-  storageBucket: "manopavana-d399e.firebasestorage.app",
-  messagingSenderId: "675866391632",
-  appId: "1:675866391632:web:a5c160fb7315a5f8788d55",
-  measurementId: "G-5G8JTQF8Q2",
+  apiKey: (typeof import.meta !== "undefined" && import.meta.env?.VITE_FIREBASE_API_KEY) || "AIzaSyBZ2h7B82XvIR2ffT2E5g9MHp1M7QPO9K4",
+  authDomain: (typeof import.meta !== "undefined" && import.meta.env?.VITE_FIREBASE_AUTH_DOMAIN) || "manopavana-d399e.firebaseapp.com",
+  projectId: (typeof import.meta !== "undefined" && import.meta.env?.VITE_FIREBASE_PROJECT_ID) || "manopavana-d399e",
+  storageBucket: (typeof import.meta !== "undefined" && import.meta.env?.VITE_FIREBASE_STORAGE_BUCKET) || "manopavana-d399e.firebasestorage.app",
+  messagingSenderId: (typeof import.meta !== "undefined" && import.meta.env?.VITE_FIREBASE_MESSAGING_SENDER_ID) || "675866391632",
+  appId: (typeof import.meta !== "undefined" && import.meta.env?.VITE_FIREBASE_APP_ID) || "1:675866391632:web:a5c160fb7315a5f8788d55",
+  measurementId: (typeof import.meta !== "undefined" && import.meta.env?.VITE_FIREBASE_MEASUREMENT_ID) || "G-5G8JTQF8Q2",
 };
 
 export const EMAILJS_CONFIG = {
