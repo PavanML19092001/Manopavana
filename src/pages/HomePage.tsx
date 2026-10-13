@@ -179,6 +179,24 @@ export const HomePage: React.FC = () => {
     });
   };
 
+  const handleBuyNowCombo = (combo: (typeof COMBOS)[0]) => {
+    startBuyNow(
+      {
+        id: combo.id,
+        productId: combo.id,
+        isCombo: true,
+        title: combo.name,
+        subtitle: combo.volumeLabel,
+        variant: combo.id === "combo-3l" ? "3L Trio" : "1.5L Trio",
+        price: loyalty.isActive ? combo.loyaltyPrice : combo.regularPrice,
+        regularPrice: combo.mrp,
+        image: combo.image,
+      },
+      1
+    );
+    navigate("/checkout?mode=buynow");
+  };
+
   return (
     <div className="w-full max-w-full overflow-x-hidden flex flex-col box-border">
       {/* 1. HERO SECTION (SPLIT-SCREEN 2-COLUMN LAYOUT) */}
@@ -880,14 +898,23 @@ export const HomePage: React.FC = () => {
                         )}
                       </div>
 
-                      <button
-                        type="button"
-                        onClick={() => handleAddCombo(combo)}
-                        className="px-6 py-3 rounded-xl bg-[#E08F35] hover:bg-[#F59E0B] text-[#29170C] font-black text-xs shadow-lg transition-all flex items-center gap-2 cursor-pointer"
-                      >
-                        <ShoppingBag className="w-4 h-4 text-[#29170C]" />
-                        <span>Order Trio Box</span>
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleAddCombo(combo)}
+                          className="px-4 py-2.5 rounded-xl border-2 border-[#E08F35] text-[#E08F35] hover:bg-[#E08F35]/10 font-black text-xs transition-all flex items-center gap-1.5 cursor-pointer"
+                        >
+                          <ShoppingBag className="w-3.5 h-3.5 text-[#E08F35]" />
+                          <span>Add to Bag</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleBuyNowCombo(combo)}
+                          className="px-5 py-2.5 rounded-xl bg-[#E08F35] hover:bg-[#F59E0B] text-[#29170C] font-black text-xs shadow-lg transition-all flex items-center gap-1.5 cursor-pointer"
+                        >
+                          <span>Buy Now</span>
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ))}

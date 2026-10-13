@@ -75,19 +75,7 @@ export default function App() {
           state === "COMPLETED" ||
           state === "SUCCESS"
         ) {
-          // Clear pending order tracking keys from localStorage
-          localStorage.removeItem("pending_order_ref");
-          localStorage.removeItem("pending_order_timestamp");
-          localStorage.removeItem("pending_order_data");
-
-          // 1. Update Firestore order document to PHONEPE_PAID and Placed
-          await updateFirestoreOrderStatus(ref, {
-            orderStatus: "Placed",
-            paymentMode: "PHONEPE_PAID",
-            paymentStatus: "COMPLETED",
-          });
-
-          // 2. Dispatch EmailJS confirmation alert to manopavana@gmail.com
+          // 1. Retrieve matched order data before clearing storage
           let matched = getOrder(ref);
           if (!matched) {
             try {
@@ -98,6 +86,19 @@ export default function App() {
             }
           }
 
+          // Clear pending order tracking keys from localStorage
+          localStorage.removeItem("pending_order_ref");
+          localStorage.removeItem("pending_order_timestamp");
+          localStorage.removeItem("pending_order_data");
+
+          // 2. Update Firestore order document to PHONEPE_PAID and Placed
+          await updateFirestoreOrderStatus(ref, {
+            orderStatus: "Placed",
+            paymentMode: "PHONEPE_PAID",
+            paymentStatus: "COMPLETED",
+          });
+
+          // 3. Dispatch EmailJS confirmation alert
           if (matched) {
             await sendOrderConfirmationEmail({
               ...matched,
@@ -107,9 +108,13 @@ export default function App() {
             });
           }
 
-          // 3. Clear cart and open Order Confirmation Modal with reference number
-          clearCart();
-          clearBuyNow();
+          // 4. If direct Buy Now, clear only buyNowItem so bag items remain safe
+          if (matched?.isBuyNow) {
+            clearBuyNow();
+          } else {
+            clearCart();
+            clearBuyNow();
+          }
           setOrderSuccessRef(ref);
           showToast("Payment verified online! Order placed.");
         } else {

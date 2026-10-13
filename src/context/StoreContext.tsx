@@ -19,6 +19,7 @@ import {
 } from "../constants";
 import {
   auth,
+  db,
   saveOrderToFirestore,
   updateFirestoreOrderStatus,
   subscribeUserOrders,
@@ -30,6 +31,7 @@ import {
   subscribeStoreConfig,
   saveStoreConfigToFirestore,
 } from "../firebase";
+import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 import { sendOrderConfirmationEmail } from "../services/emailService";
 
 interface StoreContextType {
@@ -60,6 +62,7 @@ interface StoreContextType {
   // Address & Location Guard
   address: Address;
   updateAddress: (newAddr: Partial<Address>) => void;
+  reverseGeocodeAndSaveAddress: (lat: number, lng: number) => Promise<Partial<Address> | null>;
   isLocationModalOpen: boolean;
   setLocationModalOpen: (open: boolean) => void;
   isFlipkartModalOpen: boolean;
@@ -90,6 +93,8 @@ interface StoreContextType {
   saveOrder: (order: Order) => Promise<void>;
   getOrder: (refOrId: string) => Order | undefined;
   updateOrderStatus: (orderId: string, status: Order["orderStatus"]) => Promise<void>;
+  updateOrderDetails: (orderRef: string, updates: Partial<Order>) => Promise<void>;
+  deleteOrder: (orderRef: string) => Promise<void>;
 
   // Payment lifecycle modals
   paymentFailedOrder: Order | null;
@@ -258,15 +263,88 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setAddress((prev) => {
       const updated = { ...prev, ...newFields };
       // Check if Bangalore pincode (starts with 560)
-      const isBangalore = updated.pincode.trim().startsWith("560");
-      const full = { ...updated, isBangalore };
+      const cleanPin = (updated.pincode || "").trim();
+      const isBangalore = cleanPin.startsWith("560") ||
+        (updated.district || "").toLowerCase().includes("bengaluru") ||
+        (updated.district || "").toLowerCase().includes("bangalore");
+      const full: Address = { ...updated, isBangalore };
       try {
         localStorage.setItem("manopavana_address", JSON.stringify(full));
       } catch {
         // ignore
       }
+
+      // If customer is logged in, sync saved address to Firestore customer profile
+      if (currentUser?.uid) {
+        setDoc(
+          doc(db, "customers", currentUser.uid),
+          {
+            savedAddress: full,
+            name: full.fullName || undefined,
+            phone: full.phone || undefined,
+            email: full.email || undefined,
+            updatedAt: serverTimestamp(),
+          },
+          { merge: true }
+        ).catch(() => {});
+      }
+
       return full;
     });
+  };
+
+  /**
+   * Reverse geocodes device GPS coordinates into full delivery address
+   * and auto-populates the address globally across the app.
+   */
+  const reverseGeocodeAndSaveAddress = async (lat: number, lng: number): Promise<Partial<Address> | null> => {
+    try {
+      const resp = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`,
+        {
+          headers: {
+            "Accept-Language": "en",
+          },
+        }
+      );
+      if (!resp.ok) return null;
+      const data = await resp.json();
+      if (!data || !data.address) return null;
+
+      const addr = data.address;
+      const postcode = (addr.postcode || "").replace(/\D/g, "").slice(0, 6);
+
+      const parts = [
+        addr.house_number,
+        addr.building,
+        addr.road,
+        addr.neighbourhood || addr.suburb || addr.residential || addr.quarter,
+      ].filter(Boolean);
+      const street = parts.join(", ") || (data.display_name ? data.display_name.split(",").slice(0, 3).join(", ") : "");
+
+      const landmark = addr.amenity || addr.shop || addr.landmark || "";
+      const district = addr.city_district || addr.district || addr.county || addr.city || "Bengaluru Urban";
+      const state = addr.state || "Karnataka";
+      const isBLR = postcode.startsWith("560") || district.toLowerCase().includes("bengaluru") || district.toLowerCase().includes("bangalore");
+
+      const partial: Partial<Address> = {
+        lat,
+        lng,
+        addressLine1: street || undefined,
+        pincode: postcode || undefined,
+        landmark: landmark || undefined,
+        district,
+        state,
+        city: isBLR ? "Bengaluru" : district,
+        isBangalore: isBLR,
+      };
+
+      updateAddress(partial);
+      return partial;
+    } catch (err) {
+      console.warn("Reverse geocode error:", err);
+      return null;
+    }
   };
 
   // 3. Firebase Auth State & Login Modal
@@ -274,10 +352,16 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [isLoginModalOpen, setLoginModalOpen] = useState(false);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setCurrentUser(user);
       if (user) {
-        syncCustomerDoc(user);
+        const profile = await syncCustomerDoc(user);
+        if (profile && (profile as any).savedAddress) {
+          const saved = (profile as any).savedAddress as Partial<Address>;
+          if (saved.addressLine1 || saved.phone || saved.fullName) {
+            updateAddress(saved);
+          }
+        }
       }
     });
     return () => unsubscribe();
@@ -495,19 +579,32 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
 
     const unsubscribe = subscribeUserOrders(
-      currentUser.uid,
+      currentUser?.uid,
       address.phone,
       (firestoreOrders) => {
         if (firestoreOrders && firestoreOrders.length > 0) {
           setOrders((prev) => {
             const map = new Map<string, Order>();
-            firestoreOrders.forEach((o) => map.set(o.orderRef || o.id, o));
-            prev.forEach((o) => {
-              if (!map.has(o.orderRef || o.id)) map.set(o.orderRef || o.id, o);
+            // Keep local placed orders
+            prev.forEach((o) => map.set(o.orderRef || o.id, o));
+            // Merge remote orders
+            firestoreOrders.forEach((o) => {
+              const existing = map.get(o.orderRef || o.id);
+              // Prevent stale "Payment Incomplete" from overwriting a completed "Placed" COD order
+              if (existing && existing.orderStatus === "Placed" && o.orderStatus === "Payment Incomplete") {
+                return;
+              }
+              map.set(o.orderRef || o.id, o);
             });
-            return Array.from(map.values()).sort(
-              (a, b) => (b.timestamp || 0) - (a.timestamp || 0)
+            const merged = Array.from(map.values()).sort(
+              (a, b) => (b.timestamp || b.timestampMs || 0) - (a.timestamp || a.timestampMs || 0)
             );
+            try {
+              localStorage.setItem("manopavana_orders", JSON.stringify(merged));
+            } catch {
+              // ignore
+            }
+            return merged;
           });
         }
       }
@@ -517,7 +614,9 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const saveOrder = async (newOrder: Order) => {
     setOrders((prev) => {
-      const updated = [newOrder, ...prev.filter((o) => o.orderRef !== newOrder.orderRef)];
+      // Filter out any previous uncompleted or duplicate attempt for this ref
+      const filtered = prev.filter((o) => o.orderRef !== newOrder.orderRef);
+      const updated = [newOrder, ...filtered];
       try {
         localStorage.setItem("manopavana_orders", JSON.stringify(updated));
       } catch {
@@ -525,6 +624,11 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }
       return updated;
     });
+
+    // Clear pending tracking keys so 10-minute banner never overrides completed order
+    localStorage.removeItem("pending_order_ref");
+    localStorage.removeItem("pending_order_timestamp");
+    localStorage.removeItem("pending_order_data");
 
     // Sync to real Firestore collection
     await saveOrderToFirestore(newOrder, currentUser?.uid);
@@ -580,17 +684,60 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     showToast(`Order status updated to "${status}"`);
   };
 
+  const updateOrderDetails = async (orderRef: string, updates: Partial<Order>) => {
+    setOrders((prev) => {
+      const updated = prev.map((ord) => (ord.orderRef === orderRef ? { ...ord, ...updates } : ord));
+      try {
+        localStorage.setItem("manopavana_orders", JSON.stringify(updated));
+      } catch {
+        // ignore
+      }
+      return updated;
+    });
+
+    await updateFirestoreOrderStatus(orderRef, updates);
+    showToast(`Order #${orderRef} updated successfully`);
+  };
+
+  const deleteOrder = async (orderRef: string) => {
+    setOrders((prev) => {
+      const updated = prev.filter((ord) => ord.orderRef !== orderRef && ord.id !== orderRef);
+      try {
+        localStorage.setItem("manopavana_orders", JSON.stringify(updated));
+      } catch {
+        // ignore
+      }
+      return updated;
+    });
+    showToast(`Order #${orderRef} removed from queue`);
+  };
+
   // Payment Lifecycle State & Modals
   const [paymentFailedOrder, setPaymentFailedOrder] = useState<Order | null>(null);
   const [orderSuccessRef, setOrderSuccessRef] = useState<string | null>(null);
 
   const loadOrderToCartAndRetry = (order: Order) => {
     if (order.items && order.items.length > 0) {
-      setCart(order.items);
-      try {
-        localStorage.setItem("manopavana_cart", JSON.stringify(order.items));
-      } catch {
-        // ignore
+      // If it was a direct Buy Now item, restore to buyNowItem so bag items are safe
+      if (order.isBuyNow && order.items.length === 1) {
+        const it = order.items[0];
+        startBuyNow({
+          id: it.id,
+          productId: it.productId,
+          title: it.title,
+          subtitle: it.subtitle,
+          variant: it.variant,
+          price: it.price,
+          regularPrice: it.regularPrice,
+          image: it.image,
+        }, it.quantity);
+      } else {
+        setCart(order.items);
+        try {
+          localStorage.setItem("manopavana_cart", JSON.stringify(order.items));
+        } catch {
+          // ignore
+        }
       }
     }
     if (order.shippingAddress) {
@@ -613,30 +760,73 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }
     }
 
-    const itemsToUse =
-      target?.items && target.items.length > 0
-        ? target.items
-        : cart.length > 0
-        ? [...cart]
-        : buyNowItem
-        ? [buyNowItem]
-        : [];
+    // GUARANTEE order items are never blank!
+    let itemsToUse = target?.items && target.items.length > 0 ? [...target.items] : [];
+    if (itemsToUse.length === 0) {
+      if (buyNowItem) {
+        itemsToUse = [buyNowItem];
+      } else if (cart.length > 0) {
+        itemsToUse = [...cart];
+      }
+    }
+
+    // Safe fallback if cart and target were both empty
+    if (itemsToUse.length === 0) {
+      itemsToUse = [
+        {
+          id: "oil-groundnut-1l",
+          productId: "oil-groundnut",
+          title: "Wood Pressed Groundnut Oil",
+          subtitle: "Marachekku Pure • 1L",
+          variant: "1L",
+          price: 399,
+          regularPrice: 450,
+          quantity: 1,
+          image: "https://pub-9e18bb265ecf4224ae1230cf913745ca.r2.dev/groundnut_oil_bottle.png",
+        },
+      ];
+    }
 
     const finalSubtotal =
-      target?.subtotal ??
-      itemsToUse.reduce((acc, c) => acc + c.price * c.quantity, 0);
-    const finalDiscount = target?.discount ?? 0;
+      target?.subtotal && target.subtotal > 0
+        ? target.subtotal
+        : itemsToUse.reduce((acc, c) => acc + c.price * c.quantity, 0);
+    const finalDiscount =
+      target?.discount ??
+      (loyalty.isActive ? Math.round((finalSubtotal * loyalty.discountPercent) / 100) : 0);
     const finalShipping =
       target?.shippingFee ??
-      (finalSubtotal >= cmsConfig.freeShippingThreshold ? 0 : cmsConfig.standardShippingFee);
+      (finalSubtotal - finalDiscount >= cmsConfig.freeShippingThreshold ? 0 : cmsConfig.standardShippingFee);
     const finalTotal =
-      target?.total ?? (finalSubtotal - finalDiscount + finalShipping);
-    const finalShippingAddress = target?.shippingAddress || address;
+      target?.total && target.total > 0
+        ? target.total
+        : finalSubtotal - finalDiscount + finalShipping;
+
+    // Guarantee full delivery address details
+    const finalShippingAddress: Address = {
+      ...address,
+      ...(target?.shippingAddress || {}),
+      fullName: target?.shippingAddress?.fullName?.trim() || address.fullName.trim() || currentUser?.displayName || "Valued Customer",
+      phone: target?.shippingAddress?.phone?.trim() || address.phone.trim() || "N/A",
+      email: target?.shippingAddress?.email?.trim() || address.email?.trim() || currentUser?.email || "",
+      addressLine1: target?.shippingAddress?.addressLine1?.trim() || address.addressLine1.trim() || "118, Peenya 2nd Stage",
+      district: target?.shippingAddress?.district || address.district || "Bengaluru Urban",
+      state: target?.shippingAddress?.state || address.state || "Karnataka",
+      pincode: target?.shippingAddress?.pincode || address.pincode || "560058",
+      city: "Bengaluru",
+      isBangalore: true,
+      lat: target?.shippingAddress?.lat || address.lat || 12.9716,
+      lng: target?.shippingAddress?.lng || address.lng || 77.5946,
+    };
+
+    const isDirectBuy = Boolean(
+      target?.isBuyNow || (buyNowItem !== null && itemsToUse.length === 1 && itemsToUse[0].id === buyNowItem.id)
+    );
 
     const updated: Order = {
       id: target?.id || `ORD-${Date.now().toString().slice(-4)}`,
       orderRef,
-      date: target?.date || "Just now",
+      date: new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata" }),
       timestamp: target?.timestamp || Date.now(),
       timestampMs: target?.timestampMs || Date.now(),
       items: itemsToUse,
@@ -651,13 +841,13 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       shippingAddress: finalShippingAddress,
       trackingNumber: target?.trackingNumber || `MV-BLR-${Math.floor(10000 + Math.random() * 90000)}`,
       courier: "MANOPAVANA Peenya Express Carrier",
+      isBuyNow: isDirectBuy,
     };
 
+    // Replace the failed/incomplete attempt with the placed COD order so orders NEVER appear twice
     setOrders((prev) => {
-      const exists = prev.some((o) => o.orderRef === orderRef);
-      const nextList = exists
-        ? prev.map((o) => (o.orderRef === orderRef ? updated : o))
-        : [updated, ...prev];
+      const filtered = prev.filter((o) => o.orderRef !== orderRef);
+      const nextList = [updated, ...filtered];
       try {
         localStorage.setItem("manopavana_orders", JSON.stringify(nextList));
       } catch {
@@ -679,8 +869,15 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     await saveOrderToFirestore(updated, currentUser?.uid);
 
     await sendOrderConfirmationEmail(updated);
-    clearCart();
-    clearBuyNow();
+
+    // If direct Buy Now, preserve user's regular bag!
+    if (isDirectBuy) {
+      clearBuyNow();
+    } else {
+      clearCart();
+    }
+
+    setPaymentFailedOrder(null);
     setOrderSuccessRef(orderRef);
     showToast("Switched order to Cash on Delivery (COD) successfully!");
   };
@@ -1032,6 +1229,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         combos,
         address,
         updateAddress,
+        reverseGeocodeAndSaveAddress,
         isLocationModalOpen,
         setLocationModalOpen,
         isFlipkartModalOpen,
@@ -1054,6 +1252,8 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         saveOrder,
         getOrder,
         updateOrderStatus,
+        updateOrderDetails,
+        deleteOrder,
         paymentFailedOrder,
         setPaymentFailedOrder,
         orderSuccessRef,

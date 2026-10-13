@@ -235,6 +235,242 @@ export async function onRequest(context) {
       }
     }
 
+    /* -------------------------------------------------------------
+     * DELHIVERY LOGISTICS INTEGRATION
+     * ------------------------------------------------------------- */
+    const DELHIVERY_TOKEN = env.DELHIVERY_API_TOKEN || "6d43e07bee414f88473e757d0fd9e1134e1afc9a";
+    const DELHIVERY_WAREHOUSE = env.DELHIVERY_WAREHOUSE_NAME || "MANOPAVANA_PEENYA";
+
+    // 0. Live Connection & Token Health Check
+    if (request.method === "GET" && action === "delhivery_test_connection") {
+      const start = Date.now();
+      try {
+        const checkResp = await fetch(`https://track.delhivery.com/c/api/pin-codes/json/?filter_codes=560058`, {
+          headers: { Authorization: `Token ${DELHIVERY_TOKEN}` },
+        });
+        const isAuthed = checkResp.status === 200;
+        const latency = Date.now() - start;
+
+        let waybillTest = null;
+        try {
+          const wbResp = await fetch("https://track.delhivery.com/waybill/api/fetch/json/?count=1", {
+            headers: { Authorization: `Token ${DELHIVERY_TOKEN}` },
+          });
+          if (wbResp.ok) {
+            waybillTest = (await wbResp.text()).replace(/[^0-9]/g, "");
+          }
+        } catch {}
+
+        return jsonResponse({
+          status: isAuthed ? "SUCCESS" : "FAILED",
+          authenticated: isAuthed,
+          tokenMasked: `${DELHIVERY_TOKEN.slice(0, 6)}...${DELHIVERY_TOKEN.slice(-4)}`,
+          warehouse: DELHIVERY_WAREHOUSE,
+          originPincode: "560058 (Peenya 2nd Stage, Bengaluru)",
+          sampleWaybill: waybillTest,
+          latencyMs: latency,
+          message: isAuthed
+            ? "Delhivery API Token is active and responding successfully!"
+            : "Delhivery API authentication returned non-200 code.",
+        });
+      } catch (e) {
+        return jsonResponse({ status: "ERROR", message: e?.message || "Connection test failed" }, 502);
+      }
+    }
+
+    // 0b. Fetch Fresh Waybill (AWB) from Delhivery
+    if (request.method === "GET" && action === "delhivery_fetch_waybill") {
+      try {
+        const wbResp = await fetch("https://track.delhivery.com/waybill/api/fetch/json/?count=1", {
+          headers: { Authorization: `Token ${DELHIVERY_TOKEN}` },
+        });
+        const wbText = await wbResp.text();
+        const cleanWb = wbText.replace(/[^0-9]/g, "");
+        return jsonResponse({
+          status: "SUCCESS",
+          waybill: cleanWb || wbText,
+          raw: wbText,
+        });
+      } catch (e) {
+        return jsonResponse({ status: "ERROR", message: e?.message || "Waybill fetch error" }, 502);
+      }
+    }
+
+    // 1. Check Pincode Serviceability
+    if (request.method === "GET" && action === "delhivery_check_pincode") {
+      const pincode = url.searchParams.get("pincode");
+      if (!pincode || pincode.length !== 6) {
+        return jsonResponse({ status: "FAILED", message: "Valid 6-digit pincode required" }, 400);
+      }
+
+      const checkResp = await fetch(`https://track.delhivery.com/c/api/pin-codes/json/?filter_codes=${pincode}`, {
+        headers: { Authorization: `Token ${DELHIVERY_TOKEN}` },
+      });
+      const checkData = await checkResp.json();
+      const info = checkData?.delivery_codes?.[0]?.postal_code;
+
+      if (info) {
+        return jsonResponse({
+          status: "SUCCESS",
+          serviceable: true,
+          pincode: info.pin,
+          city: info.city,
+          district: info.district,
+          state: info.state_code,
+          cod: info.cod === "Y",
+          prepaid: info.pre_paid === "Y",
+          isOda: info.is_oda === "Y",
+          raw: info,
+        });
+      }
+
+      return jsonResponse({
+        status: "SUCCESS",
+        serviceable: false,
+        pincode,
+        message: "Pincode not currently serviceable by Delhivery",
+      });
+    }
+
+    // 2. Create Delhivery Shipment Manifest
+    if (request.method === "POST" && action === "delhivery_create_shipment") {
+      let body = {};
+      try {
+        body = await request.json();
+      } catch {
+        return jsonResponse({ status: "FAILED", message: "Invalid JSON body" }, 400);
+      }
+
+      const {
+        orderRef,
+        customerName,
+        phone,
+        address,
+        pincode,
+        city,
+        state,
+        paymentMode,
+        totalAmount,
+        weightGrams = 1000,
+        productsDesc = "Pure Cold Pressed Oil",
+        quantity = "1",
+        warehouseName = DELHIVERY_WAREHOUSE,
+      } = body;
+
+      if (!orderRef || !pincode || !phone || !customerName) {
+        return jsonResponse({ status: "FAILED", message: "Missing required order fields" }, 400);
+      }
+
+      const cleanPhone = String(phone).replace(/\D/g, "").slice(-10);
+      const isCod = String(paymentMode).toUpperCase() === "COD";
+      const codAmount = isCod ? Math.round(Number(totalAmount)) : 0;
+
+      const manifestPayload = {
+        shipments: [
+          {
+            name: customerName,
+            add: address,
+            pin: String(pincode),
+            city: city || "Bengaluru",
+            state: state || "Karnataka",
+            country: "India",
+            phone: cleanPhone,
+            order: orderRef,
+            payment_mode: isCod ? "COD" : "Prepaid",
+            products_desc: productsDesc,
+            hsn_code: "1512",
+            cod_amount: codAmount,
+            total_amount: Math.round(Number(totalAmount)),
+            seller_name: "MANOPAVANA B2C",
+            quantity: String(quantity),
+            weight: Number(weightGrams) || 1000,
+            shipping_mode: "Surface",
+            address_type: "home",
+          },
+        ],
+        pickup_location: {
+          name: warehouseName,
+        },
+      };
+
+      const postData = "format=json&data=" + encodeURIComponent(JSON.stringify(manifestPayload));
+
+      const createResp = await fetch("https://track.delhivery.com/api/cmu/create.json", {
+        method: "POST",
+        headers: {
+          Authorization: `Token ${DELHIVERY_TOKEN}`,
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+        body: postData,
+      });
+
+      const createData = await createResp.json();
+      const pkg = createData.packages?.[0];
+
+      if (createData.success && pkg?.waybill) {
+        return jsonResponse({
+          status: "SUCCESS",
+          waybill: pkg.waybill,
+          refnum: pkg.refnum,
+          labelUrl: `https://track.delhivery.com/api/p/packing_slip?wbns=${pkg.waybill}&pdf=true`,
+          trackingUrl: `https://www.delhivery.com/track/package/${pkg.waybill}`,
+          raw: createData,
+        });
+      }
+
+      const remarkMsg = pkg?.remarks?.join(", ") || createData.rmk || "Shipment manifest creation failed";
+      const isInsufficientBalance = remarkMsg.toLowerCase().includes("insufficient balance");
+
+      let fallbackWaybill = null;
+      if (isInsufficientBalance) {
+        try {
+          const wbResp = await fetch("https://track.delhivery.com/waybill/api/fetch/json/?count=1", {
+            headers: { Authorization: `Token ${DELHIVERY_TOKEN}` },
+          });
+          if (wbResp.ok) {
+            const wbText = await wbResp.text();
+            fallbackWaybill = wbText.replace(/[^0-9]/g, "");
+          }
+        } catch {
+          // ignore fallback error
+        }
+      }
+
+      return jsonResponse({
+        status: "PARTIAL_OR_FAILED",
+        error: true,
+        message: remarkMsg,
+        isInsufficientBalance,
+        insufficientBalanceHelp: isInsufficientBalance
+          ? "Your Delhivery One account has ₹0 wallet balance. Please recharge ₹200-₹500 at one.delhivery.com to enable auto-manifesting."
+          : null,
+        fallbackWaybill,
+        labelUrl: fallbackWaybill ? `https://track.delhivery.com/api/p/packing_slip?wbns=${fallbackWaybill}&pdf=true` : null,
+        trackingUrl: fallbackWaybill ? `https://www.delhivery.com/track/package/${fallbackWaybill}` : null,
+        raw: createData,
+      });
+    }
+
+    // 3. Track Delhivery Waybill
+    if (request.method === "GET" && action === "delhivery_track") {
+      const waybill = url.searchParams.get("waybill");
+      if (!waybill) {
+        return jsonResponse({ status: "FAILED", message: "Missing waybill" }, 400);
+      }
+
+      const trackResp = await fetch(`https://track.delhivery.com/api/v1/packages/json/?waybill=${waybill}`, {
+        headers: { Authorization: `Token ${DELHIVERY_TOKEN}` },
+      });
+      const trackData = await trackResp.json();
+
+      return jsonResponse({
+        status: "SUCCESS",
+        waybill,
+        trackingUrl: `https://www.delhivery.com/track/package/${waybill}`,
+        data: trackData,
+      });
+    }
+
     return jsonResponse({
       status: "FAILED",
       message: `Unsupported action or method: ${request.method} ${action || "(none)"}`,

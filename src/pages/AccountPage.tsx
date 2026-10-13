@@ -46,9 +46,15 @@ export const AccountPage: React.FC = () => {
 
   const isDark = themeMode === "dark";
 
+  const visibleOrders = React.useMemo(() => {
+    return orders.filter(
+      (o) => (o.orderStatus as string) !== "Replaced by COD"
+    );
+  }, [orders]);
+
   const [searchQuery, setSearchQuery] = useState(targetRef || "");
   const [selectedOrderRef, setSelectedOrderRef] = useState<string>(
-    targetRef || (orders[0]?.orderRef || "")
+    targetRef || (visibleOrders[0]?.orderRef || "")
   );
 
   // Profile fields for editing
@@ -57,13 +63,29 @@ export const AccountPage: React.FC = () => {
   const [addressLine, setAddressLine] = useState(address.addressLine1);
   const [landmark, setLandmark] = useState(address.landmark);
 
+  // Auto-sync profile inputs when global address changes anywhere
+  useEffect(() => {
+    if (address) {
+      if (address.fullName) setName(address.fullName);
+      if (address.phone) setPhone(address.phone);
+      if (address.addressLine1) setAddressLine(address.addressLine1);
+      if (address.landmark) setLandmark(address.landmark);
+    }
+  }, [address]);
+
+  useEffect(() => {
+    if (currentUser?.displayName && !name) {
+      setName(currentUser.displayName);
+    }
+  }, [currentUser]);
+
   useEffect(() => {
     if (targetRef) {
       setSelectedOrderRef(targetRef);
-    } else if (orders.length > 0 && !selectedOrderRef) {
-      setSelectedOrderRef(orders[0].orderRef);
+    } else if (visibleOrders.length > 0 && !selectedOrderRef) {
+      setSelectedOrderRef(visibleOrders[0].orderRef);
     }
-  }, [targetRef, orders]);
+  }, [targetRef, visibleOrders]);
 
   // Auto-scroll when navigating with ?tab=profile, ?tab=addresses, or ?tab=orders
   useEffect(() => {
@@ -80,9 +102,9 @@ export const AccountPage: React.FC = () => {
     }
   }, [tabParam]);
 
-  const activeOrder = orders.find(
+  const activeOrder = visibleOrders.find(
     (o) => o.orderRef === selectedOrderRef || o.id === selectedOrderRef
-  ) || orders[0];
+  ) || visibleOrders[0];
 
   const handleUpdateProfile = (e: React.FormEvent) => {
     e.preventDefault();
@@ -351,7 +373,12 @@ export const AccountPage: React.FC = () => {
                         isDark ? "text-[#FAF4EA]" : "text-[#1F120A]"
                       }`}
                     >
-                      Carrier: {activeOrder.courier || "MANOPAVANA Peenya Express"}
+                      Carrier: {activeOrder.courier || (activeOrder.trackingNumber ? "Delhivery Express" : "MANOPAVANA Express")}
+                      {activeOrder.trackingNumber && (
+                        <span className="ml-2 font-mono text-[11px] text-[#E08F35]">
+                          (AWB: #{activeOrder.trackingNumber})
+                        </span>
+                      )}
                     </span>
                     <span
                       className={`text-[11px] ${
@@ -364,15 +391,31 @@ export const AccountPage: React.FC = () => {
                   </div>
                 </div>
 
-                <a
-                  href={`https://wa.me/${BUSINESS_CONFIG.PHONE_RAW}?text=Hi%20MANOPAVANA,%20regarding%20my%20order%20${activeOrder.orderRef}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-1.5 transition-colors shrink-0 shadow-2xs"
-                >
-                  <MessageCircle className="w-3.5 h-3.5" />
-                  <span>WhatsApp Updates</span>
-                </a>
+                <div className="flex flex-wrap items-center gap-2 shrink-0">
+                  {/* Delhivery Live Tracking Link */}
+                  {activeOrder.trackingNumber && (
+                    <a
+                      href={`https://www.delhivery.com/track/package/${activeOrder.trackingNumber}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-3.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs flex items-center gap-1.5 transition-colors shadow-2xs"
+                    >
+                      <Truck className="w-3.5 h-3.5" />
+                      <span>Live Track on Delhivery</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                  )}
+
+                  <a
+                    href={`https://wa.me/${BUSINESS_CONFIG.PHONE_RAW}?text=Hi%20MANOPAVANA,%20regarding%20my%20order%20${activeOrder.orderRef}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-1.5 transition-colors shadow-2xs"
+                  >
+                    <MessageCircle className="w-3.5 h-3.5" />
+                    <span>WhatsApp Support</span>
+                  </a>
+                </div>
               </div>
 
               {/* Order Items List */}
@@ -462,7 +505,7 @@ export const AccountPage: React.FC = () => {
           )}
 
           {/* Past Orders List */}
-          {orders.length > 0 && (
+          {visibleOrders.length > 0 && (
             <div
               className={`rounded-2xl border p-6 shadow-2xs space-y-4 ${
                 isDark
@@ -475,10 +518,10 @@ export const AccountPage: React.FC = () => {
                   isDark ? "text-[#FAF4EA]" : "text-[#1F120A]"
                 }`}
               >
-                All Orders ({orders.length})
+                All Orders ({visibleOrders.length})
               </h3>
               <div className="space-y-3">
-                {orders.map((ord) => (
+                {visibleOrders.map((ord) => (
                   <div
                     key={ord.orderRef}
                     onClick={() => setSelectedOrderRef(ord.orderRef)}

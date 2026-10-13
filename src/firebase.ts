@@ -14,6 +14,7 @@ import {
   doc,
   setDoc,
   getDoc,
+  getDocs,
   collection,
   query,
   where,
@@ -22,6 +23,7 @@ import {
   deleteDoc,
   serverTimestamp,
   increment,
+  arrayUnion,
 } from "firebase/firestore";
 import { FIREBASE_CONFIG } from "./constants";
 import { CustomerReview, Order, StoreCMSConfig } from "./types";
@@ -34,19 +36,26 @@ export const googleProvider = new GoogleAuthProvider();
 googleProvider.setCustomParameters({ prompt: "select_account" });
 
 /**
+ * Clean phone number to 10 digits
+ */
+export function extractCleanPhone(input?: string): string {
+  if (!input) return "";
+  const digitsOnly = input.replace(/\D/g, "");
+  if (digitsOnly.length === 10) return digitsOnly;
+  if (digitsOnly.length === 12 && digitsOnly.startsWith("91")) return digitsOnly.slice(2);
+  return digitsOnly.slice(-10);
+}
+
+/**
  * Format 10-digit phone number into a valid Firebase email
  */
 export function formatLoginIdentifier(input: string): string {
   const cleaned = input.trim();
-  // Check if exactly 10 digits or starts with +91
-  const digitsOnly = cleaned.replace(/\D/g, "");
-  if (digitsOnly.length === 10) {
-    return `${digitsOnly}@phone.manopavana.com`;
+  const digits = extractCleanPhone(cleaned);
+  if (digits.length === 10 && !cleaned.includes("@")) {
+    return `${digits}@phone.manopavana.com`;
   }
-  if (digitsOnly.length === 12 && digitsOnly.startsWith("91")) {
-    return `${digitsOnly.slice(2)}@phone.manopavana.com`;
-  }
-  return cleaned;
+  return cleaned.toLowerCase();
 }
 
 /**
@@ -69,12 +78,14 @@ export async function signInWithGoogle() {
  */
 export async function signInWithPhoneOrEmail(identifier: string, password = "manopavana_default_pwd") {
   const formattedEmail = formatLoginIdentifier(identifier);
+  const cleanPhone = extractCleanPhone(identifier);
+
   try {
     const cred = await signInWithEmailAndPassword(auth, formattedEmail, password);
     if (cred.user) {
       await syncCustomerDoc(cred.user, {
-        email: formattedEmail,
-        phone: identifier.replace(/\D/g, "").slice(-10),
+        email: !formattedEmail.endsWith("@phone.manopavana.com") ? formattedEmail : undefined,
+        phone: cleanPhone || undefined,
       });
     }
     return cred.user;
@@ -83,13 +94,14 @@ export async function signInWithPhoneOrEmail(identifier: string, password = "man
     // If user does not exist yet, automatically create account
     if (
       error.code === "auth/user-not-found" ||
-      error.code === "auth/invalid-credential"
+      error.code === "auth/invalid-credential" ||
+      error.code === "auth/invalid-login-credentials"
     ) {
       const newCred = await createUserWithEmailAndPassword(auth, formattedEmail, password);
       if (newCred.user) {
         await syncCustomerDoc(newCred.user, {
-          email: formattedEmail,
-          phone: identifier.replace(/\D/g, "").slice(-10),
+          email: !formattedEmail.endsWith("@phone.manopavana.com") ? formattedEmail : undefined,
+          phone: cleanPhone || undefined,
         });
       }
       return newCred.user;
@@ -106,33 +118,125 @@ export async function logoutUser() {
 }
 
 /**
- * Sync customer details to Firestore 'customers' collection
+ * Sync & Deduplicate customer details in Firestore 'customers' collection:
+ * If a user uses the same email or phone number for Google login and email/phone login,
+ * their details are merged seamlessly instead of creating duplicate fragmented users.
  */
 export async function syncCustomerDoc(
   user: FirebaseUser,
   extra?: { name?: string; phone?: string; email?: string }
 ) {
   try {
+    const userEmail = (extra?.email || user.email || "").toLowerCase().trim();
+    const isSyntheticPhoneEmail = userEmail.endsWith("@phone.manopavana.com");
+    const canonicalEmail = isSyntheticPhoneEmail ? "" : userEmail;
+
+    const rawPhone = extra?.phone || user.phoneNumber || "";
+    const cleanPhone = extractCleanPhone(rawPhone) || (isSyntheticPhoneEmail ? userEmail.split("@")[0] : "");
+
     const customerRef = doc(db, "customers", user.uid);
     const snap = await getDoc(customerRef);
 
-    const payload: Record<string, unknown> = {
-      uid: user.uid,
-      name: extra?.name || user.displayName || "Valued Customer",
-      email: extra?.email || user.email || "",
-      phone: extra?.phone || user.phoneNumber || "",
-      lastLogin: serverTimestamp(),
-    };
+    let existingData: Record<string, unknown> = snap.exists() ? snap.data() : {};
+    let matchedDocRef = customerRef;
 
-    if (!snap.exists()) {
-      payload.createdAt = serverTimestamp();
-      payload.totalOrders = 0;
-      payload.totalSpent = 0;
+    // Search for existing duplicate customer profile by email or phone
+    const customersCol = collection(db, "customers");
+
+    if (canonicalEmail) {
+      try {
+        const qEmail = query(customersCol, where("email", "==", canonicalEmail));
+        const emailSnap = await getDocs(qEmail);
+        if (!emailSnap.empty) {
+          const matchDoc = emailSnap.docs[0];
+          matchedDocRef = matchDoc.ref;
+          existingData = { ...matchDoc.data(), ...existingData };
+        }
+      } catch (e) {
+        console.warn("Notice checking customer by email:", e);
+      }
     }
 
-    await setDoc(customerRef, payload, { merge: true });
+    if (cleanPhone && cleanPhone.length === 10) {
+      try {
+        const qPhone = query(customersCol, where("phone", "==", cleanPhone));
+        const phoneSnap = await getDocs(qPhone);
+        if (!phoneSnap.empty) {
+          const matchDoc = phoneSnap.docs[0];
+          matchedDocRef = matchDoc.ref;
+          existingData = { ...matchDoc.data(), ...existingData };
+        }
+      } catch (e) {
+        console.warn("Notice checking customer by phone:", e);
+      }
+    }
+
+    const resolvedName =
+      (extra?.name && extra.name !== "Valued Customer" && extra.name !== "Google Customer" ? extra.name : "") ||
+      (user.displayName && user.displayName !== "Customer" ? user.displayName : "") ||
+      (existingData.name as string) ||
+      "Valued Customer";
+
+    const resolvedEmail = canonicalEmail || (existingData.email as string) || "";
+    const resolvedPhone = cleanPhone || (existingData.phone as string) || "";
+
+    const mergedPayload: Record<string, unknown> = {
+      uid: user.uid,
+      uids: arrayUnion(user.uid),
+      name: resolvedName,
+      email: resolvedEmail,
+      phone: resolvedPhone,
+      lastLogin: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    };
+
+    if (!existingData.createdAt) {
+      mergedPayload.createdAt = serverTimestamp();
+      mergedPayload.totalOrders = 0;
+      mergedPayload.totalSpent = 0;
+    }
+
+    // Update the matched master doc & the current UID doc
+    await setDoc(matchedDocRef, mergedPayload, { merge: true });
+    if (matchedDocRef.id !== user.uid) {
+      await setDoc(customerRef, mergedPayload, { merge: true });
+    }
+
+    // Link any past guest orders placed with this phone or email to this user UID
+    linkPastOrdersToCustomer(user.uid, resolvedPhone, resolvedEmail);
+
+    return mergedPayload;
   } catch (e) {
     console.warn("Could not sync customer record to Firestore:", e);
+    return null;
+  }
+}
+
+/**
+ * Link past guest orders matching phone or email to the customer's UID
+ */
+async function linkPastOrdersToCustomer(userUid: string, phone: string, email: string) {
+  try {
+    const ordersCol = collection(db, "orders");
+    const queries = [];
+    if (phone && phone.length === 10) {
+      queries.push(query(ordersCol, where("customerPhone", "==", phone)));
+    }
+    if (email && email.includes("@")) {
+      queries.push(query(ordersCol, where("customerEmail", "==", email.toLowerCase())));
+    }
+
+    for (const q of queries) {
+      const snap = await getDocs(q);
+      for (const d of snap.docs) {
+        const orderData = d.data();
+        if (!orderData.customerUid || orderData.customerUid !== userUid) {
+          await setDoc(d.ref, { customerUid: userUid, updatedAt: serverTimestamp() }, { merge: true });
+        }
+      }
+    }
+  } catch (err) {
+    console.warn("Notice linking past orders:", err);
   }
 }
 
@@ -142,9 +246,14 @@ export async function syncCustomerDoc(
 export async function saveOrderToFirestore(order: Order, userUid?: string) {
   try {
     const orderDocRef = doc(db, "orders", order.orderRef);
+    const cleanPhone = extractCleanPhone(order.shippingAddress?.phone);
+    const cleanEmail = (order.shippingAddress?.email || "").toLowerCase().trim();
+
     await setDoc(orderDocRef, {
       ...order,
-      customerUid: userUid || null,
+      customerUid: userUid || order.customerUid || null,
+      customerPhone: cleanPhone || null,
+      customerEmail: cleanEmail || null,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     });
@@ -190,30 +299,67 @@ export async function updateFirestoreOrderStatus(
 }
 
 /**
- * Listen to orders for a specific user in real-time
+ * Listen to orders for a specific user in real-time.
+ * Checks customerUid, customerPhone, and customerEmail to guarantee
+ * all user orders appear and never vanish across page refreshes or device changes.
  */
 export function subscribeUserOrders(
-  userUid: string,
-  phone: string,
+  userUid: string | undefined,
+  phone: string | undefined,
   callback: (orders: Order[]) => void
 ) {
   try {
     const ordersCol = collection(db, "orders");
-    // Query by customerUid if present
-    const q = query(ordersCol, where("customerUid", "==", userUid));
-    return onSnapshot(
-      q,
-      (snapshot) => {
-        const list: Order[] = [];
-        snapshot.forEach((d) => {
-          list.push(d.data() as Order);
-        });
-        callback(list);
-      },
-      (error) => {
-        console.warn("Firestore user orders listener notice:", error);
-      }
-    );
+    const cleanPhone = extractCleanPhone(phone);
+    const unsubs: (() => void)[] = [];
+    const aggregatedMap = new Map<string, Order>();
+
+    const emitAggregated = () => {
+      const list = Array.from(aggregatedMap.values()).sort(
+        (a, b) => (b.timestamp || b.timestampMs || 0) - (a.timestamp || a.timestampMs || 0)
+      );
+      callback(list);
+    };
+
+    // 1. Query by customerUid if present
+    if (userUid) {
+      const qUid = query(ordersCol, where("customerUid", "==", userUid));
+      const unsub1 = onSnapshot(
+        qUid,
+        (snapshot) => {
+          snapshot.forEach((d) => {
+            aggregatedMap.set(d.id, d.data() as Order);
+          });
+          emitAggregated();
+        },
+        (error) => {
+          console.warn("Firestore user orders UID listener notice:", error);
+        }
+      );
+      unsubs.push(unsub1);
+    }
+
+    // 2. Query by customerPhone if 10 digits
+    if (cleanPhone && cleanPhone.length === 10) {
+      const qPhone = query(ordersCol, where("customerPhone", "==", cleanPhone));
+      const unsub2 = onSnapshot(
+        qPhone,
+        (snapshot) => {
+          snapshot.forEach((d) => {
+            aggregatedMap.set(d.id, d.data() as Order);
+          });
+          emitAggregated();
+        },
+        (error) => {
+          console.warn("Firestore user orders phone listener notice:", error);
+        }
+      );
+      unsubs.push(unsub2);
+    }
+
+    return () => {
+      unsubs.forEach((u) => u());
+    };
   } catch (err) {
     console.warn("Failed to subscribe user orders:", err);
     return () => {};
@@ -342,4 +488,3 @@ export function subscribeAllOrders(callback: (orders: Order[]) => void) {
     return () => {};
   }
 }
-

@@ -8,6 +8,7 @@ export const LocationModal: React.FC = () => {
   const {
     address,
     updateAddress,
+    reverseGeocodeAndSaveAddress,
     isLocationModalOpen,
     setLocationModalOpen,
     setFlipkartModalOpen,
@@ -87,7 +88,7 @@ export const LocationModal: React.FC = () => {
         marker.on("dragend", async () => {
           const latLng = marker.getLatLng();
           setCoords([latLng.lat, latLng.lng]);
-          reverseGeocode(latLng.lat, latLng.lng);
+          await reverseGeocode(latLng.lat, latLng.lng);
         });
 
         mapInstanceRef.current = map;
@@ -107,29 +108,14 @@ export const LocationModal: React.FC = () => {
 
   const reverseGeocode = async (lat: number, lon: number) => {
     try {
-      const resp = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=18&addressdetails=1`,
-        {
-          headers: {
-            "Accept-Language": "en",
-          },
-        }
-      );
-      if (!resp.ok) return;
-      const data = await resp.json();
-      if (data && data.address) {
-        const addr = data.address;
-        if (addr.postcode) setPincode(addr.postcode);
-        if (addr.suburb || addr.neighbourhood || addr.road) {
-          const street = [addr.road, addr.neighbourhood || addr.suburb]
-            .filter(Boolean)
-            .join(", ");
-          if (street) setAddressLine1((prev) => prev || street);
-        }
-        if (addr.state && INDIAN_STATES_DISTRICTS[addr.state]) {
-          setState(addr.state);
-        }
-        showToast("📍 Coordinates and street synced from map pin!");
+      const partial = await reverseGeocodeAndSaveAddress(lat, lon);
+      if (partial) {
+        if (partial.addressLine1) setAddressLine1(partial.addressLine1);
+        if (partial.pincode) setPincode(partial.pincode);
+        if (partial.district) setDistrict(partial.district);
+        if (partial.state) setState(partial.state);
+        if (partial.landmark) setLandmark(partial.landmark);
+        showToast("📍 Address auto-populated from pin location!");
       }
     } catch {
       // ignore network hiccups
@@ -138,7 +124,7 @@ export const LocationModal: React.FC = () => {
 
   const handleUseGPS = () => {
     if (!navigator.geolocation) {
-      alert("Geolocation is not supported by your browser");
+      showToast("Geolocation is not supported by your browser");
       return;
     }
     setIsLocating(true);
@@ -151,6 +137,7 @@ export const LocationModal: React.FC = () => {
           mapInstanceRef.current.setView([lat, lng], 15);
           markerRef.current.setLatLng([lat, lng]);
         }
+        showToast("📍 GPS coordinates retrieved! Auto-filling address...");
         await reverseGeocode(lat, lng);
         setIsLocating(false);
       },

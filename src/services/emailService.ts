@@ -8,51 +8,132 @@ import { Order } from "../types";
  */
 export async function sendOrderConfirmationEmail(order: Order) {
   try {
-    const itemsSummary =
+    // 1. Build a clean, multi-line items breakdown
+    const itemsList =
       order.items && order.items.length > 0
-        ? order.items
-            .map(
-              (item) =>
-                `• ${item.title} (${item.variant}) x ${item.quantity} = ₹${item.price * item.quantity}`
-            )
-            .join("\n")
-        : "Order item details recorded in portal";
+        ? order.items.map(
+            (item, idx) =>
+              `${idx + 1}. ${item.title} (${item.variant}) x ${item.quantity} = ₹${item.price * item.quantity}`
+          )
+        : ["1. Artisanal Wood-Pressed Oil Order"];
 
+    const itemsSummary = itemsList.join("\n");
+
+    // 2. Format customer shipping details
     const customerName =
       order.shippingAddress?.fullName?.trim() || "Valued Customer";
     const customerPhone =
       order.shippingAddress?.phone?.trim() || "N/A";
+    const customerEmail =
+      order.shippingAddress?.email?.trim() || "N/A";
     const addressLine = order.shippingAddress?.addressLine1 || "";
-    const district = order.shippingAddress?.district || "Bengaluru";
+    const district = order.shippingAddress?.district || order.shippingAddress?.city || "Bengaluru";
     const state = order.shippingAddress?.state || "Karnataka";
     const pincode = order.shippingAddress?.pincode || "";
-    const deliveryAddress = `${addressLine}, ${district}, ${state} - ${pincode}`.replace(/^,\s*/, "");
+    const deliveryAddress = [addressLine, district, `${state} - ${pincode}`]
+      .filter((part) => part && part.trim() !== "-")
+      .join(", ");
     const landmark = order.shippingAddress?.landmark || "N/A";
 
-    const paymentMethodLabel =
-      order.paymentMethod === "cod"
-        ? "CASH ON DELIVERY (COD)"
-        : "ONLINE PAYMENT (COMPLETED)";
+    const isCod = order.paymentMethod === "cod" || order.paymentMode === "COD";
+    const paymentMethodLabel = isCod
+      ? "Cash on Delivery (COD)"
+      : "Online Payment (Completed)";
 
     const mapsLink =
       order.shippingAddress?.lat && order.shippingAddress?.lng
         ? `https://www.google.com/maps?q=${order.shippingAddress.lat},${order.shippingAddress.lng}`
         : "https://www.google.com/maps?q=12.9716,77.5946";
 
-    const templateParams = {
+    const formattedDate =
+      order.date && order.date !== "Just now"
+        ? order.date
+        : new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata" });
+
+    // Comprehensive payload containing all standard naming conventions
+    // ensures ANY EmailJS template placeholder is populated without blanks
+    const templateParams: Record<string, string> = {
       to_email: EMAILJS_CONFIG.TARGET_EMAIL,
+
+      // Order Reference variations
       order_ref: order.orderRef,
-      order_date: order.date || new Date().toLocaleString("en-IN"),
+      orderRef: order.orderRef,
+      order_id: order.orderRef || order.id,
+      orderId: order.orderRef || order.id,
+      order_number: order.orderRef,
+
+      // Date variations
+      order_date: formattedDate,
+      date: formattedDate,
+
+      // Customer Name variations
       customer_name: customerName,
+      customerName: customerName,
+      name: customerName,
+      user_name: customerName,
+      from_name: customerName,
+
+      // Customer Phone variations
       customer_phone: customerPhone,
+      customerPhone: customerPhone,
+      phone: customerPhone,
+      user_phone: customerPhone,
+      contact: customerPhone,
+      mobile: customerPhone,
+
+      // Email variations
+      customer_email: customerEmail,
+      email: customerEmail,
+      user_email: customerEmail,
+
+      // Address variations
       delivery_address: deliveryAddress,
+      deliveryAddress: deliveryAddress,
+      address: deliveryAddress,
+      shipping_address: deliveryAddress,
+      shippingAddress: deliveryAddress,
+      street_address: addressLine,
       landmark: landmark,
+      city: district,
+      district: district,
+      state: state,
+      pincode: pincode,
+
+      // Item summary variations
       items_summary: itemsSummary,
+      itemsSummary: itemsSummary,
+      items: itemsSummary,
+      order_items: itemsSummary,
+      order_details: itemsSummary,
+      order_summary: itemsSummary,
+      orderSummary: itemsSummary,
+
+      // Pricing variations
       total_amount: `₹${order.total}`,
+      totalAmount: `₹${order.total}`,
+      total: `₹${order.total}`,
+      amount: `₹${order.total}`,
+      subtotal: `₹${order.subtotal}`,
+      discount: `₹${order.discount || 0}`,
+      shipping_fee: `₹${order.shippingFee || 0}`,
+
+      // Payment variations
       payment_method: paymentMethodLabel,
+      paymentMethod: paymentMethodLabel,
+      payment_mode: order.paymentMode || paymentMethodLabel,
       payment_status: order.paymentStatus || "COMPLETED",
-      is_bangalore: order.shippingAddress?.isBangalore ? "Yes (Peenya Direct)" : "Pan-India",
+      paymentStatus: order.paymentStatus || "COMPLETED",
+
+      // Facility & Logistics
+      is_bangalore: order.shippingAddress?.isBangalore ? "Yes (Peenya Direct Doorstep)" : "Pan-India Route",
       maps_link: mapsLink,
+      mapsLink: mapsLink,
+      map_url: mapsLink,
+      google_maps: mapsLink,
+      tracking_number: order.trackingNumber || `MV-BLR-${Math.floor(10000 + Math.random() * 90000)}`,
+
+      // Generic universal message fallback
+      message: `New MANOPAVANA Order: ${order.orderRef}\nCustomer: ${customerName} (${customerPhone})\nAddress: ${deliveryAddress}\nLandmark: ${landmark}\n\nOrdered Items:\n${itemsSummary}\n\nTotal Payable: ₹${order.total}\nPayment: ${paymentMethodLabel}\nMaps Pin: ${mapsLink}`,
     };
 
     const res = await emailjs.send(

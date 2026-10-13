@@ -32,11 +32,13 @@ export const CheckoutPage: React.FC = () => {
     cart,
     addToCart,
     buyNowItem,
+    startBuyNow,
     clearBuyNow,
     cmsConfig,
     loyalty,
     address,
     updateAddress,
+    reverseGeocodeAndSaveAddress,
     saveOrder,
     clearCart,
     showToast,
@@ -78,6 +80,56 @@ export const CheckoutPage: React.FC = () => {
     address.lat || 12.9716,
     address.lng || 77.5946,
   ]);
+  const [isLocating, setIsLocating] = useState(false);
+
+  // Auto-sync form state whenever address is updated globally anywhere across the app
+  useEffect(() => {
+    if (address) {
+      if (address.fullName) setFullName(address.fullName);
+      if (address.phone) setPhone(address.phone);
+      if (address.addressLine1) setAddressLine1(address.addressLine1);
+      if (address.landmark) setLandmark(address.landmark);
+      if (address.state) setState(address.state);
+      if (address.district) setDistrict(address.district);
+      if (address.pincode) setPincode(address.pincode);
+      if (address.lat && address.lng) {
+        setCoords([address.lat, address.lng]);
+        if (mapInstanceRef.current && markerRef.current) {
+          mapInstanceRef.current.setView([address.lat, address.lng], 15);
+          markerRef.current.setLatLng([address.lat, address.lng]);
+        }
+      }
+    }
+  }, [address]);
+
+  // If user returns from cancelled/uncompleted online payment with empty bag, auto-recover items!
+  useEffect(() => {
+    if (checkoutItems.length === 0) {
+      try {
+        const pendingRaw = localStorage.getItem("pending_order_data");
+        if (pendingRaw) {
+          const ord: Order = JSON.parse(pendingRaw);
+          if (ord.items && ord.items.length > 0) {
+            setLastAttemptedOrder(ord);
+            if (ord.isBuyNow && ord.items.length === 1) {
+              const it = ord.items[0];
+              startBuyNow(it, it.quantity);
+            } else {
+              ord.items.forEach((it) => {
+                addToCart(it, it.quantity);
+              });
+            }
+            if (ord.shippingAddress) {
+              updateAddress(ord.shippingAddress);
+            }
+            showToast("Recovered your ordered items into checkout bag!");
+          }
+        }
+      } catch {
+        // ignore
+      }
+    }
+  }, [checkoutItems.length]);
 
   // Payment method: "phonepe" (Online Payment) or "cod" (Cash on Delivery)
   const [paymentMethod, setPaymentMethod] = useState<"phonepe" | "cod">("phonepe");
@@ -152,22 +204,26 @@ export const CheckoutPage: React.FC = () => {
       }
     }
     if (orderToRestore && orderToRestore.items) {
-      // Restore items back into active cart
-      orderToRestore.items.forEach((item) => {
-        addToCart(
-          {
-            id: item.id,
-            productId: item.productId,
-            title: item.title,
-            subtitle: item.subtitle,
-            variant: item.variant,
-            price: item.price,
-            regularPrice: item.regularPrice,
-            image: item.image,
-          },
-          item.quantity
-        );
-      });
+      if (orderToRestore.isBuyNow && orderToRestore.items.length === 1) {
+        const it = orderToRestore.items[0];
+        startBuyNow(it, it.quantity);
+      } else {
+        orderToRestore.items.forEach((item) => {
+          addToCart(
+            {
+              id: item.id,
+              productId: item.productId,
+              title: item.title,
+              subtitle: item.subtitle,
+              variant: item.variant,
+              price: item.price,
+              regularPrice: item.regularPrice,
+              image: item.image,
+            },
+            item.quantity
+          );
+        });
+      }
       showToast("Items restored to active cart!");
     }
     setPaymentError(null);
@@ -206,10 +262,19 @@ export const CheckoutPage: React.FC = () => {
           icon: customIcon,
         }).addTo(map);
 
-        marker.on("dragend", () => {
+        marker.on("dragend", async () => {
           const latLng = marker.getLatLng();
           setCoords([latLng.lat, latLng.lng]);
           updateAddress({ lat: latLng.lat, lng: latLng.lng });
+          const partial = await reverseGeocodeAndSaveAddress(latLng.lat, latLng.lng);
+          if (partial) {
+            if (partial.addressLine1) setAddressLine1(partial.addressLine1);
+            if (partial.pincode) setPincode(partial.pincode);
+            if (partial.state) setState(partial.state);
+            if (partial.district) setDistrict(partial.district);
+            if (partial.landmark) setLandmark(partial.landmark);
+            showToast("📍 Pin dragged! Street address & district updated.");
+          }
         });
 
         mapInstanceRef.current = map;
@@ -232,21 +297,37 @@ export const CheckoutPage: React.FC = () => {
   const isBangalore = pincode.trim().startsWith("560");
 
   const handleGPSDetect = () => {
-    if (!navigator.geolocation) return;
+    if (!navigator.geolocation) {
+      showToast("Geolocation is not supported by your browser");
+      return;
+    }
+    setIsLocating(true);
     navigator.geolocation.getCurrentPosition(
-      (pos) => {
+      async (pos) => {
         const c: [number, number] = [pos.coords.latitude, pos.coords.longitude];
         setCoords(c);
         if (mapInstanceRef.current && markerRef.current) {
           mapInstanceRef.current.setView(c, 15);
           markerRef.current.setLatLng(c);
         }
-        updateAddress({ lat: c[0], lng: c[1] });
-        showToast("📍 Pin set to your device GPS");
+        showToast("📍 GPS coordinates retrieved! Auto-filling address...");
+        const partial = await reverseGeocodeAndSaveAddress(c[0], c[1]);
+        if (partial) {
+          if (partial.addressLine1) setAddressLine1(partial.addressLine1);
+          if (partial.pincode) setPincode(partial.pincode);
+          if (partial.state) setState(partial.state);
+          if (partial.district) setDistrict(partial.district);
+          if (partial.landmark) setLandmark(partial.landmark);
+          showToast("📍 Address & pincode auto-populated from GPS!");
+        }
+        setIsLocating(false);
       },
-      () => {
+      (err) => {
+        console.warn("Geolocation warning:", err.message);
+        setIsLocating(false);
         showToast("GPS detection permission denied or timed out");
-      }
+      },
+      { timeout: 10000, enableHighAccuracy: true }
     );
   };
 
@@ -299,11 +380,20 @@ export const CheckoutPage: React.FC = () => {
     updateAddress(finalAddress);
 
     if (paymentMethod === "cod") {
+      // If there was an incomplete online payment attempt, mark it replaced so orders never show twice!
+      const prevPendingRef = localStorage.getItem("pending_order_ref") || lastAttemptedOrder?.orderRef;
+      if (prevPendingRef) {
+        updateFirestoreOrderStatus(prevPendingRef, {
+          orderStatus: "Replaced by COD" as any,
+          paymentStatus: "REPLACED",
+        }).catch(() => {});
+      }
+
       const orderRef = `MV-${Date.now().toString().slice(-6)}`;
       const newOrder: Order = {
         id: `ORD-${Date.now().toString().slice(-4)}`,
         orderRef,
-        date: "Just now",
+        date: new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata" }),
         timestamp: Date.now(),
         timestampMs: Date.now(),
         items: [...checkoutItems],
@@ -318,12 +408,13 @@ export const CheckoutPage: React.FC = () => {
         shippingAddress: finalAddress,
         trackingNumber: `MV-BLR-${Math.floor(10000 + Math.random() * 90000)}`,
         courier: "MANOPAVANA Peenya Express Carrier",
+        isBuyNow: isBuyNowMode,
       };
 
       await saveOrder(newOrder);
       await sendOrderConfirmationEmail(newOrder);
 
-      // If direct Buy Now session, clear only buyNowItem so regular bag items remain untouched
+      // If direct Buy Now session, clear ONLY buyNowItem so regular bag items remain untouched!
       if (isBuyNowMode) {
         clearBuyNow();
       } else {
@@ -345,7 +436,7 @@ export const CheckoutPage: React.FC = () => {
       const pendingOrder: Order = {
         id: `ORD-${Date.now().toString().slice(-4)}`,
         orderRef: phonePeOrderRef,
-        date: "Just now",
+        date: new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata" }),
         timestamp: Date.now(),
         timestampMs: Date.now(),
         items: [...checkoutItems],
@@ -360,6 +451,7 @@ export const CheckoutPage: React.FC = () => {
         shippingAddress: finalAddress,
         trackingNumber: `MV-BLR-${Math.floor(10000 + Math.random() * 90000)}`,
         courier: "MANOPAVANA Peenya Express Carrier",
+        isBuyNow: isBuyNowMode,
       };
 
       setLastAttemptedOrder(pendingOrder);
@@ -390,9 +482,7 @@ export const CheckoutPage: React.FC = () => {
         const data = await resp.json();
 
         if (resp.ok && data.status === "SUCCESS" && data.redirectUrl) {
-          if (isBuyNowMode) {
-            clearBuyNow();
-          }
+          // Do NOT clear buyNowItem here; only clear upon verified completion
           window.location.href = data.redirectUrl;
           return;
         } else {

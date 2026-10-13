@@ -140,8 +140,8 @@ export interface Order {
   discount: number;
   shippingFee: number;
   total: number;
-  paymentMethod: "online" | "phonepe" | "cod" | "whatsapp";
-  paymentMode?: "ONLINE" | "PHONEPE" | "PHONEPE_PAID" | "COD" | "WHATSAPP" | string;
+  paymentMethod: "online" | "phonepe" | "cod";
+  paymentMode?: "ONLINE" | "PHONEPE" | "PHONEPE_PAID" | "COD" | string;
   paymentStatus: "PENDING" | "COMPLETED" | "FAILED" | "PHONEPE_PAID" | string;
   orderStatus: OrderStatus;
   shippingAddress: Address;
@@ -149,6 +149,9 @@ export interface Order {
   courier?: string;
   notes?: string;
   customerUid?: string;
+  customerPhone?: string;
+  customerEmail?: string;
+  isBuyNow?: boolean;
 }
 
 export interface CustomerReview {

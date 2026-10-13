@@ -9,6 +9,7 @@ export const PendingOrderBanner: React.FC = () => {
   const {
     getOrder,
     clearCart,
+    clearBuyNow,
     addToCart,
     setOrderSuccessRef,
     setPaymentFailedOrder,
@@ -147,7 +148,12 @@ export const PendingOrderBanner: React.FC = () => {
           });
         }
 
-        clearCart();
+        if (matched?.isBuyNow) {
+          clearBuyNow();
+        } else {
+          clearCart();
+          clearBuyNow();
+        }
         setOrderSuccessRef(pendingRef);
         showToast("Online payment verified! Order placed.");
       } else {
