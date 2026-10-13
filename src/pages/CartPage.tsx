@@ -32,7 +32,6 @@ export const CartPage: React.FC = () => {
     openLoyaltyQuiz,
     cmsConfig,
     address,
-    setFlipkartModalOpen,
     themeMode,
   } = useStore();
 
@@ -82,10 +81,6 @@ export const CartPage: React.FC = () => {
   }
 
   const handleProceedToCheckout = () => {
-    if (!address.pincode.trim().startsWith("560")) {
-      setFlipkartModalOpen(true);
-      return;
-    }
     navigate("/checkout");
   };
 

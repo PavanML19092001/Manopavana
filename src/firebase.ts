@@ -306,11 +306,13 @@ export async function updateFirestoreOrderStatus(
 export function subscribeUserOrders(
   userUid: string | undefined,
   phone: string | undefined,
+  email: string | undefined,
   callback: (orders: Order[]) => void
 ) {
   try {
     const ordersCol = collection(db, "orders");
     const cleanPhone = extractCleanPhone(phone);
+    const cleanEmail = (email || "").toLowerCase().trim();
     const unsubs: (() => void)[] = [];
     const aggregatedMap = new Map<string, Order>();
 
@@ -339,7 +341,25 @@ export function subscribeUserOrders(
       unsubs.push(unsub1);
     }
 
-    // 2. Query by customerPhone if 10 digits
+    // 2. Query by customerEmail if valid email
+    if (cleanEmail && cleanEmail.includes("@") && !cleanEmail.endsWith("@phone.manopavana.com")) {
+      const qEmail = query(ordersCol, where("customerEmail", "==", cleanEmail));
+      const unsubEmail = onSnapshot(
+        qEmail,
+        (snapshot) => {
+          snapshot.forEach((d) => {
+            aggregatedMap.set(d.id, d.data() as Order);
+          });
+          emitAggregated();
+        },
+        (error) => {
+          console.warn("Firestore user orders email listener notice:", error);
+        }
+      );
+      unsubs.push(unsubEmail);
+    }
+
+    // 3. Query by customerPhone if 10 digits
     if (cleanPhone && cleanPhone.length === 10) {
       const qPhone = query(ordersCol, where("customerPhone", "==", cleanPhone));
       const unsub2 = onSnapshot(

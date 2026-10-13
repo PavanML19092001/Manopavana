@@ -17,10 +17,14 @@ import {
   ShoppingBag,
   ShieldAlert,
   LogOut,
+  Lock,
 } from "lucide-react";
 import { useStore } from "../context/StoreContext";
 import { BUSINESS_CONFIG } from "../constants";
-import { OrderStatus } from "../types";
+import { OrderStatus, Order } from "../types";
+import { db } from "../firebase";
+import { doc, getDoc } from "firebase/firestore";
+import { LiveOrderTracker } from "../components/LiveOrderTracker";
 
 const ORDER_STEPS: OrderStatus[] = ["Placed", "Packed", "Dispatched", "Delivered"];
 
@@ -32,6 +36,7 @@ export const AccountPage: React.FC = () => {
 
   const {
     orders,
+    getOrder,
     address,
     updateAddress,
     loyalty,
@@ -52,10 +57,71 @@ export const AccountPage: React.FC = () => {
     );
   }, [orders]);
 
+  const [guestLookedUpOrder, setGuestLookedUpOrder] = useState<Order | null>(null);
+  const [lookupInputRef, setLookupInputRef] = useState(targetRef || "");
+  const [lookupLoading, setLookupLoading] = useState(false);
+  const [lookupError, setLookupError] = useState("");
+
   const [searchQuery, setSearchQuery] = useState(targetRef || "");
   const [selectedOrderRef, setSelectedOrderRef] = useState<string>(
     targetRef || (visibleOrders[0]?.orderRef || "")
   );
+
+  // If order param passed in URL, load it
+  useEffect(() => {
+    if (targetRef) {
+      setSelectedOrderRef(targetRef);
+      const existing = getOrder(targetRef);
+      if (existing) {
+        setGuestLookedUpOrder(existing);
+      } else {
+        // Fetch from Firestore
+        getDoc(doc(db, "orders", targetRef))
+          .then((snap) => {
+            if (snap.exists()) {
+              setGuestLookedUpOrder(snap.data() as Order);
+            }
+          })
+          .catch(() => {});
+      }
+    }
+  }, [targetRef, getOrder]);
+
+  const handleLookupOrder = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const cleanRef = lookupInputRef.trim();
+    if (!cleanRef) {
+      setLookupError("Please enter your Order Reference (e.g. MV-123456)");
+      return;
+    }
+    setLookupLoading(true);
+    setLookupError("");
+
+    try {
+      const match = getOrder(cleanRef);
+      if (match) {
+        setGuestLookedUpOrder(match);
+        setSelectedOrderRef(match.orderRef);
+        showToast(`Tracking Order #${match.orderRef}`);
+        setLookupLoading(false);
+        return;
+      }
+
+      const snap = await getDoc(doc(db, "orders", cleanRef));
+      if (snap.exists()) {
+        const ordData = snap.data() as Order;
+        setGuestLookedUpOrder(ordData);
+        setSelectedOrderRef(ordData.orderRef);
+        showToast(`Tracking Order #${ordData.orderRef}`);
+      } else {
+        setLookupError(`Order #${cleanRef} was not found. Please verify reference.`);
+      }
+    } catch {
+      setLookupError("Could not retrieve order. Please check reference.");
+    } finally {
+      setLookupLoading(false);
+    }
+  };
 
   // Profile fields for editing
   const [name, setName] = useState(currentUser?.displayName || address.fullName);
@@ -102,9 +168,11 @@ export const AccountPage: React.FC = () => {
     }
   }, [tabParam]);
 
-  const activeOrder = visibleOrders.find(
-    (o) => o.orderRef === selectedOrderRef || o.id === selectedOrderRef
-  ) || visibleOrders[0];
+  const activeOrder =
+    (guestLookedUpOrder && (guestLookedUpOrder.orderRef === selectedOrderRef || guestLookedUpOrder.id === selectedOrderRef) ? guestLookedUpOrder : null) ||
+    visibleOrders.find((o) => o.orderRef === selectedOrderRef || o.id === selectedOrderRef) ||
+    guestLookedUpOrder ||
+    visibleOrders[0];
 
   const handleUpdateProfile = (e: React.FormEvent) => {
     e.preventDefault();
@@ -121,6 +189,62 @@ export const AccountPage: React.FC = () => {
     const idx = ORDER_STEPS.indexOf(status);
     return idx >= 0 ? idx : 0;
   };
+
+  // MANDATORY AUTHENTICATION GATE:
+  // If user is not logged in, require them to log in to access orders and tracking
+  if (!currentUser) {
+    return (
+      <div
+        className={`w-full min-h-[calc(100vh-80px)] py-16 flex items-center justify-center transition-colors box-border ${
+          isDark ? "bg-[#140D09] text-[#FAF4EA]" : "bg-[#FAF7F2] text-[#24140A]"
+        }`}
+      >
+        <div
+          className={`max-w-md w-full mx-4 p-8 sm:p-10 rounded-3xl border text-center space-y-6 shadow-xl ${
+            isDark ? "bg-[#1C120B] border-[#362114]" : "bg-white border-[#E8DEC8]"
+          }`}
+        >
+          <div className="w-16 h-16 mx-auto rounded-full bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-[#E08F35]">
+            <Lock className="w-8 h-8 text-[#E08F35]" />
+          </div>
+          <div className="space-y-2">
+            <h1
+              className={`text-2xl font-bold font-serif ${
+                isDark ? "text-[#FAF4EA]" : "text-[#1F120A]"
+              }`}
+            >
+              Sign In to Track Orders
+            </h1>
+            <p
+              className={`text-xs sm:text-sm leading-relaxed ${
+                isDark ? "text-[#D8C8B8]" : "text-[#5C4230]"
+              }`}
+            >
+              Your order history, live parcel tracking, and invoices are private to your account. Please log in or register with your phone number or Google account to view and track your orders.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setLoginModalOpen(true)}
+            className="w-full py-3.5 rounded-2xl bg-[#5E3210] hover:bg-[#43230A] text-white font-bold text-xs shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
+          >
+            <LogIn className="w-4 h-4 text-amber-300" />
+            <span>Sign In / Create Account</span>
+          </button>
+          <div className="pt-2">
+            <Link
+              to="/"
+              className={`text-xs font-semibold hover:underline ${
+                isDark ? "text-amber-400" : "text-[#5E3210]"
+              }`}
+            >
+              ← Back to Storefront
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div
@@ -222,287 +346,83 @@ export const AccountPage: React.FC = () => {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
           {/* Left Column: Live Order Tracking Timeline */}
           <div id="orders-section" className="lg:col-span-8 space-y-6">
+            {/* Quick Guest / Direct Tracking Lookup */}
+            <div
+              className={`p-5 rounded-3xl border shadow-sm space-y-3 ${
+                isDark ? "bg-[#1A1009] border-[#3B2516]" : "bg-white border-[#E8DFC8]"
+              }`}
+            >
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <Package className="w-4 h-4 text-[#E08F35]" />
+                  <span className="font-bold text-xs">Direct Order Tracker (In-Website)</span>
+                </div>
+                <span className={`text-[11px] ${isDark ? "text-[#A89482]" : "text-[#7A5E48]"}`}>
+                  Real-time visual tracking directly on our website
+                </span>
+              </div>
+
+              <form onSubmit={handleLookupOrder} className="flex flex-col sm:flex-row gap-2.5">
+                <input
+                  type="text"
+                  placeholder="Enter Order Reference (e.g. MV-123456)..."
+                  value={lookupInputRef}
+                  onChange={(e) => setLookupInputRef(e.target.value)}
+                  className={`flex-1 px-4 py-2.5 text-xs rounded-xl focus:outline-none focus:ring-2 focus:ring-[#E08F35]/40 transition-colors ${
+                    isDark
+                      ? "bg-[#140D07] border border-[#362114] text-[#FAF4EA] placeholder-[#8A7665]"
+                      : "bg-[#FAF7F2] border border-[#DDD1BE] text-[#1F120A] placeholder-[#8A7665]"
+                  }`}
+                />
+                <button
+                  type="submit"
+                  disabled={lookupLoading}
+                  className="px-5 py-2.5 rounded-xl bg-[#5E3210] hover:bg-[#43230A] text-white text-xs font-bold transition-all cursor-pointer shrink-0 disabled:opacity-50 shadow-sm"
+                >
+                  {lookupLoading ? "Locating..." : "Track Order"}
+                </button>
+              </form>
+              {lookupError && (
+                <p className="text-[11px] text-red-500 font-semibold">{lookupError}</p>
+              )}
+            </div>
+
+            {/* Active Order Live Tracker */}
             {activeOrder ? (
+              <LiveOrderTracker order={activeOrder} themeMode={themeMode} />
+            ) : (
               <div
-                className={`rounded-2xl border p-6 shadow-2xs space-y-6 ${
+                className={`p-10 rounded-3xl border text-center space-y-4 ${
                   isDark
                     ? "bg-[#1C120B] border-[#362114]"
                     : "bg-white border-[#E8DEC8]"
                 }`}
               >
-                <div
-                  className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b pb-4 ${
-                    isDark ? "border-[#2D1B10]" : "border-[#EFE8DC]"
-                  }`}
-                >
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span
-                        className={`text-base font-bold font-serif ${
-                          isDark ? "text-[#FAF4EA]" : "text-[#1F120A]"
-                        }`}
-                      >
-                        Order #{activeOrder.orderRef}
-                      </span>
-                      <span
-                        className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                          activeOrder.paymentStatus === "COMPLETED" ||
-                          (activeOrder.paymentStatus as string) === "PHONEPE_PAID"
-                            ? "bg-emerald-100 text-emerald-800"
-                            : "bg-amber-100 text-amber-900"
-                        }`}
-                      >
-                        {activeOrder.paymentMethod === "cod"
-                          ? "Cash on Delivery"
-                          : activeOrder.paymentStatus === "COMPLETED" || (activeOrder.paymentStatus as string) === "PHONEPE_PAID"
-                          ? "Online Paid"
-                          : "Online Pending"}
-                      </span>
-                    </div>
-                    <p
-                      className={`text-xs mt-0.5 ${
-                        isDark ? "text-[#D8C8B8]" : "text-[#6A523E]"
-                      }`}
-                    >
-                      Placed: {activeOrder.date} • Total: ₹{activeOrder.total}
-                    </p>
-                  </div>
-
-                  <div className="text-left sm:text-right">
-                    <span
-                      className={`text-xs font-semibold block ${
-                        isDark ? "text-[#A89482]" : "text-[#7A5E48]"
-                      }`}
-                    >
-                      Tracking ID
-                    </span>
-                    <span className="text-xs font-mono font-bold text-[#E08F35]">
-                      {activeOrder.trackingNumber || "MV-BLR-Pending"}
-                    </span>
-                  </div>
-                </div>
-
-                {/* 4-Step Visual Progress Bar */}
-                <div className="py-4">
-                  <div className="relative flex items-center justify-between">
-                    {/* Progress Line */}
-                    <div
-                      className={`absolute top-1/2 left-0 right-0 -translate-y-1/2 h-1 z-0 ${
-                        isDark ? "bg-[#2D1B10]" : "bg-[#EFE9DF]"
-                      }`}
-                    />
-                    <div
-                      className="absolute top-1/2 left-0 -translate-y-1/2 h-1 bg-[#E08F35] z-0 transition-all duration-500"
-                      style={{
-                        width: `${(getStepIndex(activeOrder.orderStatus) / (ORDER_STEPS.length - 1)) * 100}%`,
-                      }}
-                    />
-
-                    {ORDER_STEPS.map((step, idx) => {
-                      const currentIdx = getStepIndex(activeOrder.orderStatus);
-                      const isPassed = idx <= currentIdx;
-                      const isCurrent = idx === currentIdx;
-
-                      return (
-                        <div
-                          key={step}
-                          className="relative z-10 flex flex-col items-center group"
-                        >
-                          <div
-                            className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-xs transition-all shadow-sm ${
-                              isPassed
-                                ? "bg-[#5E3210] text-amber-300 ring-4 ring-[#FAF6EE]"
-                                : isDark
-                                ? "bg-[#150D07] text-[#8C7A6B] border-2 border-[#3D2514]"
-                                : "bg-white text-[#8C7A6B] border-2 border-[#DDD1BE]"
-                            } ${isCurrent ? "scale-110 ring-[#E08F35]/50 ring-4" : ""}`}
-                          >
-                            {isPassed ? (
-                              <CheckCircle2 className="w-5 h-5 text-amber-300" />
-                            ) : (
-                              <span>0{idx + 1}</span>
-                            )}
-                          </div>
-                          <span
-                            className={`text-xs font-bold mt-2 ${
-                              isCurrent
-                                ? "text-[#E08F35]"
-                                : isPassed
-                                ? isDark
-                                  ? "text-[#FAF4EA]"
-                                  : "text-[#1F120A]"
-                                : isDark
-                                ? "text-[#8C7A6B]"
-                                : "text-[#8C7A6B]"
-                            }`}
-                          >
-                            {step}
-                          </span>
-                          <span
-                            className={`text-[10px] ${
-                              isDark ? "text-[#A89482]" : "text-[#7A5E48]"
-                            }`}
-                          >
-                            {step === "Placed"
-                              ? "Confirmed"
-                              : step === "Packed"
-                              ? "Peenya Facility"
-                              : step === "Dispatched"
-                              ? "In Transit"
-                              : "At Doorstep"}
-                          </span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-
-              {/* Dispatch Logistics Detail */}
-              <div
-                className={`p-4 rounded-xl border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs ${
-                  isDark
-                    ? "bg-[#160D07] border-[#362114]"
-                    : "bg-[#FAF6EE] border-[#E8DEC8]"
-                }`}
-              >
-                <div className="flex items-center gap-2.5">
-                  <Truck className="w-4 h-4 text-[#E08F35] shrink-0" />
-                  <div>
-                    <span
-                      className={`font-bold block ${
-                        isDark ? "text-[#FAF4EA]" : "text-[#1F120A]"
-                      }`}
-                    >
-                      Carrier: {activeOrder.courier || (activeOrder.trackingNumber ? "Delhivery Express" : "MANOPAVANA Express")}
-                      {activeOrder.trackingNumber && (
-                        <span className="ml-2 font-mono text-[11px] text-[#E08F35]">
-                          (AWB: #{activeOrder.trackingNumber})
-                        </span>
-                      )}
-                    </span>
-                    <span
-                      className={`text-[11px] ${
-                        isDark ? "text-[#D8C8B8]" : "text-[#6A523E]"
-                      }`}
-                    >
-                      Delivering to: {activeOrder.shippingAddress.addressLine1},{" "}
-                      {activeOrder.shippingAddress.city} - {activeOrder.shippingAddress.pincode}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="flex flex-wrap items-center gap-2 shrink-0">
-                  {/* Delhivery Live Tracking Link */}
-                  {activeOrder.trackingNumber && (
-                    <a
-                      href={`https://www.delhivery.com/track/package/${activeOrder.trackingNumber}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="px-3.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs flex items-center gap-1.5 transition-colors shadow-2xs"
-                    >
-                      <Truck className="w-3.5 h-3.5" />
-                      <span>Live Track on Delhivery</span>
-                      <ExternalLink className="w-3 h-3" />
-                    </a>
-                  )}
-
-                  <a
-                    href={`https://wa.me/${BUSINESS_CONFIG.PHONE_RAW}?text=Hi%20MANOPAVANA,%20regarding%20my%20order%20${activeOrder.orderRef}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-1.5 transition-colors shadow-2xs"
+                <ShoppingBag className="w-12 h-12 text-[#C8BAA8] mx-auto" />
+                <div className="space-y-1">
+                  <h3
+                    className={`font-bold text-sm font-serif ${
+                      isDark ? "text-[#FAF4EA]" : "text-[#1F120A]"
+                    }`}
                   >
-                    <MessageCircle className="w-3.5 h-3.5" />
-                    <span>WhatsApp Support</span>
-                  </a>
+                    No Active Orders Displayed
+                  </h3>
+                  <p
+                    className={`text-xs max-w-md mx-auto ${
+                      isDark ? "text-[#D8C8B8]" : "text-[#6A523E]"
+                    }`}
+                  >
+                    Orders placed by you will be visible here. Enter your Order Reference number above to track your order, or sign in to access past orders.
+                  </p>
                 </div>
+                <Link
+                  to="/"
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#5E3210] hover:bg-[#43230A] text-white font-bold text-xs shadow-sm transition-all"
+                >
+                  <span>Browse Pure Cold-Pressed Oils</span>
+                </Link>
               </div>
-
-              {/* Order Items List */}
-              <div className="space-y-3 pt-2">
-                <h4
-                  className={`text-xs font-bold uppercase tracking-wider ${
-                    isDark ? "text-[#D8C8B8]" : "text-[#6A523E]"
-                  }`}
-                >
-                  Order Items Breakdown
-                </h4>
-                <div
-                  className={`divide-y ${
-                    isDark ? "divide-[#2D1B10]" : "divide-[#EFE8DC]"
-                  }`}
-                >
-                  {activeOrder.items.map((item) => (
-                    <div
-                      key={item.id}
-                      className="py-3 flex items-center justify-between text-xs"
-                    >
-                      <div className="flex items-center gap-3">
-                        <img
-                          src={item.image}
-                          alt={item.title}
-                          className={`w-10 h-10 object-contain p-1 rounded-lg ${
-                            isDark ? "bg-[#150D07]" : "bg-[#FAF6EE]"
-                          }`}
-                        />
-                        <div>
-                          <p
-                            className={`font-bold ${
-                              isDark ? "text-[#FAF4EA]" : "text-[#1F120A]"
-                            }`}
-                          >
-                            {item.title}
-                          </p>
-                          <p
-                            className={`text-[11px] ${
-                              isDark ? "text-[#A89482]" : "text-[#7A5E48]"
-                            }`}
-                          >
-                            {item.variant} x {item.quantity}
-                          </p>
-                        </div>
-                      </div>
-                      <span className="font-black text-[#E08F35]">
-                        ₹{item.price * item.quantity}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div
-              className={`p-10 rounded-2xl border text-center space-y-4 ${
-                isDark
-                  ? "bg-[#1C120B] border-[#362114]"
-                  : "bg-white border-[#E8DEC8]"
-              }`}
-            >
-              <ShoppingBag className="w-10 h-10 text-[#C8BAA8] mx-auto" />
-              <div className="space-y-1">
-                <h3
-                  className={`font-bold text-sm ${
-                    isDark ? "text-[#FAF4EA]" : "text-[#1F120A]"
-                  }`}
-                >
-                  No Orders Yet
-                </h3>
-                <p
-                  className={`text-xs ${
-                    isDark ? "text-[#D8C8B8]" : "text-[#6A523E]"
-                  }`}
-                >
-                  Your placed orders with live Firestore tracking will appear here.
-                </p>
-              </div>
-              <Link
-                to="/"
-                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#5E3210] hover:bg-[#43230A] text-white font-bold text-xs shadow-sm transition-all"
-              >
-                <span>Browse Cold-Pressed Oils</span>
-              </Link>
-            </div>
-          )}
+            )}
 
           {/* Past Orders List */}
           {visibleOrders.length > 0 && (

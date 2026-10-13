@@ -472,7 +472,7 @@ export const FAQS: FAQItem[] = [
   {
     category: "shipping",
     question: "Where do you deliver and what are the shipping charges?",
-    answer: "Direct doorstep delivery from our packaging and distribution facility is exclusive to Bangalore (560xxx). All orders above ₹500 unlock Free Doorstep Delivery (delivered within 24 to 72 hours). A standard delivery fee of ₹49 applies on orders below ₹500. For all other locations across Karnataka and India, orders are fulfilled via our official Flipkart store!"
+    answer: "We deliver across all of India! For Bengaluru (560xxx), orders are fulfilled directly via our Peenya Facility Carrier within 24 to 48 hours. For all other locations across Karnataka and India, orders are fulfilled via our integrated Delhivery Express courier with live website tracking! Orders above ₹500 unlock Free Doorstep Delivery."
   }
 ];
 
@@ -481,7 +481,7 @@ export const CUSTOMER_REVIEWS: CustomerReview[] = [];
 export const LEGAL_POLICIES = {
   terms: {
     title: "Terms & Conditions",
-    content: `1. Business Scope & Facility Disclosure: MANOPAVANA is an artisanal repacker and distributor of wood-pressed edible oils. Oils are sourced directly from traditional wood-press artisans, settled naturally, and packed hygienically at our Bangalore packaging and distribution facility. Direct doorstep delivery is currently serviced exclusively within Bangalore (560xxx), while nationwide fulfillment is conducted through our verified Flipkart storefront.
+    content: `1. Business Scope & Facility Disclosure: MANOPAVANA is an artisanal repacker and distributor of wood-pressed edible oils. Oils are sourced directly from traditional wood-press artisans, settled naturally, and packed hygienically at our Bangalore packaging and distribution facility. Doorstep delivery is serviced directly across Bengaluru and nationwide across India via our integrated express logistics partners.
 
 2. Pricing & Taxes: All prices listed on this website are in Indian Rupees (₹) and are inclusive of applicable GST (GSTIN: 29EYSPR5297E1ZE).
 
@@ -498,11 +498,11 @@ Packaging Facility Address: 118, Raghavendra Layout, Thigalarapalya, Peenya 2nd 
   },
   shipping: {
     title: "Shipping & Delivery Policy",
-    content: `1. Shipping Charges: Orders of ₹500 and above qualify for FREE Doorstep Delivery across Bangalore. Orders below ₹500 incur a flat ₹49 standard delivery fee.
+    content: `1. Shipping Charges: Orders of ₹500 and above qualify for FREE Doorstep Delivery. Orders below ₹500 incur a flat ₹49 standard delivery fee.
 
-2. Delivery Timeline: Orders are dispatched directly from our Bangalore packaging and distribution facility and delivered within 24 to 72 business hours across Bangalore pin codes (560xxx).
+2. Bengaluru Delivery: Orders within Bengaluru (560xxx) are dispatched directly from our Peenya packaging facility and delivered within 24 to 48 business hours.
 
-3. Pan-India Delivery: Pin codes outside Bangalore are fulfilled exclusively via our Official Flipkart Store with Flipkart Assured transit and courier tracking.`
+3. Pan-India Delivery: Pin codes outside Bengaluru are fulfilled via Delhivery Express Logistics with real-time tracking directly inside your account on our website (delivered within 2 to 4 business days).`
   },
   returns: {
     title: "Return & Refund Policy",

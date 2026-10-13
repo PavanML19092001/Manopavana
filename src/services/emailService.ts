@@ -52,8 +52,49 @@ export async function sendOrderConfirmationEmail(order: Order) {
 
     // Comprehensive payload containing all standard naming conventions
     // ensures ANY EmailJS template placeholder is populated without blanks
+    const fullOrderText = [
+      `🛒 NEW ORDER #${order.orderRef}`,
+      `📅 Date: ${formattedDate}`,
+      `💳 Payment: ${paymentMethodLabel}`,
+      `💰 Total Amount: ₹${order.total} (Subtotal: ₹${order.subtotal}, Delivery: ₹${order.shippingFee || 0}, Discount: ₹${order.discount || 0})`,
+      ``,
+      `👤 CUSTOMER DETAILS:`,
+      `• Name: ${customerName}`,
+      `• Phone: ${customerPhone}`,
+      `• Email: ${customerEmail}`,
+      `• Address: ${deliveryAddress}`,
+      `• Landmark: ${landmark}`,
+      `• Google Maps Pin: ${mapsLink}`,
+      ``,
+      `📦 ORDERED ITEMS:`,
+      itemsSummary,
+      ``,
+      isCod ? `⚠️ ACTION REQUIRED: COLLECT ₹${order.total} CASH ON DELIVERY AT DOORSTEP` : `✅ Online Payment Completed`,
+    ].join("\n");
+
     const templateParams: Record<string, string> = {
       to_email: EMAILJS_CONFIG.TARGET_EMAIL,
+      to_name: "MANOPAVANA Team",
+      from_name: customerName,
+      from_email: customerEmail !== "N/A" ? customerEmail : "orders@manopavana.com",
+      reply_to: customerEmail !== "N/A" ? customerEmail : EMAILJS_CONFIG.TARGET_EMAIL,
+      subject: `[${isCod ? "COD ORDER" : "PAID ORDER"}] #${order.orderRef} - ₹${order.total} by ${customerName}`,
+      title: `Order #${order.orderRef} (${paymentMethodLabel})`,
+
+      // Primary Message & Content fallbacks (the most common EmailJS variables)
+      message: fullOrderText,
+      content: fullOrderText,
+      body: fullOrderText,
+      email_body: fullOrderText,
+      text: fullOrderText,
+      details: fullOrderText,
+      order_details: fullOrderText,
+      order_summary: fullOrderText,
+      orderSummary: fullOrderText,
+      summary: fullOrderText,
+      notes: fullOrderText,
+      description: fullOrderText,
+      my_message: fullOrderText,
 
       // Order Reference variations
       order_ref: order.orderRef,
@@ -61,17 +102,19 @@ export async function sendOrderConfirmationEmail(order: Order) {
       order_id: order.orderRef || order.id,
       orderId: order.orderRef || order.id,
       order_number: order.orderRef,
+      id: order.orderRef || order.id,
 
       // Date variations
       order_date: formattedDate,
       date: formattedDate,
+      time: formattedDate,
 
       // Customer Name variations
       customer_name: customerName,
       customerName: customerName,
       name: customerName,
       user_name: customerName,
-      from_name: customerName,
+      client_name: customerName,
 
       // Customer Phone variations
       customer_phone: customerPhone,
@@ -80,6 +123,7 @@ export async function sendOrderConfirmationEmail(order: Order) {
       user_phone: customerPhone,
       contact: customerPhone,
       mobile: customerPhone,
+      phone_number: customerPhone,
 
       // Email variations
       customer_email: customerEmail,
@@ -93,26 +137,31 @@ export async function sendOrderConfirmationEmail(order: Order) {
       shipping_address: deliveryAddress,
       shippingAddress: deliveryAddress,
       street_address: addressLine,
+      address_line1: addressLine,
       landmark: landmark,
       city: district,
       district: district,
       state: state,
       pincode: pincode,
+      zip: pincode,
+      zipcode: pincode,
 
       // Item summary variations
       items_summary: itemsSummary,
       itemsSummary: itemsSummary,
       items: itemsSummary,
       order_items: itemsSummary,
-      order_details: itemsSummary,
-      order_summary: itemsSummary,
-      orderSummary: itemsSummary,
+      item_list: itemsSummary,
+      products: itemsSummary,
+      cart: itemsSummary,
 
       // Pricing variations
       total_amount: `₹${order.total}`,
       totalAmount: `₹${order.total}`,
       total: `₹${order.total}`,
       amount: `₹${order.total}`,
+      grand_total: `₹${order.total}`,
+      price: `₹${order.total}`,
       subtotal: `₹${order.subtotal}`,
       discount: `₹${order.discount || 0}`,
       shipping_fee: `₹${order.shippingFee || 0}`,
@@ -121,8 +170,9 @@ export async function sendOrderConfirmationEmail(order: Order) {
       payment_method: paymentMethodLabel,
       paymentMethod: paymentMethodLabel,
       payment_mode: order.paymentMode || paymentMethodLabel,
-      payment_status: order.paymentStatus || "COMPLETED",
-      paymentStatus: order.paymentStatus || "COMPLETED",
+      paymentMode: order.paymentMode || paymentMethodLabel,
+      payment_status: order.paymentStatus || (isCod ? "COD_PENDING_HANDOVER" : "COMPLETED"),
+      paymentStatus: order.paymentStatus || (isCod ? "COD_PENDING_HANDOVER" : "COMPLETED"),
 
       // Facility & Logistics
       is_bangalore: order.shippingAddress?.isBangalore ? "Yes (Peenya Direct Doorstep)" : "Pan-India Route",
@@ -131,9 +181,7 @@ export async function sendOrderConfirmationEmail(order: Order) {
       map_url: mapsLink,
       google_maps: mapsLink,
       tracking_number: order.trackingNumber || `MV-BLR-${Math.floor(10000 + Math.random() * 90000)}`,
-
-      // Generic universal message fallback
-      message: `New MANOPAVANA Order: ${order.orderRef}\nCustomer: ${customerName} (${customerPhone})\nAddress: ${deliveryAddress}\nLandmark: ${landmark}\n\nOrdered Items:\n${itemsSummary}\n\nTotal Payable: ₹${order.total}\nPayment: ${paymentMethodLabel}\nMaps Pin: ${mapsLink}`,
+      courier: order.courier || (order.shippingAddress?.isBangalore ? "MANOPAVANA Peenya Express" : "Delhivery Express"),
     };
 
     const res = await emailjs.send(

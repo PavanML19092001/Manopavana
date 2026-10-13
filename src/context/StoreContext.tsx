@@ -65,8 +65,6 @@ interface StoreContextType {
   reverseGeocodeAndSaveAddress: (lat: number, lng: number) => Promise<Partial<Address> | null>;
   isLocationModalOpen: boolean;
   setLocationModalOpen: (open: boolean) => void;
-  isFlipkartModalOpen: boolean;
-  setFlipkartModalOpen: (open: boolean) => void;
 
   // Firebase Auth
   currentUser: FirebaseUser | null;
@@ -90,6 +88,7 @@ interface StoreContextType {
 
   // Orders
   orders: Order[];
+  adminOrders: Order[];
   saveOrder: (order: Order) => Promise<void>;
   getOrder: (refOrId: string) => Order | undefined;
   updateOrderStatus: (orderId: string, status: Order["orderStatus"]) => Promise<void>;
@@ -179,6 +178,35 @@ const DEFAULT_CMS_CONFIG: StoreCMSConfig = {
 const StoreContext = createContext<StoreContextType | null>(null);
 
 export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  // Toast notifications (used across all actions and lifecycle hooks)
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => {
+      setToastMessage(null);
+    }, 4000);
+  };
+
+  // Admin Authentication State
+  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState<boolean>(() => {
+    return sessionStorage.getItem("manopavana_admin_auth") === "true";
+  });
+
+  const authenticateAdmin = (pin: string) => {
+    if (pin.trim() === BUSINESS_CONFIG.ADMIN_PIN) {
+      setIsAdminAuthenticated(true);
+      sessionStorage.setItem("manopavana_admin_auth", "true");
+      return true;
+    }
+    return false;
+  };
+
+  const logoutAdmin = () => {
+    setIsAdminAuthenticated(false);
+    sessionStorage.removeItem("manopavana_admin_auth");
+  };
+
   // 1. Cart State
   const [cart, setCart] = useState<CartItem[]>(() => {
     try {
@@ -237,7 +265,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   });
 
   const [isLocationModalOpen, setLocationModalOpen] = useState(false);
-  const [isFlipkartModalOpen, setFlipkartModalOpen] = useState(false);
 
   // Check on first mount if location exists in localStorage
   // The location modal must NOT open on page refresh if an address has already been saved.
@@ -478,36 +505,44 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const audio = new Audio("https://pub-9e18bb265ecf4224ae1230cf913745ca.r2.dev/marada_gaana_beat.mp3");
     audio.loop = true;
     audio.volume = 0.4;
+    audio.preload = "auto";
+    audio.setAttribute("playsinline", "true");
+    audio.setAttribute("webkit-playsinline", "true");
     audioRef.current = audio;
 
-    const startAudioOnGesture = () => {
+    const events = ["pointerdown", "touchstart", "touchend", "click", "keydown"];
+
+    const triggerPlay = () => {
       if (!audioRef.current) return;
       audioRef.current
         .play()
-        .then(() => setIsPlayingAudio(true))
-        .catch(() => {});
-      ["click", "touchstart", "scroll", "keydown"].forEach((evt) =>
-        window.removeEventListener(evt, startAudioOnGesture)
-      );
+        .then(() => {
+          setIsPlayingAudio(true);
+          // Only remove listeners once audio playback successfully starts
+          events.forEach((evt) => {
+            document.removeEventListener(evt, triggerPlay, true);
+            window.removeEventListener(evt, triggerPlay, true);
+          });
+        })
+        .catch(() => {
+          // If browser policy blocked this particular event, keep listeners active for next touch
+        });
     };
 
-    // 1. Attempt programmatic audio playback on page load
-    audio
-      .play()
-      .then(() => setIsPlayingAudio(true))
-      .catch(() => {
-        // Autoplay policy prevented playback without gesture
-      });
+    // 1. Attempt programmatic playback immediately
+    triggerPlay();
 
-    // 2. Attach one-time global user gesture listener on window
-    ["click", "touchstart", "scroll", "keydown"].forEach((evt) =>
-      window.addEventListener(evt, startAudioOnGesture, { passive: true })
-    );
+    // 2. Attach capture listeners so any screen touch on mobile starts playback
+    events.forEach((evt) => {
+      document.addEventListener(evt, triggerPlay, { capture: true, passive: true });
+      window.addEventListener(evt, triggerPlay, { capture: true, passive: true });
+    });
 
     return () => {
-      ["click", "touchstart", "scroll", "keydown"].forEach((evt) =>
-        window.removeEventListener(evt, startAudioOnGesture)
-      );
+      events.forEach((evt) => {
+        document.removeEventListener(evt, triggerPlay, true);
+        window.removeEventListener(evt, triggerPlay, true);
+      });
       if (audioRef.current) {
         audioRef.current.pause();
       }
@@ -530,13 +565,20 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   };
 
-  // 6. Orders Management - Initialize from localStorage to NEVER lose orders across page refresh
+  // 6. Orders Management
+  // Admin orders queue (all orders across store, subscribed only when admin authenticated)
+  const [adminOrders, setAdminOrders] = useState<Order[]>([]);
+
+  // User orders: strictly isolated to the currently logged in customer, or guest session
   const [orders, setOrders] = useState<Order[]>(() => {
     try {
+      const guestIds: string[] = JSON.parse(localStorage.getItem("manopavana_guest_order_ids") || "[]");
       const saved = localStorage.getItem("manopavana_orders");
-      if (saved) {
+      if (saved && guestIds.length > 0) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) return parsed;
+        if (Array.isArray(parsed)) {
+          return parsed.filter((o) => guestIds.includes(o.orderRef) || guestIds.includes(o.id));
+        }
       }
     } catch {
       // ignore
@@ -544,68 +586,85 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return [];
   });
 
-  // Automatically sync orders to localStorage whenever updated
-  useEffect(() => {
-    try {
-      localStorage.setItem("manopavana_orders", JSON.stringify(orders));
-    } catch {
-      // ignore
-    }
-  }, [orders]);
-
-  // Subscribe to real Firestore orders: all orders for store admin, or user-specific orders
+  // Keep guest orders persisted locally
   useEffect(() => {
     if (!currentUser) {
-      // DO NOT wipe local orders! Users who placed orders without login must see their orders!
-      return;
+      try {
+        localStorage.setItem("manopavana_orders", JSON.stringify(orders));
+      } catch {
+        // ignore
+      }
     }
+  }, [orders, currentUser]);
 
-    if (currentUser.email === "manopavana@gmail.com") {
+  // Subscribe to all orders ONLY for store administration (manopavana@gmail.com or admin unlocked)
+  useEffect(() => {
+    if (isAdminAuthenticated || currentUser?.email === "manopavana@gmail.com") {
       const unsubscribe = subscribeAllOrders((allOrders) => {
-        if (allOrders && allOrders.length > 0) {
-          setOrders((prev) => {
-            const map = new Map<string, Order>();
-            allOrders.forEach((o) => map.set(o.orderRef || o.id, o));
-            prev.forEach((o) => {
-              if (!map.has(o.orderRef || o.id)) map.set(o.orderRef || o.id, o);
-            });
-            return Array.from(map.values()).sort(
-              (a, b) => (b.timestamp || 0) - (a.timestamp || 0)
-            );
-          });
+        if (allOrders) {
+          setAdminOrders(
+            [...allOrders].sort(
+              (a, b) => (b.timestamp || b.timestampMs || 0) - (a.timestamp || a.timestampMs || 0)
+            )
+          );
         }
       });
       return () => unsubscribe();
     }
+  }, [isAdminAuthenticated, currentUser?.email]);
 
+  // Subscribe strictly to the active user's personal orders in Firestore
+  useEffect(() => {
+    if (!currentUser) {
+      // Unauthenticated visitor: display ONLY orders placed by this device/guest session
+      try {
+        const guestIds: string[] = JSON.parse(localStorage.getItem("manopavana_guest_order_ids") || "[]");
+        const saved = localStorage.getItem("manopavana_orders");
+        if (saved && guestIds.length > 0) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed)) {
+            setOrders(parsed.filter((o) => guestIds.includes(o.orderRef) || guestIds.includes(o.id)));
+            return;
+          }
+        }
+      } catch {}
+      setOrders([]);
+      return;
+    }
+
+    // Authenticated user: load STRICTLY matching orders belonging to this user
     const unsubscribe = subscribeUserOrders(
-      currentUser?.uid,
+      currentUser.uid,
       address.phone,
+      currentUser.email || undefined,
       (firestoreOrders) => {
-        if (firestoreOrders && firestoreOrders.length > 0) {
-          setOrders((prev) => {
-            const map = new Map<string, Order>();
-            // Keep local placed orders
-            prev.forEach((o) => map.set(o.orderRef || o.id, o));
-            // Merge remote orders
-            firestoreOrders.forEach((o) => {
-              const existing = map.get(o.orderRef || o.id);
-              // Prevent stale "Payment Incomplete" from overwriting a completed "Placed" COD order
-              if (existing && existing.orderStatus === "Placed" && o.orderStatus === "Payment Incomplete") {
-                return;
-              }
-              map.set(o.orderRef || o.id, o);
-            });
-            const merged = Array.from(map.values()).sort(
-              (a, b) => (b.timestamp || b.timestampMs || 0) - (a.timestamp || a.timestampMs || 0)
-            );
-            try {
-              localStorage.setItem("manopavana_orders", JSON.stringify(merged));
-            } catch {
-              // ignore
+        if (firestoreOrders) {
+          const userEmail = (currentUser.email || "").toLowerCase().trim();
+          const cleanPhone = address.phone ? address.phone.replace(/\D/g, "").slice(-10) : "";
+
+          // Strict user-level filter ensures zero leakage of other customers' orders
+          const userOnlyOrders = firestoreOrders.filter((o) => {
+            if (o.customerUid && o.customerUid === currentUser.uid) return true;
+            if (userEmail && (
+              (o.customerEmail && o.customerEmail.toLowerCase() === userEmail) ||
+              (o.shippingAddress?.email && o.shippingAddress.email.toLowerCase() === userEmail)
+            )) {
+              return true;
             }
-            return merged;
+            if (cleanPhone && cleanPhone.length === 10 && (
+              (o.customerPhone && o.customerPhone.replace(/\D/g, "").slice(-10) === cleanPhone) ||
+              (o.shippingAddress?.phone && o.shippingAddress.phone.replace(/\D/g, "").slice(-10) === cleanPhone)
+            )) {
+              return true;
+            }
+            return false;
           });
+
+          const sorted = userOnlyOrders.sort(
+            (a, b) => (b.timestamp || b.timestampMs || 0) - (a.timestamp || a.timestampMs || 0)
+          );
+
+          setOrders(sorted);
         }
       }
     );
@@ -614,18 +673,16 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const saveOrder = async (newOrder: Order) => {
     setOrders((prev) => {
-      // Filter out any previous uncompleted or duplicate attempt for this ref
       const filtered = prev.filter((o) => o.orderRef !== newOrder.orderRef);
-      const updated = [newOrder, ...filtered];
-      try {
-        localStorage.setItem("manopavana_orders", JSON.stringify(updated));
-      } catch {
-        // ignore
-      }
-      return updated;
+      return [newOrder, ...filtered];
     });
 
-    // Clear pending tracking keys so 10-minute banner never overrides completed order
+    setAdminOrders((prev) => {
+      const filtered = prev.filter((o) => o.orderRef !== newOrder.orderRef);
+      return [newOrder, ...filtered];
+    });
+
+    // Clear pending tracking keys
     localStorage.removeItem("pending_order_ref");
     localStorage.removeItem("pending_order_timestamp");
     localStorage.removeItem("pending_order_data");
@@ -635,23 +692,17 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const getOrder = (refOrId: string): Order | undefined => {
-    const memoryMatch = orders.find(
+    // 1. Check user orders
+    const userMatch = orders.find(
       (o) => o.id === refOrId || o.orderRef === refOrId || o.trackingNumber === refOrId
     );
-    if (memoryMatch) return memoryMatch;
+    if (userMatch) return userMatch;
 
-    try {
-      const stored = localStorage.getItem("manopavana_orders");
-      if (stored) {
-        const list: Order[] = JSON.parse(stored);
-        const match = list.find(
-          (o) => o.id === refOrId || o.orderRef === refOrId || o.trackingNumber === refOrId
-        );
-        if (match) return match;
-      }
-    } catch {
-      // ignore
-    }
+    // 2. Check admin orders
+    const adminMatch = adminOrders.find(
+      (o) => o.id === refOrId || o.orderRef === refOrId || o.trackingNumber === refOrId
+    );
+    if (adminMatch) return adminMatch;
 
     try {
       const pendingRaw = localStorage.getItem("pending_order_data");
@@ -841,8 +892,22 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       shippingAddress: finalShippingAddress,
       trackingNumber: target?.trackingNumber || `MV-BLR-${Math.floor(10000 + Math.random() * 90000)}`,
       courier: "MANOPAVANA Peenya Express Carrier",
+      customerUid: currentUser?.uid || target?.customerUid || undefined,
+      customerPhone: (finalShippingAddress.phone || "").replace(/\D/g, "").slice(-10),
+      customerEmail: finalShippingAddress.email || currentUser?.email || undefined,
       isBuyNow: isDirectBuy,
     };
+
+    // Record this orderRef for guest session tracking so the placer can view their own order
+    try {
+      const guestRefs: string[] = JSON.parse(localStorage.getItem("manopavana_guest_order_ids") || "[]");
+      if (!guestRefs.includes(orderRef)) {
+        guestRefs.push(orderRef);
+        localStorage.setItem("manopavana_guest_order_ids", JSON.stringify(guestRefs));
+      }
+    } catch {
+      // ignore
+    }
 
     // Replace the failed/incomplete attempt with the placed COD order so orders NEVER appear twice
     setOrders((prev) => {
@@ -1082,38 +1147,10 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     });
   }, [cmsConfig]);
 
-  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState<boolean>(() => {
-    return sessionStorage.getItem("manopavana_admin_auth") === "true";
-  });
-
-  const authenticateAdmin = (pin: string) => {
-    if (pin.trim() === BUSINESS_CONFIG.ADMIN_PIN) {
-      setIsAdminAuthenticated(true);
-      sessionStorage.setItem("manopavana_admin_auth", "true");
-      return true;
-    }
-    return false;
-  };
-
-  const logoutAdmin = () => {
-    setIsAdminAuthenticated(false);
-    sessionStorage.removeItem("manopavana_admin_auth");
-  };
-
   // 9. Modals
   const [activePolicyModal, setActivePolicyModal] = useState<
     "terms" | "shipping" | "returns" | "privacy" | null
   >(null);
-
-  // 10. Toast notification
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
-
-  const showToast = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => {
-      setToastMessage(null);
-    }, 4000);
-  };
 
   // 11. Theme Mode: 'blend' (default), 'light', or 'dark'
   const [themeMode, setThemeModeState] = useState<"blend" | "light" | "dark">(() => {
@@ -1232,8 +1269,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         reverseGeocodeAndSaveAddress,
         isLocationModalOpen,
         setLocationModalOpen,
-        isFlipkartModalOpen,
-        setFlipkartModalOpen,
         currentUser,
         isLoginModalOpen,
         setLoginModalOpen,
@@ -1249,6 +1284,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         isPlayingAudio,
         toggleAudio,
         orders,
+        adminOrders,
         saveOrder,
         getOrder,
         updateOrderStatus,

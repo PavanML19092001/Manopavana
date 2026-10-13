@@ -6,7 +6,6 @@ import { AudioPlayer } from "./components/AudioPlayer";
 import { LocationModal } from "./components/LocationModal";
 import { LoyaltyQuizModal } from "./components/LoyaltyQuizModal";
 import { LoginModal } from "./components/LoginModal";
-import { FlipkartModal } from "./components/FlipkartModal";
 import { PaymentFailedModal } from "./components/PaymentFailedModal";
 import { OrderSuccessModal } from "./components/OrderSuccessModal";
 import { HomePage } from "./pages/HomePage";
@@ -216,7 +215,6 @@ export default function App() {
       <LocationModal />
       <LoyaltyQuizModal />
       <LoginModal />
-      <FlipkartModal />
       <PaymentFailedModal />
       <OrderSuccessModal />
 

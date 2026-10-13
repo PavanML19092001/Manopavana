@@ -11,7 +11,6 @@ export const LocationModal: React.FC = () => {
     reverseGeocodeAndSaveAddress,
     isLocationModalOpen,
     setLocationModalOpen,
-    setFlipkartModalOpen,
     showToast,
   } = useStore();
 
@@ -203,11 +202,11 @@ export const LocationModal: React.FC = () => {
       isBangalore: isBLR,
     });
     setLocationModalOpen(false);
-    if (!isBLR) {
-      setFlipkartModalOpen(true);
-    } else {
-      showToast("📍 Delivery location updated across the entire store!");
-    }
+    showToast(
+      isBLR
+        ? "📍 Bengaluru delivery location updated!"
+        : "📍 Pan-India delivery location updated via Delhivery Express!"
+    );
   };
 
   if (!isLocationModalOpen) return null;
@@ -305,12 +304,12 @@ export const LocationModal: React.FC = () => {
               <p className="font-bold">
                 {isBangalorePincode
                   ? "Direct Doorstep Delivery Active (Bengaluru 560xxx)"
-                  : "Pan-India Route via Official Flipkart Store"}
+                  : "Pan-India Express Delivery Active via Delhivery Logistics"}
               </p>
               <p className="text-[11px] opacity-90 mt-0.5">
                 {isBangalorePincode
                   ? "Orders dispatched fresh from our Peenya facility within 24 to 72 hours. Free delivery unlocked at ₹500!"
-                  : "Deliveries outside Bengaluru urban/rural run with Flipkart Assured transit and courier tracking."}
+                  : "Deliveries outside Bengaluru are fulfilled directly across India via Delhivery express courier with live website tracking."}
               </p>
             </div>
           </div>

@@ -42,6 +42,7 @@ export const AdminPage: React.FC = () => {
     cmsConfig,
     updateCMSConfig,
     orders,
+    adminOrders,
     saveOrder,
     deleteOrder,
     updateOrderStatus,
@@ -79,6 +80,28 @@ export const AdminPage: React.FC = () => {
   const [fallbackAwb, setFallbackAwb] = useState<Record<string, string>>({});
   const [customAwb, setCustomAwb] = useState<Record<string, string>>({});
   const [copiedPorter, setCopiedPorter] = useState<Record<string, boolean>>({});
+
+  // Bangalore Local Manual Tracking State
+  const [blrCourier, setBlrCourier] = useState<Record<string, string>>({});
+  const [blrNotes, setBlrNotes] = useState<Record<string, string>>({});
+
+  const handleSaveBlrTracking = async (orderRef: string, currentOrd: Order) => {
+    const courierVal = blrCourier[orderRef] !== undefined ? blrCourier[orderRef] : (currentOrd.courier || "MANOPAVANA Peenya Direct Fleet");
+    const notesVal = blrNotes[orderRef] !== undefined ? blrNotes[orderRef] : (currentOrd.notes || "");
+    await updateOrderDetails(orderRef, { courier: courierVal, notes: notesVal });
+    showToast(`Bengaluru tracking details saved for #${orderRef}`);
+  };
+
+  const handleCopyRiderDrop = (ord: Order) => {
+    const mapsLink = ord.shippingAddress.lat && ord.shippingAddress.lng
+      ? `https://www.google.com/maps?q=${ord.shippingAddress.lat},${ord.shippingAddress.lng}`
+      : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+          `${ord.shippingAddress.addressLine1}, Bengaluru - ${ord.shippingAddress.pincode}`
+        )}`;
+    const text = `📦 MANOPAVANA DROP DETAILS\nOrder: #${ord.orderRef}\nCustomer: ${ord.shippingAddress.fullName}\nPhone: ${ord.shippingAddress.phone}\nAddress: ${ord.shippingAddress.addressLine1}${ord.shippingAddress.landmark ? ` (Near ${ord.shippingAddress.landmark})` : ""}, ${ord.shippingAddress.district || "Bengaluru"} - ${ord.shippingAddress.pincode}\nPayment: ${ord.paymentMethod?.toUpperCase()} (₹${ord.total})\nLocation Pin: ${mapsLink}`;
+    navigator.clipboard.writeText(text);
+    showToast("📋 Drop address & GPS copied for delivery rider!");
+  };
 
   const handleCheckPincode = async (orderRef: string, pincode: string) => {
     setCheckingPincode((p) => ({ ...p, [orderRef]: true }));
@@ -271,137 +294,6 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
     } finally {
       setPingingApi(false);
     }
-  };
-
-  const handleTestPincodeLookup = async (pinOverride?: string) => {
-    const pin = (pinOverride || testPincodeInput).trim();
-    if (pin.length !== 6) {
-      showToast("Please enter a valid 6-digit pincode");
-      return;
-    }
-    if (pinOverride) {
-      setTestPincodeInput(pinOverride);
-    }
-    setTestPincodeLoading(true);
-    try {
-      const res = await fetch(`/api?action=delhivery_check_pincode&pincode=${encodeURIComponent(pin)}`);
-      const data = await res.json();
-      if (data.status === "SUCCESS") {
-        setTestPincodeResult(data);
-        showToast(
-          data.serviceable
-            ? `Pincode ${pin} is deliverable by Delhivery!`
-            : `Pincode ${pin} not serviceable by Delhivery`
-        );
-      } else {
-        showToast("Pincode lookup failed");
-      }
-    } catch {
-      showToast("Network error during pincode lookup");
-    } finally {
-      setTestPincodeLoading(false);
-    }
-  };
-
-  const handleGenerateTestAwb = async () => {
-    setFetchingTestAwb(true);
-    try {
-      const res = await fetch("/api?action=delhivery_fetch_waybill");
-      const data = await res.json();
-      if (data.status === "SUCCESS" && data.waybill) {
-        setTestAwbResult(data.waybill);
-        showToast(`Allocated Delhivery AWB: #${data.waybill}`);
-      } else {
-        showToast("Failed to fetch test AWB from Delhivery");
-      }
-    } catch {
-      showToast("Error communicating with Delhivery Waybill API");
-    } finally {
-      setFetchingTestAwb(false);
-    }
-  };
-
-  const handleCreateSampleOrder = async (isLocal: boolean) => {
-    const testNum = Math.floor(1000 + Math.random() * 9000);
-    const testRef = isLocal ? `BLR-TEST-${testNum}` : `NAT-TEST-${testNum}`;
-    const now = Date.now();
-    const sampleOrder: Order = {
-      id: `order_${now}`,
-      orderRef: testRef,
-      date: new Date().toISOString(),
-      timestamp: now,
-      timestampMs: now,
-      items: [
-        {
-          id: `item_1_${now}`,
-          productId: "groundnut",
-          title: "Cold Pressed Groundnut Oil",
-          subtitle: "Traditional Marachekku Extra Virgin",
-          variant: "1L",
-          price: 360,
-          regularPrice: 420,
-          quantity: 2,
-          image: "https://images.unsplash.com/photo-1474979266404-7eaacbcd87c5?w=500&auto=format&fit=crop&q=80",
-        },
-        {
-          id: `item_2_${now}`,
-          productId: "coconut",
-          title: "Cold Pressed Coconut Oil",
-          subtitle: "Pure Sulphur-Free Copra",
-          variant: "500ml",
-          price: 240,
-          regularPrice: 280,
-          quantity: 1,
-          image: "https://images.unsplash.com/photo-1526947425960-945c6e72858f?w=500&auto=format&fit=crop&q=80",
-        },
-      ],
-      subtotal: 960,
-      discount: 0,
-      shippingFee: 0,
-      total: 960,
-      orderStatus: "Placed",
-      paymentMethod: isLocal ? "phonepe" : "cod",
-      paymentMode: isLocal ? "PHONEPE_PAID" : "COD",
-      paymentStatus: isLocal ? "COMPLETED" : "PENDING",
-      shippingAddress: isLocal
-        ? {
-            fullName: "Ramesh Kumar (Bangalore Test)",
-            phone: "9876543210",
-            addressLine1: "Flat 402, Green Glen Layout, Bellandur",
-            landmark: "Near EcoSpace Tech Park",
-            city: "Bengaluru",
-            district: "Bengaluru Urban",
-            state: "Karnataka",
-            pincode: "560103",
-            isBangalore: true,
-          }
-        : {
-            fullName: "Aditi Sharma (National Test)",
-            phone: "9820012345",
-            addressLine1: "A-501, Raheja Heights, Dindoshi",
-            landmark: "Near Oberoi Mall",
-            city: "Mumbai",
-            district: "Mumbai Suburban",
-            state: "Maharashtra",
-            pincode: "400063",
-            isBangalore: false,
-          },
-    };
-
-    await saveOrder(sampleOrder);
-    showToast(`Created sample ${isLocal ? "Bengaluru Local" : "National (Delhivery Express)"} order #${testRef}!`);
-  };
-
-  const handleClearSampleOrders = async () => {
-    const testOrders = orders.filter((o) => o.orderRef.includes("TEST"));
-    if (testOrders.length === 0) {
-      showToast("No test orders found in queue");
-      return;
-    }
-    for (const ord of testOrders) {
-      await deleteOrder(ord.orderRef);
-    }
-    showToast(`Removed ${testOrders.length} test order(s)`);
   };
 
   // Keep state in sync with real-time Firestore updates
@@ -671,180 +563,6 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
             )}
           </div>
         )}
-
-        {/* Diagnostic Testing Tools Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-1">
-          {/* Tool 1: Live Pincode Serviceability Tester */}
-          <div
-            className={`p-4 rounded-2xl border space-y-3 ${
-              isDark ? "bg-[#140D07] border-[#2D1B10]" : "bg-[#FAF8F5] border-[#E8DEC8]"
-            }`}
-          >
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold flex items-center gap-1.5 text-[#1F120A] dark:text-[#FAF4EA]">
-                <Search className="w-3.5 h-3.5 text-[#E08F35]" />
-                1. Test Any Pincode
-              </span>
-              <span className="text-[10px] text-stone-500">Serviceability Check</span>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <input
-                type="text"
-                maxLength={6}
-                value={testPincodeInput}
-                onChange={(e) => setTestPincodeInput(e.target.value)}
-                placeholder="6-digit pincode"
-                className="w-full px-3 py-1.5 text-xs font-mono rounded-xl bg-white dark:bg-[#1E130B] border border-stone-300 dark:border-stone-700 text-[#1F120A] dark:text-[#FAF4EA] focus:outline-none focus:ring-1 focus:ring-[#E08F35]"
-              />
-              <button
-                type="button"
-                onClick={() => handleTestPincodeLookup()}
-                disabled={testPincodeLoading}
-                className="px-3 py-1.5 rounded-xl bg-[#5E3210] hover:bg-[#43230A] text-white text-xs font-bold transition-colors cursor-pointer shrink-0 disabled:opacity-50"
-              >
-                {testPincodeLoading ? "Checking..." : "Check"}
-              </button>
-            </div>
-
-            {/* Quick Pincode Presets */}
-            <div className="flex flex-wrap gap-1.5 pt-0.5">
-              {[
-                { label: "Mumbai", pin: "400001" },
-                { label: "Delhi", pin: "110001" },
-                { label: "Mysuru", pin: "570001" },
-                { label: "Bangalore", pin: "560001" },
-              ].map((p) => (
-                <button
-                  key={p.pin}
-                  type="button"
-                  onClick={() => handleTestPincodeLookup(p.pin)}
-                  className="text-[10px] px-2 py-0.5 rounded-lg border border-stone-300 dark:border-stone-700 hover:border-amber-500 text-stone-600 dark:text-stone-300 cursor-pointer"
-                >
-                  {p.label} ({p.pin})
-                </button>
-              ))}
-            </div>
-
-            {testPincodeResult && (
-              <div
-                className={`p-2.5 rounded-xl border text-[11px] space-y-1 ${
-                  testPincodeResult.serviceable
-                    ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-800 dark:text-emerald-300"
-                    : "bg-red-500/10 border-red-500/20 text-red-800 dark:text-red-300"
-                }`}
-              >
-                <div className="font-bold flex items-center justify-between">
-                  <span>Pin {testPincodeResult.pincode}: {testPincodeResult.serviceable ? "Serviceable ✓" : "Not Serviceable ✗"}</span>
-                  {testPincodeResult.serviceable && (
-                    <span className="text-[10px] uppercase font-mono">{testPincodeResult.city}, {testPincodeResult.state}</span>
-                  )}
-                </div>
-                {testPincodeResult.serviceable && (
-                  <div className="flex gap-2 text-[10px] opacity-90">
-                    <span>COD: {testPincodeResult.cod ? "✓ Available" : "✗ No"}</span>
-                    <span>Prepaid: {testPincodeResult.prepaid ? "✓ Available" : "✗ No"}</span>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Tool 2: Test Live Waybill Generation */}
-          <div
-            className={`p-4 rounded-2xl border space-y-3 ${
-              isDark ? "bg-[#140D07] border-[#2D1B10]" : "bg-[#FAF8F5] border-[#E8DEC8]"
-            }`}
-          >
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold flex items-center gap-1.5 text-[#1F120A] dark:text-[#FAF4EA]">
-                <Zap className="w-3.5 h-3.5 text-[#E08F35]" />
-                2. Test Waybill / AWB Allocator
-              </span>
-              <span className="text-[10px] text-stone-500">Live API</span>
-            </div>
-            <p className="text-[11px] text-[#6A523E] dark:text-[#C4B29E]">
-              Tests Delhivery's live Waybill allocation engine to verify that your account can reserve official tracking numbers.
-            </p>
-
-            <button
-              type="button"
-              onClick={handleGenerateTestAwb}
-              disabled={fetchingTestAwb}
-              className="w-full py-2 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-[#5E3210] dark:text-amber-200 border border-amber-500/30 text-xs font-bold flex items-center justify-center gap-2 transition-colors cursor-pointer"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${fetchingTestAwb ? "animate-spin" : ""}`} />
-              <span>{fetchingTestAwb ? "Allocating Waybill..." : "Request Live Test AWB"}</span>
-            </button>
-
-            {testAwbResult && (
-              <div className="p-2.5 rounded-xl bg-white dark:bg-[#1E130B] border border-emerald-500/30 text-[11px] space-y-1">
-                <span className="font-bold text-emerald-600 block">Delhivery AWB Reserved:</span>
-                <div className="flex items-center justify-between">
-                  <span className="font-mono font-bold text-xs">#{testAwbResult}</span>
-                  <a
-                    href={`https://www.delhivery.com/track/package/${testAwbResult}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-blue-600 hover:underline flex items-center gap-0.5 text-[10px] font-bold"
-                  >
-                    <span>Check Tracking</span>
-                    <ExternalLink className="w-2.5 h-2.5" />
-                  </a>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Tool 3: Simulate Orders (Test Without Buying!) */}
-          <div
-            className={`p-4 rounded-2xl border space-y-3 ${
-              isDark ? "bg-[#140D07] border-[#2D1B10]" : "bg-[#FAF8F5] border-[#E8DEC8]"
-            }`}
-          >
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold flex items-center gap-1.5 text-[#1F120A] dark:text-[#FAF4EA]">
-                <Package className="w-3.5 h-3.5 text-[#E08F35]" />
-                3. Test Without Placing Order
-              </span>
-              <span className="text-[10px] text-emerald-600 font-bold">1-Click Seed</span>
-            </div>
-            <p className="text-[11px] text-[#6A523E] dark:text-[#C4B29E]">
-              Generate a realistic test order in your delivery dispatch queue below to try the full manifest, label printing, and WhatsApp dispatch!
-            </p>
-
-            <div className="flex flex-col gap-2">
-              <button
-                type="button"
-                onClick={() => handleCreateSampleOrder(false)}
-                className="w-full py-1.5 rounded-xl bg-[#5E3210] hover:bg-[#43230A] text-white text-[11px] font-bold flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs"
-              >
-                <Truck className="w-3 h-3 text-amber-300" />
-                <span>+ Seed Outside-Bengaluru Order</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleCreateSampleOrder(true)}
-                className="w-full py-1.5 rounded-xl bg-stone-200 dark:bg-stone-800 hover:bg-stone-300 dark:hover:bg-stone-700 text-[#1F120A] dark:text-[#FAF4EA] text-[11px] font-bold flex items-center justify-center gap-1.5 cursor-pointer"
-              >
-                <MapPin className="w-3 h-3 text-[#E08F35]" />
-                <span>+ Seed Bengaluru Local Order</span>
-              </button>
-            </div>
-
-            {orders.some((o) => o.orderRef.includes("TEST")) && (
-              <button
-                type="button"
-                onClick={handleClearSampleOrders}
-                className="text-[10px] text-red-500 hover:text-red-700 font-bold flex items-center gap-1 cursor-pointer pt-0.5 mx-auto"
-              >
-                <Trash2 className="w-3 h-3" />
-                <span>Clear All Test Orders</span>
-              </button>
-            )}
-          </div>
-        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
@@ -1200,7 +918,7 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
               </div>
             ) : (
               <div className="space-y-4 max-h-[750px] overflow-y-auto pr-1">
-                {orders.map((ord) => {
+                {(adminOrders && adminOrders.length > 0 ? adminOrders : orders).map((ord) => {
                   const mapsQuery = ord.shippingAddress.lat && ord.shippingAddress.lng
                     ? `${ord.shippingAddress.lat},${ord.shippingAddress.lng}`
                     : encodeURIComponent(
@@ -1219,6 +937,13 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                     }`
                   );
                   const waUrl = `https://wa.me/91${cleanPhone}?text=${waText}`;
+
+                  const isLocal = Boolean(
+                    ord.shippingAddress?.isBangalore ||
+                    (ord.shippingAddress?.pincode && ord.shippingAddress.pincode.startsWith("560")) ||
+                    ord.shippingAddress?.city?.toLowerCase().includes("bangalore") ||
+                    ord.shippingAddress?.city?.toLowerCase().includes("bengaluru")
+                  );
 
                   return (
                     <div
@@ -1255,11 +980,6 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                             >
                               {ord.paymentMethod?.toUpperCase()}
                             </span>
-                            {ord.orderRef.includes("TEST") && (
-                              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-purple-500/15 text-purple-700 dark:text-purple-300 border border-purple-500/30">
-                                SIMULATED TEST
-                              </span>
-                            )}
                           </div>
                           <p
                             className={`text-[11px] mt-0.5 ${
@@ -1270,18 +990,8 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                           </p>
                         </div>
 
-                        {/* Status Selector with quick remove for test orders */}
+                        {/* Status Selector */}
                         <div className="flex items-center gap-1.5">
-                          {ord.orderRef.includes("TEST") && (
-                            <button
-                              type="button"
-                              onClick={() => deleteOrder(ord.orderRef)}
-                              className="p-1.5 rounded-lg hover:bg-red-500/10 text-red-500 border border-red-500/20 transition-colors cursor-pointer shrink-0"
-                              title="Delete this test order"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          )}
                           <select
                             value={ord.orderStatus}
                             onChange={(e) =>
@@ -1344,25 +1054,17 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                             Delivery Drop Address:
                           </span>
                           {/* Route Destination Badge */}
-                          {(() => {
-                            const isLocal = Boolean(
-                              ord.shippingAddress?.isBangalore ||
-                              (ord.shippingAddress?.pincode && ord.shippingAddress.pincode.startsWith("560")) ||
-                              ord.shippingAddress?.city?.toLowerCase().includes("bangalore") ||
-                              ord.shippingAddress?.city?.toLowerCase().includes("bengaluru")
-                            );
-                            return isLocal ? (
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-500 font-bold text-[10px] border border-amber-500/20">
-                                <MapPin className="w-2.5 h-2.5" />
-                                Bengaluru Local
-                              </span>
-                            ) : (
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-500 font-bold text-[10px] border border-blue-500/20">
-                                <Truck className="w-2.5 h-2.5" />
-                                Outside Bengaluru • Delhivery
-                              </span>
-                            );
-                          })()}
+                          {isLocal ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-500 font-bold text-[10px] border border-amber-500/20">
+                              <MapPin className="w-2.5 h-2.5" />
+                              Bengaluru Local (Peenya Facility)
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-500 font-bold text-[10px] border border-blue-500/20">
+                              <Truck className="w-2.5 h-2.5" />
+                              Outside Bengaluru • Delhivery
+                            </span>
+                          )}
                         </div>
                         <p>
                           {ord.shippingAddress.addressLine1}
@@ -1372,190 +1074,278 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                         </p>
                       </div>
 
-                      {/* DELHIVERY DISPATCH & LOGISTICS ENGINE */}
-                      <div
-                        className={`p-3 rounded-xl border space-y-2.5 text-xs ${
-                          isDark
-                            ? "bg-[#191009] border-[#3D2514]"
-                            : "bg-[#F7F2E8] border-[#DFD4BF]"
-                        }`}
-                      >
-                        <div className="flex flex-wrap items-center justify-between gap-2">
-                          <div className="flex items-center gap-1.5 font-bold">
-                            <Truck className="w-3.5 h-3.5 text-[#E08F35]" />
-                            <span className={isDark ? "text-[#FAF4EA]" : "text-[#1F120A]"}>
-                              Delhivery Logistics Hub
-                            </span>
-                            <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-amber-500/10 text-amber-600 font-normal">
-                              Token Active
+                      {/* LOGISTICS BLOCK: SEPARATE BANGALORE DIRECT FROM DELHIVERY */}
+                      {isLocal ? (
+                        /* BENGALURU LOCAL: DEDICATED MANUAL TRACKING DETAILS (NO DELHIVERY) */
+                        <div
+                          className={`p-3.5 rounded-xl border space-y-3 text-xs ${
+                            isDark
+                              ? "bg-[#191009] border-[#3D2514]"
+                              : "bg-[#FDF9F2] border-[#E8DEC8]"
+                          }`}
+                        >
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <div className="flex items-center gap-1.5 font-bold">
+                              <MapPin className="w-3.5 h-3.5 text-amber-500" />
+                              <span className={isDark ? "text-[#FAF4EA]" : "text-[#1F120A]"}>
+                                Bengaluru Direct Delivery (Peenya Hub)
+                              </span>
+                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-600 border border-amber-500/20">
+                                Manual Tracking Mode
+                              </span>
+                            </div>
+                            <span className="text-[11px] text-stone-500">
+                              Direct Doorstep Dispatch • 24-48h Delivery
                             </span>
                           </div>
 
-                          {/* Quick Pincode Serviceability Check */}
-                          <div className="flex items-center gap-2">
-                            {pincodeStatus[ord.orderRef] ? (
-                              <span
-                                className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                                  pincodeStatus[ord.orderRef].serviceable
-                                    ? "bg-emerald-500/15 text-emerald-600 border border-emerald-500/30"
-                                    : "bg-red-500/15 text-red-600 border border-red-500/30"
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                            <div>
+                              <label className={`block text-[11px] font-bold mb-1 ${isDark ? "text-[#D8C8B8]" : "text-[#5C4230]"}`}>
+                                Delivery Partner / Rider Name
+                              </label>
+                              <input
+                                type="text"
+                                placeholder="e.g. MANOPAVANA Peenya Direct / Rider Ramesh"
+                                value={blrCourier[ord.orderRef] !== undefined ? blrCourier[ord.orderRef] : (ord.courier || "")}
+                                onChange={(e) =>
+                                  setBlrCourier((p) => ({ ...p, [ord.orderRef]: e.target.value }))
+                                }
+                                className={`w-full px-2.5 py-1.5 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-[#E08F35] ${
+                                  isDark
+                                    ? "bg-[#140D07] border border-[#362114] text-[#FAF4EA]"
+                                    : "bg-white border border-[#DDD1BE] text-[#1F120A]"
                                 }`}
-                              >
-                                {pincodeStatus[ord.orderRef].serviceable
-                                  ? `Delhivery Deliverable (COD: ${
-                                      pincodeStatus[ord.orderRef].cod ? "Yes" : "No"
-                                    })`
-                                  : "Delhivery Not Serviceable"}
-                              </span>
-                            ) : (
+                              />
+                            </div>
+
+                            <div>
+                              <label className={`block text-[11px] font-bold mb-1 ${isDark ? "text-[#D8C8B8]" : "text-[#5C4230]"}`}>
+                                Rider Contact / Delivery Notes
+                              </label>
+                              <input
+                                type="text"
+                                placeholder="e.g. Ph: +91 9886012345 • Slot: Evening 4-6 PM"
+                                value={blrNotes[ord.orderRef] !== undefined ? blrNotes[ord.orderRef] : (ord.notes || "")}
+                                onChange={(e) =>
+                                  setBlrNotes((p) => ({ ...p, [ord.orderRef]: e.target.value }))
+                                }
+                                className={`w-full px-2.5 py-1.5 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-[#E08F35] ${
+                                  isDark
+                                    ? "bg-[#140D07] border border-[#362114] text-[#FAF4EA]"
+                                    : "bg-white border border-[#DDD1BE] text-[#1F120A]"
+                                }`}
+                              />
+                            </div>
+                          </div>
+
+                          <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-stone-200 dark:border-stone-800">
+                            <div className="flex items-center gap-2">
                               <button
                                 type="button"
-                                onClick={() =>
-                                  handleCheckPincode(
-                                    ord.orderRef,
-                                    ord.shippingAddress.pincode
-                                  )
-                                }
-                                disabled={checkingPincode[ord.orderRef]}
-                                className={`text-[10px] font-bold px-2 py-1 rounded-lg border transition-colors cursor-pointer ${
+                                onClick={() => handleSaveBlrTracking(ord.orderRef, ord)}
+                                className="px-3 py-1.5 rounded-lg bg-[#5E3210] hover:bg-[#43230A] text-white font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+                              >
+                                <Save className="w-3.5 h-3.5 text-amber-300" />
+                                <span>Save Tracking Details</span>
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => handleCopyRiderDrop(ord)}
+                                className={`px-3 py-1.5 rounded-lg border text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer ${
                                   isDark
-                                    ? "bg-[#1C120B] border-[#3D2514] text-[#E08F35] hover:bg-[#28180E]"
+                                    ? "bg-[#1E130B] border-[#3D2514] text-[#FAF4EA] hover:bg-[#28180E]"
                                     : "bg-white border-[#DDD1BE] text-[#5E3210] hover:bg-[#FAF6EE]"
                                 }`}
                               >
-                                {checkingPincode[ord.orderRef]
-                                  ? "Checking..."
-                                  : `Verify Pin ${ord.shippingAddress.pincode}`}
+                                <Copy className="w-3.5 h-3.5 text-[#E08F35]" />
+                                <span>Copy Rider Drop Details</span>
                               </button>
-                            )}
+                            </div>
+
+                            <div className="text-[11px] text-emerald-600 font-semibold flex items-center gap-1">
+                              <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                              <span>Live on Website Order Tracker</span>
+                            </div>
                           </div>
                         </div>
-
-                        {/* If shipment already manifested / has AWB tracking number */}
-                        {ord.trackingNumber ? (
-                          <div
-                            className={`p-2.5 rounded-lg border space-y-2 ${
-                              isDark
-                                ? "bg-[#140D07] border-[#362114]"
-                                : "bg-white border-[#E5DAC8]"
-                            }`}
-                          >
-                            <div className="flex flex-wrap items-center justify-between gap-2">
-                              <div>
-                                <span className="text-[10px] font-bold text-emerald-600 block flex items-center gap-1">
-                                  <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                                  Shipment Booked ({ord.courier || "Delhivery Express"})
-                                </span>
-                                <span
-                                  className={`font-mono text-xs font-bold ${
-                                    isDark ? "text-[#FAF4EA]" : "text-[#1F120A]"
-                                  }`}
-                                >
-                                  AWB: {ord.trackingNumber}
-                                </span>
-                              </div>
-
-                              <div className="flex items-center gap-2">
-                                <a
-                                  href={`https://www.delhivery.com/track/package/${ord.trackingNumber}`}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="px-2.5 py-1 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold text-[11px] flex items-center gap-1 transition-colors shadow-2xs"
-                                >
-                                  <span>Track on Delhivery</span>
-                                  <ExternalLink className="w-2.5 h-2.5" />
-                                </a>
-
-                                <a
-                                  href={`https://track.delhivery.com/api/p/packing_slip?wbns=${ord.trackingNumber}&pdf=true`}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className={`px-2.5 py-1 rounded-lg border font-bold text-[11px] flex items-center gap-1 transition-colors ${
-                                    isDark
-                                      ? "bg-[#1E130B] border-[#3D2514] text-[#FAF4EA] hover:bg-[#2A1A0F]"
-                                      : "bg-[#FAF6EE] border-[#DDD1BE] text-[#1F120A] hover:bg-[#EFE8DC]"
-                                  }`}
-                                  title="Print Packing Slip Label"
-                                >
-                                  <Printer className="w-2.5 h-2.5 text-[#E08F35]" />
-                                  <span>Print Label</span>
-                                </a>
-                              </div>
+                      ) : (
+                        /* OUTSIDE BANGALORE: DELHIVERY LOGISTICS INTEGRATION */
+                        <div
+                          className={`p-3 rounded-xl border space-y-2.5 text-xs ${
+                            isDark
+                              ? "bg-[#191009] border-[#3D2514]"
+                              : "bg-[#F7F2E8] border-[#DFD4BF]"
+                          }`}
+                        >
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <div className="flex items-center gap-1.5 font-bold">
+                              <Truck className="w-3.5 h-3.5 text-[#E08F35]" />
+                              <span className={isDark ? "text-[#FAF4EA]" : "text-[#1F120A]"}>
+                                Delhivery Logistics Hub (Outside Bengaluru)
+                              </span>
+                              <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-amber-500/10 text-amber-600 font-normal">
+                                Token Active
+                              </span>
                             </div>
-                          </div>
-                        ) : (
-                          /* If shipment not manifested yet */
-                          <div className="space-y-2">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <button
-                                type="button"
-                                onClick={() => handleManifestDelhivery(ord)}
-                                disabled={manifesting[ord.orderRef]}
-                                className="px-3 py-1.5 rounded-lg bg-[#5E3210] hover:bg-[#43230A] disabled:opacity-50 text-white font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
-                              >
-                                <Truck className="w-3.5 h-3.5 text-amber-300" />
-                                <span>
-                                  {manifesting[ord.orderRef]
-                                    ? "Connecting Delhivery API..."
-                                    : "⚡ 1-Click Manifest with Delhivery"}
-                                </span>
-                              </button>
 
-                              {/* Manual AWB Entry Toggle / Input */}
-                              <div className="flex items-center gap-1.5 flex-1 min-w-[200px]">
-                                <input
-                                  type="text"
-                                  placeholder="Or paste AWB from Delhivery One..."
-                                  value={customAwb[ord.orderRef] || ""}
-                                  onChange={(e) =>
-                                    setCustomAwb((p) => ({
-                                      ...p,
-                                      [ord.orderRef]: e.target.value,
-                                    }))
-                                  }
-                                  className={`flex-1 px-2.5 py-1 text-xs rounded-lg font-mono focus:outline-none focus:ring-1 focus:ring-[#E08F35] ${
-                                    isDark
-                                      ? "bg-[#140D07] border border-[#362114] text-[#FAF4EA] placeholder-[#8A7665]"
-                                      : "bg-white border border-[#DDD1BE] text-[#1F120A] placeholder-[#8A7665]"
+                            {/* Quick Pincode Serviceability Check */}
+                            <div className="flex items-center gap-2">
+                              {pincodeStatus[ord.orderRef] ? (
+                                <span
+                                  className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                                    pincodeStatus[ord.orderRef].serviceable
+                                      ? "bg-emerald-500/15 text-emerald-600 border border-emerald-500/30"
+                                      : "bg-red-500/15 text-red-600 border border-red-500/30"
                                   }`}
-                                />
+                                >
+                                  {pincodeStatus[ord.orderRef].serviceable
+                                    ? `Delhivery Deliverable (COD: ${
+                                        pincodeStatus[ord.orderRef].cod ? "Yes" : "No"
+                                      })`
+                                    : "Delhivery Not Serviceable"}
+                                </span>
+                              ) : (
                                 <button
                                   type="button"
-                                  onClick={() => handleSaveCustomAwb(ord.orderRef)}
-                                  className="px-2.5 py-1 rounded-lg bg-stone-700 hover:bg-stone-800 text-white text-[11px] font-bold cursor-pointer transition-colors shrink-0"
+                                  onClick={() =>
+                                    handleCheckPincode(
+                                      ord.orderRef,
+                                      ord.shippingAddress.pincode
+                                    )
+                                  }
+                                  disabled={checkingPincode[ord.orderRef]}
+                                  className={`text-[10px] font-bold px-2 py-1 rounded-lg border transition-colors cursor-pointer ${
+                                    isDark
+                                      ? "bg-[#1C120B] border-[#3D2514] text-[#E08F35] hover:bg-[#28180E]"
+                                      : "bg-white border-[#DDD1BE] text-[#5E3210] hover:bg-[#FAF6EE]"
+                                  }`}
                                 >
-                                  Save AWB
+                                  {checkingPincode[ord.orderRef]
+                                    ? "Checking..."
+                                    : `Verify Pin ${ord.shippingAddress.pincode}`}
                                 </button>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* If shipment already manifested / has AWB tracking number */}
+                          {ord.trackingNumber ? (
+                            <div
+                              className={`p-2.5 rounded-lg border space-y-2 ${
+                                isDark
+                                  ? "bg-[#140D07] border-[#362114]"
+                                  : "bg-white border-[#E5DAC8]"
+                              }`}
+                            >
+                              <div className="flex flex-wrap items-center justify-between gap-2">
+                                <div>
+                                  <span className="text-[10px] font-bold text-emerald-600 block flex items-center gap-1">
+                                    <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                                    Shipment Booked ({ord.courier || "Delhivery Express"})
+                                  </span>
+                                  <span
+                                    className={`font-mono text-xs font-bold ${
+                                      isDark ? "text-[#FAF4EA]" : "text-[#1F120A]"
+                                    }`}
+                                  >
+                                    AWB: {ord.trackingNumber}
+                                  </span>
+                                </div>
+
+                                <div className="flex items-center gap-2">
+                                  <a
+                                    href={`https://track.delhivery.com/api/p/packing_slip?wbns=${ord.trackingNumber}&pdf=true`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className={`px-2.5 py-1 rounded-lg border font-bold text-[11px] flex items-center gap-1 transition-colors ${
+                                      isDark
+                                        ? "bg-[#1E130B] border-[#3D2514] text-[#FAF4EA] hover:bg-[#2A1A0F]"
+                                        : "bg-[#FAF6EE] border-[#DDD1BE] text-[#1F120A] hover:bg-[#EFE8DC]"
+                                    }`}
+                                    title="Print Packing Slip Label"
+                                  >
+                                    <Printer className="w-2.5 h-2.5 text-[#E08F35]" />
+                                    <span>Print Label</span>
+                                  </a>
+                                </div>
                               </div>
                             </div>
+                          ) : (
+                            /* If shipment not manifested yet */
+                            <div className="space-y-2">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => handleManifestDelhivery(ord)}
+                                  disabled={manifesting[ord.orderRef]}
+                                  className="px-3 py-1.5 rounded-lg bg-[#5E3210] hover:bg-[#43230A] disabled:opacity-50 text-white font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+                                >
+                                  <Truck className="w-3.5 h-3.5 text-amber-300" />
+                                  <span>
+                                    {manifesting[ord.orderRef]
+                                      ? "Connecting Delhivery API..."
+                                      : "⚡ 1-Click Manifest with Delhivery"}
+                                  </span>
+                                </button>
 
-                            {/* Insufficient balance notice or error explanation */}
-                            {manifestError[ord.orderRef] && (
-                              <div className="p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-300 text-[11px] space-y-1">
-                                <div className="flex items-center gap-1 font-bold">
-                                  <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                                  <span>Delhivery Dispatch Alert:</span>
-                                </div>
-                                <p className="opacity-90">{manifestError[ord.orderRef]}</p>
-                                {fallbackAwb[ord.orderRef] && (
+                                {/* Manual AWB Entry Toggle / Input */}
+                                <div className="flex items-center gap-1.5 flex-1 min-w-[200px]">
+                                  <input
+                                    type="text"
+                                    placeholder="Or paste AWB from Delhivery One..."
+                                    value={customAwb[ord.orderRef] || ""}
+                                    onChange={(e) =>
+                                      setCustomAwb((p) => ({
+                                        ...p,
+                                        [ord.orderRef]: e.target.value,
+                                      }))
+                                    }
+                                    className={`flex-1 px-2.5 py-1 text-xs rounded-lg font-mono focus:outline-none focus:ring-1 focus:ring-[#E08F35] ${
+                                      isDark
+                                        ? "bg-[#140D07] border border-[#362114] text-[#FAF4EA] placeholder-[#8A7665]"
+                                        : "bg-white border border-[#DDD1BE] text-[#1F120A] placeholder-[#8A7665]"
+                                    }`}
+                                  />
                                   <button
                                     type="button"
-                                    onClick={() =>
-                                      handleApplyFallbackAwb(
-                                        ord.orderRef,
-                                        fallbackAwb[ord.orderRef]
-                                      )
-                                    }
-                                    className="mt-1 px-2.5 py-1 rounded bg-[#5E3210] text-white font-bold text-[10px] cursor-pointer hover:bg-[#43230A]"
+                                    onClick={() => handleSaveCustomAwb(ord.orderRef)}
+                                    className="px-2.5 py-1 rounded-lg bg-stone-700 hover:bg-stone-800 text-white text-[11px] font-bold cursor-pointer transition-colors shrink-0"
                                   >
-                                    Assign Generated AWB #{fallbackAwb[ord.orderRef]} & Mark Dispatched
+                                    Save AWB
                                   </button>
-                                )}
+                                </div>
                               </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
+
+                              {/* Insufficient balance notice or error explanation */}
+                              {manifestError[ord.orderRef] && (
+                                <div className="p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-300 text-[11px] space-y-1">
+                                  <div className="flex items-center gap-1 font-bold">
+                                    <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                                    <span>Delhivery Dispatch Alert:</span>
+                                  </div>
+                                  <p className="opacity-90">{manifestError[ord.orderRef]}</p>
+                                  {fallbackAwb[ord.orderRef] && (
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        handleApplyFallbackAwb(
+                                          ord.orderRef,
+                                          fallbackAwb[ord.orderRef]
+                                        )
+                                      }
+                                      className="mt-1 px-2.5 py-1 rounded bg-[#5E3210] text-white font-bold text-[10px] cursor-pointer hover:bg-[#43230A]"
+                                    >
+                                      Assign Generated AWB #{fallbackAwb[ord.orderRef]} & Mark Dispatched
+                                    </button>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      )}
 
                       {/* Action buttons (Maps, Porter Copy, WhatsApp) */}
                       <div className="flex flex-wrap items-center justify-between gap-2 pt-1">

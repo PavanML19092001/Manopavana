@@ -13,6 +13,7 @@ import {
   RefreshCw,
   Navigation,
   ExternalLink,
+  User,
 } from "lucide-react";
 import L from "leaflet";
 import { useStore } from "../context/StoreContext";
@@ -42,7 +43,7 @@ export const CheckoutPage: React.FC = () => {
     saveOrder,
     clearCart,
     showToast,
-    setFlipkartModalOpen,
+    setLoginModalOpen,
     getOrder,
     currentUser,
     themeMode,
@@ -340,42 +341,49 @@ export const CheckoutPage: React.FC = () => {
       return;
     }
 
-    if (!fullName || !phone || !addressLine1 || !pincode) {
+    // MANDATORY AUTHENTICATION GUARD:
+    // Only logged-in users can place orders so orders are strictly linked to their account
+    if (!currentUser) {
+      showToast("Please log in or sign up first to place your order.");
+      setLoginModalOpen(true);
+      return;
+    }
+
+    if (!fullName.trim() || !phone.trim() || !addressLine1.trim() || !pincode.trim()) {
       showToast("Please fill in all required shipping address details.");
       return;
     }
 
-    // MANDATORY LOCATION GUARD:
-    // If pincode does not start with 560, trigger the Flipkart Intercept Modal and block local dispatch
-    if (!pincode.trim().startsWith("560")) {
-      updateAddress({
-        fullName,
-        phone,
-        addressLine1,
-        landmark,
-        district,
-        state,
-        pincode,
-        city: district,
-        isBangalore: false,
-      });
-      setFlipkartModalOpen(true);
+    const cleanPin = pincode.trim().replace(/\D/g, "").slice(0, 6);
+    if (cleanPin.length !== 6) {
+      showToast("Please enter a valid 6-digit Indian pincode.");
+      return;
+    }
+    const cleanPhone = phone.trim().replace(/\D/g, "").slice(-10);
+    if (cleanPhone.length !== 10) {
+      showToast("Please enter a valid 10-digit mobile number.");
       return;
     }
 
-    // 1-Click sync address globally
+    const isBLR =
+      cleanPin.startsWith("560") ||
+      district.toLowerCase().includes("bengaluru") ||
+      district.toLowerCase().includes("bangalore");
+
+    const customerEmail = address.email?.trim() || currentUser?.email?.trim() || "";
     const finalAddress = {
-      fullName,
-      phone,
-      addressLine1,
-      landmark,
+      fullName: fullName.trim(),
+      phone: cleanPhone,
+      email: customerEmail,
+      addressLine1: addressLine1.trim(),
+      landmark: landmark.trim(),
       district,
       state,
-      pincode,
-      city: "Bengaluru",
+      pincode: cleanPin,
+      city: isBLR ? "Bengaluru" : (district || "India"),
       lat: coords[0],
       lng: coords[1],
-      isBangalore: true,
+      isBangalore: isBLR,
     };
     updateAddress(finalAddress);
 
@@ -406,8 +414,13 @@ export const CheckoutPage: React.FC = () => {
         paymentStatus: "COMPLETED",
         orderStatus: "Placed",
         shippingAddress: finalAddress,
-        trackingNumber: `MV-BLR-${Math.floor(10000 + Math.random() * 90000)}`,
-        courier: "MANOPAVANA Peenya Express Carrier",
+        trackingNumber: isBLR
+          ? `MV-BLR-${Math.floor(10000 + Math.random() * 90000)}`
+          : `MV-DLH-${Math.floor(10000 + Math.random() * 90000)}`,
+        courier: isBLR ? "MANOPAVANA Peenya Express Carrier" : "Delhivery Express Logistics",
+        customerUid: currentUser.uid,
+        customerPhone: cleanPhone,
+        customerEmail: customerEmail || undefined,
         isBuyNow: isBuyNowMode,
       };
 
@@ -449,8 +462,13 @@ export const CheckoutPage: React.FC = () => {
         paymentStatus: "PENDING",
         orderStatus: "Payment Incomplete",
         shippingAddress: finalAddress,
-        trackingNumber: `MV-BLR-${Math.floor(10000 + Math.random() * 90000)}`,
-        courier: "MANOPAVANA Peenya Express Carrier",
+        trackingNumber: isBLR
+          ? `MV-BLR-${Math.floor(10000 + Math.random() * 90000)}`
+          : `MV-DLH-${Math.floor(10000 + Math.random() * 90000)}`,
+        courier: isBLR ? "MANOPAVANA Peenya Express Carrier" : "Delhivery Express Logistics",
+        customerUid: currentUser.uid,
+        customerPhone: cleanPhone,
+        customerEmail: customerEmail || undefined,
         isBuyNow: isBuyNowMode,
       };
 
@@ -579,23 +597,18 @@ export const CheckoutPage: React.FC = () => {
           </div>
         )}
 
-        {/* Location warning if non-560 */}
+        {/* Pan-India Delivery route badge if outside Bangalore */}
         {!isBangalore && pincode && (
-          <div className="p-4 rounded-2xl bg-amber-50 border border-amber-300 flex items-center justify-between gap-3 text-xs text-amber-900">
+          <div className="p-4 rounded-2xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-between gap-3 text-xs text-blue-900 dark:text-blue-200">
             <div className="flex items-center gap-2.5">
-              <AlertCircle className="w-5 h-5 text-amber-700 shrink-0" />
+              <Truck className="w-5 h-5 text-blue-600 dark:text-blue-400 shrink-0" />
               <span>
-                Pincode <strong>{pincode}</strong> is outside Bengaluru (560xxx). Direct Peenya doorstep delivery is exclusive to Bengaluru.
+                Pincode <strong>{pincode}</strong> is outside Bengaluru — fulfilled directly via <strong>Delhivery Express Logistics</strong> with live order tracking on our website!
               </span>
             </div>
-            <button
-              type="button"
-              onClick={() => setFlipkartModalOpen(true)}
-              className="px-3 py-1.5 rounded-lg bg-[#2874F0] text-white font-bold text-[11px] shrink-0 flex items-center gap-1 cursor-pointer"
-            >
-              <span>Flipkart Store</span>
-              <ExternalLink className="w-3 h-3" />
-            </button>
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-blue-600 text-white shrink-0">
+              Pan-India Delivery
+            </span>
           </div>
         )}
 
@@ -842,12 +855,12 @@ export const CheckoutPage: React.FC = () => {
                   <p className="font-bold">
                     {isBangalore
                       ? "Direct Bengaluru Facility Doorstep Delivery (24–72 hrs)"
-                      : "Pan-India Route via Flipkart Assured"}
+                      : "Pan-India Route via Delhivery Express Logistics (2–4 Days)"}
                   </p>
                   <p className="text-[11px] opacity-90 mt-0.5">
                     {isBangalore
-                      ? "Packed hygienically in Peenya and dispatched fresh."
-                      : "Shipped with tracking via authorized logistics."}
+                      ? "Packed hygienically in Peenya and dispatched fresh via direct carrier."
+                      : "Shipped with real-time Delhivery waybill tracking right here on our website."}
                   </p>
                 </div>
               </div>
@@ -1066,6 +1079,27 @@ export const CheckoutPage: React.FC = () => {
                   </span>
                 </div>
               </div>
+
+              {/* Login requirement banner if user is not logged in */}
+              {!currentUser && (
+                <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-900 dark:text-amber-200 text-xs space-y-2">
+                  <div className="flex items-center gap-2 font-bold">
+                    <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+                    <span>Login Required to Place Order</span>
+                  </div>
+                  <p className="text-[11px] opacity-90 leading-relaxed">
+                    Please log in or sign up before completing checkout. Your orders, live courier tracking, and invoices are securely tied to your registered account.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setLoginModalOpen(true)}
+                    className="w-full py-2.5 rounded-lg bg-[#5E3210] hover:bg-[#43230A] text-white font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-xs transition-all"
+                  >
+                    <User className="w-3.5 h-3.5 text-amber-300" />
+                    <span>Log In / Sign Up to Continue</span>
+                  </button>
+                </div>
+              )}
 
               <button
                 type="submit"
