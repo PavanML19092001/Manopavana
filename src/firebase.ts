@@ -6,7 +6,6 @@ import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   signOut,
-  onAuthStateChanged,
   User as FirebaseUser,
 } from "firebase/auth";
 import {
@@ -24,16 +23,76 @@ import {
   serverTimestamp,
   increment,
   arrayUnion,
+  getDocFromServer,
 } from "firebase/firestore";
-import { FIREBASE_CONFIG } from "./constants";
+import firebaseConfig from "../firebase-applet-config.json";
 import { CustomerReview, Order, StoreCMSConfig } from "./types";
 
-// Initialize Firebase safely
-const app = !getApps().length ? initializeApp(FIREBASE_CONFIG) : getApp();
+// Initialize Firebase safely with provisioned Database ID
+const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 export const auth = getAuth(app);
-export const db = getFirestore(app);
+export const db = getFirestore(app, (firebaseConfig as any).firestoreDatabaseId);
 export const googleProvider = new GoogleAuthProvider();
 googleProvider.setCustomParameters({ prompt: "select_account" });
+
+export enum OperationType {
+  CREATE = "create",
+  UPDATE = "update",
+  DELETE = "delete",
+  LIST = "list",
+  GET = "get",
+  WRITE = "write",
+}
+
+export interface FirestoreErrorInfo {
+  error: string;
+  operationType: OperationType;
+  path: string | null;
+  authInfo: {
+    userId?: string | null;
+    email?: string | null;
+    emailVerified?: boolean | null;
+    isAnonymous?: boolean | null;
+    tenantId?: string | null;
+    providerInfo?: {
+      providerId?: string | null;
+      email?: string | null;
+    }[];
+  };
+}
+
+export function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
+  const errInfo: FirestoreErrorInfo = {
+    error: error instanceof Error ? error.message : String(error),
+    authInfo: {
+      userId: auth.currentUser?.uid,
+      email: auth.currentUser?.email,
+      emailVerified: auth.currentUser?.emailVerified,
+      isAnonymous: auth.currentUser?.isAnonymous,
+      tenantId: auth.currentUser?.tenantId,
+      providerInfo:
+        auth.currentUser?.providerData?.map((p) => ({
+          providerId: p.providerId,
+          email: p.email,
+        })) || [],
+    },
+    operationType,
+    path,
+  };
+  console.warn("Firestore Error: ", JSON.stringify(errInfo));
+}
+
+// Test live database connectivity at boot
+async function testFirestoreConnection() {
+  try {
+    await getDocFromServer(doc(db, "test", "connection"));
+  } catch (error) {
+    if (error instanceof Error && error.message.includes("the client is offline")) {
+      console.warn("Firestore offline notice. Please verify network.");
+    }
+  }
+}
+testFirestoreConnection();
 
 /**
  * Clean phone number to 10 digits
@@ -119,8 +178,7 @@ export async function logoutUser() {
 
 /**
  * Sync & Deduplicate customer details in Firestore 'customers' collection:
- * If a user uses the same email or phone number for Google login and email/phone login,
- * their details are merged seamlessly instead of creating duplicate fragmented users.
+ * Merges profile, savedAddress, and cart seamlessly.
  */
 export async function syncCustomerDoc(
   user: FirebaseUser,
@@ -140,7 +198,7 @@ export async function syncCustomerDoc(
     let existingData: Record<string, unknown> = snap.exists() ? snap.data() : {};
     let matchedDocRef = customerRef;
 
-    // Search for existing duplicate customer profile by email or phone
+    // Search for existing customer profile by email or phone
     const customersCol = collection(db, "customers");
 
     if (canonicalEmail) {
@@ -153,7 +211,7 @@ export async function syncCustomerDoc(
           existingData = { ...matchDoc.data(), ...existingData };
         }
       } catch (e) {
-        console.warn("Notice checking customer by email:", e);
+        handleFirestoreError(e, OperationType.GET, "customers");
       }
     }
 
@@ -167,7 +225,7 @@ export async function syncCustomerDoc(
           existingData = { ...matchDoc.data(), ...existingData };
         }
       } catch (e) {
-        console.warn("Notice checking customer by phone:", e);
+        handleFirestoreError(e, OperationType.GET, "customers");
       }
     }
 
@@ -175,7 +233,7 @@ export async function syncCustomerDoc(
       (extra?.name && extra.name !== "Valued Customer" && extra.name !== "Google Customer" ? extra.name : "") ||
       (user.displayName && user.displayName !== "Customer" ? user.displayName : "") ||
       (existingData.name as string) ||
-      "Valued Customer";
+      "";
 
     const resolvedEmail = canonicalEmail || (existingData.email as string) || "";
     const resolvedPhone = cleanPhone || (existingData.phone as string) || "";
@@ -196,18 +254,26 @@ export async function syncCustomerDoc(
       mergedPayload.totalSpent = 0;
     }
 
-    // Update the matched master doc & the current UID doc
-    await setDoc(matchedDocRef, mergedPayload, { merge: true });
-    if (matchedDocRef.id !== user.uid) {
-      await setDoc(customerRef, mergedPayload, { merge: true });
+    // Preserve existing savedAddress and cart if already on file
+    if (existingData.savedAddress) {
+      mergedPayload.savedAddress = existingData.savedAddress;
+    }
+    if (Array.isArray(existingData.cart)) {
+      mergedPayload.cart = existingData.cart;
     }
 
-    // Link any past guest orders placed with this phone or email to this user UID
+    const cleanPayload = cleanFirestoreObject(mergedPayload);
+    await setDoc(matchedDocRef, cleanPayload, { merge: true });
+    if (matchedDocRef.id !== user.uid) {
+      await setDoc(customerRef, cleanPayload, { merge: true });
+    }
+
+    // Link any past guest orders matching this phone or email to this user UID
     linkPastOrdersToCustomer(user.uid, resolvedPhone, resolvedEmail);
 
-    return mergedPayload;
+    return { ...existingData, ...cleanPayload };
   } catch (e) {
-    console.warn("Could not sync customer record to Firestore:", e);
+    handleFirestoreError(e, OperationType.WRITE, `customers/${user.uid}`);
     return null;
   }
 }
@@ -236,25 +302,39 @@ async function linkPastOrdersToCustomer(userUid: string, phone: string, email: s
       }
     }
   } catch (err) {
-    console.warn("Notice linking past orders:", err);
+    handleFirestoreError(err, OperationType.UPDATE, "orders");
   }
 }
 
 /**
- * Sanitize object for Firestore to guarantee zero 'undefined' value errors
+ * Sanitize object for Firestore:
+ * Preserves Date and Firestore FieldValues (serverTimestamp, increment, arrayUnion)
+ * Strips undefined values to prevent SDK errors.
  */
 export function cleanFirestoreObject(obj: any): any {
   if (obj === undefined) return null;
   if (obj === null) return null;
   if (typeof obj !== "object") return obj;
+  if (obj instanceof Date) return obj;
+
+  // Preserve Firestore sentinel field values
+  if (
+    (obj as any)._methodName ||
+    (obj as any).constructor?.name === "FieldValueImpl" ||
+    (obj as any)._delegate
+  ) {
+    return obj;
+  }
+
   if (Array.isArray(obj)) {
     return obj.map(cleanFirestoreObject);
   }
+
   const cleaned: Record<string, any> = {};
   for (const [key, val] of Object.entries(obj)) {
     if (val === undefined) {
-      cleaned[key] = null;
-    } else if (val && typeof val === "object" && !Array.isArray(val) && !(val instanceof Date) && !(val as any)._methodName) {
+      continue;
+    } else if (val && typeof val === "object") {
       cleaned[key] = cleanFirestoreObject(val);
     } else {
       cleaned[key] = val;
@@ -264,9 +344,27 @@ export function cleanFirestoreObject(obj: any): any {
 }
 
 /**
+ * Fetch an order directly by orderRef from Firestore
+ */
+export async function getOrderFromFirestore(orderRef: string): Promise<Order | null> {
+  if (!orderRef) return null;
+  try {
+    const orderDocRef = doc(db, "orders", orderRef);
+    const snap = await getDoc(orderDocRef);
+    if (snap.exists()) {
+      return snap.data() as Order;
+    }
+    return null;
+  } catch (err) {
+    handleFirestoreError(err, OperationType.GET, `orders/${orderRef}`);
+    return null;
+  }
+}
+
+/**
  * Save order document in Firestore 'orders' collection
  */
-export async function saveOrderToFirestore(order: Order, userUid?: string) {
+export async function saveOrderToFirestore(order: Order, userUid?: string): Promise<boolean> {
   try {
     const orderDocRef = doc(db, "orders", order.orderRef);
     const cleanPhone = extractCleanPhone(order.shippingAddress?.phone);
@@ -284,11 +382,16 @@ export async function saveOrderToFirestore(order: Order, userUid?: string) {
     };
 
     const sanitizedPayload = cleanFirestoreObject(rawPayload);
-    await setDoc(orderDocRef, sanitizedPayload);
+
+    // 5-second race timeout to guarantee non-hanging behavior
+    await Promise.race([
+      setDoc(orderDocRef, sanitizedPayload, { merge: true }),
+      new Promise((_, reject) => setTimeout(() => reject(new Error("Firestore save timeout")), 5000)),
+    ]);
 
     if (uid) {
       const customerRef = doc(db, "customers", uid);
-      await setDoc(
+      setDoc(
         customerRef,
         {
           totalOrders: increment(1),
@@ -297,10 +400,12 @@ export async function saveOrderToFirestore(order: Order, userUid?: string) {
           lastOrderAt: serverTimestamp(),
         },
         { merge: true }
-      );
+      ).catch(() => {});
     }
+    return true;
   } catch (err) {
-    console.warn("Firestore saveOrder error:", err);
+    handleFirestoreError(err, OperationType.WRITE, `orders/${order.orderRef}`);
+    return false;
   }
 }
 
@@ -310,26 +415,27 @@ export async function saveOrderToFirestore(order: Order, userUid?: string) {
 export async function updateFirestoreOrderStatus(
   orderRef: string,
   updates: Partial<Order>
-) {
+): Promise<boolean> {
   try {
     const orderDocRef = doc(db, "orders", orderRef);
-    await setDoc(
-      orderDocRef,
-      {
-        ...updates,
-        updatedAt: serverTimestamp(),
-      },
-      { merge: true }
-    );
+    const cleanUpdates = cleanFirestoreObject({
+      ...updates,
+      updatedAt: serverTimestamp(),
+    });
+
+    await Promise.race([
+      setDoc(orderDocRef, cleanUpdates, { merge: true }),
+      new Promise((_, reject) => setTimeout(() => reject(new Error("Firestore update timeout")), 5000)),
+    ]);
+    return true;
   } catch (err) {
-    console.warn("Firestore updateOrderStatus error:", err);
+    handleFirestoreError(err, OperationType.UPDATE, `orders/${orderRef}`);
+    return false;
   }
 }
 
 /**
  * Listen to orders for a specific user in real-time.
- * Strictly queries customerUid and firebaseUid to guarantee
- * all user orders appear and never vanish across page refreshes or device changes.
  */
 export function subscribeUserOrders(
   userUid: string | undefined,
@@ -350,7 +456,6 @@ export function subscribeUserOrders(
       callback(list);
     };
 
-    // 1. Query by customerUid if present (guarantees strict 100% user exclusivity)
     if (userUid) {
       const qUid = query(ordersCol, where("customerUid", "==", userUid));
       const unsub1 = onSnapshot(
@@ -365,30 +470,12 @@ export function subscribeUserOrders(
           emitAggregated();
         },
         (error) => {
-          console.warn("Firestore user orders UID listener notice:", error);
+          handleFirestoreError(error, OperationType.GET, "orders");
         }
       );
       unsubs.push(unsub1);
-
-      // Query by firebaseUid fallback
-      const qFbUid = query(ordersCol, where("firebaseUid", "==", userUid));
-      const unsubFb = onSnapshot(
-        qFbUid,
-        (snapshot) => {
-          snapshot.forEach((d) => {
-            const data = d.data() as Order;
-            if (!data.customerUid || data.customerUid === userUid || (data as any).firebaseUid === userUid) {
-              aggregatedMap.set(d.id, data);
-            }
-          });
-          emitAggregated();
-        },
-        () => {}
-      );
-      unsubs.push(unsubFb);
     }
 
-    // 2. Query by customerEmail if valid email (only for orders belonging to this user)
     if (cleanEmail && cleanEmail.includes("@") && !cleanEmail.endsWith("@phone.manopavana.com")) {
       const qEmail = query(ordersCol, where("customerEmail", "==", cleanEmail));
       const unsubEmail = onSnapshot(
@@ -396,7 +483,6 @@ export function subscribeUserOrders(
         (snapshot) => {
           snapshot.forEach((d) => {
             const data = d.data() as Order;
-            // Never leak orders explicitly owned by another userUid
             if (!data.customerUid || data.customerUid === userUid) {
               aggregatedMap.set(d.id, data);
             }
@@ -404,7 +490,7 @@ export function subscribeUserOrders(
           emitAggregated();
         },
         (error) => {
-          console.warn("Firestore user orders email listener notice:", error);
+          handleFirestoreError(error, OperationType.GET, "orders");
         }
       );
       unsubs.push(unsubEmail);
@@ -414,7 +500,7 @@ export function subscribeUserOrders(
       unsubs.forEach((u) => u());
     };
   } catch (err) {
-    console.warn("Failed to subscribe user orders:", err);
+    handleFirestoreError(err, OperationType.LIST, "orders");
     return () => {};
   }
 }
@@ -436,11 +522,11 @@ export function subscribeReviews(callback: (reviews: CustomerReview[]) => void) 
         callback(list);
       },
       (error) => {
-        console.warn("Reviews snapshot notice:", error);
+        handleFirestoreError(error, OperationType.LIST, "reviews");
       }
     );
   } catch (err) {
-    console.warn("Failed to subscribe reviews:", err);
+    handleFirestoreError(err, OperationType.LIST, "reviews");
     return () => {};
   }
 }
@@ -449,21 +535,31 @@ export function subscribeReviews(callback: (reviews: CustomerReview[]) => void) 
  * Add a new customer review to Firestore
  */
 export async function addReviewToFirestore(review: Omit<CustomerReview, "id">) {
-  const reviewsCol = collection(db, "reviews");
-  const newDoc = doc(reviewsCol);
-  await setDoc(newDoc, {
-    ...review,
-    createdAt: serverTimestamp(),
-  });
-  return newDoc.id;
+  try {
+    const reviewsCol = collection(db, "reviews");
+    const newDoc = doc(reviewsCol);
+    await setDoc(newDoc, {
+      ...review,
+      createdAt: serverTimestamp(),
+    });
+    return newDoc.id;
+  } catch (err) {
+    handleFirestoreError(err, OperationType.WRITE, "reviews");
+    throw err;
+  }
 }
 
 /**
- * Delete a review from Firestore (PIN 1917 protected)
+ * Delete a review from Firestore
  */
 export async function deleteReviewFromFirestore(reviewId: string) {
-  const reviewDocRef = doc(db, "reviews", reviewId);
-  await deleteDoc(reviewDocRef);
+  try {
+    const reviewDocRef = doc(db, "reviews", reviewId);
+    await deleteDoc(reviewDocRef);
+  } catch (err) {
+    handleFirestoreError(err, OperationType.DELETE, `reviews/${reviewId}`);
+    throw err;
+  }
 }
 
 /**
@@ -481,7 +577,7 @@ export async function saveStoreConfigToFirestore(config: StoreCMSConfig) {
       { merge: true }
     );
   } catch (err) {
-    console.warn("Firestore saveStoreConfig error:", err);
+    handleFirestoreError(err, OperationType.WRITE, "settings/store_config");
   }
 }
 
@@ -499,11 +595,11 @@ export function subscribeStoreConfig(callback: (config: StoreCMSConfig) => void)
         }
       },
       (error) => {
-        console.warn("Firestore store_config snapshot notice:", error);
+        handleFirestoreError(error, OperationType.GET, "settings/store_config");
       }
     );
   } catch (err) {
-    console.warn("Failed to subscribe store_config:", err);
+    handleFirestoreError(err, OperationType.GET, "settings/store_config");
     return () => {};
   }
 }
@@ -525,7 +621,7 @@ export function subscribeAllOrders(callback: (orders: Order[]) => void) {
         callback(list);
       },
       (error) => {
-        console.warn("Firestore all orders listener notice:", error);
+        handleFirestoreError(error, OperationType.LIST, "orders");
         // Fallback without orderBy
         return onSnapshot(ordersCol, (snapshot) => {
           const list: Order[] = [];
@@ -537,7 +633,7 @@ export function subscribeAllOrders(callback: (orders: Order[]) => void) {
       }
     );
   } catch (err) {
-    console.warn("Failed to subscribe all orders:", err);
+    handleFirestoreError(err, OperationType.LIST, "orders");
     return () => {};
   }
 }

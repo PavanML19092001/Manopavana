@@ -102,12 +102,33 @@ export const AdminPage: React.FC = () => {
   // Bangalore Local Manual Tracking State
   const [blrCourier, setBlrCourier] = useState<Record<string, string>>({});
   const [blrNotes, setBlrNotes] = useState<Record<string, string>>({});
+  const [blrTracking, setBlrTracking] = useState<Record<string, string>>({});
+  const [blrStatus, setBlrStatus] = useState<Record<string, OrderStatus>>({});
+  const [savedSuccessRef, setSavedSuccessRef] = useState<Record<string, boolean>>({});
 
   const handleSaveBlrTracking = async (orderRef: string, currentOrd: Order) => {
-    const courierVal = blrCourier[orderRef] !== undefined ? blrCourier[orderRef] : (currentOrd.courier || "MANOPAVANA Peenya Direct Fleet");
-    const notesVal = blrNotes[orderRef] !== undefined ? blrNotes[orderRef] : (currentOrd.notes || "");
-    await updateOrderDetails(orderRef, { courier: courierVal, notes: notesVal });
-    showToast(`Bengaluru tracking details saved for #${orderRef}`);
+    try {
+      const courierVal = blrCourier[orderRef] !== undefined ? blrCourier[orderRef] : (currentOrd.courier || "MANOPAVANA Peenya Direct Fleet");
+      const notesVal = blrNotes[orderRef] !== undefined ? blrNotes[orderRef] : (currentOrd.notes || "");
+      const trackingVal = blrTracking[orderRef] !== undefined ? blrTracking[orderRef] : (currentOrd.trackingNumber || "");
+      const statusVal = blrStatus[orderRef] || currentOrd.orderStatus || "Dispatched";
+
+      await updateOrderDetails(orderRef, {
+        courier: courierVal,
+        notes: notesVal,
+        trackingNumber: trackingVal,
+        orderStatus: statusVal,
+      });
+
+      setSavedSuccessRef((p) => ({ ...p, [orderRef]: true }));
+      setTimeout(() => {
+        setSavedSuccessRef((p) => ({ ...p, [orderRef]: false }));
+      }, 4000);
+      showToast(`Bengaluru tracking details saved for #${orderRef}`);
+    } catch (err) {
+      console.error("Failed to save tracking:", err);
+      showToast(`Error saving tracking details for #${orderRef}`);
+    }
   };
 
   const handleCopyRiderDrop = (ord: Order) => {
@@ -336,12 +357,6 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
     setStock(cmsConfig.stock);
   }, [cmsConfig]);
 
-  // STRICT ACCESS SECURITY GATE
-  // If not logged in as manopavana@gmail.com, immediately redirect to Home page
-  if (!currentUser || currentUser.email !== "manopavana@gmail.com") {
-    return <Navigate to="/" replace />;
-  }
-
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     const ok = await authenticateAdmin(pinInput);
@@ -425,15 +440,17 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                   isDark ? "text-[#D8C8B8]" : "text-[#5C4230]"
                 }`}
               >
-                Logged in as{" "}
-                <span
-                  className={`font-semibold ${
-                    isDark ? "text-[#FAF4EA]" : "text-[#1F120A]"
-                  }`}
-                >
-                  {currentUser.email}
-                </span>
-                . Enter PIN to unlock live CMS & dispatch hub.
+                {currentUser?.email ? (
+                  <>
+                    Logged in as{" "}
+                    <span className="font-semibold text-amber-500">
+                      {currentUser.email}
+                    </span>
+                    . Enter PIN to unlock live CMS & dispatch hub.
+                  </>
+                ) : (
+                  <>Enter Master Security PIN (1917) to unlock store management.</>
+                )}
               </p>
             </div>
 
@@ -587,7 +604,7 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
               </span>
             </div>
             <p className="text-xs text-[#D6C4B0] mt-0.5">
-              Admin: {currentUser.email} • Facility: {facilityAddress}
+              Admin: {currentUser?.email || "Master PIN 1917 Authorized"} • Facility: {facilityAddress}
             </p>
           </div>
         </div>
@@ -1409,14 +1426,14 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                             </span>
                           </div>
 
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-1">
                             <div>
                               <label className={`block text-[11px] font-bold mb-1 ${isDark ? "text-[#D8C8B8]" : "text-[#5C4230]"}`}>
-                                Delivery Partner / Rider Name
+                                Delivery Partner / Rider
                               </label>
                               <input
                                 type="text"
-                                placeholder="e.g. MANOPAVANA Peenya Direct / Rider Ramesh"
+                                placeholder="e.g. MANOPAVANA Peenya Direct / Borzo"
                                 value={blrCourier[ord.orderRef] !== undefined ? blrCourier[ord.orderRef] : (ord.courier || "")}
                                 onChange={(e) =>
                                   setBlrCourier((p) => ({ ...p, [ord.orderRef]: e.target.value }))
@@ -1431,11 +1448,11 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
 
                             <div>
                               <label className={`block text-[11px] font-bold mb-1 ${isDark ? "text-[#D8C8B8]" : "text-[#5C4230]"}`}>
-                                Rider Contact / Delivery Notes
+                                Rider Contact / Notes
                               </label>
                               <input
                                 type="text"
-                                placeholder="e.g. Ph: +91 9886012345 • Slot: Evening 4-6 PM"
+                                placeholder="e.g. Ph: +91 9886012345 • Slot: 4-6 PM"
                                 value={blrNotes[ord.orderRef] !== undefined ? blrNotes[ord.orderRef] : (ord.notes || "")}
                                 onChange={(e) =>
                                   setBlrNotes((p) => ({ ...p, [ord.orderRef]: e.target.value }))
@@ -1447,6 +1464,48 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                                 }`}
                               />
                             </div>
+
+                            <div>
+                              <label className={`block text-[11px] font-bold mb-1 ${isDark ? "text-[#D8C8B8]" : "text-[#5C4230]"}`}>
+                                Tracking / Waybill Number
+                              </label>
+                              <input
+                                type="text"
+                                placeholder="e.g. MV-BLR-83801"
+                                value={blrTracking[ord.orderRef] !== undefined ? blrTracking[ord.orderRef] : (ord.trackingNumber || "")}
+                                onChange={(e) =>
+                                  setBlrTracking((p) => ({ ...p, [ord.orderRef]: e.target.value }))
+                                }
+                                className={`w-full px-2.5 py-1.5 rounded-lg text-xs font-mono focus:outline-none focus:ring-1 focus:ring-[#E08F35] ${
+                                  isDark
+                                    ? "bg-[#140D07] border border-[#362114] text-[#FAF4EA]"
+                                    : "bg-white border border-[#DDD1BE] text-[#1F120A]"
+                                }`}
+                              />
+                            </div>
+
+                            <div>
+                              <label className={`block text-[11px] font-bold mb-1 ${isDark ? "text-[#D8C8B8]" : "text-[#5C4230]"}`}>
+                                Fulfillment Status
+                              </label>
+                              <select
+                                value={blrStatus[ord.orderRef] || ord.orderStatus || "Placed"}
+                                onChange={(e) =>
+                                  setBlrStatus((p) => ({ ...p, [ord.orderRef]: e.target.value as OrderStatus }))
+                                }
+                                className={`w-full px-2.5 py-1.5 rounded-lg text-xs font-bold focus:outline-none focus:ring-1 focus:ring-[#E08F35] ${
+                                  isDark
+                                    ? "bg-[#140D07] border border-[#362114] text-[#FAF4EA]"
+                                    : "bg-white border border-[#DDD1BE] text-[#1F120A]"
+                                }`}
+                              >
+                                <option value="Placed">Placed (Pending Fulfillment)</option>
+                                <option value="Processing">Processing (Peenya Facility)</option>
+                                <option value="Dispatched">Dispatched (Out for Delivery)</option>
+                                <option value="Delivered">Delivered (Completed)</option>
+                                <option value="Cancelled">Cancelled</option>
+                              </select>
+                            </div>
                           </div>
 
                           <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-stone-200 dark:border-stone-800">
@@ -1454,11 +1513,18 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                               <button
                                 type="button"
                                 onClick={() => handleSaveBlrTracking(ord.orderRef, ord)}
-                                className="px-3 py-1.5 rounded-lg bg-[#5E3210] hover:bg-[#43230A] text-white font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+                                className="px-3.5 py-1.5 rounded-lg bg-[#5E3210] hover:bg-[#43230A] text-white font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
                               >
                                 <Save className="w-3.5 h-3.5 text-amber-300" />
                                 <span>Save Tracking Details</span>
                               </button>
+
+                              {savedSuccessRef[ord.orderRef] && (
+                                <span className="text-[11px] font-bold text-emerald-600 bg-emerald-500/15 border border-emerald-500/30 px-2.5 py-1 rounded-md flex items-center gap-1 animate-fade-in">
+                                  <Check className="w-3.5 h-3.5 text-emerald-600" />
+                                  <span>Saved to Firestore!</span>
+                                </span>
+                              )}
 
                               <button
                                 type="button"

@@ -1,0 +1,100 @@
+{
+  "entities": {
+    "Customer": {
+      "title": "Customer",
+      "description": "Registered customer profile, saved address, and persistent cart",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "phone": { "type": "string" },
+        "cart": { "type": "array" },
+        "savedAddress": { "type": "object" },
+        "totalOrders": { "type": "number" },
+        "totalSpent": { "type": "number" },
+        "lastOrderRef": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid"]
+    },
+    "Order": {
+      "title": "Order",
+      "description": "Order records with line items, delivery address, tracking and payment details",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "orderRef": { "type": "string" },
+        "customerUid": { "type": "string" },
+        "customerEmail": { "type": "string" },
+        "customerPhone": { "type": "string" },
+        "items": { "type": "array" },
+        "subtotal": { "type": "number" },
+        "discount": { "type": "number" },
+        "shippingFee": { "type": "number" },
+        "total": { "type": "number" },
+        "paymentMethod": { "type": "string" },
+        "paymentMode": { "type": "string" },
+        "paymentStatus": { "type": "string" },
+        "orderStatus": { "type": "string" },
+        "shippingAddress": { "type": "object" },
+        "trackingNumber": { "type": "string" },
+        "courier": { "type": "string" },
+        "notes": { "type": "string" },
+        "isBuyNow": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["orderRef", "total", "orderStatus"]
+    },
+    "Review": {
+      "title": "Review",
+      "description": "Customer feedback and ratings for oils",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "rating": { "type": "number" },
+        "comment": { "type": "string" },
+        "oil": { "type": "string" },
+        "verified": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "rating", "comment"]
+    },
+    "StoreConfig": {
+      "title": "StoreConfig",
+      "description": "Storewide CMS configuration, pricing, and banners",
+      "type": "object",
+      "properties": {
+        "announcementTicker": { "type": "string" },
+        "heroHeadline": { "type": "string" },
+        "heroSubhead": { "type": "string" },
+        "brandTagline": { "type": "string" },
+        "prices": { "type": "object" },
+        "stock": { "type": "object" },
+        "freeShippingThreshold": { "type": "number" },
+        "standardShippingFee": { "type": "number" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      }
+    }
+  },
+  "firestore": {
+    "/customers/{userId}": {
+      "schema": { "$ref": "#/entities/Customer" },
+      "description": "Customer accounts and synced carts"
+    },
+    "/orders/{orderId}": {
+      "schema": { "$ref": "#/entities/Order" },
+      "description": "E-commerce customer orders"
+    },
+    "/reviews/{reviewId}": {
+      "schema": { "$ref": "#/entities/Review" },
+      "description": "Customer product reviews"
+    },
+    "/settings/{settingId}": {
+      "schema": { "$ref": "#/entities/StoreConfig" },
+      "description": "Store configuration and dynamic pricing"
+    }
+  }
+}

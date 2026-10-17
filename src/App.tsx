@@ -15,8 +15,9 @@ import { CheckoutPage } from "./pages/CheckoutPage";
 import { AccountPage } from "./pages/AccountPage";
 import { AdminPage } from "./pages/AdminPage";
 import { useStore } from "./context/StoreContext";
+import { Order } from "./types";
 import { PendingOrderBanner } from "./components/PendingOrderBanner";
-import { updateFirestoreOrderStatus } from "./firebase";
+import { updateFirestoreOrderStatus, getOrderFromFirestore } from "./firebase";
 import { sendOrderConfirmationEmail } from "./services/emailService";
 import { Sparkles } from "lucide-react";
 
@@ -103,6 +104,20 @@ export default function App() {
 
     async function verifyReturn(ref: string) {
       try {
+        // 1. Retrieve the exact order directly from Firestore
+        let matched: Order | null | undefined = await getOrderFromFirestore(ref);
+        if (!matched) {
+          matched = getOrder(ref) || null;
+        }
+        if (!matched) {
+          try {
+            const pendingRaw = localStorage.getItem("pending_order_data");
+            if (pendingRaw) matched = JSON.parse(pendingRaw);
+          } catch {
+            // ignore
+          }
+        }
+
         const resp = await fetch(`/api?action=verify_order&orderRef=${encodeURIComponent(ref)}`);
         const data = await resp.json();
         const code = data.code || "";
@@ -114,17 +129,6 @@ export default function App() {
           state === "COMPLETED" ||
           state === "SUCCESS"
         ) {
-          // 1. Retrieve matched order data before clearing storage
-          let matched = getOrder(ref);
-          if (!matched) {
-            try {
-              const pendingRaw = localStorage.getItem("pending_order_data");
-              if (pendingRaw) matched = JSON.parse(pendingRaw);
-            } catch {
-              // ignore
-            }
-          }
-
           // Clear pending order tracking keys from localStorage
           localStorage.removeItem("pending_order_ref");
           localStorage.removeItem("pending_order_timestamp");
@@ -163,51 +167,38 @@ export default function App() {
             paymentStatus: "FAILED",
           });
 
-          let matched = getOrder(ref);
-          if (!matched) {
-            try {
-              const pendingRaw = localStorage.getItem("pending_order_data");
-              if (pendingRaw) matched = JSON.parse(pendingRaw);
-            } catch {
-              // ignore
-            }
-          }
-
-          if (matched) {
+          if (matched && matched.items && matched.items.length > 0) {
             setPaymentFailedOrder(matched);
           } else {
+            // If matched was not found, try to reconstruct from cart if items exist
+            const fallbackItems = cart.length > 0 ? [...cart] : [];
             const fallbackOrder = {
               id: ref,
               orderRef: ref,
               date: "Just now",
               timestamp: Date.now(),
               timestampMs: Date.now(),
-              items: [...cart],
-              subtotal,
+              items: fallbackItems,
+              subtotal: fallbackItems.reduce((acc, i) => acc + i.price * i.quantity, 0),
               discount,
               shippingFee,
-              total,
+              total: fallbackItems.reduce((acc, i) => acc + i.price * i.quantity, 0),
               paymentMethod: "phonepe" as const,
               paymentMode: "PHONEPE",
               paymentStatus: "FAILED",
               orderStatus: "Payment Incomplete" as const,
               shippingAddress: address,
             };
-            setPaymentFailedOrder(fallbackOrder);
+            if (fallbackOrder.items.length > 0) {
+              setPaymentFailedOrder(fallbackOrder);
+            }
           }
         }
       } catch (err) {
         console.warn("Payment verification error:", err);
-        let matched = getOrder(ref);
-        if (!matched) {
-          try {
-            const pendingRaw = localStorage.getItem("pending_order_data");
-            if (pendingRaw) matched = JSON.parse(pendingRaw);
-          } catch {
-            // ignore
-          }
-        }
-        if (matched) {
+        let matched: Order | null | undefined = await getOrderFromFirestore(ref);
+        if (!matched) matched = getOrder(ref) || null;
+        if (matched && matched.items && matched.items.length > 0) {
           setPaymentFailedOrder(matched);
         }
       }

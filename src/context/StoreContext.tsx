@@ -31,6 +31,7 @@ import {
   syncCustomerDoc,
   subscribeStoreConfig,
   saveStoreConfigToFirestore,
+  getOrderFromFirestore,
 } from "../firebase";
 import { doc, setDoc, onSnapshot, serverTimestamp } from "firebase/firestore";
 import { sendOrderConfirmationEmail } from "../services/emailService";
@@ -92,6 +93,7 @@ interface StoreContextType {
   adminOrders: Order[];
   saveOrder: (order: Order) => Promise<void>;
   getOrder: (refOrId: string) => Order | undefined;
+  getOrderAsync: (refOrId: string) => Promise<Order | undefined>;
   updateOrderStatus: (orderId: string, status: Order["orderStatus"]) => Promise<void>;
   updateOrderDetails: (orderRef: string, updates: Partial<Order>) => Promise<void>;
   deleteOrder: (orderRef: string) => Promise<void>;
@@ -265,10 +267,24 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const currentUidRef = useRef<string | null>(null);
   const customerDocUnsubRef = useRef<(() => void) | null>(null);
 
-  const [cart, setCart] = useState<CartItem[]>([]);
+  const [cart, setCart] = useState<CartItem[]>(() => {
+    try {
+      const saved = localStorage.getItem("manopavana_active_cart");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch {}
+    return [];
+  });
 
-  // Sync cart to Firestore whenever cart changes for authenticated user
+  // Sync cart to local persistent storage and Firestore whenever cart changes
   useEffect(() => {
+    try {
+      localStorage.setItem("manopavana_active_cart", JSON.stringify(cart));
+    } catch {
+      // ignore
+    }
     if (!isCartInitializedRef.current) return;
     try {
       if (currentUser?.uid) {
@@ -636,20 +652,50 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           const profile = await syncCustomerDoc(user);
           if (profile && Array.isArray((profile as any).cart) && (profile as any).cart.length > 0) {
             setCart((profile as any).cart);
+            try {
+              localStorage.setItem("manopavana_active_cart", JSON.stringify((profile as any).cart));
+            } catch {}
           } else {
-            setCart([]);
+            // Retain active cart items from local persistent storage and save to Firestore customer profile
+            setCart((prev) => {
+              const currentToKeep = prev.length > 0 ? prev : (() => {
+                try {
+                  const s = localStorage.getItem("manopavana_active_cart");
+                  return s ? JSON.parse(s) : [];
+                } catch { return []; }
+              })();
+              if (currentToKeep.length > 0) {
+                setDoc(doc(db, "customers", user.uid), { cart: currentToKeep, updatedAt: serverTimestamp() }, { merge: true }).catch(() => {});
+              }
+              return currentToKeep;
+            });
           }
 
+          // Extract clean phone and email safely
+          let userPhone = (profile as any)?.phone || user.phoneNumber || "";
+          if (!userPhone && user.email && user.email.endsWith("@phone.manopavana.com")) {
+            userPhone = user.email.split("@")[0];
+          }
+          const userEmail = (profile as any)?.email || (user.email && !user.email.endsWith("@phone.manopavana.com") ? user.email : "");
+          const userName = (profile as any)?.name || user.displayName || "";
+
           if (profile && (profile as any).savedAddress) {
-            setAddress((profile as any).savedAddress);
+            const saved = (profile as any).savedAddress;
+            setAddress((prev) => ({
+              ...prev,
+              ...saved,
+              fullName: saved.fullName || userName || prev.fullName || "",
+              phone: saved.phone || userPhone || prev.phone || "",
+              email: saved.email || userEmail || prev.email || "",
+            }));
             setLocationModalOpen(false);
           } else {
-            setAddress({
-              ...DEFAULT_ADDRESS,
-              fullName: user.displayName || "",
-              email: user.email || "",
-              phone: user.phoneNumber || "",
-            });
+            setAddress((prev) => ({
+              ...prev,
+              fullName: userName || prev.fullName || "",
+              email: userEmail || prev.email || "",
+              phone: userPhone || prev.phone || "",
+            }));
           }
 
           // 2. Bind real-time snapshot listener on customers/{user.uid} so any change on laptop instantly syncs to mobile
@@ -658,11 +704,27 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             (snap) => {
               if (!snap.exists()) return;
               const data = snap.data();
-              if (Array.isArray(data?.cart)) {
+              if (Array.isArray(data?.cart) && data.cart.length > 0) {
                 setCart(data.cart);
+                try {
+                  localStorage.setItem("manopavana_active_cart", JSON.stringify(data.cart));
+                } catch {}
               }
               if (data?.savedAddress && typeof data.savedAddress === "object") {
-                setAddress(data.savedAddress);
+                setAddress((prev) => ({
+                  ...prev,
+                  ...data.savedAddress,
+                  fullName: data.savedAddress.fullName || data.name || prev.fullName,
+                  phone: data.savedAddress.phone || data.phone || prev.phone,
+                  email: data.savedAddress.email || data.email || prev.email,
+                }));
+              } else if (data?.name || data?.phone || data?.email) {
+                setAddress((prev) => ({
+                  ...prev,
+                  fullName: data.name || prev.fullName,
+                  phone: data.phone || prev.phone,
+                  email: data.email || prev.email,
+                }));
               }
             },
             (err) => {
@@ -675,10 +737,8 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           isCartInitializedRef.current = true;
         }
       } else {
-        // User logged out: clear all orders and cart completely so no data leaks to guest session
+        // User logged out: clear personal orders
         setOrders([]);
-        setCart([]);
-        setAddress(DEFAULT_ADDRESS);
         isCartInitializedRef.current = true;
       }
     });
@@ -1022,13 +1082,43 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     );
     if (userMatch) return userMatch;
 
-    // 2. Check admin orders ONLY for authenticated store admin
+    // 2. Check payment failed order in memory
+    if (paymentFailedOrder && (paymentFailedOrder.orderRef === refOrId || paymentFailedOrder.id === refOrId)) {
+      return paymentFailedOrder;
+    }
+
+    // 3. Check pending order in local storage
+    try {
+      const pendingRaw = localStorage.getItem("pending_order_data");
+      if (pendingRaw) {
+        const parsed = JSON.parse(pendingRaw);
+        if (parsed.orderRef === refOrId || parsed.id === refOrId) {
+          return parsed;
+        }
+      }
+    } catch {}
+
+    // 4. Check admin orders ONLY for authenticated store admin
     if (isAdminAuthenticated || currentUser?.email === "manopavana@gmail.com") {
       const adminMatch = adminOrders.find(
         (o) => o.id === refOrId || o.orderRef === refOrId || o.trackingNumber === refOrId
       );
       if (adminMatch) return adminMatch;
     }
+
+    return undefined;
+  };
+
+  const getOrderAsync = async (refOrId: string): Promise<Order | undefined> => {
+    const syncMatch = getOrder(refOrId);
+    if (syncMatch) return syncMatch;
+
+    try {
+      const fromFirestore = await getOrderFromFirestore(refOrId);
+      if (fromFirestore) {
+        return fromFirestore;
+      }
+    } catch {}
 
     return undefined;
   };
@@ -1114,9 +1204,16 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       } else {
         setCart(order.items);
         try {
-          localStorage.setItem("manopavana_cart", JSON.stringify(order.items));
+          localStorage.setItem("manopavana_active_cart", JSON.stringify(order.items));
         } catch {
           // ignore
+        }
+        if (currentUser?.uid) {
+          setDoc(
+            doc(db, "customers", currentUser.uid),
+            { cart: order.items, updatedAt: serverTimestamp() },
+            { merge: true }
+          ).catch(() => {});
         }
       }
     }
@@ -1130,6 +1227,14 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     let target = getOrder(orderRef);
     if (!target && paymentFailedOrder?.orderRef === orderRef) {
       target = paymentFailedOrder;
+    }
+    if (!target) {
+      try {
+        const fromDb = await getOrderFromFirestore(orderRef);
+        if (fromDb) target = fromDb;
+      } catch {
+        // ignore
+      }
     }
     if (!target) {
       try {
@@ -1616,6 +1721,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         adminOrders,
         saveOrder,
         getOrder,
+        getOrderAsync,
         updateOrderStatus,
         updateOrderDetails,
         deleteOrder,

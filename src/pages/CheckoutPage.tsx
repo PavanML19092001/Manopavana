@@ -15,6 +15,7 @@ import {
   ExternalLink,
   User,
   LogIn,
+  Zap,
 } from "lucide-react";
 import L from "leaflet";
 import { useStore } from "../context/StoreContext";
@@ -24,7 +25,8 @@ import {
   PHONEPE_CONFIG,
 } from "../constants";
 import { Order } from "../types";
-import { updateFirestoreOrderStatus } from "../firebase";
+import { updateFirestoreOrderStatus, getOrderFromFirestore, db } from "../firebase";
+import { doc, getDoc } from "firebase/firestore";
 import { sendOrderConfirmationEmail } from "../services/emailService";
 
 export const CheckoutPage: React.FC = () => {
@@ -71,11 +73,18 @@ export const CheckoutPage: React.FC = () => {
   const checkoutTotal =
     checkoutItems.length === 0 ? 0 : checkoutDiscountedSubtotal + checkoutShippingFee;
 
-  // Address Form State
-  const [fullName, setFullName] = useState(address.fullName);
-  const [phone, setPhone] = useState(address.phone);
-  const [addressLine1, setAddressLine1] = useState(address.addressLine1);
-  const [landmark, setLandmark] = useState(address.landmark);
+  // Address Form State with instant customer pre-fill
+  const [fullName, setFullName] = useState(() => address.fullName || currentUser?.displayName || "");
+  const [phone, setPhone] = useState(() => {
+    if (address.phone) return address.phone;
+    if (currentUser?.phoneNumber) return currentUser.phoneNumber.replace(/\D/g, "").slice(-10);
+    if (currentUser?.email && currentUser.email.endsWith("@phone.manopavana.com")) {
+      return currentUser.email.split("@")[0];
+    }
+    return "";
+  });
+  const [addressLine1, setAddressLine1] = useState(address.addressLine1 || "");
+  const [landmark, setLandmark] = useState(address.landmark || "");
   const [state, setState] = useState(address.state || "Karnataka");
   const [district, setDistrict] = useState(address.district || "Bengaluru Urban");
   const [pincode, setPincode] = useState(address.pincode || "560058");
@@ -84,6 +93,8 @@ export const CheckoutPage: React.FC = () => {
     Number.isFinite(address.lng) ? (address.lng as number) : 77.5946,
   ]);
   const [isLocating, setIsLocating] = useState(false);
+  const [iframePaymentUrl, setIframePaymentUrl] = useState<string | null>(null);
+  const [pendingPhonePeRef, setPendingPhonePeRef] = useState<string | null>(null);
 
   const safeUpdateMapCenter = (lat: number, lng: number, zoom = 14) => {
     if (!mapInstanceRef.current || !markerRef.current) return;
@@ -97,16 +108,25 @@ export const CheckoutPage: React.FC = () => {
     }
   };
 
-  // Auto-sync form state whenever address is updated globally anywhere across the app
+  // 1. Auto-fill from Auth & Address updates
   useEffect(() => {
+    if (currentUser) {
+      if (!fullName && currentUser.displayName) setFullName(currentUser.displayName);
+      const cleanPhone = currentUser.phoneNumber
+        ? currentUser.phoneNumber.replace(/\D/g, "").slice(-10)
+        : currentUser.email?.endsWith("@phone.manopavana.com")
+        ? currentUser.email.split("@")[0]
+        : "";
+      if (!phone && cleanPhone) setPhone(cleanPhone);
+    }
     if (address) {
-      if (address.fullName) setFullName(address.fullName);
-      if (address.phone) setPhone(address.phone);
-      if (address.addressLine1) setAddressLine1(address.addressLine1);
-      if (address.landmark) setLandmark(address.landmark);
+      if (address.fullName && !fullName) setFullName(address.fullName);
+      if (address.phone && !phone) setPhone(address.phone);
+      if (address.addressLine1 && !addressLine1) setAddressLine1(address.addressLine1);
+      if (address.landmark && !landmark) setLandmark(address.landmark);
       if (address.state) setState(address.state);
       if (address.district) setDistrict(address.district);
-      if (address.pincode) setPincode(address.pincode);
+      if (address.pincode && (!pincode || pincode === "560058")) setPincode(address.pincode);
       if (Number.isFinite(address.lat) && Number.isFinite(address.lng)) {
         const lat = address.lat as number;
         const lng = address.lng as number;
@@ -114,7 +134,60 @@ export const CheckoutPage: React.FC = () => {
         safeUpdateMapCenter(lat, lng, 15);
       }
     }
-  }, [address]);
+  }, [address, currentUser]);
+
+  // 2. Direct Firestore Customer Profile Sync on mount
+  useEffect(() => {
+    if (!currentUser?.uid) return;
+    let isMounted = true;
+    async function loadCustomerFromFirestore() {
+      try {
+        const snap = await getDoc(doc(db, "customers", currentUser!.uid));
+        if (snap.exists() && isMounted) {
+          const data = snap.data();
+          if (data.name && !fullName) setFullName(data.name);
+          if (data.phone && !phone) setPhone(data.phone);
+          if (data.savedAddress && typeof data.savedAddress === "object") {
+            const s = data.savedAddress;
+            if (s.fullName) setFullName(s.fullName);
+            if (s.phone) setPhone(s.phone);
+            if (s.addressLine1) setAddressLine1(s.addressLine1);
+            if (s.landmark) setLandmark(s.landmark);
+            if (s.pincode) setPincode(s.pincode);
+            if (s.district) setDistrict(s.district);
+            if (s.state) setState(s.state);
+            if (Number.isFinite(s.lat) && Number.isFinite(s.lng)) {
+              setCoords([s.lat, s.lng]);
+              safeUpdateMapCenter(s.lat, s.lng, 15);
+            }
+          }
+        }
+      } catch (err) {
+        console.warn("Notice loading customer from Firestore:", err);
+      }
+    }
+    loadCustomerFromFirestore();
+    return () => {
+      isMounted = false;
+    };
+  }, [currentUser?.uid]);
+
+  // Auto-save edited contact/address details to Firestore on blur so customer never retypes
+  const handleFieldBlur = () => {
+    if (fullName.trim() || phone.trim() || addressLine1.trim()) {
+      updateAddress({
+        fullName: fullName.trim(),
+        phone: phone.trim().replace(/\D/g, "").slice(-10),
+        addressLine1: addressLine1.trim(),
+        landmark: landmark.trim(),
+        pincode: pincode.trim(),
+        district,
+        state,
+        lat: coords[0],
+        lng: coords[1],
+      });
+    }
+  };
 
   // If user returns from cancelled/uncompleted online payment with empty bag, auto-recover items!
   useEffect(() => {
@@ -151,61 +224,19 @@ export const CheckoutPage: React.FC = () => {
   const [paymentError, setPaymentError] = useState<string | null>(null);
   const [lastAttemptedOrder, setLastAttemptedOrder] = useState<Order | null>(null);
 
-  // Check URL query parameters for return from PhonePe
+  // Check URL query parameters for return from PhonePe (non-blocking, App.tsx handles verification)
   const orderRefQuery = searchParams.get("orderRef");
-
   useEffect(() => {
     if (orderRefQuery) {
-      verifyPhonePeOrder(orderRefQuery);
+      async function syncReturnedOrder(ref: string) {
+        try {
+          const ord = await getOrderFromFirestore(ref);
+          if (ord) setLastAttemptedOrder(ord);
+        } catch {}
+      }
+      syncReturnedOrder(orderRefQuery);
     }
   }, [orderRefQuery]);
-
-  const verifyPhonePeOrder = async (ref: string) => {
-    setIsProcessing(true);
-    try {
-      const resp = await fetch(`/api?action=verify_order&orderRef=${encodeURIComponent(ref)}`);
-      if (resp.ok) {
-        const data = await resp.json();
-        if (data.status === "SUCCESS" || data.paymentStatus === "COMPLETED") {
-          // 1. Update Firestore order document to PHONEPE_PAID
-          await updateFirestoreOrderStatus(ref, {
-            paymentStatus: "PHONEPE_PAID" as any,
-            orderStatus: "Placed",
-          });
-
-          // 2. Dispatch order confirmation email via EmailJS to manopavana@gmail.com
-          const matchedOrder = getOrder(ref);
-          if (matchedOrder) {
-            await sendOrderConfirmationEmail({
-              ...matchedOrder,
-              paymentStatus: "PHONEPE_PAID" as any,
-            });
-          }
-
-          showToast("Payment verified online! Order confirmed.");
-          clearCart();
-          clearBuyNow();
-          navigate(`/account?order=${ref}`);
-          return;
-        }
-      }
-
-      // Incomplete or cancelled payment handling
-      setPaymentError(
-        "Online transaction was not completed or was cancelled. Your items are safe. You can retry with Online Payment or switch to Cash on Delivery."
-      );
-      // Retrieve stored pending order
-      const existing = getOrder(ref);
-      if (existing) {
-        setLastAttemptedOrder(existing);
-      }
-    } catch (e) {
-      console.warn("Verification notice:", e);
-      setPaymentError("Could not verify online payment status. You can retry with Online Payment or select Cash on Delivery.");
-    } finally {
-      setIsProcessing(false);
-    }
-  };
 
   const handleRetryPayment = () => {
     let orderToRestore = lastAttemptedOrder;
@@ -577,8 +608,19 @@ export const CheckoutPage: React.FC = () => {
         const data = await resp.json();
 
         if (resp.ok && data.status === "SUCCESS" && data.redirectUrl) {
-          window.location.href = data.redirectUrl;
-          return;
+          const isIframe = window.self !== window.top;
+          if (isIframe) {
+            setPendingPhonePeRef(phonePeOrderRef);
+            setIframePaymentUrl(data.redirectUrl);
+            setIsProcessing(false);
+            try {
+              window.open(data.redirectUrl, "_blank");
+            } catch {}
+            return;
+          } else {
+            window.location.href = data.redirectUrl;
+            return;
+          }
         } else {
           const errorMsg =
             data.message ||
@@ -642,6 +684,28 @@ export const CheckoutPage: React.FC = () => {
               <LogIn className="w-4 h-4 text-amber-300" />
               <span>Sign In / Register</span>
             </button>
+          </div>
+        )}
+
+        {/* Logged-in Customer Auto-fill Confirmation Banner */}
+        {currentUser && (
+          <div className="p-4 rounded-2xl bg-emerald-500/10 border-2 border-emerald-500/40 flex items-center justify-between gap-4 text-xs shadow-xs">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-emerald-500/20 text-emerald-600 border border-emerald-500/30 flex items-center justify-center shrink-0">
+                <CheckCircle2 className="w-5 h-5" />
+              </div>
+              <div>
+                <p className="font-bold text-xs text-[#1F120A] dark:text-[#FAF4EA]">
+                  Account Synced & Details Pre-Filled
+                </p>
+                <p className="text-[11px] text-[#6A523E] dark:text-[#D6C4B0] mt-0.5">
+                  Logged in as <strong className="text-emerald-700 dark:text-emerald-300">{fullName || currentUser.displayName || phone || currentUser.email}</strong>. Delivery address loaded from Firestore.
+                </p>
+              </div>
+            </div>
+            <span className="text-[10px] font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-500/15 px-2.5 py-1 rounded-full border border-emerald-500/30 shrink-0">
+              ✓ Firestore Synced
+            </span>
           </div>
         )}
 
@@ -1342,6 +1406,70 @@ export const CheckoutPage: React.FC = () => {
             </div>
           </div>
         </form>
+
+        {/* Iframe Safe Payment Launch Modal */}
+        {iframePaymentUrl && (
+          <div
+            role="dialog"
+            aria-modal="true"
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-fade-in"
+          >
+            <div className="relative w-full max-w-md bg-gradient-to-b from-[#24160F] to-[#140D09] text-[#FDF6EC] rounded-3xl p-6 sm:p-7 shadow-[0_25px_60px_rgba(0,0,0,0.95)] border-2 border-[#E08F35]/70 space-y-5">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#D49A37]/30 to-[#E08F35]/10 border border-[#E08F35]/40 flex items-center justify-center text-[#F5BC51] shrink-0">
+                  <Zap className="w-6 h-6 text-[#F5BC51]" />
+                </div>
+                <div>
+                  <h3 className="font-serif font-black text-base text-[#FFD885]">
+                    PhonePe Payment Gateway Ready
+                  </h3>
+                  <p className="text-[11px] text-[#A88D77]">
+                    Order Ref: <span className="font-mono text-amber-300 font-bold">#{pendingPhonePeRef}</span>
+                  </p>
+                </div>
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-[#180E09] border border-[#3D2514] text-xs text-[#D6BEAA] space-y-1.5">
+                <p className="font-bold text-[#FAF4EA]">Secure 256-Bit UPI & Card Gateway</p>
+                <p className="text-[11px] text-[#A88D77] leading-relaxed">
+                  Your order items and reserved stock have been secured in Firestore. Tap below to complete payment on the official PhonePe portal.
+                </p>
+              </div>
+
+              <div className="space-y-3 pt-1">
+                <a
+                  href={iframePaymentUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-[#D49A37] via-[#F5BC51] to-[#BF7E16] text-[#140D09] font-serif font-black tracking-wider uppercase shadow-[0_4px_20px_rgba(212,154,55,0.35)] border border-[#FFD885] transition-all flex items-center justify-center gap-2 cursor-pointer hover:brightness-110 text-xs"
+                >
+                  <span>Open PhonePe Gateway (New Tab)</span>
+                  <ExternalLink className="w-4 h-4 text-[#140D09]" />
+                </a>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIframePaymentUrl(null);
+                    handlePlaceOrder(undefined, "cod");
+                  }}
+                  className="w-full py-3 px-4 rounded-xl bg-[#1C110B] hover:bg-[#2C1D14] border-2 border-emerald-700/80 text-emerald-300 font-bold text-xs transition-colors flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <Banknote className="w-4 h-4 text-emerald-400" />
+                  <span>Switch to Cash on Delivery (COD)</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setIframePaymentUrl(null)}
+                  className="w-full text-center text-xs text-[#A88D77] hover:text-[#FAF4EA] cursor-pointer pt-1"
+                >
+                  Cancel & Return to Checkout
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
