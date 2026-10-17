@@ -1,17 +1,3 @@
-Here is the diagnosis of why AdminPage_4.tsx failed, followed by the complete, fully corrected, and verified code for src/pages/AdminPage.tsx.
-What Was Broken in AdminPage_4.tsx
- * Broken Import Case Sensitivity (Line 3):
-   import { StorefrontCMSPanel } from "../components/admin/StoreFrontCmsPanel";
-
-   The file on disk is typically named StorefrontCMSPanel.tsx (lowercase f and lowercase ms). On Linux/Cloudflare, this causes a module resolution failure.
- * Duplicate Unused Component Logic & State (Lines 48–78):
-   State variables like ticker, headline, subhead, tagline, logoUrl, founderName, prices, stock, and their corresponding submit handlers were still lingering in AdminPage_4.tsx even though <StorefrontCMSPanel/> handles all of them now.
- * Duplicated Two-Column Grid Layout (Lines 630–670):
-   The two-column grid (<div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">) was opened twice, causing the left column and right column markup to be rendered multiple times and resulting in unbalanced closing </div> tags.
- * Direct Packing Slip URL (Authentication Error):
-   The Print Label button was still linking to [https://track.delhivery.com/api/p/packing_slip](https://track.delhivery.com/api/p/packing_slip)... instead of your backend proxy endpoint /api?action=delhivery_packing_slip..., which triggers Authentication credentials were not provided.
-Complete, Clean & Verified Code for src/pages/AdminPage.tsx
-Replace the entire content of src/pages/AdminPage.tsx with this code:
 import React, { useState } from "react";
 import { StorefrontCMSPanel } from "../components/admin/StorefrontCMSPanel";
 import {
