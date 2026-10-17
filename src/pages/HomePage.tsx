@@ -1441,7 +1441,7 @@ export const HomePage: React.FC = () => {
                         setDeletePinInput("");
                         setDeletePinError(false);
                       }}
-                      title="Delete Review (Requires PIN 1234)"
+                      title="Delete Review (Requires Admin PIN 1917)"
                       className="opacity-0 group-hover:opacity-100 p-1 text-[#C8BAA8] hover:text-red-600 transition-opacity cursor-pointer"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
@@ -1490,7 +1490,7 @@ export const HomePage: React.FC = () => {
             ))}
           </div>
 
-          {/* PIN-Protected Review Deletion Modal (PIN 1234) */}
+          {/* PIN-Protected Review Deletion Modal (PIN 1917) */}
           {deletingReviewId && (
             <div
               role="dialog"
@@ -1519,14 +1519,14 @@ export const HomePage: React.FC = () => {
                     isDark ? "text-[#D6C4B0]" : "text-[#5C402D]"
                   }`}
                 >
-                  Deleting customer reviews from Firestore requires the authorized facility PIN (1234).
+                  Deleting customer reviews from Firestore requires the authorized facility PIN (1917).
                 </p>
 
                 <div>
                   <input
                     type="password"
                     maxLength={4}
-                    placeholder="Enter 4-digit PIN (1234)"
+                    placeholder="Enter 4-digit PIN (1917)"
                     value={deletePinInput}
                     onChange={(e) => {
                       setDeletePinInput(e.target.value);
@@ -1540,7 +1540,7 @@ export const HomePage: React.FC = () => {
                   />
                   {deletePinError && (
                     <p className="text-[11px] text-red-500 font-bold mt-1 text-center">
-                      Incorrect PIN. Use: 1234
+                      Incorrect PIN. Use: 1917
                     </p>
                   )}
                 </div>

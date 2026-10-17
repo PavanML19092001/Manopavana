@@ -28,6 +28,12 @@ import {
   RefreshCw,
   Trash2,
   Search,
+  Eye,
+  Key,
+  HelpCircle,
+  Info,
+  Globe,
+  FileText,
 } from "lucide-react";
 import { useStore } from "../context/StoreContext";
 import { BUSINESS_CONFIG } from "../constants";
@@ -49,12 +55,14 @@ export const AdminPage: React.FC = () => {
     updateOrderDetails,
     showToast,
     themeMode,
+    togglePreviewStorefront,
   } = useStore();
 
   const isDark = themeMode === "dark";
 
   const [pinInput, setPinInput] = useState("");
   const [pinError, setPinError] = useState(false);
+  const [showCloudflareGuide, setShowCloudflareGuide] = useState(false);
 
   // Editable config state
   const [ticker, setTicker] = useState(cmsConfig.announcementTicker);
@@ -65,6 +73,16 @@ export const AdminPage: React.FC = () => {
   const [videoUrl, setVideoUrl] = useState(cmsConfig.chekkuVideoUrl || "");
   const [threshold, setThreshold] = useState(cmsConfig.freeShippingThreshold);
   const [stdFee, setStdFee] = useState(cmsConfig.standardShippingFee);
+
+  // Expanded Business Credentials & Contact State
+  const [founderName, setFounderName] = useState(cmsConfig.founderName || BUSINESS_CONFIG.FOUNDER_NAME);
+  const [primaryPhone, setPrimaryPhone] = useState(cmsConfig.primaryPhone || BUSINESS_CONFIG.PRIMARY_PHONE);
+  const [altPhone, setAltPhone] = useState(cmsConfig.altPhone || BUSINESS_CONFIG.ALT_PHONE);
+  const [email, setEmail] = useState(cmsConfig.email || BUSINESS_CONFIG.EMAIL);
+  const [facilityAddress, setFacilityAddress] = useState(cmsConfig.facilityAddress || BUSINESS_CONFIG.FACILITY_ADDRESS);
+  const [fssaiLicense, setFssaiLicense] = useState(cmsConfig.fssaiLicense || BUSINESS_CONFIG.FSSAI_LICENSE);
+  const [gstin, setGstin] = useState(cmsConfig.gstin || BUSINESS_CONFIG.GSTIN);
+  const [blrNotice, setBlrNotice] = useState(cmsConfig.bangaloreDeliveryNotice || "Same-Day / Next-Day Direct Courier from Peenya Facility");
 
   // Price overrides
   const [prices, setPrices] = useState(cmsConfig.prices);
@@ -304,6 +322,14 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
     setTagline(cmsConfig.brandTagline || "Pure by nature, trusted for life");
     setLogoUrl(cmsConfig.brandLogoUrl || "");
     setVideoUrl(cmsConfig.chekkuVideoUrl || "");
+    setFounderName(cmsConfig.founderName || BUSINESS_CONFIG.FOUNDER_NAME);
+    setPrimaryPhone(cmsConfig.primaryPhone || BUSINESS_CONFIG.PRIMARY_PHONE);
+    setAltPhone(cmsConfig.altPhone || BUSINESS_CONFIG.ALT_PHONE);
+    setEmail(cmsConfig.email || BUSINESS_CONFIG.EMAIL);
+    setFacilityAddress(cmsConfig.facilityAddress || BUSINESS_CONFIG.FACILITY_ADDRESS);
+    setFssaiLicense(cmsConfig.fssaiLicense || BUSINESS_CONFIG.FSSAI_LICENSE);
+    setGstin(cmsConfig.gstin || BUSINESS_CONFIG.GSTIN);
+    setBlrNotice(cmsConfig.bangaloreDeliveryNotice || "Same-Day / Next-Day Direct Courier from Peenya Facility");
     setThreshold(cmsConfig.freeShippingThreshold);
     setStdFee(cmsConfig.standardShippingFee);
     setPrices(cmsConfig.prices);
@@ -316,14 +342,14 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
     return <Navigate to="/" replace />;
   }
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    const ok = authenticateAdmin(pinInput);
+    const ok = await authenticateAdmin(pinInput);
     if (!ok) {
       setPinError(true);
     } else {
       setPinError(false);
-      showToast("Admin session unlocked!");
+      showToast("Administrator portal unlocked successfully!");
     }
   };
 
@@ -337,12 +363,20 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
       brandTagline: tagline,
       brandLogoUrl: logoUrl,
       chekkuVideoUrl: videoUrl,
+      founderName,
+      primaryPhone,
+      altPhone,
+      email,
+      facilityAddress,
+      fssaiLicense,
+      gstin,
+      bangaloreDeliveryNotice: blrNotice,
       freeShippingThreshold: Number(threshold),
       standardShippingFee: Number(stdFee),
       prices,
       stock,
     }));
-    showToast("Storefront copy, branding & prices saved to Firestore live!");
+    showToast("Storefront copy, facility details & prices saved to Firestore live!");
   };
 
   const handleToggleStock = (key: keyof typeof stock) => {
@@ -352,7 +386,7 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
     }));
   };
 
-  // If logged in as manopavana@gmail.com, require PIN 1234
+  // If logged in as manopavana@gmail.com, require PIN 1917
   if (!isAdminAuthenticated) {
     return (
       <div
@@ -408,7 +442,7 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                 <input
                   type="password"
                   maxLength={4}
-                  placeholder="Enter 4-digit PIN (1234)"
+                  placeholder="Enter 4-digit PIN (1917)"
                   value={pinInput}
                   onChange={(e) => {
                     setPinInput(e.target.value);
@@ -422,7 +456,7 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                 />
                 {pinError && (
                   <p className="text-xs text-red-500 font-semibold mt-1.5">
-                    Invalid PIN. Enter secret administrator PIN (1234).
+                    Invalid PIN. Please enter secret PIN (1917) or configure encrypted ADMIN_PIN in Cloudflare.
                   </p>
                 )}
               </div>
@@ -433,6 +467,19 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
               >
                 Unlock Administration Portal
               </button>
+
+              <button
+                type="button"
+                onClick={() => setShowCloudflareGuide(true)}
+                className={`w-full py-2 rounded-xl text-[11px] font-semibold border flex items-center justify-center gap-1.5 transition-colors cursor-pointer ${
+                  isDark
+                    ? "bg-transparent border-[#362114] text-[#D8C8B8] hover:bg-[#1C120B]"
+                    : "bg-transparent border-[#DDD1BE] text-[#5C4230] hover:bg-[#FAF6EE]"
+                }`}
+              >
+                <Key className="w-3.5 h-3.5 text-[#E08F35]" />
+                <span>How to store PIN encrypted in Cloudflare</span>
+              </button>
             </form>
 
             <p
@@ -440,10 +487,78 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                 isDark ? "text-[#A89482]" : "text-[#7A5E48]"
               }`}
             >
-              Authorized Facility: Peenya 2nd Stage, Bangalore
+              Authorized Facility: Peenya 2nd Stage, Bangalore • Edge Verified
             </p>
           </div>
         </div>
+
+        {/* Cloudflare Guide Modal inside Gate */}
+        {showCloudflareGuide && (
+          <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4">
+            <div
+              className={`w-full max-w-xl rounded-3xl p-6 sm:p-8 space-y-5 text-left border shadow-2xl overflow-y-auto max-h-[90vh] ${
+                isDark ? "bg-[#1C120B] text-[#FAF4EA] border-[#362114]" : "bg-white text-[#1F120A] border-[#DDD1BE]"
+              }`}
+            >
+              <div className="flex items-center justify-between border-b pb-3 border-stone-200 dark:border-stone-800">
+                <div className="flex items-center gap-2">
+                  <Key className="w-5 h-5 text-[#E08F35]" />
+                  <h3 className="font-bold font-serif text-base">Cloudflare Encrypted PIN Setup Guide</h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowCloudflareGuide(false)}
+                  className="px-2.5 py-1 rounded-lg bg-stone-200 dark:bg-stone-800 text-xs font-bold"
+                >
+                  ✕ Close
+                </button>
+              </div>
+
+              <div className="space-y-3 text-xs leading-relaxed text-stone-700 dark:text-stone-300">
+                <p>
+                  To prevent the PIN from ever existing in public client-side JavaScript, you can store it as an
+                  <strong> Encrypted Environment Variable</strong> inside your Cloudflare Pages Dashboard:
+                </p>
+                <ol className="list-decimal list-inside space-y-2 pl-1">
+                  <li>
+                    Log in to <strong>dash.cloudflare.com</strong> and open <strong>Workers & Pages</strong>.
+                  </li>
+                  <li>
+                    Select your <strong>manopavana</strong> project.
+                  </li>
+                  <li>
+                    Go to <strong>Settings</strong> ➔ <strong>Environment variables</strong>.
+                  </li>
+                  <li>
+                    Click <strong>Add variable</strong>:
+                    <div className="p-3 my-1.5 rounded-xl bg-stone-100 dark:bg-black/40 font-mono text-[11px] border border-amber-500/30 space-y-1">
+                      <div>Variable Name: <strong className="text-amber-700 dark:text-amber-400">ADMIN_PIN</strong></div>
+                      <div>Value: <strong className="text-amber-700 dark:text-amber-400">1917</strong></div>
+                      <div>Type: Select <strong className="text-emerald-700 dark:text-emerald-400">Encrypt</strong> (Stores secret in Cloudflare KMS)</div>
+                    </div>
+                  </li>
+                  <li>
+                    (Optional for max security) You can instead add <strong>ADMIN_PIN_HASH</strong> with the SHA-256 hash of <code className="px-1 bg-stone-200 dark:bg-stone-800 rounded">1917</code>:
+                    <div className="p-2 my-1 rounded bg-stone-100 dark:bg-black/40 font-mono text-[10px] break-all border border-stone-300 dark:border-stone-700">
+                      2f913d809ddca5913f044bb7145de7061d4b684cb3a7fe424fb8bbbb5582f349
+                    </div>
+                  </li>
+                  <li>
+                    Click <strong>Save and Deploy</strong>. Cloudflare Pages Function will now decrypt and verify the PIN on the serverless edge with zero exposure in browser code.
+                  </li>
+                </ol>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowCloudflareGuide(false)}
+                className="w-full py-2.5 rounded-xl bg-[#5E3210] hover:bg-[#43230A] text-white font-bold text-xs shadow-md transition-colors"
+              >
+                Got it, Continue
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
@@ -472,17 +587,36 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
               </span>
             </div>
             <p className="text-xs text-[#D6C4B0] mt-0.5">
-              Admin: {currentUser.email} • Facility: {BUSINESS_CONFIG.FACILITY_ADDRESS}
+              Admin: {currentUser.email} • Facility: {facilityAddress}
             </p>
           </div>
         </div>
 
-        <button
-          onClick={logoutAdmin}
-          className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 border border-white/20 text-xs font-bold transition-colors cursor-pointer shrink-0"
-        >
-          Lock / Logout
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => togglePreviewStorefront(true)}
+            className="px-4 py-2.5 rounded-xl bg-[#E08F35] hover:bg-[#c97a26] text-[#1F120A] text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-md"
+          >
+            <Eye className="w-3.5 h-3.5" />
+            <span>Preview Storefront as Customer</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowCloudflareGuide(true)}
+            className="px-3.5 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 border border-white/20 text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5"
+          >
+            <Key className="w-3.5 h-3.5 text-amber-300" />
+            <span>Cloudflare PIN Setup</span>
+          </button>
+          <button
+            type="button"
+            onClick={logoutAdmin}
+            className="px-3 py-2.5 rounded-xl bg-red-500/20 hover:bg-red-500/30 border border-red-500/30 text-red-200 text-xs font-bold transition-colors cursor-pointer shrink-0"
+          >
+            Lock PIN
+          </button>
+        </div>
       </div>
 
       {/* Delhivery Logistics Integration Hub & Testing Sandbox */}
@@ -781,6 +915,136 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                 </div>
               </div>
 
+              {/* Facility, Legal & Contact Credentials */}
+              <div
+                className={`pt-3 border-t space-y-3 ${
+                  isDark ? "border-[#2D1B10]" : "border-[#EFE8DC]"
+                }`}
+              >
+                <div className="flex items-center gap-1.5 font-bold">
+                  <FileText className="w-4 h-4 text-[#E08F35]" />
+                  <h3 className={isDark ? "text-[#FAF4EA]" : "text-[#1F120A]"}>
+                    Facility Address & Legal Credentials
+                  </h3>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className={`block font-semibold mb-1 ${isDark ? "text-[#D8C8B8]" : "text-[#5C4230]"}`}>
+                      Founder / Grievance Officer
+                    </label>
+                    <input
+                      type="text"
+                      value={founderName}
+                      onChange={(e) => setFounderName(e.target.value)}
+                      className={`w-full px-3 py-1.5 rounded-lg text-xs ${
+                        isDark ? "bg-[#150D07] border border-[#362114] text-[#FAF4EA]" : "bg-white border border-[#DDD1BE] text-[#1F120A]"
+                      }`}
+                    />
+                  </div>
+
+                  <div>
+                    <label className={`block font-semibold mb-1 ${isDark ? "text-[#D8C8B8]" : "text-[#5C4230]"}`}>
+                      Primary WhatsApp / Phone
+                    </label>
+                    <input
+                      type="text"
+                      value={primaryPhone}
+                      onChange={(e) => setPrimaryPhone(e.target.value)}
+                      className={`w-full px-3 py-1.5 rounded-lg text-xs ${
+                        isDark ? "bg-[#150D07] border border-[#362114] text-[#FAF4EA]" : "bg-white border border-[#DDD1BE] text-[#1F120A]"
+                      }`}
+                    />
+                  </div>
+
+                  <div>
+                    <label className={`block font-semibold mb-1 ${isDark ? "text-[#D8C8B8]" : "text-[#5C4230]"}`}>
+                      Support Email
+                    </label>
+                    <input
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className={`w-full px-3 py-1.5 rounded-lg text-xs ${
+                        isDark ? "bg-[#150D07] border border-[#362114] text-[#FAF4EA]" : "bg-white border border-[#DDD1BE] text-[#1F120A]"
+                      }`}
+                    />
+                  </div>
+
+                  <div>
+                    <label className={`block font-semibold mb-1 ${isDark ? "text-[#D8C8B8]" : "text-[#5C4230]"}`}>
+                      Alternate Phone
+                    </label>
+                    <input
+                      type="text"
+                      value={altPhone}
+                      onChange={(e) => setAltPhone(e.target.value)}
+                      className={`w-full px-3 py-1.5 rounded-lg text-xs ${
+                        isDark ? "bg-[#150D07] border border-[#362114] text-[#FAF4EA]" : "bg-white border border-[#DDD1BE] text-[#1F120A]"
+                      }`}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className={`block font-semibold mb-1 ${isDark ? "text-[#D8C8B8]" : "text-[#5C4230]"}`}>
+                    Peenya Facility Address
+                  </label>
+                  <input
+                    type="text"
+                    value={facilityAddress}
+                    onChange={(e) => setFacilityAddress(e.target.value)}
+                    className={`w-full px-3 py-1.5 rounded-lg text-xs ${
+                      isDark ? "bg-[#150D07] border border-[#362114] text-[#FAF4EA]" : "bg-white border border-[#DDD1BE] text-[#1F120A]"
+                    }`}
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className={`block font-semibold mb-1 ${isDark ? "text-[#D8C8B8]" : "text-[#5C4230]"}`}>
+                      FSSAI License Reg.
+                    </label>
+                    <input
+                      type="text"
+                      value={fssaiLicense}
+                      onChange={(e) => setFssaiLicense(e.target.value)}
+                      className={`w-full px-3 py-1.5 rounded-lg text-xs font-mono ${
+                        isDark ? "bg-[#150D07] border border-[#362114] text-[#FAF4EA]" : "bg-white border border-[#DDD1BE] text-[#1F120A]"
+                      }`}
+                    />
+                  </div>
+
+                  <div>
+                    <label className={`block font-semibold mb-1 ${isDark ? "text-[#D8C8B8]" : "text-[#5C4230]"}`}>
+                      GSTIN Identification
+                    </label>
+                    <input
+                      type="text"
+                      value={gstin}
+                      onChange={(e) => setGstin(e.target.value)}
+                      className={`w-full px-3 py-1.5 rounded-lg text-xs font-mono ${
+                        isDark ? "bg-[#150D07] border border-[#362114] text-[#FAF4EA]" : "bg-white border border-[#DDD1BE] text-[#1F120A]"
+                      }`}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className={`block font-semibold mb-1 ${isDark ? "text-[#D8C8B8]" : "text-[#5C4230]"}`}>
+                    Bengaluru Delivery Notice Banner
+                  </label>
+                  <input
+                    type="text"
+                    value={blrNotice}
+                    onChange={(e) => setBlrNotice(e.target.value)}
+                    className={`w-full px-3 py-1.5 rounded-lg text-xs ${
+                      isDark ? "bg-[#150D07] border border-[#362114] text-[#FAF4EA]" : "bg-white border border-[#DDD1BE] text-[#1F120A]"
+                    }`}
+                  />
+                </div>
+              </div>
+
               {/* Price & Stock toggles */}
               <div
                 className={`pt-3 border-t space-y-3 ${
@@ -863,6 +1127,52 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                 </div>
               </div>
 
+              {/* Bengaluru Hyperlocal Delivery Partner: Borzo (WeFast) Info & Dispatch Card */}
+              <div
+                className={`p-4 rounded-2xl border space-y-2.5 text-xs ${
+                  isDark
+                    ? "bg-[#191009] border-[#3D2514] text-[#D8C8B8]"
+                    : "bg-[#FAF7F0] border-[#E2D6C0] text-[#4A3220]"
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 font-bold">
+                    <Truck className="w-4 h-4 text-emerald-600" />
+                    <span className={isDark ? "text-[#FAF4EA]" : "text-[#1F120A]"}>
+                      Bengaluru Delivery Solution: Borzo (WeFast)
+                    </span>
+                  </div>
+                  <span className="px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 font-bold text-[10px] border border-emerald-500/30">
+                    No Wait • Instant Sign-Up
+                  </span>
+                </div>
+                <p className="text-[11px] leading-relaxed">
+                  <strong>Why Borzo is the best alternative to Porter for Bangalore:</strong> Unlike Porter Enterprise (which requires corporate sales calls and delays), <strong>Borzo</strong> lets you register instantly in 2 minutes at <a href="https://borzodelivery.com/in" target="_blank" rel="noopener noreferrer" className="underline font-bold text-emerald-600">borzodelivery.com/in</a>. Bike delivery starts at only ₹40-50 across Bangalore from your Peenya facility with direct rider assignment and live tracking sent to the customer.
+                </p>
+                <div className="flex flex-wrap items-center gap-2 pt-1">
+                  <a
+                    href="https://borzodelivery.com/in"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] flex items-center gap-1.5 transition-colors"
+                  >
+                    <span>Open Borzo Bangalore Portal</span>
+                    <ExternalLink className="w-3 h-3" />
+                  </a>
+                  <a
+                    href="https://web.porter.in"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={`px-3 py-1.5 rounded-xl border text-[11px] font-bold flex items-center gap-1.5 transition-colors ${
+                      isDark ? "bg-[#1E130B] border-[#3D2514] text-[#FAF4EA]" : "bg-white border-[#DDD1BE] text-[#5E3210]"
+                    }`}
+                  >
+                    <span>Porter Web</span>
+                    <ExternalLink className="w-3 h-3" />
+                  </a>
+                </div>
+              </div>
+
               <button
                 type="submit"
                 className="w-full py-3.5 rounded-xl bg-[#5E3210] hover:bg-[#43230A] text-white font-bold text-xs shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
@@ -895,7 +1205,7 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                     isDark ? "text-[#FAF4EA]" : "text-[#1F120A]"
                   }`}
                 >
-                  Live Orders & Delivery Dispatch Queue ({orders.length})
+                  Live Orders & Delivery Dispatch Queue ({adminOrders.length || orders.length})
                 </h2>
               </div>
               <span className="text-[11px] text-emerald-700 font-bold bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200 flex items-center gap-1">
@@ -904,7 +1214,7 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
               </span>
             </div>
 
-            {orders.length === 0 ? (
+            {(adminOrders.length === 0 && orders.length === 0) ? (
               <div
                 className={`p-8 text-center space-y-2 ${
                   isDark ? "text-[#A89482]" : "text-[#6A523E]"
@@ -918,7 +1228,7 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
               </div>
             ) : (
               <div className="space-y-4 max-h-[750px] overflow-y-auto pr-1">
-                {(adminOrders && adminOrders.length > 0 ? adminOrders : orders).map((ord) => {
+                {(adminOrders.length > 0 ? adminOrders : orders).map((ord) => {
                   const mapsQuery = ord.shippingAddress.lat && ord.shippingAddress.lng
                     ? `${ord.shippingAddress.lat},${ord.shippingAddress.lng}`
                     : encodeURIComponent(
@@ -1140,7 +1450,7 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                           </div>
 
                           <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-stone-200 dark:border-stone-800">
-                            <div className="flex items-center gap-2">
+                            <div className="flex flex-wrap items-center gap-2">
                               <button
                                 type="button"
                                 onClick={() => handleSaveBlrTracking(ord.orderRef, ord)}
@@ -1162,6 +1472,19 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                                 <Copy className="w-3.5 h-3.5 text-[#E08F35]" />
                                 <span>Copy Rider Drop Details</span>
                               </button>
+
+                              <a
+                                href="https://borzodelivery.com/in"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                onClick={() => handleCopyRiderDrop(ord)}
+                                className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+                                title="Copies customer drop details and opens Borzo intra-city booking"
+                              >
+                                <Truck className="w-3.5 h-3.5" />
+                                <span>Book on Borzo (WeFast)</span>
+                                <ExternalLink className="w-3 h-3 opacity-80" />
+                              </a>
                             </div>
 
                             <div className="text-[11px] text-emerald-600 font-semibold flex items-center gap-1">

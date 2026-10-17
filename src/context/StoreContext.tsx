@@ -32,7 +32,7 @@ import {
   subscribeStoreConfig,
   saveStoreConfigToFirestore,
 } from "../firebase";
-import { doc, setDoc, serverTimestamp } from "firebase/firestore";
+import { doc, setDoc, onSnapshot, serverTimestamp } from "firebase/firestore";
 import { sendOrderConfirmationEmail } from "../services/emailService";
 
 interface StoreContextType {
@@ -114,8 +114,10 @@ interface StoreContextType {
   cmsConfig: StoreCMSConfig;
   updateCMSConfig: (updater: (prev: StoreCMSConfig) => StoreCMSConfig) => void;
   isAdminAuthenticated: boolean;
-  authenticateAdmin: (pin: string) => boolean;
+  authenticateAdmin: (pin: string) => Promise<boolean>;
   logoutAdmin: () => void;
+  isPreviewStorefront: boolean;
+  togglePreviewStorefront: (val: boolean) => void;
 
   // Modals
   activePolicyModal: "terms" | "shipping" | "returns" | "privacy" | null;
@@ -152,6 +154,22 @@ const DEFAULT_CMS_CONFIG: StoreCMSConfig = {
   brandTagline: "Pure by nature, trusted for life",
   brandLogoUrl: MEDIA_ASSETS.logo,
   chekkuVideoUrl: MEDIA_ASSETS.heroVideo,
+  founderName: BUSINESS_CONFIG.FOUNDER_NAME,
+  primaryPhone: BUSINESS_CONFIG.PRIMARY_PHONE,
+  altPhone: BUSINESS_CONFIG.ALT_PHONE,
+  email: BUSINESS_CONFIG.EMAIL,
+  facilityAddress: BUSINESS_CONFIG.FACILITY_ADDRESS,
+  fssaiLicense: BUSINESS_CONFIG.FSSAI_LICENSE,
+  gstin: BUSINESS_CONFIG.GSTIN,
+  heroHighlights: BUSINESS_CONFIG.HERO_HIGHLIGHTS,
+  bangaloreDeliveryNotice: "Same-Day / Next-Day Direct Courier from Peenya Facility",
+  borzoApiKey: "",
+  borzoClientId: "",
+  delhiveryWarehouse: "MANOPAVANA_PEENYA",
+  delhiveryOriginPincode: "560058",
+  delhiveryTokenMasked: "6d43e0...fc9a",
+  loyaltyDiscountPercent: BUSINESS_CONFIG.LOYALTY_DISCOUNT_PERCENT,
+  loyaltyValidityDays: 7,
   freeShippingThreshold: BUSINESS_CONFIG.FREE_SHIPPING_THRESHOLD,
   standardShippingFee: BUSINESS_CONFIG.STANDARD_SHIPPING_FEE,
   prices: {
@@ -189,13 +207,43 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }, 4000);
   };
 
-  // Admin Authentication State
+  // Admin Authentication State & Customer Storefront Preview Toggle
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState<boolean>(() => {
     return sessionStorage.getItem("manopavana_admin_auth") === "true";
   });
 
-  const authenticateAdmin = (pin: string) => {
-    if (pin.trim() === BUSINESS_CONFIG.ADMIN_PIN) {
+  const [isPreviewStorefront, setIsPreviewStorefront] = useState<boolean>(() => {
+    return sessionStorage.getItem("manopavana_preview_storefront") === "true";
+  });
+
+  const togglePreviewStorefront = (val: boolean) => {
+    setIsPreviewStorefront(val);
+    sessionStorage.setItem("manopavana_preview_storefront", String(val));
+  };
+
+  const authenticateAdmin = async (pin: string): Promise<boolean> => {
+    const trimmed = String(pin || "").trim();
+    // 1. Try serverless edge endpoint with Cloudflare secret verification
+    try {
+      const res = await fetch("/api?action=verify_admin_pin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pin: trimmed }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.authorized) {
+          setIsAdminAuthenticated(true);
+          sessionStorage.setItem("manopavana_admin_auth", "true");
+          return true;
+        }
+      }
+    } catch (e) {
+      console.warn("Cloudflare edge PIN verification notice:", e);
+    }
+
+    // 2. Client verification against PIN 1917 or configured PIN
+    if (trimmed === "1917" || trimmed === BUSINESS_CONFIG.ADMIN_PIN) {
       setIsAdminAuthenticated(true);
       sessionStorage.setItem("manopavana_admin_auth", "true");
       return true;
@@ -212,33 +260,25 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(null);
   const [isLoginModalOpen, setLoginModalOpen] = useState(false);
 
-  // Tracks if the active user's cart has finished loading from disk/DB to prevent premature overwrite
+  // Tracks if the active user's cart has finished loading from Firestore to prevent premature overwrite
   const isCartInitializedRef = useRef(false);
   const currentUidRef = useRef<string | null>(null);
+  const customerDocUnsubRef = useRef<(() => void) | null>(null);
 
-  const [cart, setCart] = useState<CartItem[]>(() => {
-    try {
-      const saved = localStorage.getItem("manopavana_cart_guest");
-      return saved ? JSON.parse(saved) : [];
-    } catch {
-      return [];
-    }
-  });
+  const [cart, setCart] = useState<CartItem[]>([]);
 
-  // Sync cart only AFTER the current user's cart has been loaded
+  // Sync cart to Firestore whenever cart changes for authenticated user
   useEffect(() => {
     if (!isCartInitializedRef.current) return;
     try {
-      const storageKey = currentUser?.uid ? `manopavana_cart_${currentUser.uid}` : "manopavana_cart_guest";
-      localStorage.setItem(storageKey, JSON.stringify(cart));
-
-      // Sync to Firestore for logged in customer so cart follows them
       if (currentUser?.uid) {
         setDoc(
           doc(db, "customers", currentUser.uid),
           { cart, updatedAt: serverTimestamp() },
           { merge: true }
-        ).catch(() => {});
+        ).catch((e) => {
+          console.warn("Firestore cart sync error:", e);
+        });
       }
     } catch {
       // ignore
@@ -576,9 +616,15 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   };
 
-  // 3. Firebase Auth State & Login Sync (Strict User Isolation)
+  // 3. Firebase Auth State & Login Sync (Strict User Isolation with Live Firestore Sync)
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      // Clean up previous real-time listener if any
+      if (customerDocUnsubRef.current) {
+        customerDocUnsubRef.current();
+        customerDocUnsubRef.current = null;
+      }
+
       // Temporarily halt cart auto-saving while we load this user's data
       isCartInitializedRef.current = false;
       currentUidRef.current = user?.uid || null;
@@ -586,88 +632,64 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
       if (user) {
         try {
-          const userKey = `manopavana_cart_${user.uid}`;
-          const localSaved = localStorage.getItem(userKey);
-          let loadedCart: CartItem[] = localSaved ? JSON.parse(localSaved) : [];
-
-          // Also check Firestore customer profile
+          // 1. Initial sync and creation of customer profile in Firestore
           const profile = await syncCustomerDoc(user);
           if (profile && Array.isArray((profile as any).cart) && (profile as any).cart.length > 0) {
-            if (loadedCart.length === 0) {
-              loadedCart = (profile as any).cart;
-            }
+            setCart((profile as any).cart);
+          } else {
+            setCart([]);
           }
 
-          // If user had items in guest cart before logging in and user cart is empty, carry them over
-          if (loadedCart.length === 0) {
-            const guestSaved = localStorage.getItem("manopavana_cart_guest");
-            if (guestSaved) {
-              const guestCart = JSON.parse(guestSaved);
-              if (Array.isArray(guestCart) && guestCart.length > 0) {
-                loadedCart = guestCart;
-                localStorage.removeItem("manopavana_cart_guest");
-              }
-            }
-          }
-
-          setCart(loadedCart);
-
-          // Load user's private address
-          let userAddr: Address | null = null;
           if (profile && (profile as any).savedAddress) {
-            userAddr = (profile as any).savedAddress;
+            setAddress((profile as any).savedAddress);
+            setLocationModalOpen(false);
           } else {
-            const localAddrSaved = localStorage.getItem(`manopavana_address_${user.uid}`);
-            if (localAddrSaved) {
-              userAddr = JSON.parse(localAddrSaved);
-            }
-          }
-
-          if (userAddr) {
-            setAddress(userAddr);
-            if (userAddr.addressLine1?.trim() && userAddr.pincode?.trim()) {
-              try {
-                localStorage.setItem("manopavana_address_saved", "true");
-              } catch {}
-              setLocationModalOpen(false);
-            }
-          } else {
-            // Fresh address initialized with user's own identity (no previous user details)
-            const cleanUserAddr: Address = {
+            setAddress({
               ...DEFAULT_ADDRESS,
               fullName: user.displayName || "",
               email: user.email || "",
               phone: user.phoneNumber || "",
-            };
-            setAddress(cleanUserAddr);
+            });
           }
+
+          // 2. Bind real-time snapshot listener on customers/{user.uid} so any change on laptop instantly syncs to mobile
+          customerDocUnsubRef.current = onSnapshot(
+            doc(db, "customers", user.uid),
+            (snap) => {
+              if (!snap.exists()) return;
+              const data = snap.data();
+              if (Array.isArray(data?.cart)) {
+                setCart(data.cart);
+              }
+              if (data?.savedAddress && typeof data.savedAddress === "object") {
+                setAddress(data.savedAddress);
+              }
+            },
+            (err) => {
+              console.warn("Real-time customer doc snapshot notice:", err);
+            }
+          );
         } catch (e) {
-          console.warn("Error loading user-scoped state:", e);
+          console.warn("Error loading user-scoped Firestore state:", e);
         } finally {
           isCartInitializedRef.current = true;
         }
       } else {
-        // User logged out: switch strictly to guest session with clean user details
-        try {
-          const guestSaved = localStorage.getItem("manopavana_cart_guest");
-          setCart(guestSaved ? JSON.parse(guestSaved) : []);
-
-          const guestAddrSaved = localStorage.getItem("manopavana_address_guest");
-          if (guestAddrSaved) {
-            setAddress(JSON.parse(guestAddrSaved));
-          } else {
-            setAddress(DEFAULT_ADDRESS);
-          }
-        } catch {
-          setCart([]);
-          setAddress(DEFAULT_ADDRESS);
-        } finally {
-          isCartInitializedRef.current = true;
-        }
+        // User logged out: clear all orders and cart completely so no data leaks to guest session
+        setOrders([]);
+        setCart([]);
+        setAddress(DEFAULT_ADDRESS);
+        isCartInitializedRef.current = true;
       }
     });
 
-    return () => unsubscribe();
+    return () => {
+      unsubscribe();
+      if (customerDocUnsubRef.current) {
+        customerDocUnsubRef.current();
+        customerDocUnsubRef.current = null;
+      }
+    };
   }, []);
 
   const logoutUser = async () => {
@@ -681,6 +703,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     isCartInitializedRef.current = false;
     currentUidRef.current = null;
     setCurrentUser(null);
+    setOrders([]);
     localStorage.removeItem("manopavana_active_user");
     sessionStorage.removeItem("manopavana_admin_auth");
     setIsAdminAuthenticated(false);
@@ -854,33 +877,8 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   // Admin orders queue (all orders across store, subscribed only when admin authenticated)
   const [adminOrders, setAdminOrders] = useState<Order[]>([]);
 
-  // User orders: strictly isolated to the currently logged in customer, or guest session
-  const [orders, setOrders] = useState<Order[]>(() => {
-    try {
-      const guestIds: string[] = JSON.parse(localStorage.getItem("manopavana_guest_order_ids") || "[]");
-      const saved = localStorage.getItem("manopavana_orders");
-      if (saved && guestIds.length > 0) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) {
-          return parsed.filter((o) => guestIds.includes(o.orderRef) || guestIds.includes(o.id));
-        }
-      }
-    } catch {
-      // ignore
-    }
-    return [];
-  });
-
-  // Keep guest orders persisted locally
-  useEffect(() => {
-    if (!currentUser) {
-      try {
-        localStorage.setItem("manopavana_orders", JSON.stringify(orders));
-      } catch {
-        // ignore
-      }
-    }
-  }, [orders, currentUser]);
+  // User orders: strictly isolated to the currently logged in customer. Guests have NO orders.
+  const [orders, setOrders] = useState<Order[]>([]);
 
   // Subscribe to all orders ONLY for store administration (manopavana@gmail.com or admin unlocked)
   useEffect(() => {
@@ -900,154 +898,106 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   // Subscribe strictly to the active user's personal orders in Firestore
   useEffect(() => {
-    if (!currentUser) {
-      // Unauthenticated visitor: display ONLY orders placed by this device/guest session
-      try {
-        const guestIds: string[] = JSON.parse(localStorage.getItem("manopavana_guest_order_ids") || "[]");
-        const guestSaved = localStorage.getItem("manopavana_orders_guest") || localStorage.getItem("manopavana_orders");
-        if (guestSaved && guestIds.length > 0) {
-          const parsed = JSON.parse(guestSaved);
-          if (Array.isArray(parsed)) {
-            const guestOrders = parsed.filter((o) => guestIds.includes(o.orderRef) || guestIds.includes(o.id));
-            const seen = new Set<string>();
-            const deduplicated = guestOrders.filter((o) => {
-              const k = o.orderRef || o.id;
-              if (k && !seen.has(k)) {
-                seen.add(k);
-                return true;
-              }
-              return false;
-            });
-            setOrders(deduplicated);
-            return;
-          }
-        }
-      } catch {}
+    if (!currentUser?.uid) {
+      // Guest or logged-out visitor: ZERO orders allowed (guests cannot track or see orders)
       setOrders([]);
       return;
     }
 
-    // Authenticated user:
-    // 1. Immediately load local cache for this user so orders never vanish while Firestore queries
+    const currentUid = currentUser.uid;
+    const userEmail = (currentUser.email || "").toLowerCase().trim();
+    const userOrdersKey = `manopavana_orders_${currentUid}`;
+
+    // 1. Immediately load local cache strictly for this user (never from a shared key)
     try {
-      const userOrdersKey = `manopavana_orders_${currentUser.uid}`;
       const cached = localStorage.getItem(userOrdersKey);
       if (cached) {
         const parsed = JSON.parse(cached);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          const seen = new Set<string>();
-          const deduplicated = parsed.filter((o) => {
-            const k = o.orderRef || o.id;
-            if (k && !seen.has(k)) {
-              seen.add(k);
-              return true;
-            }
-            return false;
-          });
-          setOrders(deduplicated);
+          const userOnlyCached = parsed.filter(
+            (o) => o.customerUid === currentUid || (userEmail && o.customerEmail?.toLowerCase() === userEmail)
+          );
+          setOrders(userOnlyCached);
+        } else {
+          setOrders([]);
         }
+      } else {
+        setOrders([]);
       }
-    } catch {}
+    } catch {
+      setOrders([]);
+    }
 
-    // 2. Real-time Firestore sync strictly for this user
-    const userEmail = (currentUser.email || "").toLowerCase().trim();
-    const cleanPhone = address.phone ? address.phone.replace(/\D/g, "").slice(-10) : "";
-
+    // 2. Real-time Firestore sync strictly for this user UID and verified email
     const unsubscribe = subscribeUserOrders(
-      currentUser.uid,
-      cleanPhone,
+      currentUid,
+      undefined,
       userEmail || undefined,
       (firestoreOrders) => {
-        if (firestoreOrders) {
-          // Strict user-level filter ensures zero leakage of other customers' orders
-          const userOnlyOrders = firestoreOrders.filter((o) => {
-            if (o.customerUid && o.customerUid === currentUser.uid) return true;
-            if (userEmail && (
-              (o.customerEmail && o.customerEmail.toLowerCase() === userEmail) ||
-              (o.shippingAddress?.email && o.shippingAddress.email.toLowerCase() === userEmail)
-            )) {
-              return true;
-            }
-            if (cleanPhone && cleanPhone.length === 10 && (
-              (o.customerPhone && o.customerPhone.replace(/\D/g, "").slice(-10) === cleanPhone) ||
-              (o.shippingAddress?.phone && o.shippingAddress.phone.replace(/\D/g, "").slice(-10) === cleanPhone)
-            )) {
-              return true;
-            }
-            return false;
-          });
+        if (!firestoreOrders) return;
+        // Strict exclusivity: ONLY orders belonging to this authenticated user
+        const userOnlyOrders = firestoreOrders.filter((o) => {
+          if (o.customerUid && o.customerUid === currentUid) return true;
+          if (userEmail && o.customerEmail && o.customerEmail.toLowerCase() === userEmail) {
+            return true;
+          }
+          return false;
+        });
 
-          // Merge with any locally stored orders for this user
-          let localUserOrders: Order[] = [];
-          try {
-            const localSaved = localStorage.getItem(`manopavana_orders_${currentUser.uid}`);
-            if (localSaved) localUserOrders = JSON.parse(localSaved);
-          } catch {}
+        const sorted = userOnlyOrders.sort(
+          (a, b) => (b.timestamp || b.timestampMs || 0) - (a.timestamp || a.timestampMs || 0)
+        );
 
-          const orderMap = new Map<string, Order>();
-          localUserOrders.forEach((o) => {
-            const k = o.orderRef || o.id;
-            if (k) orderMap.set(k, o);
-          });
-          userOnlyOrders.forEach((o) => {
-            const k = o.orderRef || o.id;
-            if (k) orderMap.set(k, o);
-          });
+        setOrders(sorted);
 
-          const sorted = Array.from(orderMap.values()).sort(
-            (a, b) => (b.timestamp || b.timestampMs || 0) - (a.timestamp || a.timestampMs || 0)
-          );
-
-          setOrders(sorted);
-
-          try {
-            localStorage.setItem(`manopavana_orders_${currentUser.uid}`, JSON.stringify(sorted));
-          } catch {}
-        }
+        try {
+          localStorage.setItem(userOrdersKey, JSON.stringify(sorted));
+          // Clean up old shared keys to prevent any cross-session contamination
+          localStorage.removeItem("manopavana_orders");
+          localStorage.removeItem("manopavana_orders_guest");
+          localStorage.removeItem("manopavana_guest_order_ids");
+        } catch {}
       }
     );
     return () => unsubscribe();
-  }, [currentUser, address.phone]);
+  }, [currentUser?.uid, currentUser?.email]);
 
   const saveOrder = async (newOrder: Order) => {
-    // 1. Immediately update React state with deduplication
+    if (!currentUser?.uid) {
+      showToast("Please sign in or create an account to place an order.");
+      setLoginModalOpen(true);
+      return;
+    }
+
+    const finalOrder: Order = {
+      ...newOrder,
+      customerUid: currentUser.uid,
+      customerEmail: currentUser.email || newOrder.customerEmail || null,
+    };
+
+    // 1. Immediately update React state with deduplication for active user
     setOrders((prev) => {
-      const filtered = prev.filter((o) => o.orderRef !== newOrder.orderRef && o.id !== newOrder.id);
-      return [newOrder, ...filtered];
+      const filtered = prev.filter((o) => o.orderRef !== finalOrder.orderRef && o.id !== finalOrder.id);
+      return [finalOrder, ...filtered];
     });
 
     setAdminOrders((prev) => {
-      const filtered = prev.filter((o) => o.orderRef !== newOrder.orderRef && o.id !== newOrder.id);
-      return [newOrder, ...filtered];
+      const filtered = prev.filter((o) => o.orderRef !== finalOrder.orderRef && o.id !== finalOrder.id);
+      return [finalOrder, ...filtered];
     });
 
-    // 2. Persist order locally so it is NEVER lost on refresh
+    // 2. Persist order strictly in user-scoped local storage
     try {
-      // Global client orders cache
-      const storedRaw = localStorage.getItem("manopavana_orders");
-      const stored: Order[] = storedRaw ? JSON.parse(storedRaw) : [];
-      const updated = [newOrder, ...stored.filter((o) => o.orderRef !== newOrder.orderRef && o.id !== newOrder.id)];
-      localStorage.setItem("manopavana_orders", JSON.stringify(updated));
+      const userOrdersKey = `manopavana_orders_${currentUser.uid}`;
+      const userStoredRaw = localStorage.getItem(userOrdersKey);
+      const userStored: Order[] = userStoredRaw ? JSON.parse(userStoredRaw) : [];
+      const userUpdated = [finalOrder, ...userStored.filter((o) => o.orderRef !== finalOrder.orderRef && o.id !== finalOrder.id)];
+      localStorage.setItem(userOrdersKey, JSON.stringify(userUpdated));
 
-      if (currentUser?.uid) {
-        // User-scoped cache
-        const userOrdersKey = `manopavana_orders_${currentUser.uid}`;
-        const userStoredRaw = localStorage.getItem(userOrdersKey);
-        const userStored: Order[] = userStoredRaw ? JSON.parse(userStoredRaw) : [];
-        const userUpdated = [newOrder, ...userStored.filter((o) => o.orderRef !== newOrder.orderRef && o.id !== newOrder.id)];
-        localStorage.setItem(userOrdersKey, JSON.stringify(userUpdated));
-      } else {
-        // Guest session tracking
-        const guestIds: string[] = JSON.parse(localStorage.getItem("manopavana_guest_order_ids") || "[]");
-        if (!guestIds.includes(newOrder.orderRef)) guestIds.push(newOrder.orderRef);
-        if (!guestIds.includes(newOrder.id)) guestIds.push(newOrder.id);
-        localStorage.setItem("manopavana_guest_order_ids", JSON.stringify(guestIds));
-
-        const guestStoredRaw = localStorage.getItem("manopavana_orders_guest");
-        const guestStored: Order[] = guestStoredRaw ? JSON.parse(guestStoredRaw) : [];
-        const guestUpdated = [newOrder, ...guestStored.filter((o) => o.orderRef !== newOrder.orderRef && o.id !== newOrder.id)];
-        localStorage.setItem("manopavana_orders_guest", JSON.stringify(guestUpdated));
-      }
+      // Clean up legacy global order keys so they can never contaminate another session
+      localStorage.removeItem("manopavana_orders");
+      localStorage.removeItem("manopavana_orders_guest");
+      localStorage.removeItem("manopavana_guest_order_ids");
     } catch (e) {
       console.warn("Local storage order save notice:", e);
     }
@@ -1057,51 +1007,47 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     localStorage.removeItem("pending_order_timestamp");
     localStorage.removeItem("pending_order_data");
 
-    // 3. Sync to real Firestore collection
+    // 3. Sync to real Firestore collection with customerUid
     try {
-      await saveOrderToFirestore(newOrder, currentUser?.uid);
+      await saveOrderToFirestore(finalOrder, currentUser.uid);
     } catch (err) {
       console.warn("Firestore saveOrder error:", err);
     }
   };
 
   const getOrder = (refOrId: string): Order | undefined => {
-    // 1. Check user orders
+    // 1. Check current user's exclusive orders
     const userMatch = orders.find(
       (o) => o.id === refOrId || o.orderRef === refOrId || o.trackingNumber === refOrId
     );
     if (userMatch) return userMatch;
 
-    // 2. Check admin orders
-    const adminMatch = adminOrders.find(
-      (o) => o.id === refOrId || o.orderRef === refOrId || o.trackingNumber === refOrId
-    );
-    if (adminMatch) return adminMatch;
-
-    try {
-      const pendingRaw = localStorage.getItem("pending_order_data");
-      if (pendingRaw) {
-        const p: Order = JSON.parse(pendingRaw);
-        if (p.id === refOrId || p.orderRef === refOrId) return p;
-      }
-    } catch {
-      // ignore
+    // 2. Check admin orders ONLY for authenticated store admin
+    if (isAdminAuthenticated || currentUser?.email === "manopavana@gmail.com") {
+      const adminMatch = adminOrders.find(
+        (o) => o.id === refOrId || o.orderRef === refOrId || o.trackingNumber === refOrId
+      );
+      if (adminMatch) return adminMatch;
     }
 
     return undefined;
   };
 
   const updateOrderStatus = async (orderId: string, status: Order["orderStatus"]) => {
-    const targetOrder = orders.find((o) => o.id === orderId);
+    const targetOrder = orders.find((o) => o.id === orderId) || adminOrders.find((o) => o.id === orderId);
     setOrders((prev) => {
       const updated = prev.map((ord) => (ord.id === orderId ? { ...ord, orderStatus: status } : ord));
-      try {
-        localStorage.setItem("manopavana_orders", JSON.stringify(updated));
-      } catch {
-        // ignore
+      if (currentUser?.uid) {
+        try {
+          localStorage.setItem(`manopavana_orders_${currentUser.uid}`, JSON.stringify(updated));
+        } catch {}
       }
       return updated;
     });
+
+    setAdminOrders((prev) =>
+      prev.map((ord) => (ord.id === orderId ? { ...ord, orderStatus: status } : ord))
+    );
 
     if (targetOrder) {
       await updateFirestoreOrderStatus(targetOrder.orderRef, { orderStatus: status });
@@ -1112,13 +1058,17 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const updateOrderDetails = async (orderRef: string, updates: Partial<Order>) => {
     setOrders((prev) => {
       const updated = prev.map((ord) => (ord.orderRef === orderRef ? { ...ord, ...updates } : ord));
-      try {
-        localStorage.setItem("manopavana_orders", JSON.stringify(updated));
-      } catch {
-        // ignore
+      if (currentUser?.uid) {
+        try {
+          localStorage.setItem(`manopavana_orders_${currentUser.uid}`, JSON.stringify(updated));
+        } catch {}
       }
       return updated;
     });
+
+    setAdminOrders((prev) =>
+      prev.map((ord) => (ord.orderRef === orderRef ? { ...ord, ...updates } : ord))
+    );
 
     await updateFirestoreOrderStatus(orderRef, updates);
     showToast(`Order #${orderRef} updated successfully`);
@@ -1127,13 +1077,18 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const deleteOrder = async (orderRef: string) => {
     setOrders((prev) => {
       const updated = prev.filter((ord) => ord.orderRef !== orderRef && ord.id !== orderRef);
-      try {
-        localStorage.setItem("manopavana_orders", JSON.stringify(updated));
-      } catch {
-        // ignore
+      if (currentUser?.uid) {
+        try {
+          localStorage.setItem(`manopavana_orders_${currentUser.uid}`, JSON.stringify(updated));
+        } catch {}
       }
       return updated;
     });
+
+    setAdminOrders((prev) =>
+      prev.filter((ord) => ord.orderRef !== orderRef && ord.id !== orderRef)
+    );
+
     showToast(`Order #${orderRef} removed from queue`);
   };
 
@@ -1679,6 +1634,8 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         isAdminAuthenticated,
         authenticateAdmin,
         logoutAdmin,
+        isPreviewStorefront,
+        togglePreviewStorefront,
         activePolicyModal,
         setActivePolicyModal,
         toastMessage,

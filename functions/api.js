@@ -89,6 +89,51 @@ export async function onRequest(context) {
 
   try {
     /* -------------------------------------------------------------
+     * ACTION: verify_admin_pin (Encrypted Cloudflare PIN Gate Verification)
+     * ------------------------------------------------------------- */
+    if (request.method === "POST" && action === "verify_admin_pin") {
+      let body = {};
+      try {
+        body = await request.json();
+      } catch {
+        return jsonResponse({ status: "FAILED", authorized: false, message: "Invalid JSON body" }, 400);
+      }
+
+      const inputPin = String(body.pin || "").trim();
+      const expectedPin = String(env.ADMIN_PIN || "1917").trim();
+
+      let authorized = false;
+
+      // 1. Support encrypted / hashed PIN via ADMIN_PIN_HASH
+      if (env.ADMIN_PIN_HASH) {
+        const pinBuf = new TextEncoder().encode(inputPin);
+        const hashBuf = await crypto.subtle.digest("SHA-256", pinBuf);
+        const hashHex = Array.from(new Uint8Array(hashBuf))
+          .map((b) => b.toString(16).padStart(2, "0"))
+          .join("");
+        authorized = hashHex.toLowerCase() === String(env.ADMIN_PIN_HASH).toLowerCase().trim();
+      } else {
+        // 2. Direct comparison against Cloudflare Pages secret ADMIN_PIN (or default 1917)
+        authorized = inputPin === expectedPin;
+      }
+
+      if (authorized) {
+        return jsonResponse({
+          status: "SUCCESS",
+          authorized: true,
+          email: "manopavana@gmail.com",
+          message: "PIN verified successfully",
+        });
+      } else {
+        return jsonResponse({
+          status: "FAILED",
+          authorized: false,
+          message: "Invalid administrator PIN",
+        }, 401);
+      }
+    }
+
+    /* -------------------------------------------------------------
      * ACTION: create_order (Initiate PG v2 payment)
      * ------------------------------------------------------------- */
     if (request.method === "POST" && action === "create_order") {

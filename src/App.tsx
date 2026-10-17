@@ -86,6 +86,8 @@ export default function App() {
     total,
     address,
     themeMode,
+    isPreviewStorefront,
+    togglePreviewStorefront,
   } = useStore();
 
   // REAL PAYMENT RETURN & VERIFICATION ROUTE HANDLER
@@ -214,6 +216,36 @@ export default function App() {
     verifyReturn(targetRef);
   }, []);
 
+  const isStoreAdmin = currentUser?.email === "manopavana@gmail.com";
+
+  // If logged in as manopavana@gmail.com, show exclusively the Master CMS Portal (unless preview mode is active)
+  if (isStoreAdmin && !isPreviewStorefront) {
+    return (
+      <div
+        className={`w-full max-w-full overflow-x-hidden min-h-screen flex flex-col font-['Outfit',sans-serif] box-border transition-colors duration-200 ${
+          themeMode === "dark"
+            ? "bg-[#140D09] text-[#FDF6EC]"
+            : themeMode === "light"
+            ? "bg-[#FAF7F2] text-[#24140A]"
+            : "bg-[#FAF6F0] text-[#24140A]"
+        }`}
+      >
+        <ScrollToTop />
+        <ErrorBoundary>
+          <AdminPage />
+        </ErrorBoundary>
+
+        {/* Floating Global Toast Notification */}
+        {toastMessage && (
+          <div className="fixed top-20 right-5 z-50 flex items-center gap-2.5 px-4 py-3 rounded-2xl bg-[#1C110B]/95 text-[#FDF6EC] text-xs font-semibold shadow-2xl border border-[#D49A37]/50 backdrop-blur-md animate-bounce">
+            <Sparkles className="w-4 h-4 text-[#F5BC51] shrink-0" />
+            <span>{toastMessage}</span>
+          </div>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div
       className={`w-full max-w-full overflow-x-hidden min-h-screen flex flex-col font-['Outfit',sans-serif] box-border transition-colors duration-200 ${
@@ -225,6 +257,26 @@ export default function App() {
       }`}
     >
       <ScrollToTop />
+
+      {/* Admin Customer Storefront Preview Sticky Top Bar */}
+      {isStoreAdmin && isPreviewStorefront && (
+        <div className="bg-[#2D1B10] text-[#FDF6EC] px-4 py-2.5 text-xs flex items-center justify-between border-b border-[#D49A37]/40 sticky top-0 z-50 shadow-md">
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+            <span className="font-bold">Storefront Customer Preview</span>
+            <span className="text-[#C4B29E] hidden md:inline">
+              (Viewing storefront as customer • Logged in as {currentUser?.email})
+            </span>
+          </div>
+          <button
+            onClick={() => togglePreviewStorefront(false)}
+            className="px-3.5 py-1.5 rounded-xl bg-[#E08F35] hover:bg-[#c97a26] text-[#1F120A] text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow"
+          >
+            <span>⚙️ Return to Master CMS</span>
+          </button>
+        </div>
+      )}
+
       <PendingOrderBanner />
       <Navbar />
 
@@ -239,7 +291,7 @@ export default function App() {
             <Route
               path="/admin"
               element={
-                currentUser?.email === "manopavana@gmail.com" ? (
+                isStoreAdmin ? (
                   <AdminPage />
                 ) : (
                   <Navigate to="/" replace />

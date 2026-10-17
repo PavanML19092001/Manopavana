@@ -46,6 +46,30 @@ export default defineConfig(() => {
                 return cachedToken;
               }
 
+              if (req.method === 'POST' && action === 'verify_admin_pin') {
+                let bodyStr = '';
+                req.on('data', (chunk) => { bodyStr += chunk; });
+                req.on('end', () => {
+                  try {
+                    const parsed = JSON.parse(bodyStr || '{}');
+                    const inputPin = String(parsed.pin || '').trim();
+                    const expectedPin = String(process.env.ADMIN_PIN || '1917').trim();
+                    const authorized = inputPin === expectedPin;
+                    res.statusCode = authorized ? 200 : 401;
+                    res.end(JSON.stringify({
+                      status: authorized ? 'SUCCESS' : 'FAILED',
+                      authorized,
+                      email: 'manopavana@gmail.com',
+                      message: authorized ? 'PIN verified successfully' : 'Invalid PIN',
+                    }));
+                  } catch {
+                    res.statusCode = 400;
+                    res.end(JSON.stringify({ status: 'FAILED', authorized: false }));
+                  }
+                });
+                return;
+              }
+
               if (req.method === 'POST' && action === 'create_order') {
                 let bodyStr = '';
                 req.on('data', chunk => { bodyStr += chunk; });

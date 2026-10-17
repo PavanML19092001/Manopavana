@@ -186,6 +186,22 @@ export interface StoreCMSConfig {
   brandTagline: string;
   brandLogoUrl: string;
   chekkuVideoUrl: string;
+  founderName?: string;
+  primaryPhone?: string;
+  altPhone?: string;
+  email?: string;
+  facilityAddress?: string;
+  fssaiLicense?: string;
+  gstin?: string;
+  heroHighlights?: string[];
+  bangaloreDeliveryNotice?: string;
+  borzoApiKey?: string;
+  borzoClientId?: string;
+  delhiveryWarehouse?: string;
+  delhiveryOriginPincode?: string;
+  delhiveryTokenMasked?: string;
+  loyaltyDiscountPercent?: number;
+  loyaltyValidityDays?: number;
   freeShippingThreshold: number;
   standardShippingFee: number;
   prices: {

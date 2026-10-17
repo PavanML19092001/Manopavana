@@ -14,6 +14,7 @@ import {
   Navigation,
   ExternalLink,
   User,
+  LogIn,
 } from "lucide-react";
 import L from "leaflet";
 import { useStore } from "../context/StoreContext";
@@ -395,6 +396,14 @@ export const CheckoutPage: React.FC = () => {
 
   const handlePlaceOrder = async (e?: React.FormEvent, methodChoice?: "phonepe" | "cod") => {
     if (e) e.preventDefault();
+
+    // Guests are NOT allowed to place orders - must prompt login!
+    if (!currentUser) {
+      showToast("Please sign in or create an account to place an order.");
+      setLoginModalOpen(true);
+      return;
+    }
+
     const effectiveMethod = methodChoice || paymentMethod;
     if (methodChoice) setPaymentMethod(methodChoice);
 
@@ -447,7 +456,7 @@ export const CheckoutPage: React.FC = () => {
     };
     updateAddress(finalAddress);
 
-    const finalCustomerUid = currentUser?.uid || null;
+    const finalCustomerUid = currentUser.uid;
 
     if (effectiveMethod === "cod") {
       setIsProcessing(true);
@@ -486,14 +495,6 @@ export const CheckoutPage: React.FC = () => {
           customerEmail: customerEmail || null,
           isBuyNow: isBuyNowMode,
         };
-
-        try {
-          const guestRefs: string[] = JSON.parse(localStorage.getItem("manopavana_guest_order_ids") || "[]");
-          if (!guestRefs.includes(orderRef)) {
-            guestRefs.push(orderRef);
-            localStorage.setItem("manopavana_guest_order_ids", JSON.stringify(guestRefs));
-          }
-        } catch {}
 
         await saveOrder(newOrder);
         // Non-blocking email dispatch
@@ -550,14 +551,6 @@ export const CheckoutPage: React.FC = () => {
       };
 
       setLastAttemptedOrder(pendingOrder);
-
-      try {
-        const guestRefs: string[] = JSON.parse(localStorage.getItem("manopavana_guest_order_ids") || "[]");
-        if (!guestRefs.includes(phonePeOrderRef)) {
-          guestRefs.push(phonePeOrderRef);
-          localStorage.setItem("manopavana_guest_order_ids", JSON.stringify(guestRefs));
-        }
-      } catch {}
 
       localStorage.setItem("pending_order_ref", phonePeOrderRef);
       localStorage.setItem("pending_order_timestamp", Date.now().toString());
@@ -624,6 +617,33 @@ export const CheckoutPage: React.FC = () => {
             Pinpoint Bengaluru delivery coordinates and choose payment method
           </p>
         </div>
+
+        {/* Guest Sign-in Required Banner */}
+        {!currentUser && (
+          <div className="p-4 sm:p-5 rounded-2xl bg-amber-500/15 border-2 border-[#E08F35]/70 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 text-xs shadow-md">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-[#E08F35]/20 border border-[#E08F35]/40 flex items-center justify-center text-[#E08F35] shrink-0">
+                <Lock className="w-5 h-5 text-[#E08F35]" />
+              </div>
+              <div>
+                <p className="font-bold text-sm text-[#1F120A] dark:text-[#FAF4EA]">
+                  Sign In Required to Place Order
+                </p>
+                <p className="text-[#6A523E] dark:text-[#D6C4B0] mt-0.5">
+                  Guests cannot place or track orders. Please sign in or create an account to complete your purchase and track delivery.
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setLoginModalOpen(true)}
+              className="px-5 py-2.5 rounded-xl bg-[#5E3210] hover:bg-[#43230A] text-white font-bold text-xs shrink-0 flex items-center gap-2 cursor-pointer shadow-sm transition-all hover:brightness-110"
+            >
+              <LogIn className="w-4 h-4 text-amber-300" />
+              <span>Sign In / Register</span>
+            </button>
+          </div>
+        )}
 
         {/* Direct Buy indicator banner */}
         {isBuyNowMode && buyNowItem && (
@@ -1163,21 +1183,21 @@ export const CheckoutPage: React.FC = () => {
                 </div>
               </div>
 
-              {/* Optional user account note - non-blocking */}
+              {/* User Account State Check */}
               {!currentUser ? (
-                <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/25 flex items-center justify-between text-xs text-amber-900 dark:text-amber-200">
-                  <div className="flex items-center gap-2">
-                    <User className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-                    <span className="text-[11px]">
-                      Guest Checkout: Orders tracked via your WhatsApp number.
+                <div className="p-3.5 rounded-xl bg-amber-500/15 border-2 border-[#E08F35]/60 flex items-center justify-between text-xs text-amber-900 dark:text-amber-200">
+                  <div className="flex items-center gap-2.5">
+                    <Lock className="w-4 h-4 text-[#E08F35] shrink-0" />
+                    <span className="text-xs font-semibold">
+                      Sign in required to place and track your orders.
                     </span>
                   </div>
                   <button
                     type="button"
                     onClick={() => setLoginModalOpen(true)}
-                    className="text-[11px] font-bold underline hover:text-amber-300 cursor-pointer shrink-0 ml-2"
+                    className="px-3 py-1.5 rounded-lg bg-[#5E3210] hover:bg-[#43230A] text-white text-xs font-bold cursor-pointer shrink-0 ml-2 shadow-xs hover:brightness-110"
                   >
-                    Log In
+                    Sign In
                   </button>
                 </div>
               ) : (
@@ -1258,7 +1278,19 @@ export const CheckoutPage: React.FC = () => {
 
               {/* Single Unified Order Action Button matching selected payment method */}
               <div className="pt-1">
-                {paymentMethod === "phonepe" ? (
+                {!currentUser ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      showToast("Please sign in or create an account to place an order.");
+                      setLoginModalOpen(true);
+                    }}
+                    className="w-full py-4 px-4 rounded-xl bg-gradient-to-r from-[#D49A37] via-[#F5BC51] to-[#BF7E16] text-[#140D09] font-black font-serif text-xs uppercase tracking-wider shadow-[0_4px_20px_rgba(212,154,55,0.4)] border border-[#FFD885] hover:brightness-110 active:scale-[0.99] transition-all flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    <Lock className="w-4 h-4 text-[#140D09]" />
+                    <span>Sign In to Place Order (₹{checkoutTotal})</span>
+                  </button>
+                ) : paymentMethod === "phonepe" ? (
                   <button
                     type="button"
                     disabled={isProcessing}

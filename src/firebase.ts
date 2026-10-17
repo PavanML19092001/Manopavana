@@ -272,9 +272,11 @@ export async function saveOrderToFirestore(order: Order, userUid?: string) {
     const cleanPhone = extractCleanPhone(order.shippingAddress?.phone);
     const cleanEmail = (order.shippingAddress?.email || "").toLowerCase().trim();
 
+    const uid = userUid || order.customerUid || (order as any).firebaseUid || null;
     const rawPayload = {
       ...order,
-      customerUid: userUid || order.customerUid || null,
+      customerUid: uid,
+      firebaseUid: uid,
       customerPhone: cleanPhone || null,
       customerEmail: cleanEmail || null,
       createdAt: serverTimestamp(),
@@ -284,8 +286,8 @@ export async function saveOrderToFirestore(order: Order, userUid?: string) {
     const sanitizedPayload = cleanFirestoreObject(rawPayload);
     await setDoc(orderDocRef, sanitizedPayload);
 
-    if (userUid) {
-      const customerRef = doc(db, "customers", userUid);
+    if (uid) {
+      const customerRef = doc(db, "customers", uid);
       await setDoc(
         customerRef,
         {
@@ -326,7 +328,7 @@ export async function updateFirestoreOrderStatus(
 
 /**
  * Listen to orders for a specific user in real-time.
- * Checks customerUid, customerPhone, and customerEmail to guarantee
+ * Strictly queries customerUid and firebaseUid to guarantee
  * all user orders appear and never vanish across page refreshes or device changes.
  */
 export function subscribeUserOrders(
@@ -337,7 +339,6 @@ export function subscribeUserOrders(
 ) {
   try {
     const ordersCol = collection(db, "orders");
-    const cleanPhone = extractCleanPhone(phone);
     const cleanEmail = (email || "").toLowerCase().trim();
     const unsubs: (() => void)[] = [];
     const aggregatedMap = new Map<string, Order>();
@@ -349,14 +350,17 @@ export function subscribeUserOrders(
       callback(list);
     };
 
-    // 1. Query by customerUid if present
+    // 1. Query by customerUid if present (guarantees strict 100% user exclusivity)
     if (userUid) {
       const qUid = query(ordersCol, where("customerUid", "==", userUid));
       const unsub1 = onSnapshot(
         qUid,
         (snapshot) => {
           snapshot.forEach((d) => {
-            aggregatedMap.set(d.id, d.data() as Order);
+            const data = d.data() as Order;
+            if (!data.customerUid || data.customerUid === userUid || (data as any).firebaseUid === userUid) {
+              aggregatedMap.set(d.id, data);
+            }
           });
           emitAggregated();
         },
@@ -365,16 +369,37 @@ export function subscribeUserOrders(
         }
       );
       unsubs.push(unsub1);
+
+      // Query by firebaseUid fallback
+      const qFbUid = query(ordersCol, where("firebaseUid", "==", userUid));
+      const unsubFb = onSnapshot(
+        qFbUid,
+        (snapshot) => {
+          snapshot.forEach((d) => {
+            const data = d.data() as Order;
+            if (!data.customerUid || data.customerUid === userUid || (data as any).firebaseUid === userUid) {
+              aggregatedMap.set(d.id, data);
+            }
+          });
+          emitAggregated();
+        },
+        () => {}
+      );
+      unsubs.push(unsubFb);
     }
 
-    // 2. Query by customerEmail if valid email
+    // 2. Query by customerEmail if valid email (only for orders belonging to this user)
     if (cleanEmail && cleanEmail.includes("@") && !cleanEmail.endsWith("@phone.manopavana.com")) {
       const qEmail = query(ordersCol, where("customerEmail", "==", cleanEmail));
       const unsubEmail = onSnapshot(
         qEmail,
         (snapshot) => {
           snapshot.forEach((d) => {
-            aggregatedMap.set(d.id, d.data() as Order);
+            const data = d.data() as Order;
+            // Never leak orders explicitly owned by another userUid
+            if (!data.customerUid || data.customerUid === userUid) {
+              aggregatedMap.set(d.id, data);
+            }
           });
           emitAggregated();
         },
@@ -383,24 +408,6 @@ export function subscribeUserOrders(
         }
       );
       unsubs.push(unsubEmail);
-    }
-
-    // 3. Query by customerPhone if 10 digits
-    if (cleanPhone && cleanPhone.length === 10) {
-      const qPhone = query(ordersCol, where("customerPhone", "==", cleanPhone));
-      const unsub2 = onSnapshot(
-        qPhone,
-        (snapshot) => {
-          snapshot.forEach((d) => {
-            aggregatedMap.set(d.id, d.data() as Order);
-          });
-          emitAggregated();
-        },
-        (error) => {
-          console.warn("Firestore user orders phone listener notice:", error);
-        }
-      );
-      unsubs.push(unsub2);
     }
 
     return () => {
@@ -452,7 +459,7 @@ export async function addReviewToFirestore(review: Omit<CustomerReview, "id">) {
 }
 
 /**
- * Delete a review from Firestore (PIN 1234 protected)
+ * Delete a review from Firestore (PIN 1917 protected)
  */
 export async function deleteReviewFromFirestore(reviewId: string) {
   const reviewDocRef = doc(db, "reviews", reviewId);

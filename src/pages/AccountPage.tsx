@@ -52,83 +52,39 @@ export const AccountPage: React.FC = () => {
   const isDark = themeMode === "dark";
 
   const visibleOrders = React.useMemo(() => {
+    if (!currentUser?.uid) return [];
     const seen = new Set<string>();
     const res: Order[] = [];
+    const userEmail = (currentUser.email || "").toLowerCase().trim();
+
     for (const o of orders) {
-      const key = o.orderRef || o.id;
-      if (key && !seen.has(key)) {
-        seen.add(key);
-        res.push(o);
+      const isMine =
+        (o.customerUid && o.customerUid === currentUser.uid) ||
+        (userEmail && o.customerEmail && o.customerEmail.toLowerCase() === userEmail);
+      if (isMine) {
+        const key = o.orderRef || o.id;
+        if (key && !seen.has(key)) {
+          seen.add(key);
+          res.push(o);
+        }
       }
     }
     return res;
-  }, [orders]);
-
-  const [guestLookedUpOrder, setGuestLookedUpOrder] = useState<Order | null>(null);
-  const [lookupInputRef, setLookupInputRef] = useState(targetRef || "");
-  const [lookupLoading, setLookupLoading] = useState(false);
-  const [lookupError, setLookupError] = useState("");
+  }, [orders, currentUser]);
 
   const [searchQuery, setSearchQuery] = useState(targetRef || "");
   const [selectedOrderRef, setSelectedOrderRef] = useState<string>(
     targetRef || (visibleOrders[0]?.orderRef || "")
   );
 
-  // If order param passed in URL, load it
+  // If order param passed in URL, only select it if it belongs to this user!
   useEffect(() => {
-    if (targetRef) {
+    if (targetRef && visibleOrders.some((o) => o.orderRef === targetRef || o.id === targetRef)) {
       setSelectedOrderRef(targetRef);
-      const existing = getOrder(targetRef);
-      if (existing) {
-        setGuestLookedUpOrder(existing);
-      } else {
-        // Fetch from Firestore
-        getDoc(doc(db, "orders", targetRef))
-          .then((snap) => {
-            if (snap.exists()) {
-              setGuestLookedUpOrder(snap.data() as Order);
-            }
-          })
-          .catch(() => {});
-      }
+    } else if (visibleOrders.length > 0 && !selectedOrderRef) {
+      setSelectedOrderRef(visibleOrders[0].orderRef);
     }
-  }, [targetRef, getOrder]);
-
-  const handleLookupOrder = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const cleanRef = lookupInputRef.trim();
-    if (!cleanRef) {
-      setLookupError("Please enter your Order Reference (e.g. MV-123456)");
-      return;
-    }
-    setLookupLoading(true);
-    setLookupError("");
-
-    try {
-      const match = getOrder(cleanRef);
-      if (match) {
-        setGuestLookedUpOrder(match);
-        setSelectedOrderRef(match.orderRef);
-        showToast(`Tracking Order #${match.orderRef}`);
-        setLookupLoading(false);
-        return;
-      }
-
-      const snap = await getDoc(doc(db, "orders", cleanRef));
-      if (snap.exists()) {
-        const ordData = snap.data() as Order;
-        setGuestLookedUpOrder(ordData);
-        setSelectedOrderRef(ordData.orderRef);
-        showToast(`Tracking Order #${ordData.orderRef}`);
-      } else {
-        setLookupError(`Order #${cleanRef} was not found. Please verify reference.`);
-      }
-    } catch {
-      setLookupError("Could not retrieve order. Please check reference.");
-    } finally {
-      setLookupLoading(false);
-    }
-  };
+  }, [targetRef, visibleOrders]);
 
   // Profile fields for editing
   const [name, setName] = useState(currentUser?.displayName || address.fullName);
@@ -152,14 +108,6 @@ export const AccountPage: React.FC = () => {
     }
   }, [currentUser]);
 
-  useEffect(() => {
-    if (targetRef) {
-      setSelectedOrderRef(targetRef);
-    } else if (visibleOrders.length > 0 && !selectedOrderRef) {
-      setSelectedOrderRef(visibleOrders[0].orderRef);
-    }
-  }, [targetRef, visibleOrders]);
-
   // Auto-scroll when navigating with ?tab=profile, ?tab=addresses, or ?tab=orders
   useEffect(() => {
     if (tabParam === "profile" || tabParam === "addresses") {
@@ -176,10 +124,9 @@ export const AccountPage: React.FC = () => {
   }, [tabParam]);
 
   const activeOrder =
-    (guestLookedUpOrder && (guestLookedUpOrder.orderRef === selectedOrderRef || guestLookedUpOrder.id === selectedOrderRef) ? guestLookedUpOrder : null) ||
     visibleOrders.find((o) => o.orderRef === selectedOrderRef || o.id === selectedOrderRef) ||
-    guestLookedUpOrder ||
-    visibleOrders[0];
+    visibleOrders[0] ||
+    null;
 
   const handleUpdateProfile = (e: React.FormEvent) => {
     e.preventDefault();
@@ -197,9 +144,8 @@ export const AccountPage: React.FC = () => {
     return idx >= 0 ? idx : 0;
   };
 
-  // If user is not logged in, but has an active order to track (from Checkout redirect or search lookup):
-  // allow them to view and track their order! Only show the login gate if no order is selected.
-  if (!currentUser && !targetRef && !guestLookedUpOrder && visibleOrders.length === 0) {
+  // Guests are NEVER permitted to track orders. Require login!
+  if (!currentUser) {
     return (
       <div
         className={`w-full min-h-[calc(100vh-80px)] py-16 flex items-center justify-center transition-colors box-border ${
@@ -220,62 +166,26 @@ export const AccountPage: React.FC = () => {
                 isDark ? "text-[#FAF4EA]" : "text-[#1F120A]"
               }`}
             >
-              Customer Account & Tracking
+              Sign In to Track Orders
             </h1>
             <p
               className={`text-xs sm:text-sm leading-relaxed ${
                 isDark ? "text-[#D8C8B8]" : "text-[#5C4230]"
               }`}
             >
-              Sign in to manage your saved delivery address and view your complete order history.
+              Order history and live shipment tracking are exclusive to your personal account. Guests cannot track orders. Please sign in or register to access your orders.
             </p>
-          </div>
-
-          {/* Quick Order Lookup for Guests */}
-          <form onSubmit={handleLookupOrder} className="space-y-3 pt-2 text-left">
-            <label className={`block text-xs font-semibold ${isDark ? "text-[#D8C8B8]" : "text-[#5C4230]"}`}>
-              Track Order without Logging In:
-            </label>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                placeholder="e.g. MV-123456"
-                value={lookupInputRef}
-                onChange={(e) => setLookupInputRef(e.target.value)}
-                className={`flex-1 px-3.5 py-2.5 text-xs rounded-xl focus:outline-none focus:ring-2 focus:ring-[#E08F35] ${
-                  isDark
-                    ? "bg-[#150D07] border border-[#362114] text-[#FAF4EA]"
-                    : "bg-[#FAF7F2] border border-[#DDD1BE] text-[#24140A]"
-                }`}
-              />
-              <button
-                type="submit"
-                disabled={lookupLoading}
-                className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-[#D49A37] to-[#B87C24] text-[#140D09] font-bold text-xs shadow-md cursor-pointer hover:brightness-110"
-              >
-                {lookupLoading ? "..." : "Track"}
-              </button>
-            </div>
-            {lookupError && (
-              <p className="text-xs text-red-500 font-semibold">{lookupError}</p>
-            )}
-          </form>
-
-          <div className="relative flex items-center justify-center py-1">
-            <div className="w-full border-t border-[#3A2417]" />
-            <span className={`absolute px-2.5 text-[10px] uppercase font-bold tracking-wider ${isDark ? "bg-[#1C120B] text-[#A88D77]" : "bg-white text-[#8C7A6B]"}`}>
-              Or Sign In
-            </span>
           </div>
 
           <button
             type="button"
             onClick={() => setLoginModalOpen(true)}
-            className="w-full py-3.5 rounded-2xl bg-[#5E3210] hover:bg-[#43230A] text-white font-bold text-xs shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
+            className="w-full py-3.5 rounded-2xl bg-[#5E3210] hover:bg-[#43230A] text-white font-bold text-xs shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer hover:brightness-110"
           >
             <LogIn className="w-4 h-4 text-amber-300" />
             <span>Sign In / Create Account</span>
           </button>
+
           <div className="pt-2">
             <Link
               to="/"
@@ -360,77 +270,9 @@ export const AccountPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Guest Banner if not signed in */}
-        {!currentUser && (
-          <div
-            className={`p-4 rounded-2xl border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs ${
-              isDark
-                ? "bg-[#1E130B] border-[#3D2514] text-amber-200"
-                : "bg-amber-50/80 border-amber-200 text-[#5A381E]"
-            }`}
-          >
-            <div className="flex items-center gap-2.5">
-              <LogIn className="w-5 h-5 text-[#E08F35] shrink-0" />
-              <div>
-                <p className="font-bold">Sign in with Google or Phone to sync all Firestore orders</p>
-                <p className={`text-[11px] ${isDark ? "text-[#D8C8B8]" : "text-[#7A5E48]"}`}>
-                  Access past invoices and live delivery tracking timelines on any device.
-                </p>
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={() => setLoginModalOpen(true)}
-              className="px-4 py-2 rounded-xl bg-[#5E3210] hover:bg-[#43230A] text-white font-bold text-xs shrink-0 cursor-pointer shadow-xs"
-            >
-              Sign In with 1-Click
-            </button>
-          </div>
-        )}
-
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
           {/* Left Column: Live Order Tracking Timeline */}
           <div id="orders-section" className="lg:col-span-8 space-y-6">
-            {/* Quick Guest / Direct Tracking Lookup */}
-            <div
-              className={`p-5 rounded-3xl border shadow-sm space-y-3 ${
-                isDark ? "bg-[#1A1009] border-[#3B2516]" : "bg-white border-[#E8DFC8]"
-              }`}
-            >
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                <div className="flex items-center gap-2">
-                  <Package className="w-4 h-4 text-[#E08F35]" />
-                  <span className="font-bold text-xs">Direct Order Tracker (In-Website)</span>
-                </div>
-                <span className={`text-[11px] ${isDark ? "text-[#A89482]" : "text-[#7A5E48]"}`}>
-                  Real-time visual tracking directly on our website
-                </span>
-              </div>
-
-              <form onSubmit={handleLookupOrder} className="flex flex-col sm:flex-row gap-2.5">
-                <input
-                  type="text"
-                  placeholder="Enter Order Reference (e.g. MV-123456)..."
-                  value={lookupInputRef}
-                  onChange={(e) => setLookupInputRef(e.target.value)}
-                  className={`flex-1 px-4 py-2.5 text-xs rounded-xl focus:outline-none focus:ring-2 focus:ring-[#E08F35]/40 transition-colors ${
-                    isDark
-                      ? "bg-[#140D07] border border-[#362114] text-[#FAF4EA] placeholder-[#8A7665]"
-                      : "bg-[#FAF7F2] border border-[#DDD1BE] text-[#1F120A] placeholder-[#8A7665]"
-                  }`}
-                />
-                <button
-                  type="submit"
-                  disabled={lookupLoading}
-                  className="px-5 py-2.5 rounded-xl bg-[#5E3210] hover:bg-[#43230A] text-white text-xs font-bold transition-all cursor-pointer shrink-0 disabled:opacity-50 shadow-sm"
-                >
-                  {lookupLoading ? "Locating..." : "Track Order"}
-                </button>
-              </form>
-              {lookupError && (
-                <p className="text-[11px] text-red-500 font-semibold">{lookupError}</p>
-              )}
-            </div>
 
             {/* Active Order Live Tracker */}
             {activeOrder ? (
@@ -457,7 +299,7 @@ export const AccountPage: React.FC = () => {
                       isDark ? "text-[#D8C8B8]" : "text-[#6A523E]"
                     }`}
                   >
-                    Orders placed by you will be visible here. Enter your Order Reference number above to track your order, or sign in to access past orders.
+                    Orders placed by your account will appear here with real-time shipment updates once you place an order.
                   </p>
                 </div>
                 <Link

@@ -10,6 +10,7 @@ import {
   QrCode,
   ShieldCheck,
   CheckCircle2,
+  Lock,
 } from "lucide-react";
 import { useStore } from "../context/StoreContext";
 import { BUSINESS_CONFIG } from "../constants";
@@ -33,6 +34,9 @@ export const CartPage: React.FC = () => {
     cmsConfig,
     address,
     themeMode,
+    currentUser,
+    setLoginModalOpen,
+    showToast,
   } = useStore();
 
   const isDark = themeMode === "dark";
@@ -81,6 +85,11 @@ export const CartPage: React.FC = () => {
   }
 
   const handleProceedToCheckout = () => {
+    if (!currentUser) {
+      showToast("Please sign in or create an account to place an order.");
+      setLoginModalOpen(true);
+      return;
+    }
     navigate("/checkout");
   };
 
@@ -425,10 +434,19 @@ export const CartPage: React.FC = () => {
               <button
                 type="button"
                 onClick={handleProceedToCheckout}
-                className="w-full py-4 rounded-xl bg-[#5E3210] hover:bg-[#43230A] text-white font-black text-xs shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
+                className="w-full py-4 rounded-xl bg-[#5E3210] hover:bg-[#43230A] text-white font-black text-xs shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer hover:brightness-110"
               >
-                <span>Proceed to Delivery & Payment</span>
-                <ArrowRight className="w-4 h-4 text-amber-300" />
+                {!currentUser ? (
+                  <>
+                    <Lock className="w-4 h-4 text-amber-300" />
+                    <span>Sign In to Proceed to Checkout</span>
+                  </>
+                ) : (
+                  <>
+                    <span>Proceed to Delivery & Payment</span>
+                    <ArrowRight className="w-4 h-4 text-amber-300" />
+                  </>
+                )}
               </button>
 
               <div

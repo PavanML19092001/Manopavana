@@ -22,7 +22,7 @@ export const BUSINESS_CONFIG = {
   FACILITY_ADDRESS: "118, Raghavendra Layout, Thigalarapalya, Peenya 2nd Stage, Bangalore, Karnataka - 560058",
   FSSAI_LICENSE: "Reg. No. 21226008004689",
   GSTIN: "29EYSPR5297E1ZE",
-  ADMIN_PIN: "1234",
+  ADMIN_PIN: "1917",
   DEFAULT_COORDINATES: [12.9716, 77.5946] as [number, number],
   FREE_SHIPPING_THRESHOLD: 500,
   STANDARD_SHIPPING_FEE: 49,
