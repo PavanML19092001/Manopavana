@@ -1,5 +1,5 @@
 /**
- * Cloudflare Pages Functions - PhonePe v2 Payment Gateway Edge Handler
+ * Cloudflare Pages Functions - PhonePe v2 Payment Gateway & Delhivery Edge Handler
  * Route: /api or /functions/api
  */
 
@@ -88,9 +88,13 @@ export async function onRequest(context) {
   const REFUND_URL = env.PHONEPE_REFUND_URL || "https://api.phonepe.com/apis/pg/checkout/v2/refund";
   const PRODUCTION_ORIGIN = env.PRODUCTION_ORIGIN || "https://manopavana.com";
 
+  // Delhivery credentials
+  const DELHIVERY_TOKEN = env.DELHIVERY_API_TOKEN || "6d43e07bee414f88473e757d0fd9e1134e1afc9a";
+  const DELHIVERY_WAREHOUSE = env.DELHIVERY_WAREHOUSE_NAME || "MANOPAVANA_PEENYA";
+
   try {
     /* -------------------------------------------------------------
-     * ACTION: verify_admin_pin (Encrypted Cloudflare PIN Gate Verification)
+     * ACTION: verify_admin_pin (Encrypted Cloudflare PIN Gate)
      * ------------------------------------------------------------- */
     if (request.method === "POST" && action === "verify_admin_pin") {
       let body = {};
@@ -171,7 +175,6 @@ export async function onRequest(context) {
       const baseOrigin = redirectBaseUrl || PRODUCTION_ORIGIN;
       const redirectUrl = `${baseOrigin}/?orderRef=${encodeURIComponent(orderRef)}`;
 
-      // Official PhonePe PG v2 checkout payload schema
       const checkoutPayload = {
         merchantOrderId: orderRef,
         amount: amountInPaise,
@@ -345,10 +348,35 @@ export async function onRequest(context) {
     }
 
     /* -------------------------------------------------------------
+     * ACTION: reverse_geocode (OpenStreetMap Proxy to prevent CORS/Rate Limits)
+     * ------------------------------------------------------------- */
+    if (request.method === "GET" && action === "reverse_geocode") {
+      const lat = url.searchParams.get("lat");
+      const lng = url.searchParams.get("lng");
+      if (!lat || !lng) {
+        return jsonResponse({ status: "FAILED", message: "Missing lat/lng" }, 400);
+      }
+
+      try {
+        const osmResp = await fetch(
+          `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`,
+          {
+            headers: {
+              "User-Agent": "ManopavanaApp/1.0 (manopavana@gmail.com)",
+              "Accept-Language": "en",
+            },
+          }
+        );
+        const osmData = await osmResp.json();
+        return jsonResponse(osmData);
+      } catch (err) {
+        return jsonResponse({ status: "ERROR", message: err.message }, 502);
+      }
+    }
+
+    /* -------------------------------------------------------------
      * DELHIVERY LOGISTICS INTEGRATION
      * ------------------------------------------------------------- */
-    const DELHIVERY_TOKEN = env.DELHIVERY_API_TOKEN || "6d43e07bee414f88473e757d0fd9e1134e1afc9a";
-    const DELHIVERY_WAREHOUSE = env.DELHIVERY_WAREHOUSE_NAME || "MANOPAVANA_PEENYA";
 
     // 0. Live Connection & Token Health Check
     if (request.method === "GET" && action === "delhivery_test_connection") {
@@ -521,7 +549,7 @@ export async function onRequest(context) {
           status: "SUCCESS",
           waybill: pkg.waybill,
           refnum: pkg.refnum,
-          labelUrl: `https://track.delhivery.com/api/p/packing_slip?wbns=${pkg.waybill}&pdf=true`,
+          labelUrl: `/api?action=delhivery_packing_slip&waybill=${pkg.waybill}`,
           trackingUrl: `https://www.delhivery.com/track/package/${pkg.waybill}`,
           raw: createData,
         });
@@ -554,7 +582,7 @@ export async function onRequest(context) {
           ? "Your Delhivery One account has ₹0 wallet balance. Please recharge ₹200-₹500 at one.delhivery.com to enable auto-manifesting."
           : null,
         fallbackWaybill,
-        labelUrl: fallbackWaybill ? `https://track.delhivery.com/api/p/packing_slip?wbns=${fallbackWaybill}&pdf=true` : null,
+        labelUrl: fallbackWaybill ? `/api?action=delhivery_packing_slip&waybill=${fallbackWaybill}` : null,
         trackingUrl: fallbackWaybill ? `https://www.delhivery.com/track/package/${fallbackWaybill}` : null,
         raw: createData,
       });
@@ -580,7 +608,46 @@ export async function onRequest(context) {
       });
     }
 
-    // 4. Delhivery Webhook Push Notification Handler
+    // 4. Secure Packing Slip Proxy (Fixes "Authentication credentials were not provided")
+    if (request.method === "GET" && action === "delhivery_packing_slip") {
+      const waybill = url.searchParams.get("waybill");
+      if (!waybill) {
+        return jsonResponse({ status: "FAILED", message: "Missing waybill parameter" }, 400);
+      }
+
+      const slipResp = await fetch(
+        `https://track.delhivery.com/api/p/packing_slip?wbns=${encodeURIComponent(waybill)}&pdf=true`,
+        {
+          headers: {
+            Authorization: `Token ${DELHIVERY_TOKEN}`,
+          },
+        }
+      );
+
+      if (!slipResp.ok) {
+        const errText = await slipResp.text();
+        return jsonResponse(
+          {
+            status: "FAILED",
+            message: "Unable to retrieve packing slip from Delhivery",
+            error: errText,
+          },
+          slipResp.status
+        );
+      }
+
+      const pdfBuffer = await slipResp.arrayBuffer();
+      return new Response(pdfBuffer, {
+        status: 200,
+        headers: {
+          "Content-Type": "application/pdf",
+          "Content-Disposition": `inline; filename="delhivery_slip_${waybill}.pdf"`,
+          ...CORS_HEADERS,
+        },
+      });
+    }
+
+    // 5. Delhivery Webhook Push Notification Handler
     if (request.method === "POST" && action === "delhivery_webhook") {
       try {
         const webhookData = await request.json().catch(() => ({}));
