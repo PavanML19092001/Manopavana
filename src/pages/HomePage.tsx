@@ -842,7 +842,9 @@ export const HomePage: React.FC = () => {
               </div>
 
               <div className="w-full max-w-full grid grid-cols-1 lg:grid-cols-2 gap-8">
-                {combos.map((combo) => (
+                {combos.map((combo) => {
+                  const comboCartItem = cart.find((i) => i.id === combo.id);
+                  return (
                   <div
                     key={combo.id}
                     className="w-full max-w-full bg-white/5 border border-white/10 rounded-2xl p-6 hover:bg-white/10 transition-all flex flex-col justify-between space-y-5 box-border"
@@ -899,14 +901,38 @@ export const HomePage: React.FC = () => {
                       </div>
 
                       <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => handleAddCombo(combo)}
-                          className="px-4 py-2.5 rounded-xl border-2 border-[#E08F35] text-[#E08F35] hover:bg-[#E08F35]/10 font-black text-xs transition-all flex items-center gap-1.5 cursor-pointer"
-                        >
-                          <ShoppingBag className="w-3.5 h-3.5 text-[#E08F35]" />
-                          <span>Add to Bag</span>
-                        </button>
+                        {comboCartItem ? (
+                          <div className="flex items-center gap-1.5 border-2 border-[#E08F35] rounded-xl px-2 py-1 bg-[#1A0E07]">
+                            <button
+                              type="button"
+                              onClick={() => updateQuantity(combo.id, -1)}
+                              className="w-7 h-7 rounded-lg border border-[#D4A373]/40 text-[#FAF4EA] font-black flex items-center justify-center hover:bg-[#25150C] cursor-pointer"
+                              aria-label="Decrease quantity"
+                            >
+                              <Minus className="w-3.5 h-3.5" />
+                            </button>
+                            <span className="text-xs font-black px-2 text-[#FAF4EA]">
+                              {comboCartItem.quantity}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => updateQuantity(combo.id, 1)}
+                              className="w-7 h-7 rounded-lg bg-[#E08F35] text-[#140D09] font-black flex items-center justify-center hover:bg-[#F59E0B] cursor-pointer"
+                              aria-label="Increase quantity"
+                            >
+                              <Plus className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => handleAddCombo(combo)}
+                            className="px-4 py-2.5 rounded-xl border-2 border-[#E08F35] text-[#E08F35] hover:bg-[#E08F35]/10 font-black text-xs transition-all flex items-center gap-1.5 cursor-pointer"
+                          >
+                            <ShoppingBag className="w-3.5 h-3.5 text-[#E08F35]" />
+                            <span>Add to Bag</span>
+                          </button>
+                        )}
                         <button
                           type="button"
                           onClick={() => handleBuyNowCombo(combo)}
@@ -917,7 +943,8 @@ export const HomePage: React.FC = () => {
                       </div>
                     </div>
                   </div>
-                ))}
+                );
+              })}
               </div>
             </div>
           </div>

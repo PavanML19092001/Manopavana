@@ -365,8 +365,8 @@ export const Navbar: React.FC = () => {
             </div>
 
             {/* 3. Cart Trigger */}
-            <button
-              onClick={() => navigate("/cart")}
+            <Link
+              to="/cart"
               aria-label="Shopping Cart"
               className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-gradient-to-r from-[#D49A37] to-[#B87C24] text-[#140D09] font-black text-xs shadow-md border border-[#F5BC51] cursor-pointer"
             >
@@ -375,7 +375,7 @@ export const Navbar: React.FC = () => {
               <span className="bg-[#140D09] text-[#F5BC51] text-[10px] px-1.5 py-0.2 rounded-full font-bold">
                 {cartCount}
               </span>
-            </button>
+            </Link>
 
             {/* Secret Admin CMS link for manopavana@gmail.com */}
             {currentUser?.email === "manopavana@gmail.com" && (
@@ -813,8 +813,9 @@ export const Navbar: React.FC = () => {
           </div>
 
           {/* Cart Trigger */}
-          <button
-            onClick={() => navigate("/cart")}
+          <Link
+            to="/cart"
+            aria-label="Shopping Cart"
             className="flex items-center gap-2 px-3.5 py-1.5 rounded-lg bg-gradient-to-r from-[#D49A37] to-[#B87C24] text-[#140D09] font-black text-xs shadow-md border border-[#F5BC51] hover:brightness-105 transition-all cursor-pointer"
           >
             <ShoppingBag className="w-4 h-4 text-[#140D09]" />
@@ -822,7 +823,7 @@ export const Navbar: React.FC = () => {
             <span className="bg-[#140D09] text-[#F5BC51] text-[10px] px-2 py-0.5 rounded-full font-bold">
               {cartCount}
             </span>
-          </button>
+          </Link>
 
           {/* Secret Admin CMS link strictly for manopavana@gmail.com */}
           {currentUser?.email === "manopavana@gmail.com" && (

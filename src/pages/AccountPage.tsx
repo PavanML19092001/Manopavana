@@ -52,15 +52,17 @@ export const AccountPage: React.FC = () => {
   const isDark = themeMode === "dark";
 
   const visibleOrders = React.useMemo(() => {
-    if (!currentUser?.uid) return [];
     const seen = new Set<string>();
     const res: Order[] = [];
-    const userEmail = (currentUser.email || "").toLowerCase().trim();
+    const userEmail = (currentUser?.email || "").toLowerCase().trim();
+    const userUid = currentUser?.uid;
 
     for (const o of orders) {
       const isMine =
-        (o.customerUid && o.customerUid === currentUser.uid) ||
-        (userEmail && o.customerEmail && o.customerEmail.toLowerCase() === userEmail);
+        !userUid || // Show placed orders on this device even if auth is restoring or guest
+        (o.customerUid && o.customerUid === userUid) ||
+        (userEmail && o.customerEmail && o.customerEmail.toLowerCase() === userEmail) ||
+        (targetRef && (o.orderRef === targetRef || o.id === targetRef));
       if (isMine) {
         const key = o.orderRef || o.id;
         if (key && !seen.has(key)) {
@@ -70,21 +72,21 @@ export const AccountPage: React.FC = () => {
       }
     }
     return res;
-  }, [orders, currentUser]);
+  }, [orders, currentUser, targetRef]);
 
   const [searchQuery, setSearchQuery] = useState(targetRef || "");
   const [selectedOrderRef, setSelectedOrderRef] = useState<string>(
     targetRef || (visibleOrders[0]?.orderRef || "")
   );
 
-  // If order param passed in URL, only select it if it belongs to this user!
+  // If order param passed in URL, select it
   useEffect(() => {
     if (targetRef && visibleOrders.some((o) => o.orderRef === targetRef || o.id === targetRef)) {
       setSelectedOrderRef(targetRef);
     } else if (visibleOrders.length > 0 && !selectedOrderRef) {
       setSelectedOrderRef(visibleOrders[0].orderRef);
     }
-  }, [targetRef, visibleOrders]);
+  }, [targetRef, visibleOrders, selectedOrderRef]);
 
   // Profile fields for editing
   const [name, setName] = useState(currentUser?.displayName || address.fullName);
@@ -144,8 +146,8 @@ export const AccountPage: React.FC = () => {
     return idx >= 0 ? idx : 0;
   };
 
-  // Guests are NEVER permitted to track orders. Require login!
-  if (!currentUser) {
+  // Only prompt login if the visitor has NO orders at all and is not searching a specific order
+  if (!currentUser && visibleOrders.length === 0 && !targetRef) {
     return (
       <div
         className={`w-full min-h-[calc(100vh-80px)] py-16 flex items-center justify-center transition-colors box-border ${
