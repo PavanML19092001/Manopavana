@@ -127,7 +127,8 @@ export type OrderStatus =
   | "Packed"
   | "Dispatched"
   | "Delivered"
-  | "Failed (Expired)";
+  | "Failed (Expired)"
+  | "Cancelled";
 
 export interface Order {
   id: string;
@@ -179,6 +180,18 @@ export interface LoyaltyState {
   scannedOil?: string;
 }
 
+export interface PolicyContent {
+  title: string;
+  content: string;
+}
+
+export interface ProductDetailOverride {
+  name?: string;
+  shortDescription?: string;
+  imageUrl?: string;
+  benefits?: string[];
+}
+
 export interface StoreCMSConfig {
   announcementTicker: string;
   heroHeadline: string;
@@ -224,4 +237,15 @@ export interface StoreCMSConfig {
     combo3L: boolean;
     combo1_5L: boolean;
   };
+
+  // Editable A-to-Z Legal Policies
+  policies?: {
+    terms?: PolicyContent;
+    shipping?: PolicyContent;
+    returns?: PolicyContent;
+    privacy?: PolicyContent;
+  };
+
+  // Editable A-to-Z Product Metadata Overrides (keyed by product ID: groundnut, coconut, sesame, combo-3l, combo-1.5l)
+  productDetails?: Record<string, ProductDetailOverride>;
 }

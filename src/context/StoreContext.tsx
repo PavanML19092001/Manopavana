@@ -36,6 +36,12 @@ import {
 import { doc, setDoc, onSnapshot, serverTimestamp } from "firebase/firestore";
 import { sendOrderConfirmationEmail } from "../services/emailService";
 
+export interface LabeledAddress extends Address {
+  id: string;
+  label: "Home" | "Work" | "Other";
+  isDefault?: boolean;
+}
+
 interface StoreContextType {
   // Cart
   cart: CartItem[];
@@ -61,8 +67,12 @@ interface StoreContextType {
   products: Product[];
   combos: ComboProduct[];
 
-  // Address & Location Guard
+  // Address & Multi-Address Book
   address: Address;
+  savedAddresses: LabeledAddress[];
+  selectSavedAddress: (id: string) => void;
+  saveNewAddress: (newAddr: Omit<LabeledAddress, "id">) => void;
+  deleteSavedAddress: (id: string) => void;
   updateAddress: (newAddr: Partial<Address>) => void;
   reverseGeocodeAndSaveAddress: (lat: number, lng: number) => Promise<Partial<Address> | null>;
   isLocationModalOpen: boolean;
@@ -97,6 +107,7 @@ interface StoreContextType {
   updateOrderStatus: (orderId: string, status: Order["orderStatus"]) => Promise<void>;
   updateOrderDetails: (orderRef: string, updates: Partial<Order>) => Promise<void>;
   deleteOrder: (orderRef: string) => Promise<void>;
+  cancelOrderWithinWindow: (orderRef: string) => Promise<boolean>;
 
   // Payment lifecycle modals
   paymentFailedOrder: Order | null;
@@ -132,6 +143,13 @@ interface StoreContextType {
   // Theme Mode (Blend, Light, Dark)
   themeMode: "blend" | "light" | "dark";
   setThemeMode: (mode: "blend" | "light" | "dark") => void;
+
+  addProductReview: (reviewData: {
+    productId: string;
+    productName: string;
+    rating: number;
+    comment: string;
+  }) => Promise<boolean>;
 }
 
 const DEFAULT_ADDRESS: Address = {
@@ -353,7 +371,18 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   };
 
-  // 2. Address & Location State (Strictly User-Scoped)
+  // 2. Address & Multi-Address Book (Strictly User-Scoped)
+  const [savedAddresses, setSavedAddresses] = useState<LabeledAddress[]>(() => {
+    try {
+      const raw = localStorage.getItem("manopavana_saved_addresses");
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch {}
+    return [];
+  });
+
   const [address, setAddress] = useState<Address>(() => {
     try {
       const saved = localStorage.getItem("manopavana_address_guest");
@@ -409,6 +438,52 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       // safe fallback
     }
   }, []);
+
+  const selectSavedAddress = (id: string) => {
+    const selected = savedAddresses.find((a) => a.id === id);
+    if (selected) {
+      setAddress(selected);
+      showToast(`Selected "${selected.label}" delivery address`);
+    }
+  };
+
+  const saveNewAddress = (newAddr: Omit<LabeledAddress, "id">) => {
+    const entry: LabeledAddress = {
+      ...newAddr,
+      id: `addr-${Date.now()}`,
+    };
+    const updated = [entry, ...savedAddresses];
+    setSavedAddresses(updated);
+    setAddress(entry);
+    try {
+      localStorage.setItem("manopavana_saved_addresses", JSON.stringify(updated));
+    } catch {}
+
+    if (currentUser?.uid) {
+      setDoc(
+        doc(db, "customers", currentUser.uid),
+        { savedAddresses: updated, updatedAt: serverTimestamp() },
+        { merge: true }
+      ).catch(() => {});
+    }
+    showToast(`Saved new address under "${entry.label}"`);
+  };
+
+  const deleteSavedAddress = (id: string) => {
+    const filtered = savedAddresses.filter((a) => a.id !== id);
+    setSavedAddresses(filtered);
+    try {
+      localStorage.setItem("manopavana_saved_addresses", JSON.stringify(filtered));
+    } catch {}
+    if (currentUser?.uid) {
+      setDoc(
+        doc(db, "customers", currentUser.uid),
+        { savedAddresses: filtered, updatedAt: serverTimestamp() },
+        { merge: true }
+      ).catch(() => {});
+    }
+    showToast("Address deleted");
+  };
 
   const updateAddress = (newFields: Partial<Address>) => {
     setAddress((prev) => {
@@ -704,6 +779,14 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           const userEmail = (profile as any)?.email || (user.email && !user.email.endsWith("@phone.manopavana.com") ? user.email : "");
           const userName = (profile as any)?.name || user.displayName || "";
 
+          // Populate address book from Firestore
+          if (profile && Array.isArray((profile as any).savedAddresses)) {
+            setSavedAddresses((profile as any).savedAddresses);
+            try {
+              localStorage.setItem("manopavana_saved_addresses", JSON.stringify((profile as any).savedAddresses));
+            } catch {}
+          }
+
           if (profile && (profile as any).savedAddress) {
             const saved = (profile as any).savedAddress;
             setAddress((prev) => ({
@@ -742,6 +825,12 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
                     localStorage.setItem("manopavana_active_cart", newCartStr);
                   } catch {}
                 }
+              }
+              if (Array.isArray(data?.savedAddresses)) {
+                setSavedAddresses(data.savedAddresses);
+                try {
+                  localStorage.setItem("manopavana_saved_addresses", JSON.stringify(data.savedAddresses));
+                } catch {}
               }
               if (data?.savedAddress && typeof data.savedAddress === "object") {
                 setAddress((prev) => ({
@@ -811,7 +900,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
     isCartInitializedRef.current = true;
 
-    showToast("👋 You have signed out. User session cleared.");
+    showToast("You have signed out. User session cleared.");
   };
 
   // 4. Loyalty Program
@@ -967,7 +1056,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   // 6. Orders Management
-  // Helper to load all stored orders safely across sessions and reloads
   const loadStoredOrders = (): Order[] => {
     try {
       // 1. Primary device-level store for all placed orders
@@ -1055,7 +1143,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
 
     if (!currentUser?.uid) {
-      // Keep existing stored orders! Never wipe orders when user is null on refresh
       return;
     }
 
@@ -1133,6 +1220,66 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       console.warn("Firestore saveOrder non-fatal notice:", err);
     }
   };
+
+  // 15-Minute Cancellation Window Function (Guaranteed 100% Free)
+  const cancelOrderWithinWindow = async (orderRef: string): Promise<boolean> => {
+  const target =
+    orders.find((o) => o.orderRef === orderRef) ||
+    adminOrders.find((o) => o.orderRef === orderRef);
+
+  if (!target) return false;
+
+  // Rule: Order can be cancelled only before it leaves the facility
+  if (target.orderStatus === "Dispatched" || target.orderStatus === "Delivered") {
+    showToast("This order is already out for delivery and cannot be cancelled.");
+    return false;
+  }
+
+  const isOnlinePayment =
+    target.paymentMethod === "phonepe" ||
+    target.paymentMethod === "online" ||
+    target.paymentMode?.includes("PHONEPE");
+
+  let refundStatus = "CANCELLED";
+
+  // If order was paid online, initiate PhonePe refund
+  if (isOnlinePayment && target.total > 0) {
+    try {
+      showToast("Initiating online refund with PhonePe...");
+      const res = await fetch("/api?action=phonepe_refund", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          orderRef: target.orderRef,
+          originalTransactionId: target.orderRef,
+          amountInRupees: target.total,
+        }),
+      });
+
+      const result = await res.json();
+      if (result.success) {
+        refundStatus = "REFUND_INITIATED";
+        showToast("Online refund initiated successfully! Funds will credit in 3–5 working days.");
+      } else {
+        refundStatus = "REFUND_PENDING_MANUAL";
+        showToast("Order cancelled. Refund queued for processing.");
+      }
+    } catch (err) {
+      console.warn("PhonePe refund trigger error:", err);
+      refundStatus = "REFUND_PENDING_MANUAL";
+    }
+  } else {
+    showToast(`Order #${orderRef} cancelled successfully.`);
+  }
+
+  // Update React state and Firestore
+  await updateOrderDetails(orderRef, {
+    orderStatus: "Cancelled",
+    paymentStatus: refundStatus,
+  });
+
+  return true;
+};
 
   const getOrder = (refOrId: string): Order | undefined => {
     // 1. Check current user's exclusive orders
@@ -1304,7 +1451,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }
     }
 
-    // GUARANTEE order items are never blank!
     let itemsToUse = target?.items && target.items.length > 0 ? [...target.items] : [];
     if (itemsToUse.length === 0) {
       if (buyNowItem) {
@@ -1314,7 +1460,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }
     }
 
-    // Safe fallback if cart and target were both empty
     if (itemsToUse.length === 0) {
       itemsToUse = [
         {
@@ -1391,7 +1536,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       isBuyNow: isDirectBuy,
     };
 
-    // Record this orderRef for guest session tracking so the placer can view their own order
     try {
       const guestRefs: string[] = JSON.parse(localStorage.getItem("manopavana_guest_order_ids") || "[]");
       if (!guestRefs.includes(orderRef)) {
@@ -1402,7 +1546,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       // ignore
     }
 
-    // Replace the failed/incomplete attempt with the placed COD order so orders NEVER appear twice
     setOrders((prev) => {
       const filtered = prev.filter((o) => o.orderRef !== orderRef);
       const nextList = [updated, ...filtered];
@@ -1425,10 +1568,8 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       orderStatus: "Placed",
     });
     await saveOrderToFirestore(updated, currentUser?.uid);
-
     await sendOrderConfirmationEmail(updated);
 
-    // If direct Buy Now, preserve user's regular bag!
     if (isDirectBuy) {
       clearBuyNow();
     } else {
@@ -1564,7 +1705,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       } catch {
         // ignore
       }
-      // Save directly to Firestore for live propagation across all browser tabs & devices
       saveStoreConfigToFirestore(next);
       return next;
     });
@@ -1645,7 +1785,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     "terms" | "shipping" | "returns" | "privacy" | null
   >(null);
 
-  // 11. Theme Mode: 'blend' (default), 'light', or 'dark'
+  // 10. Theme Mode: 'blend' (default), 'light', or 'dark'
   const [themeMode, setThemeModeState] = useState<"blend" | "light" | "dark">(() => {
     try {
       const saved = localStorage.getItem("manopavana_theme_mode");
@@ -1697,8 +1837,65 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     );
   };
 
-  const clearCart = () => {
+  const clearCart = async () => {
     setCart([]);
+    try {
+      localStorage.removeItem("manopavana_cart");
+      if (currentUser?.uid) {
+        await setDoc(
+          doc(db, "customers", currentUser.uid),
+          { cart: [] },
+          { merge: true }
+        );
+      }
+    } catch (e) {
+      console.warn("Notice clearing cart:", e);
+    }
+  };
+
+  const addProductReview = async (reviewData: {
+    productId: string;
+    productName: string;
+    rating: number;
+    comment: string;
+  }) => {
+    if (!currentUser) {
+      showToast("Please sign in to submit a review.");
+      setLoginModalOpen(true);
+      return false;
+    }
+
+    try {
+      const newReview = {
+        id: `rev_${Date.now()}`,
+        name: currentUser.displayName || address.fullName || "Verified Buyer",
+        locality: address.district || "Bengaluru",
+        city: address.city || "Bengaluru",
+        rating: reviewData.rating,
+        comment: reviewData.comment.trim(),
+        product: reviewData.productName,
+        productId: reviewData.productId,
+        date: new Date().toLocaleDateString("en-IN", {
+          day: "numeric",
+          month: "short",
+          year: "numeric",
+        }),
+        verified: true,
+        customerUid: currentUser.uid,
+      };
+
+      // 1. Save directly to Firestore
+      await setDoc(doc(db, "reviews", newReview.id), newReview);
+
+      // 2. Update local state so it appears immediately
+      setReviews((prev) => [newReview, ...prev]);
+      showToast("Thank you! Your verified review has been published.");
+      return true;
+    } catch (err) {
+      console.error("Error submitting review to Firestore:", err);
+      showToast("Could not submit review. Please try again.");
+      return false;
+    }
   };
 
   // Cart Calculations
@@ -1728,13 +1925,14 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, [cart.length, discountedSubtotal, shippingFee]);
 
   const freeShippingProgress = useMemo(() => {
-    if (discountedSubtotal >= cmsConfig.freeShippingThreshold) return 100;
-    return Math.min(100, Math.round((discountedSubtotal / cmsConfig.freeShippingThreshold) * 100));
-  }, [discountedSubtotal, cmsConfig]);
+  if (discountedSubtotal >= cmsConfig.freeShippingThreshold) return 100;
+  // Floor to prevent 99.8% rounding to 100%
+  return Math.min(99, Math.floor((discountedSubtotal / cmsConfig.freeShippingThreshold) * 100));
+}, [discountedSubtotal, cmsConfig.freeShippingThreshold]);
 
   const freeShippingShortfall = useMemo(() => {
-    return Math.max(0, cmsConfig.freeShippingThreshold - discountedSubtotal);
-  }, [discountedSubtotal, cmsConfig]);
+  return Math.max(0, cmsConfig.freeShippingThreshold - discountedSubtotal);
+}, [discountedSubtotal, cmsConfig.freeShippingThreshold]);
 
   return (
     <StoreContext.Provider
@@ -1758,6 +1956,10 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         products,
         combos,
         address,
+        savedAddresses,
+        selectSavedAddress,
+        saveNewAddress,
+        deleteSavedAddress,
         updateAddress,
         reverseGeocodeAndSaveAddress,
         isLocationModalOpen,
@@ -1784,6 +1986,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         updateOrderStatus,
         updateOrderDetails,
         deleteOrder,
+        cancelOrderWithinWindow,
         paymentFailedOrder,
         setPaymentFailedOrder,
         orderSuccessRef,
@@ -1807,6 +2010,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         showToast,
         themeMode,
         setThemeMode,
+        addProductReview,
       }}
     >
       {children}

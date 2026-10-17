@@ -85,6 +85,7 @@ export async function onRequest(context) {
   // Read endpoints & configuration from Cloudflare environment variables
   const PAY_URL = env.PHONEPE_PAY_URL || "https://api.phonepe.com/apis/pg/checkout/v2/pay";
   const STATUS_URL = env.PHONEPE_STATUS_URL || "https://api.phonepe.com/apis/pg/checkout/v2/order";
+  const REFUND_URL = env.PHONEPE_REFUND_URL || "https://api.phonepe.com/apis/pg/checkout/v2/refund";
   const PRODUCTION_ORIGIN = env.PRODUCTION_ORIGIN || "https://manopavana.com";
 
   try {
@@ -278,6 +279,69 @@ export async function onRequest(context) {
           data: verifyData,
         });
       }
+    }
+
+    /* -------------------------------------------------------------
+     * ACTION: phonepe_refund (Automated Online Refund to Original Source)
+     * ------------------------------------------------------------- */
+    if (request.method === "POST" && action === "phonepe_refund") {
+      let body = {};
+      try {
+        body = await request.json();
+      } catch {
+        return jsonResponse({ status: "FAILED", message: "Invalid JSON body" }, 400);
+      }
+
+      const { orderRef, originalTransactionId, amountInRupees } = body;
+      if (!orderRef || !amountInRupees) {
+        return jsonResponse({ status: "FAILED", message: "Missing orderRef or amountInRupees" }, 400);
+      }
+
+      let token;
+      try {
+        token = await getOAuthToken(env);
+      } catch (authErr) {
+        return jsonResponse({
+          status: "FAILED",
+          message: "Unable to authenticate with payment provider for refund",
+          details: authErr.message,
+        }, 502);
+      }
+
+      const amountInPaise = Math.round(parseFloat(amountInRupees) * 100);
+      const refundMerchantId = `REFUND_${orderRef}_${Date.now()}`;
+
+      const refundPayload = {
+        merchantOrderId: refundMerchantId,
+        originalMerchantOrderId: originalTransactionId || orderRef,
+        amount: amountInPaise,
+        callbackUrl: `${PRODUCTION_ORIGIN}/api?action=phonepe_refund_callback`,
+      };
+
+      const refundResp = await fetch(REFUND_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `O-Bearer ${token}`,
+        },
+        body: JSON.stringify(refundPayload),
+      });
+
+      const refundData = await refundResp.json();
+      const isSuccess = refundResp.ok && (
+        refundData.state === "COMPLETED" ||
+        refundData.state === "PENDING" ||
+        refundData.code === "PAYMENT_SUCCESS" ||
+        refundData.code === "PAYMENT_PENDING"
+      );
+
+      return jsonResponse({
+        status: isSuccess ? "SUCCESS" : "FAILED",
+        success: isSuccess,
+        refundMerchantId,
+        orderRef,
+        data: refundData,
+      }, refundResp.status);
     }
 
     /* -------------------------------------------------------------

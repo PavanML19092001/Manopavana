@@ -833,11 +833,10 @@ export const HomePage: React.FC = () => {
               </div>
 
               {/* Combo Section Banner Image */}
-              <div className="w-full rounded-2xl overflow-hidden border border-white/10 shadow-lg bg-black/40">
-                <img
+<div className="w-full max-w-4xl mx-auto rounded-3xl overflow-hidden bg-[#1E1108] border border-[#3E2616] p-4 flex items-center justify-center">                <img
                   src="https://pub-9e18bb265ecf4224ae1230cf913745ca.r2.dev/combo-all-labels.jpg"
                   alt="MANOPAVANA Complete 3-Oil Essential Trio Box"
-                  className="w-full max-h-[340px] object-cover object-center"
+                  className="w-full h-auto max-h-[480px] object-contain block mx-auto transition-transform duration-300 hover:scale-[1.02]"
                 />
               </div>
 

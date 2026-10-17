@@ -15,7 +15,9 @@ import { BUSINESS_CONFIG, LEGAL_POLICIES, MEDIA_ASSETS } from "../constants";
 export const Footer: React.FC = () => {
   const { activePolicyModal, setActivePolicyModal, cmsConfig } = useStore();
 
-  const activePolicyData = activePolicyModal ? LEGAL_POLICIES[activePolicyModal] : null;
+  const activePolicyData = activePolicyModal
+  ? (cmsConfig?.policies?.[activePolicyModal] || LEGAL_POLICIES[activePolicyModal])
+  : null;
 
   return (
     <>

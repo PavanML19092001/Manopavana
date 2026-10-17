@@ -8,6 +8,7 @@ import { LoyaltyQuizModal } from "./components/LoyaltyQuizModal";
 import { LoginModal } from "./components/LoginModal";
 import { PaymentFailedModal } from "./components/PaymentFailedModal";
 import { OrderSuccessModal } from "./components/OrderSuccessModal";
+import { FreeShippingNudge } from "./components/FreeShippingNudge";
 import { HomePage } from "./pages/HomePage";
 import { ProductPage } from "./pages/ProductPage";
 import { CartPage } from "./pages/CartPage";
@@ -19,7 +20,7 @@ import { Order } from "./types";
 import { PendingOrderBanner } from "./components/PendingOrderBanner";
 import { updateFirestoreOrderStatus, getOrderFromFirestore } from "./firebase";
 import { sendOrderConfirmationEmail } from "./services/emailService";
-import { Sparkles } from "lucide-react";
+import { Sparkles, LogOut, Home, RefreshCw } from "lucide-react";
 
 // Automatically scrolls to top on route change
 function ScrollToTop() {
@@ -40,28 +41,71 @@ export class ErrorBoundary extends React.Component<
     super(props);
     this.state = { hasError: false, error: null };
   }
+
   static getDerivedStateFromError(error: Error) {
     return { hasError: true, error };
   }
+
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
     console.warn("ErrorBoundary captured error:", error, errorInfo);
   }
+
+  handleEmergencyReset = () => {
+    try {
+      localStorage.clear();
+      sessionStorage.clear();
+      indexedDB.deleteDatabase("firebaseLocalStorageDb");
+    } catch {
+      // ignore
+    }
+    window.location.href = "/";
+  };
+
   render() {
     if (this.state.hasError) {
       return (
-        <div className="min-h-[50vh] flex items-center justify-center p-6 bg-[#FAF6F0] text-[#24140A] text-center">
-          <div className="max-w-md p-6 bg-white rounded-2xl shadow-xl border border-[#D49A37]/40 space-y-4">
-            <h2 className="text-lg font-bold font-serif text-[#5E3210]">Something interrupted this view</h2>
-            <p className="text-xs text-[#7A5E48]">The page has been safely preserved. Click below to continue.</p>
-            <button
-              onClick={() => {
-                this.setState({ hasError: false, error: null });
-                window.location.reload();
-              }}
-              className="px-5 py-2.5 rounded-xl bg-[#5E3210] text-white text-xs font-bold hover:bg-[#43230A] transition-colors cursor-pointer shadow-md"
-            >
-              Continue / Refresh
-            </button>
+        <div className="min-h-[60vh] flex items-center justify-center p-6 bg-[#FAF6F0] text-[#24140A] text-center">
+          <div className="max-w-md w-full p-8 bg-white rounded-3xl shadow-xl border border-[#D49A37]/40 space-y-5">
+            <div className="w-12 h-12 mx-auto rounded-full bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-[#E08F35]">
+              <RefreshCw className="w-6 h-6" />
+            </div>
+
+            <div className="space-y-1.5">
+              <h2 className="text-lg font-bold font-serif text-[#5E3210]">
+                Something interrupted this view
+              </h2>
+              <p className="text-xs text-[#7A5E48]">
+                A data format error occurred while rendering this section.
+              </p>
+              {this.state.error?.message && (
+                <p className="text-[10px] font-mono text-red-600 bg-red-50 p-2 rounded-lg border border-red-200 break-all text-left">
+                  {this.state.error.message}
+                </p>
+              )}
+            </div>
+
+            <div className="flex flex-col gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  this.setState({ hasError: false, error: null });
+                  window.location.reload();
+                }}
+                className="w-full py-2.5 rounded-xl bg-[#5E3210] text-white text-xs font-bold hover:bg-[#43230A] transition-colors cursor-pointer shadow-md flex items-center justify-center gap-1.5"
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+                <span>Try Refreshing View</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={this.handleEmergencyReset}
+                className="w-full py-2.5 rounded-xl bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 text-xs font-bold transition-colors cursor-pointer flex items-center justify-center gap-1.5"
+              >
+                <LogOut className="w-3.5 h-3.5 text-red-600" />
+                <span>Emergency Sign Out & Return Home</span>
+              </button>
+            </div>
           </div>
         </div>
       );
@@ -89,6 +133,8 @@ export default function App() {
     themeMode,
     isPreviewStorefront,
     togglePreviewStorefront,
+    logoutUser,
+    logoutAdmin,
   } = useStore();
 
   // REAL PAYMENT RETURN & VERIFICATION ROUTE HANDLER
@@ -104,7 +150,6 @@ export default function App() {
 
     async function verifyReturn(ref: string) {
       try {
-        // 1. Retrieve the exact order directly from Firestore
         let matched: Order | null | undefined = await getOrderFromFirestore(ref);
         if (!matched) {
           matched = getOrder(ref) || null;
@@ -129,19 +174,16 @@ export default function App() {
           state === "COMPLETED" ||
           state === "SUCCESS"
         ) {
-          // Clear pending order tracking keys from localStorage
           localStorage.removeItem("pending_order_ref");
           localStorage.removeItem("pending_order_timestamp");
           localStorage.removeItem("pending_order_data");
 
-          // 2. Update Firestore order document to PHONEPE_PAID and Placed
           await updateFirestoreOrderStatus(ref, {
             orderStatus: "Placed",
             paymentMode: "PHONEPE_PAID",
             paymentStatus: "COMPLETED",
           });
 
-          // 3. Dispatch EmailJS confirmation alert
           if (matched) {
             await sendOrderConfirmationEmail({
               ...matched,
@@ -151,7 +193,6 @@ export default function App() {
             });
           }
 
-          // 4. If direct Buy Now, clear only buyNowItem so bag items remain safe
           if (matched?.isBuyNow) {
             clearBuyNow();
           } else {
@@ -161,7 +202,6 @@ export default function App() {
           setOrderSuccessRef(ref);
           showToast("Payment verified online! Order placed.");
         } else {
-          // FAILED / PENDING / DECLINED / USER_CANCELLED
           await updateFirestoreOrderStatus(ref, {
             orderStatus: "Payment Incomplete",
             paymentStatus: "FAILED",
@@ -170,8 +210,10 @@ export default function App() {
           if (matched && matched.items && matched.items.length > 0) {
             setPaymentFailedOrder(matched);
           } else {
-            // If matched was not found, try to reconstruct from cart if items exist
             const fallbackItems = cart.length > 0 ? [...cart] : [];
+            const fallbackSubtotal = fallbackItems.reduce((acc, i) => acc + i.price * i.quantity, 0);
+            const fallbackTotal = Math.max(0, fallbackSubtotal - (discount || 0) + (shippingFee || 0));
+
             const fallbackOrder = {
               id: ref,
               orderRef: ref,
@@ -179,10 +221,10 @@ export default function App() {
               timestamp: Date.now(),
               timestampMs: Date.now(),
               items: fallbackItems,
-              subtotal: fallbackItems.reduce((acc, i) => acc + i.price * i.quantity, 0),
-              discount,
-              shippingFee,
-              total: fallbackItems.reduce((acc, i) => acc + i.price * i.quantity, 0),
+              subtotal: fallbackSubtotal,
+              discount: discount || 0,
+              shippingFee: shippingFee || 0,
+              total: fallbackTotal,
               paymentMethod: "phonepe" as const,
               paymentMode: "PHONEPE",
               paymentStatus: "FAILED",
@@ -207,9 +249,9 @@ export default function App() {
     verifyReturn(targetRef);
   }, []);
 
-  const isStoreAdmin = currentUser?.email === "manopavana@gmail.com";
+  const isStoreAdmin = currentUser?.email?.toLowerCase().trim() === "manopavana@gmail.com";
 
-  // If logged in as manopavana@gmail.com, show exclusively the Master CMS Portal (unless preview mode is active)
+  // Dedicated Admin Header with Escape & Logout Options
   if (isStoreAdmin && !isPreviewStorefront) {
     return (
       <div
@@ -222,8 +264,44 @@ export default function App() {
         }`}
       >
         <ScrollToTop />
+
+        {/* Global Admin Navigation Bar to prevent ever getting trapped */}
+        <header className="bg-[#2D1B10] text-[#FDF6EC] px-4 py-2.5 text-xs flex items-center justify-between border-b border-[#D49A37]/40 sticky top-0 z-50 shadow-md">
+          <div className="flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
+            <span className="font-bold text-amber-200">MANOPAVANA Master Admin Portal</span>
+            <span className="text-[#C4B29E] hidden md:inline">({currentUser?.email})</span>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => togglePreviewStorefront(true)}
+              className="px-3 py-1.5 rounded-xl bg-[#E08F35] hover:bg-[#c97a26] text-[#1F120A] text-xs font-bold transition-all cursor-pointer flex items-center gap-1 shadow"
+            >
+              <Home className="w-3.5 h-3.5" />
+              <span>Preview Storefront</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={async () => {
+                await logoutUser();
+                logoutAdmin();
+                window.location.href = "/";
+              }}
+              className="px-3 py-1.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-bold transition-all cursor-pointer flex items-center gap-1 shadow"
+            >
+              <LogOut className="w-3.5 h-3.5" />
+              <span>Sign Out</span>
+            </button>
+          </div>
+        </header>
+
         <ErrorBoundary>
-          <AdminPage />
+          <main className="flex-1">
+            <AdminPage />
+          </main>
         </ErrorBoundary>
 
         {/* Floating Global Toast Notification */}
@@ -260,6 +338,7 @@ export default function App() {
             </span>
           </div>
           <button
+            type="button"
             onClick={() => togglePreviewStorefront(false)}
             className="px-3.5 py-1.5 rounded-xl bg-[#E08F35] hover:bg-[#c97a26] text-[#1F120A] text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow"
           >
@@ -295,6 +374,7 @@ export default function App() {
 
       <Footer />
       <AudioPlayer />
+      <FreeShippingNudge />
       <ErrorBoundary>
         <LocationModal />
       </ErrorBoundary>

@@ -18,7 +18,7 @@ import {
   Zap,
 } from "lucide-react";
 import L from "leaflet";
-import { useStore } from "../context/StoreContext";
+import { useStore, LabeledAddress } from "../context/StoreContext";
 import {
   INDIAN_STATES_DISTRICTS,
   BUSINESS_CONFIG,
@@ -41,6 +41,9 @@ export const CheckoutPage: React.FC = () => {
     cmsConfig,
     loyalty,
     address,
+    savedAddresses,
+    selectSavedAddress,
+    saveNewAddress,
     updateAddress,
     reverseGeocodeAndSaveAddress,
     saveOrder,
@@ -73,7 +76,16 @@ export const CheckoutPage: React.FC = () => {
   const checkoutTotal =
     checkoutItems.length === 0 ? 0 : checkoutDiscountedSubtotal + checkoutShippingFee;
 
-  // Address Form State with instant customer pre-fill
+  // Multi-address book selector state
+  const [selectedAddressId, setSelectedAddressId] = useState<string>(
+    savedAddresses && savedAddresses.length > 0 ? savedAddresses[0].id : "new"
+  );
+  const [addressLabel, setAddressLabel] = useState<"Home" | "Work" | "Other">("Home");
+  const [isAddingNewAddress, setIsAddingNewAddress] = useState<boolean>(
+    !savedAddresses || savedAddresses.length === 0
+  );
+
+  // Address Form State with customer pre-fill
   const [fullName, setFullName] = useState(() => address.fullName || currentUser?.displayName || "");
   const [phone, setPhone] = useState(() => {
     if (address.phone) return address.phone;
@@ -95,6 +107,29 @@ export const CheckoutPage: React.FC = () => {
   const [isLocating, setIsLocating] = useState(false);
   const [iframePaymentUrl, setIframePaymentUrl] = useState<string | null>(null);
   const [pendingPhonePeRef, setPendingPhonePeRef] = useState<string | null>(null);
+
+  // Payment method state
+  const [paymentMethod, setPaymentMethod] = useState<"phonepe" | "cod">("phonepe");
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [paymentError, setPaymentError] = useState<string | null>(null);
+  const [lastAttemptedOrder, setLastAttemptedOrder] = useState<Order | null>(null);
+
+  // Free COD bot/accidental order safeguard (random math sum)
+  const [codChallenge, setCodChallenge] = useState<{ a: number; b: number }>({ a: 3, b: 5 });
+  const [codAnswerInput, setCodAnswerInput] = useState<string>("");
+  const [codError, setCodError] = useState<string | null>(null);
+
+  // Generate random numbers for COD challenge whenever COD is chosen
+  useEffect(() => {
+    if (paymentMethod === "cod") {
+      setCodChallenge({
+        a: Math.floor(Math.random() * 8) + 2,
+        b: Math.floor(Math.random() * 8) + 1,
+      });
+      setCodAnswerInput("");
+      setCodError(null);
+    }
+  }, [paymentMethod]);
 
   const safeUpdateMapCenter = (lat: number, lng: number, zoom = 14) => {
     if (!mapInstanceRef.current || !markerRef.current) return;
@@ -172,24 +207,7 @@ export const CheckoutPage: React.FC = () => {
     };
   }, [currentUser?.uid]);
 
-  // Auto-save edited contact/address details to Firestore on blur so customer never retypes
-  const handleFieldBlur = () => {
-    if (fullName.trim() || phone.trim() || addressLine1.trim()) {
-      updateAddress({
-        fullName: fullName.trim(),
-        phone: phone.trim().replace(/\D/g, "").slice(-10),
-        addressLine1: addressLine1.trim(),
-        landmark: landmark.trim(),
-        pincode: pincode.trim(),
-        district,
-        state,
-        lat: coords[0],
-        lng: coords[1],
-      });
-    }
-  };
-
-  // If user returns from cancelled/uncompleted online payment with empty bag, auto-recover items!
+  // If user returns from cancelled/uncompleted online payment with empty bag, auto-recover items
   useEffect(() => {
     if (checkoutItems.length === 0) {
       try {
@@ -218,13 +236,7 @@ export const CheckoutPage: React.FC = () => {
     }
   }, [checkoutItems.length]);
 
-  // Payment method: "phonepe" (Online Payment) or "cod" (Cash on Delivery)
-  const [paymentMethod, setPaymentMethod] = useState<"phonepe" | "cod">("phonepe");
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [paymentError, setPaymentError] = useState<string | null>(null);
-  const [lastAttemptedOrder, setLastAttemptedOrder] = useState<Order | null>(null);
-
-  // Check URL query parameters for return from PhonePe (non-blocking, App.tsx handles verification)
+  // Check URL query parameters for return from PhonePe
   const orderRefQuery = searchParams.get("orderRef");
   useEffect(() => {
     if (orderRefQuery) {
@@ -274,7 +286,7 @@ export const CheckoutPage: React.FC = () => {
     setPaymentError(null);
   };
 
-  // Leaflet Map in Checkout
+  // Leaflet Map Setup in Checkout
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
   const markerRef = useRef<L.Marker | null>(null);
@@ -312,7 +324,6 @@ export const CheckoutPage: React.FC = () => {
             icon: customIcon,
           }).addTo(map);
 
-          // Allow clicking directly anywhere on the map to pinpoint delivery spot
           map.on("click", async (e: L.LeafletMouseEvent) => {
             try {
               const { lat, lng } = e.latlng;
@@ -320,7 +331,7 @@ export const CheckoutPage: React.FC = () => {
                 setCoords([lat, lng]);
                 marker.setLatLng([lat, lng]);
                 updateAddress({ lat, lng });
-                showToast("📍 Pin placed on map! Updating address...");
+                showToast("Pin placed on map! Updating address...");
                 const partial = await reverseGeocodeAndSaveAddress(lat, lng);
                 if (partial) {
                   if (partial.addressLine1) setAddressLine1(partial.addressLine1);
@@ -328,7 +339,7 @@ export const CheckoutPage: React.FC = () => {
                   if (partial.state) setState(partial.state);
                   if (partial.district) setDistrict(partial.district);
                   if (partial.landmark) setLandmark(partial.landmark);
-                  showToast("📍 Address & district auto-populated from pin!");
+                  showToast("Address & district auto-populated from pin!");
                 }
               }
             } catch (err) {
@@ -348,7 +359,7 @@ export const CheckoutPage: React.FC = () => {
                 if (partial.state) setState(partial.state);
                 if (partial.district) setDistrict(partial.district);
                 if (partial.landmark) setLandmark(partial.landmark);
-                showToast("📍 Pin dragged! Street address & district updated.");
+                showToast("Pin dragged! Street address & district updated.");
               }
             } catch (e) {
               console.warn("Marker drag notice:", e);
@@ -381,7 +392,6 @@ export const CheckoutPage: React.FC = () => {
     setDistrict(districtsForState[0] || "");
   };
 
-  // Location check: Must start with 560 for Bangalore direct delivery
   const isBangalore = pincode.trim().startsWith("560");
 
   const handleGPSDetect = () => {
@@ -399,7 +409,7 @@ export const CheckoutPage: React.FC = () => {
             const c: [number, number] = [lat, lng];
             setCoords(c);
             safeUpdateMapCenter(lat, lng, 15);
-            showToast("📍 GPS coordinates retrieved! Auto-filling address...");
+            showToast("GPS coordinates retrieved! Auto-filling address...");
             const partial = await reverseGeocodeAndSaveAddress(lat, lng);
             if (partial) {
               if (partial.addressLine1) setAddressLine1(partial.addressLine1);
@@ -407,7 +417,7 @@ export const CheckoutPage: React.FC = () => {
               if (partial.state) setState(partial.state);
               if (partial.district) setDistrict(partial.district);
               if (partial.landmark) setLandmark(partial.landmark);
-              showToast("📍 Address & district auto-populated from GPS!");
+              showToast("Address & district auto-populated from GPS!");
             }
           }
         } catch (e) {
@@ -428,7 +438,6 @@ export const CheckoutPage: React.FC = () => {
   const handlePlaceOrder = async (e?: React.FormEvent, methodChoice?: "phonepe" | "cod") => {
     if (e) e.preventDefault();
 
-    // Guests are NOT allowed to place orders - must prompt login!
     if (!currentUser) {
       showToast("Please sign in or create an account to place an order.");
       setLoginModalOpen(true);
@@ -485,11 +494,28 @@ export const CheckoutPage: React.FC = () => {
       lng: coords[1],
       isBangalore: isBLR,
     };
+
     updateAddress(finalAddress);
+
+    // Save newly typed address to address book if selected
+    if (isAddingNewAddress) {
+      saveNewAddress({
+        ...finalAddress,
+        label: addressLabel,
+      });
+    }
 
     const finalCustomerUid = currentUser.uid;
 
     if (effectiveMethod === "cod") {
+      // Math challenge safeguard verification
+      const expected = codChallenge.a + codChallenge.b;
+      if (parseInt(codAnswerInput.trim(), 10) !== expected) {
+        setCodError(`Incorrect verification answer. What is ${codChallenge.a} + ${codChallenge.b}?`);
+        showToast("Please enter the correct verification answer to place a COD order.");
+        return;
+      }
+
       setIsProcessing(true);
       try {
         const prevPendingRef = localStorage.getItem("pending_order_ref") || lastAttemptedOrder?.orderRef;
@@ -528,7 +554,6 @@ export const CheckoutPage: React.FC = () => {
         };
 
         await saveOrder(newOrder);
-        // Non-blocking email dispatch
         sendOrderConfirmationEmail(newOrder).catch((e) => console.warn("Email alert notice:", e));
 
         if (isBuyNowMode) {
@@ -538,7 +563,7 @@ export const CheckoutPage: React.FC = () => {
         }
 
         setOrderSuccessRef(orderRef);
-        showToast("🎉 Order placed successfully with Cash on Delivery!");
+        showToast("Order placed successfully with Cash on Delivery!");
         navigate(`/account?order=${orderRef}`);
       } catch (err) {
         console.warn("COD placement error:", err);
@@ -687,7 +712,7 @@ export const CheckoutPage: React.FC = () => {
           </div>
         )}
 
-        {/* Logged-in Customer Auto-fill Confirmation Banner */}
+        {/* Logged-in Customer Confirmation Banner */}
         {currentUser && (
           <div className="p-4 rounded-2xl bg-emerald-500/10 border-2 border-emerald-500/40 flex items-center justify-between gap-4 text-xs shadow-xs">
             <div className="flex items-center gap-3">
@@ -756,7 +781,7 @@ export const CheckoutPage: React.FC = () => {
               className="px-5 py-2.5 rounded-xl bg-red-700 hover:bg-red-800 text-white font-bold text-xs shrink-0 flex items-center gap-2 cursor-pointer shadow-sm transition-all"
             >
               <RefreshCw className="w-4 h-4 text-amber-200" />
-              <span>⚡ Retry Payment</span>
+              <span>Retry Payment</span>
             </button>
           </div>
         )}
@@ -811,173 +836,276 @@ export const CheckoutPage: React.FC = () => {
                 </button>
               </div>
 
-              {/* Recipient details */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label
-                    className={`block text-xs font-semibold mb-1 ${
-                      isDark ? "text-[#FAF4EA]" : "text-[#3D2514]"
-                    }`}
-                  >
-                    Recipient Name *
+              {/* Saved Address Cards */}
+              {savedAddresses && savedAddresses.length > 0 && (
+                <div className="space-y-3 pb-2">
+                  <label className={`block text-xs font-bold ${isDark ? "text-[#FAF4EA]" : "text-[#3D2514]"}`}>
+                    Select Saved Delivery Address
                   </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. Manoj Kumar"
-                    value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
-                    className={`w-full px-3.5 py-2.5 text-xs rounded-xl focus:outline-none focus:ring-2 focus:ring-[#E08F35]/40 ${
-                      isDark
-                        ? "bg-[#150D07] border border-[#362114] text-[#FAF4EA] placeholder-[#8C7A6B]"
-                        : "bg-[#FAF7F2] border border-[#DDD1BE] text-[#23150C] placeholder-[#8C7A6B]"
-                    }`}
-                  />
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {savedAddresses.map((addr) => {
+                      const isSelected = selectedAddressId === addr.id && !isAddingNewAddress;
+                      return (
+                        <div
+                          key={addr.id}
+                          onClick={() => {
+                            setSelectedAddressId(addr.id);
+                            setIsAddingNewAddress(false);
+                            selectSavedAddress(addr.id);
+                            setFullName(addr.fullName || "");
+                            setPhone(addr.phone || "");
+                            setAddressLine1(addr.addressLine1 || "");
+                            setLandmark(addr.landmark || "");
+                            setState(addr.state || "Karnataka");
+                            setDistrict(addr.district || "Bengaluru Urban");
+                            setPincode(addr.pincode || "560058");
+                            if (Number.isFinite(addr.lat) && Number.isFinite(addr.lng)) {
+                              setCoords([addr.lat!, addr.lng!]);
+                              safeUpdateMapCenter(addr.lat!, addr.lng!, 15);
+                            }
+                          }}
+                          className={`p-3.5 rounded-xl border text-xs cursor-pointer transition-all ${
+                            isSelected
+                              ? isDark
+                                ? "bg-amber-950/40 border-[#E08F35] ring-2 ring-[#E08F35]/40"
+                                : "bg-amber-50/80 border-[#E08F35] ring-2 ring-[#E08F35]/40"
+                              : isDark
+                              ? "bg-[#150D07] border-[#362114] hover:border-[#4D2E1A]"
+                              : "bg-[#FAF7F2] border-[#E8DEC8] hover:border-[#DDD1BE]"
+                          }`}
+                        >
+                          <div className="flex items-center justify-between font-bold mb-1">
+                            <span className="flex items-center gap-1.5">
+                              <span className="px-2 py-0.5 rounded text-[10px] bg-[#E08F35]/20 text-[#E08F35]">
+                                {addr.label}
+                              </span>
+                              <span className="truncate max-w-[120px]">{addr.fullName}</span>
+                            </span>
+                            <span className="font-mono text-[11px] text-[#A88D77]">{addr.phone}</span>
+                          </div>
+                          <p className="text-[11px] text-stone-500 line-clamp-2">
+                            {addr.addressLine1}, {addr.district || addr.city} - {addr.pincode}
+                          </p>
+                        </div>
+                      );
+                    })}
+
+                    <div
+                      onClick={() => {
+                        setSelectedAddressId("new");
+                        setIsAddingNewAddress(true);
+                      }}
+                      className={`p-3.5 rounded-xl border-2 border-dashed flex items-center justify-center gap-2 cursor-pointer text-xs font-bold transition-all ${
+                        isAddingNewAddress
+                          ? "border-[#E08F35] bg-amber-500/10 text-[#E08F35]"
+                          : isDark
+                          ? "border-[#362114] text-[#A88D77] hover:border-[#E08F35]"
+                          : "border-[#DDD1BE] text-[#7A5E48] hover:border-[#E08F35]"
+                      }`}
+                    >
+                      <span>+ Deliver to a Different Address</span>
+                    </div>
+                  </div>
                 </div>
+              )}
 
-                <div>
-                  <label
-                    className={`block text-xs font-semibold mb-1 ${
-                      isDark ? "text-[#FAF4EA]" : "text-[#3D2514]"
-                    }`}
-                  >
-                    WhatsApp Contact Number *
-                  </label>
-                  <input
-                    type="tel"
-                    required
-                    placeholder="e.g. 9180301917"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    className={`w-full px-3.5 py-2.5 text-xs rounded-xl focus:outline-none focus:ring-2 focus:ring-[#E08F35]/40 ${
-                      isDark
-                        ? "bg-[#150D07] border border-[#362114] text-[#FAF4EA] placeholder-[#8C7A6B]"
-                        : "bg-[#FAF7F2] border border-[#DDD1BE] text-[#23150C] placeholder-[#8C7A6B]"
-                    }`}
-                  />
+              {/* Form Input Container */}
+              {isAddingNewAddress && (
+                <div className="space-y-4 pt-2 border-t border-stone-200 dark:border-stone-800">
+                  {/* Address Label Selector */}
+                  <div>
+                    <label className={`block text-xs font-semibold mb-1.5 ${isDark ? "text-[#FAF4EA]" : "text-[#3D2514]"}`}>
+                      Address Label
+                    </label>
+                    <div className="flex gap-2">
+                      {(["Home", "Work", "Other"] as const).map((lbl) => (
+                        <button
+                          key={lbl}
+                          type="button"
+                          onClick={() => setAddressLabel(lbl)}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                            addressLabel === lbl
+                              ? "bg-[#5E3210] text-white shadow-xs"
+                              : isDark
+                              ? "bg-[#150D07] border border-[#362114] text-[#A88D77]"
+                              : "bg-[#FAF7F2] border border-[#DDD1BE] text-[#5C402D]"
+                          }`}
+                        >
+                          {lbl}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Recipient details */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label
+                        className={`block text-xs font-semibold mb-1 ${
+                          isDark ? "text-[#FAF4EA]" : "text-[#3D2514]"
+                        }`}
+                      >
+                        Recipient Name *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="e.g. Manoj Kumar"
+                        value={fullName}
+                        onChange={(e) => setFullName(e.target.value)}
+                        className={`w-full px-3.5 py-2.5 text-xs rounded-xl focus:outline-none focus:ring-2 focus:ring-[#E08F35]/40 ${
+                          isDark
+                            ? "bg-[#150D07] border border-[#362114] text-[#FAF4EA] placeholder-[#8C7A6B]"
+                            : "bg-[#FAF7F2] border border-[#DDD1BE] text-[#23150C] placeholder-[#8C7A6B]"
+                        }`}
+                      />
+                    </div>
+
+                    <div>
+                      <label
+                        className={`block text-xs font-semibold mb-1 ${
+                          isDark ? "text-[#FAF4EA]" : "text-[#3D2514]"
+                        }`}
+                      >
+                        WhatsApp Contact Number *
+                      </label>
+                      <input
+                        type="tel"
+                        required
+                        placeholder="e.g. 9180301917"
+                        value={phone}
+                        onChange={(e) => setPhone(e.target.value)}
+                        className={`w-full px-3.5 py-2.5 text-xs rounded-xl focus:outline-none focus:ring-2 focus:ring-[#E08F35]/40 ${
+                          isDark
+                            ? "bg-[#150D07] border border-[#362114] text-[#FAF4EA] placeholder-[#8C7A6B]"
+                            : "bg-[#FAF7F2] border border-[#DDD1BE] text-[#23150C] placeholder-[#8C7A6B]"
+                        }`}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label
+                      className={`block text-xs font-semibold mb-1 ${
+                        isDark ? "text-[#FAF4EA]" : "text-[#3D2514]"
+                      }`}
+                    >
+                      Flat / House / Street Address *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. 118, Raghavendra Layout, Thigalarapalya"
+                      value={addressLine1}
+                      onChange={(e) => setAddressLine1(e.target.value)}
+                      className={`w-full px-3.5 py-2.5 text-xs rounded-xl focus:outline-none focus:ring-2 focus:ring-[#E08F35]/40 ${
+                        isDark
+                          ? "bg-[#150D07] border border-[#362114] text-[#FAF4EA] placeholder-[#8C7A6B]"
+                            : "bg-[#FAF7F2] border border-[#DDD1BE] text-[#23150C] placeholder-[#8C7A6B]"
+                      }`}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div>
+                      <label
+                        className={`block text-xs font-semibold mb-1 ${
+                          isDark ? "text-[#FAF4EA]" : "text-[#3D2514]"
+                        }`}
+                      >
+                        State *
+                      </label>
+                      <select
+                        value={state}
+                        onChange={(e) => handleStateChange(e.target.value)}
+                        className={`w-full px-3.5 py-2.5 text-xs rounded-xl focus:outline-none focus:ring-2 focus:ring-[#E08F35]/40 ${
+                          isDark
+                            ? "bg-[#150D07] border border-[#362114] text-[#FAF4EA]"
+                            : "bg-[#FAF7F2] border border-[#DDD1BE] text-[#23150C]"
+                        }`}
+                      >
+                        {Object.keys(INDIAN_STATES_DISTRICTS).map((s) => (
+                          <option key={s} value={s}>
+                            {s}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label
+                        className={`block text-xs font-semibold mb-1 ${
+                          isDark ? "text-[#FAF4EA]" : "text-[#3D2514]"
+                        }`}
+                      >
+                        District *
+                      </label>
+                      <select
+                        value={district}
+                        onChange={(e) => setDistrict(e.target.value)}
+                        className={`w-full px-3.5 py-2.5 text-xs rounded-xl focus:outline-none focus:ring-2 focus:ring-[#E08F35]/40 ${
+                          isDark
+                            ? "bg-[#150D07] border border-[#362114] text-[#FAF4EA]"
+                            : "bg-[#FAF7F2] border border-[#DDD1BE] text-[#23150C]"
+                        }`}
+                      >
+                        {!((INDIAN_STATES_DISTRICTS[state] || []).includes(district)) && district && (
+                          <option value={district}>{district}</option>
+                        )}
+                        {(INDIAN_STATES_DISTRICTS[state] || []).map((d) => (
+                          <option key={d} value={d}>
+                            {d}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label
+                        className={`block text-xs font-semibold mb-1 ${
+                          isDark ? "text-[#FAF4EA]" : "text-[#3D2514]"
+                        }`}
+                      >
+                        Pincode * (560xxx for BLR)
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        maxLength={6}
+                        placeholder="560058"
+                        value={pincode}
+                        onChange={(e) => setPincode(e.target.value)}
+                        className={`w-full px-3.5 py-2.5 text-xs rounded-xl focus:outline-none focus:ring-2 focus:ring-[#E08F35]/40 ${
+                          isDark
+                            ? "bg-[#150D07] border border-[#362114] text-[#FAF4EA]"
+                            : "bg-[#FAF7F2] border border-[#DDD1BE] text-[#23150C]"
+                        }`}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label
+                      className={`block text-xs font-semibold mb-1 ${
+                        isDark ? "text-[#FAF4EA]" : "text-[#3D2514]"
+                      }`}
+                    >
+                      Landmark (Optional)
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Near Peenya 2nd Stage Water Tank"
+                      value={landmark}
+                      onChange={(e) => setLandmark(e.target.value)}
+                      className={`w-full px-3.5 py-2.5 text-xs rounded-xl focus:outline-none focus:ring-2 focus:ring-[#E08F35]/40 ${
+                        isDark
+                          ? "bg-[#150D07] border border-[#362114] text-[#FAF4EA]"
+                          : "bg-[#FAF7F2] border border-[#DDD1BE] text-[#23150C]"
+                      }`}
+                    />
+                  </div>
                 </div>
-              </div>
-
-              <div>
-                <label
-                  className={`block text-xs font-semibold mb-1 ${
-                    isDark ? "text-[#FAF4EA]" : "text-[#3D2514]"
-                  }`}
-                >
-                  Flat / House / Street Address *
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. 118, Raghavendra Layout, Thigalarapalya"
-                  value={addressLine1}
-                  onChange={(e) => setAddressLine1(e.target.value)}
-                  className={`w-full px-3.5 py-2.5 text-xs rounded-xl focus:outline-none focus:ring-2 focus:ring-[#E08F35]/40 ${
-                    isDark
-                      ? "bg-[#150D07] border border-[#362114] text-[#FAF4EA] placeholder-[#8C7A6B]"
-                      : "bg-[#FAF7F2] border border-[#DDD1BE] text-[#23150C] placeholder-[#8C7A6B]"
-                  }`}
-                />
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div>
-                  <label
-                    className={`block text-xs font-semibold mb-1 ${
-                      isDark ? "text-[#FAF4EA]" : "text-[#3D2514]"
-                    }`}
-                  >
-                    State *
-                  </label>
-                  <select
-                    value={state}
-                    onChange={(e) => handleStateChange(e.target.value)}
-                    className={`w-full px-3.5 py-2.5 text-xs rounded-xl focus:outline-none focus:ring-2 focus:ring-[#E08F35]/40 ${
-                      isDark
-                        ? "bg-[#150D07] border border-[#362114] text-[#FAF4EA]"
-                        : "bg-[#FAF7F2] border border-[#DDD1BE] text-[#23150C]"
-                    }`}
-                  >
-                    {Object.keys(INDIAN_STATES_DISTRICTS).map((s) => (
-                      <option key={s} value={s}>
-                        {s}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label
-                    className={`block text-xs font-semibold mb-1 ${
-                      isDark ? "text-[#FAF4EA]" : "text-[#3D2514]"
-                    }`}
-                  >
-                    District *
-                  </label>
-                  <select
-                    value={district}
-                    onChange={(e) => setDistrict(e.target.value)}
-                    className={`w-full px-3.5 py-2.5 text-xs rounded-xl focus:outline-none focus:ring-2 focus:ring-[#E08F35]/40 ${
-                      isDark
-                        ? "bg-[#150D07] border border-[#362114] text-[#FAF4EA]"
-                        : "bg-[#FAF7F2] border border-[#DDD1BE] text-[#23150C]"
-                    }`}
-                  >
-                    {!((INDIAN_STATES_DISTRICTS[state] || []).includes(district)) && district && (
-                      <option value={district}>{district}</option>
-                    )}
-                    {(INDIAN_STATES_DISTRICTS[state] || []).map((d) => (
-                      <option key={d} value={d}>
-                        {d}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label
-                    className={`block text-xs font-semibold mb-1 ${
-                      isDark ? "text-[#FAF4EA]" : "text-[#3D2514]"
-                    }`}
-                  >
-                    Pincode * (560xxx for BLR)
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    maxLength={6}
-                    placeholder="560058"
-                    value={pincode}
-                    onChange={(e) => setPincode(e.target.value)}
-                    className={`w-full px-3.5 py-2.5 text-xs rounded-xl focus:outline-none focus:ring-2 focus:ring-[#E08F35]/40 ${
-                      isDark
-                        ? "bg-[#150D07] border border-[#362114] text-[#FAF4EA]"
-                        : "bg-[#FAF7F2] border border-[#DDD1BE] text-[#23150C]"
-                    }`}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label
-                  className={`block text-xs font-semibold mb-1 ${
-                    isDark ? "text-[#FAF4EA]" : "text-[#3D2514]"
-                  }`}
-                >
-                  Landmark (Optional)
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. Near Peenya 2nd Stage Water Tank"
-                  value={landmark}
-                  onChange={(e) => setLandmark(e.target.value)}
-                  className={`w-full px-3.5 py-2.5 text-xs rounded-xl focus:outline-none focus:ring-2 focus:ring-[#E08F35]/40 ${
-                    isDark
-                      ? "bg-[#150D07] border border-[#362114] text-[#FAF4EA]"
-                      : "bg-[#FAF7F2] border border-[#DDD1BE] text-[#23150C]"
-                  }`}
-                />
-              </div>
+              )}
 
               {/* Interactive OpenStreetMap */}
               <div className="space-y-1 pt-2">
@@ -1055,7 +1183,7 @@ export const CheckoutPage: React.FC = () => {
               </div>
 
               <div className="space-y-3">
-                {/* Option 1: Online Payment (UPI, Cards, NetBanking, Wallets) */}
+                {/* Option 1: Online Payment */}
                 <label
                   className={`p-4 rounded-xl border flex items-start justify-between cursor-pointer transition-all ${
                     paymentMethod === "phonepe"
@@ -1073,30 +1201,31 @@ export const CheckoutPage: React.FC = () => {
                       name="payment"
                       checked={paymentMethod === "phonepe"}
                       onChange={() => setPaymentMethod("phonepe")}
-                      className="mt-1 text-[#E08F35] focus:ring-[#E08F35]"
+                      className="mt-1 accent-[#E08F35]"
                     />
                     <div>
                       <span
-                        className={`text-xs font-bold flex items-center gap-2 ${
+                        className={`text-xs font-bold block ${
                           isDark ? "text-[#FAF4EA]" : "text-[#23150C]"
                         }`}
                       >
-                        <span>Online Payment (UPI, Cards, NetBanking, Wallets)</span>
-                        <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded">
-                          Recommended
-                        </span>
+                        Online Payment (UPI, PhonePe, GPay, Cards, NetBanking)
                       </span>
-                      <p className={`text-[11px] mt-0.5 ${isDark ? "text-[#D6C4B0]" : "text-[#5C402D]"}`}>
-                        Instant bank-grade encrypted checkout via UPI, Cards, NetBanking & Wallets
-                      </p>
+                      <span
+                        className={`text-[11px] block mt-0.5 ${
+                          isDark ? "text-[#D6C4B0]" : "text-[#5C402D]"
+                        }`}
+                      >
+                        Instant order confirmation & automated digital receipt
+                      </span>
                     </div>
                   </div>
-                  <Lock className="w-4 h-4 text-[#8C7A6B] shrink-0" />
+                  <Zap className="w-4 h-4 text-[#E08F35] shrink-0" />
                 </label>
 
-                {/* Option 2: Cash On Delivery */}
+                {/* Option 2: Cash on Delivery */}
                 <label
-                  className={`p-4 rounded-xl border flex items-start justify-between cursor-pointer transition-all ${
+                  className={`p-4 rounded-xl border flex flex-col cursor-pointer transition-all ${
                     paymentMethod === "cod"
                       ? isDark
                         ? "bg-amber-950/40 border-[#E08F35] ring-2 ring-[#E08F35]/30"
@@ -1106,37 +1235,72 @@ export const CheckoutPage: React.FC = () => {
                       : "border-[#E8DEC8] hover:border-[#DDD1BE]"
                   }`}
                 >
-                  <div className="flex items-start gap-3">
-                    <input
-                      type="radio"
-                      name="payment"
-                      checked={paymentMethod === "cod"}
-                      onChange={() => setPaymentMethod("cod")}
-                      className="mt-1 text-[#E08F35] focus:ring-[#E08F35]"
-                    />
-                    <div>
-                      <span
-                        className={`text-xs font-bold flex items-center gap-2 ${
-                          isDark ? "text-[#FAF4EA]" : "text-[#23150C]"
-                        }`}
-                      >
-                        <span>Cash on Delivery (Doorstep Cash / UPI QR)</span>
-                      </span>
-                      <p className={`text-[11px] mt-0.5 ${isDark ? "text-[#D6C4B0]" : "text-[#5C402D]"}`}>
-                        Pay cash or scan UPI QR upon arrival (Available for all Bengaluru & Pan-India deliveries)
-                      </p>
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-start gap-3">
+                      <input
+                        type="radio"
+                        name="payment"
+                        checked={paymentMethod === "cod"}
+                        onChange={() => setPaymentMethod("cod")}
+                        className="mt-1 accent-[#E08F35]"
+                      />
+                      <div>
+                        <span
+                          className={`text-xs font-bold block ${
+                            isDark ? "text-[#FAF4EA]" : "text-[#23150C]"
+                          }`}
+                        >
+                          Cash on Delivery (COD)
+                        </span>
+                        <span
+                          className={`text-[11px] block mt-0.5 ${
+                            isDark ? "text-[#D6C4B0]" : "text-[#5C402D]"
+                          }`}
+                        >
+                          Pay cash or UPI directly to our delivery executive at doorstep
+                        </span>
+                      </div>
                     </div>
+                    <Banknote className="w-4 h-4 text-emerald-500 shrink-0" />
                   </div>
-                  <Banknote className="w-4 h-4 text-[#8C7A6B] shrink-0" />
+
+                  {/* Math Challenge Box for COD Orders */}
+                  {paymentMethod === "cod" && (
+                    <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs space-y-2 mt-3 ml-7">
+                      <p className="font-bold text-[#1F120A] dark:text-[#FAF4EA]">
+                        Quick COD Verification (Prevent Accidental Orders):
+                      </p>
+                      <div className="flex items-center gap-3">
+                        <span className="font-mono font-bold text-sm bg-white dark:bg-black/40 px-3 py-1 rounded-lg border border-amber-400">
+                          {codChallenge.a} + {codChallenge.b} = ?
+                        </span>
+                        <input
+                          type="number"
+                          placeholder="Answer"
+                          value={codAnswerInput}
+                          onChange={(e) => {
+                            setCodAnswerInput(e.target.value);
+                            setCodError(null);
+                          }}
+                          className="w-24 px-3 py-1 text-sm font-bold rounded-lg border border-stone-300 dark:border-stone-700 bg-white dark:bg-[#120A06] text-center"
+                        />
+                      </div>
+                      {codError && (
+                        <p className="text-[11px] text-red-600 dark:text-red-400 font-semibold">
+                          {codError}
+                        </p>
+                      )}
+                    </div>
+                  )}
                 </label>
               </div>
             </div>
           </div>
 
-          {/* Right Column: Order Summary & Place Order */}
-          <div className="lg:col-span-5 space-y-4">
+          {/* Right Column: Order Summary & Place Order Button */}
+          <div className="lg:col-span-5 space-y-6">
             <div
-              className={`rounded-2xl border p-6 shadow-2xs space-y-4 sticky top-24 ${
+              className={`rounded-2xl border p-6 shadow-2xs space-y-4 ${
                 isDark ? "bg-[#1C120B] border-[#362114]" : "bg-white border-[#E8DEC8]"
               }`}
             >
@@ -1145,331 +1309,94 @@ export const CheckoutPage: React.FC = () => {
                   isDark ? "text-[#FAF4EA] border-[#2D1B10]" : "text-[#23150C] border-[#EFE8DC]"
                 }`}
               >
-                Items to Dispatch ({checkoutItems.length})
+                Order Summary ({checkoutItems.length} {checkoutItems.length === 1 ? "item" : "items"})
               </h2>
 
+              {/* Items List */}
               <div className="space-y-3 max-h-60 overflow-y-auto pr-1">
                 {checkoutItems.map((item) => (
-                  <div key={item.id} className="flex items-center justify-between text-xs">
-                    <div className="flex items-center gap-2">
+                  <div key={item.id} className="flex items-center justify-between gap-3 text-xs">
+                    <div className="flex items-center gap-2.5">
                       <img
                         src={item.image}
                         alt={item.title}
-                        className={`w-9 h-9 object-contain rounded p-0.5 ${
-                          isDark ? "bg-[#150D07]" : "bg-[#FAF6EE]"
-                        }`}
+                        className="w-10 h-10 object-contain p-0.5 rounded-lg border bg-white/5 shrink-0"
                       />
                       <div>
-                        <p
-                          className={`font-bold truncate max-w-[160px] ${
-                            isDark ? "text-[#FAF4EA]" : "text-[#23150C]"
-                          }`}
-                        >
+                        <p className={`font-bold ${isDark ? "text-[#FAF4EA]" : "text-[#23150C]"}`}>
                           {item.title}
                         </p>
-                        <p className={`text-[10px] ${isDark ? "text-[#A8907E]" : "text-[#7A5E48]"}`}>
-                          {item.variant} x {item.quantity}
+                        <p className="text-[10px] text-stone-500">
+                          {item.variant} × {item.quantity}
                         </p>
                       </div>
                     </div>
-                    <span
-                      className={`font-extrabold ${
-                        isDark ? "text-[#FAF4EA]" : "text-[#23150C]"
-                      }`}
-                    >
+                    <span className="font-extrabold text-[#E08F35]">
                       ₹{item.price * item.quantity}
                     </span>
                   </div>
                 ))}
               </div>
 
-              <div
-                className={`pt-3 border-t space-y-2 text-xs ${
-                  isDark ? "border-[#2D1B10]" : "border-[#EFE8DC]"
-                }`}
-              >
-                <div
-                  className={`flex items-center justify-between ${
-                    isDark ? "text-[#D6C4B0]" : "text-[#5C402D]"
-                  }`}
-                >
-                  <span>Items Subtotal</span>
-                  <span
-                    className={`font-bold ${
-                      isDark ? "text-[#FAF4EA]" : "text-[#23150C]"
-                    }`}
-                  >
-                    ₹{checkoutSubtotal}
-                  </span>
+              {/* Price Breakdown */}
+              <div className="space-y-2 pt-3 border-t border-stone-200 dark:border-stone-800 text-xs">
+                <div className="flex justify-between text-stone-500">
+                  <span>Items Subtotal:</span>
+                  <span>₹{checkoutSubtotal}</span>
                 </div>
-
                 {checkoutDiscount > 0 && (
-                  <div className="flex items-center justify-between text-emerald-600 font-medium">
-                    <span>10% Bottle QR Loyalty Discount</span>
-                    <span className="font-bold">-₹{checkoutDiscount}</span>
+                  <div className="flex justify-between text-emerald-600 font-medium">
+                    <span>Loyalty Discount:</span>
+                    <span>-₹{checkoutDiscount}</span>
                   </div>
                 )}
-
-                <div
-                  className={`flex items-center justify-between ${
-                    isDark ? "text-[#D6C4B0]" : "text-[#5C402D]"
-                  }`}
-                >
-                  <span>{isBangalore ? "Bangalore Doorstep Delivery" : "Pan-India Express Delivery (Delhivery)"}</span>
-                  <span
-                    className={`font-bold ${
-                      isDark ? "text-[#FAF4EA]" : "text-[#23150C]"
-                    }`}
-                  >
-                    {checkoutShippingFee === 0 ? "FREE" : `₹${checkoutShippingFee}`}
-                  </span>
+                <div className="flex justify-between text-stone-500">
+                  <span>Doorstep Delivery:</span>
+                  <span>{checkoutShippingFee === 0 ? "FREE" : `₹${checkoutShippingFee}`}</span>
                 </div>
-
-                <div
-                  className={`pt-3 border-t flex items-center justify-between ${
-                    isDark ? "border-[#2D1B10]" : "border-[#EFE8DC]"
-                  }`}
-                >
-                  <span
-                    className={`text-sm font-bold ${
-                      isDark ? "text-[#FAF4EA]" : "text-[#23150C]"
-                    }`}
-                  >
-                    Total Payable
-                  </span>
-                  <span
-                    className={`text-2xl font-black font-serif ${
-                      isDark ? "text-amber-300" : "text-[#C8751B]"
-                    }`}
-                  >
-                    ₹{checkoutTotal}
-                  </span>
+                <div className="flex justify-between font-bold text-base pt-2 border-t border-stone-200 dark:border-stone-800">
+                  <span className={isDark ? "text-[#FAF4EA]" : "text-[#23150C]"}>Total Amount:</span>
+                  <span className="text-[#E08F35]">₹{checkoutTotal}</span>
                 </div>
               </div>
 
-              {/* User Account State Check */}
-              {!currentUser ? (
-                <div className="p-3.5 rounded-xl bg-amber-500/15 border-2 border-[#E08F35]/60 flex items-center justify-between text-xs text-amber-900 dark:text-amber-200">
-                  <div className="flex items-center gap-2.5">
-                    <Lock className="w-4 h-4 text-[#E08F35] shrink-0" />
-                    <span className="text-xs font-semibold">
-                      Sign in required to place and track your orders.
-                    </span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setLoginModalOpen(true)}
-                    className="px-3 py-1.5 rounded-lg bg-[#5E3210] hover:bg-[#43230A] text-white text-xs font-bold cursor-pointer shrink-0 ml-2 shadow-xs hover:brightness-110"
-                  >
-                    Sign In
-                  </button>
-                </div>
-              ) : (
-                <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/25 flex items-center gap-2 text-xs text-emerald-800 dark:text-emerald-300">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                  <span className="text-[11px] font-medium">
-                    Ordering as: <strong>{currentUser.displayName || currentUser.email || "Valued Customer"}</strong>
-                  </span>
-                </div>
-              )}
-
-              {/* If checkout bag is empty, display instant product selection */}
-              {checkoutItems.length === 0 && (
-                <div className="p-4 rounded-xl bg-amber-950/40 border border-amber-600/40 text-center space-y-3">
-                  <p className="text-xs font-bold text-amber-200">Your checkout bag is currently empty.</p>
-                  <p className="text-[11px] text-[#D6BEAA]">Choose an authentic wood-pressed oil to order instantly:</p>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        addToCart({
-                          id: "groundnut-1L",
-                          productId: "groundnut",
-                          title: "Wood-Pressed Groundnut Oil",
-                          subtitle: "Marachekku Pure • 1L",
-                          variant: "1L",
-                          price: 399,
-                          regularPrice: 399,
-                          image: "/public/images/products/groundnut-light.png",
-                        }, 1);
-                        showToast("Added 1L Groundnut Oil to bag!");
-                      }}
-                      className="px-2.5 py-2 bg-black/40 hover:bg-black/60 border border-amber-500/40 text-amber-300 text-[11px] font-bold rounded-lg shadow-sm cursor-pointer transition-colors"
-                    >
-                      + Groundnut 1L (₹399)
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        addToCart({
-                          id: "coconut-1L",
-                          productId: "coconut",
-                          title: "Wood-Pressed Coconut Oil",
-                          subtitle: "Marachekku Pure • 1L",
-                          variant: "1L",
-                          price: 499,
-                          regularPrice: 499,
-                          image: "/public/images/products/coconut-light.png",
-                        }, 1);
-                        showToast("Added 1L Coconut Oil to bag!");
-                      }}
-                      className="px-2.5 py-2 bg-black/40 hover:bg-black/60 border border-amber-500/40 text-amber-300 text-[11px] font-bold rounded-lg shadow-sm cursor-pointer transition-colors"
-                    >
-                      + Coconut 1L (₹499)
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        addToCart({
-                          id: "sesame-1L",
-                          productId: "sesame",
-                          title: "Wood-Pressed Sesame Oil",
-                          subtitle: "Marachekku Pure • 1L",
-                          variant: "1L",
-                          price: 499,
-                          regularPrice: 499,
-                          image: "/public/images/products/sesame-light.png",
-                        }, 1);
-                        showToast("Added 1L Sesame Oil to bag!");
-                      }}
-                      className="px-2.5 py-2 bg-black/40 hover:bg-black/60 border border-amber-500/40 text-amber-300 text-[11px] font-bold rounded-lg shadow-sm cursor-pointer transition-colors"
-                    >
-                      + Sesame 1L (₹499)
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* Single Unified Order Action Button matching selected payment method */}
-              <div className="pt-1">
-                {!currentUser ? (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      showToast("Please sign in or create an account to place an order.");
-                      setLoginModalOpen(true);
-                    }}
-                    className="w-full py-4 px-4 rounded-xl bg-gradient-to-r from-[#D49A37] via-[#F5BC51] to-[#BF7E16] text-[#140D09] font-black font-serif text-xs uppercase tracking-wider shadow-[0_4px_20px_rgba(212,154,55,0.4)] border border-[#FFD885] hover:brightness-110 active:scale-[0.99] transition-all flex items-center justify-center gap-2 cursor-pointer"
-                  >
-                    <Lock className="w-4 h-4 text-[#140D09]" />
-                    <span>Sign In to Place Order (₹{checkoutTotal})</span>
-                  </button>
-                ) : paymentMethod === "phonepe" ? (
-                  <button
-                    type="button"
-                    disabled={isProcessing}
-                    onClick={() => handlePlaceOrder(undefined, "phonepe")}
-                    className="w-full py-4 px-4 rounded-xl bg-gradient-to-r from-[#D49A37] via-[#F5BC51] to-[#BF7E16] text-[#140D09] font-black font-serif text-xs uppercase tracking-wider shadow-[0_4px_20px_rgba(212,154,55,0.4)] border border-[#FFD885] hover:brightness-110 active:scale-[0.99] disabled:opacity-50 transition-all flex items-center justify-center gap-2 cursor-pointer"
-                  >
-                    {isProcessing ? (
-                      <>
-                        <RefreshCw className="w-4 h-4 animate-spin text-[#140D09]" />
-                        <span>Connecting to PhonePe PG...</span>
-                      </>
-                    ) : (
-                      <>
-                        <CreditCard className="w-4 h-4 text-[#140D09]" />
-                        <span>Pay Online ₹{checkoutTotal} (UPI / Cards / NetBanking)</span>
-                      </>
-                    )}
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    disabled={isProcessing}
-                    onClick={() => handlePlaceOrder(undefined, "cod")}
-                    className="w-full py-4 px-4 rounded-xl bg-[#5E3210] hover:bg-[#43230A] border border-[#7D451B] text-white font-black font-serif text-xs uppercase tracking-wider shadow-[0_4px_20px_rgba(94,50,16,0.4)] hover:brightness-110 active:scale-[0.99] disabled:opacity-50 transition-all flex items-center justify-center gap-2 cursor-pointer"
-                  >
-                    {isProcessing ? (
-                      <>
-                        <RefreshCw className="w-4 h-4 animate-spin text-amber-200" />
-                        <span>Placing Cash on Delivery Order...</span>
-                      </>
-                    ) : (
-                      <>
-                        <Banknote className="w-4 h-4 text-emerald-300" />
-                        <span>Place Order with Cash on Delivery (₹{checkoutTotal})</span>
-                      </>
-                    )}
-                  </button>
-                )}
-              </div>
-
-              <div
-                className={`text-[10px] space-y-1 text-center pt-2 ${
-                  isDark ? "text-[#A8907E]" : "text-[#8C7A6B]"
-                }`}
+              {/* Place Order CTA Button */}
+              <button
+                type="submit"
+                disabled={isProcessing}
+                className="w-full py-4 rounded-xl bg-gradient-to-r from-[#D49A37] via-[#F5BC51] to-[#BF7E16] text-[#140D09] font-serif font-black tracking-wider uppercase shadow-[0_4px_20px_rgba(212,154,55,0.35)] border border-[#FFD885] transition-all flex items-center justify-center gap-2 cursor-pointer hover:brightness-110 disabled:opacity-50 mt-4"
               >
-                <p>FSSAI: {BUSINESS_CONFIG.FSSAI_LICENSE} • GSTIN: {BUSINESS_CONFIG.GSTIN}</p>
-                <p>Facility: 118, Raghavendra Layout, Thigalarapalya, Peenya 2nd Stage</p>
+                {isProcessing ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin text-[#140D09]" />
+                    <span>Processing Order...</span>
+                  </>
+                ) : paymentMethod === "phonepe" ? (
+                  <>
+                    <Lock className="w-4 h-4 text-[#140D09]" />
+                    <span>Pay ₹{checkoutTotal} Online Securely</span>
+                  </>
+                ) : (
+                  <>
+                    <Banknote className="w-4 h-4 text-[#140D09]" />
+                    <span>Confirm Cash on Delivery (₹{checkoutTotal})</span>
+                  </>
+                )}
+              </button>
+
+              <div className="pt-2 text-[11px] space-y-1.5 text-stone-500">
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                  <span>Direct delivery from Peenya 2nd Stage, Bangalore</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                  <span>100% pure cold-pressed unrefined natural cooking oils</span>
+                </div>
               </div>
             </div>
           </div>
         </form>
-
-        {/* Iframe Safe Payment Launch Modal */}
-        {iframePaymentUrl && (
-          <div
-            role="dialog"
-            aria-modal="true"
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-fade-in"
-          >
-            <div className="relative w-full max-w-md bg-gradient-to-b from-[#24160F] to-[#140D09] text-[#FDF6EC] rounded-3xl p-6 sm:p-7 shadow-[0_25px_60px_rgba(0,0,0,0.95)] border-2 border-[#E08F35]/70 space-y-5">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#D49A37]/30 to-[#E08F35]/10 border border-[#E08F35]/40 flex items-center justify-center text-[#F5BC51] shrink-0">
-                  <Zap className="w-6 h-6 text-[#F5BC51]" />
-                </div>
-                <div>
-                  <h3 className="font-serif font-black text-base text-[#FFD885]">
-                    PhonePe Payment Gateway Ready
-                  </h3>
-                  <p className="text-[11px] text-[#A88D77]">
-                    Order Ref: <span className="font-mono text-amber-300 font-bold">#{pendingPhonePeRef}</span>
-                  </p>
-                </div>
-              </div>
-
-              <div className="p-3.5 rounded-xl bg-[#180E09] border border-[#3D2514] text-xs text-[#D6BEAA] space-y-1.5">
-                <p className="font-bold text-[#FAF4EA]">Secure 256-Bit UPI & Card Gateway</p>
-                <p className="text-[11px] text-[#A88D77] leading-relaxed">
-                  Your order items and reserved stock have been secured in Firestore. Tap below to complete payment on the official PhonePe portal.
-                </p>
-              </div>
-
-              <div className="space-y-3 pt-1">
-                <a
-                  href={iframePaymentUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-[#D49A37] via-[#F5BC51] to-[#BF7E16] text-[#140D09] font-serif font-black tracking-wider uppercase shadow-[0_4px_20px_rgba(212,154,55,0.35)] border border-[#FFD885] transition-all flex items-center justify-center gap-2 cursor-pointer hover:brightness-110 text-xs"
-                >
-                  <span>Open PhonePe Gateway (New Tab)</span>
-                  <ExternalLink className="w-4 h-4 text-[#140D09]" />
-                </a>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIframePaymentUrl(null);
-                    handlePlaceOrder(undefined, "cod");
-                  }}
-                  className="w-full py-3 px-4 rounded-xl bg-[#1C110B] hover:bg-[#2C1D14] border-2 border-emerald-700/80 text-emerald-300 font-bold text-xs transition-colors flex items-center justify-center gap-2 cursor-pointer"
-                >
-                  <Banknote className="w-4 h-4 text-emerald-400" />
-                  <span>Switch to Cash on Delivery (COD)</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setIframePaymentUrl(null)}
-                  className="w-full text-center text-xs text-[#A88D77] hover:text-[#FAF4EA] cursor-pointer pt-1"
-                >
-                  Cancel & Return to Checkout
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );
