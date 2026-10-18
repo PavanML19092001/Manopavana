@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { StorefrontCMSPanel } from "../components/admin/StoreFrontCmsPanel";
 import {
   Lock,
@@ -79,6 +79,75 @@ export const AdminPage: React.FC = () => {
     latencyMs?: number;
     message?: string;
   } | null>(null);
+
+  // Automatic background carrier status sync for active Delhivery orders
+  useEffect(() => {
+    const activeDelhiveryOrders = orders.filter(
+      (o) =>
+        o.trackingNumber &&
+        !o.trackingNumber.startsWith("MV-BLR") &&
+        o.orderStatus !== "Delivered" &&
+        o.orderStatus !== "Cancelled"
+    );
+
+    if (activeDelhiveryOrders.length === 0) return;
+
+    const syncActiveShipments = async () => {
+      for (const ord of activeDelhiveryOrders) {
+        try {
+          const res = await fetch(`/api?action=delhivery_track&waybill=${ord.trackingNumber}`);
+          const data = await res.json();
+          const scanStatus = data?.data?.ShipmentData?.[0]?.Shipment?.Status?.Status;
+          
+          if (scanStatus) {
+            const mapped = mapDelhiveryToWebStatus(scanStatus);
+            if (mapped && mapped !== ord.orderStatus) {
+              await updateOrderStatus(ord.id || ord.orderRef, mapped);
+            }
+          }
+        } catch (e) {
+          console.warn(`Background sync skipped for ${ord.trackingNumber}:`, e);
+        }
+      }
+    };
+
+    // Run automatically when dashboard opens
+    syncActiveShipments();
+
+    // Helper to map live Delhivery carrier status strings to MANOPAVANA website order stages
+  const mapDelhiveryToWebStatus = (delhiveryStatus: string): "Placed" | "Packed" | "Dispatched" | "Delivered" | "Cancelled" | null => {
+    const s = String(delhiveryStatus || "").toLowerCase();
+
+    if (s.includes("delivered")) {
+      return "Delivered";
+    }
+    if (
+      s.includes("in transit") ||
+      s.includes("dispatched") ||
+      s.includes("out for delivery") ||
+      s.includes("in-transit")
+    ) {
+      return "Dispatched";
+    }
+    if (
+      s.includes("manifest") ||
+      s.includes("ready to ship") ||
+      s.includes("scheduled") ||
+      s.includes("open")
+    ) {
+      return "Packed";
+    }
+    if (s.includes("cancel")) {
+      return "Cancelled";
+    }
+
+    return null;
+  };
+
+    // Re-check automatically every 5 minutes while dashboard remains open
+    const interval = setInterval(syncActiveShipments, 5 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, [orders]);
 
   const facilityAddress =
     cmsConfig?.facilityAddress || BUSINESS_CONFIG.FACILITY_ADDRESS;
