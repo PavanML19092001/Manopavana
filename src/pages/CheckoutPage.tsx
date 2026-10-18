@@ -16,6 +16,8 @@ import {
   User,
   LogIn,
   Zap,
+  Search,
+  Loader2,
 } from "lucide-react";
 import L from "leaflet";
 import { useStore, LabeledAddress } from "../context/StoreContext";
@@ -58,7 +60,7 @@ export const CheckoutPage: React.FC = () => {
 
   const isDark = themeMode === "dark";
 
-  // Check if Buy Now direct mode is active (ordering single item without touching cart)
+  // Check if Buy Now direct mode is active
   const isBuyNowMode = searchParams.get("mode") === "buynow" && buyNowItem !== null;
   const checkoutItems = isBuyNowMode && buyNowItem ? [buyNowItem] : cart;
 
@@ -85,7 +87,7 @@ export const CheckoutPage: React.FC = () => {
     !savedAddresses || savedAddresses.length === 0
   );
 
-  // Address Form State with customer pre-fill
+  // Address Form State
   const [fullName, setFullName] = useState(() => address.fullName || currentUser?.displayName || "");
   const [phone, setPhone] = useState(() => {
     if (address.phone) return address.phone;
@@ -108,18 +110,23 @@ export const CheckoutPage: React.FC = () => {
   const [iframePaymentUrl, setIframePaymentUrl] = useState<string | null>(null);
   const [pendingPhonePeRef, setPendingPhonePeRef] = useState<string | null>(null);
 
+  // Address search states for checkout map
+  const [searchQuery, setSearchQuery] = useState("");
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const searchTimeoutRef = useRef<any>(null);
+
   // Payment method state
   const [paymentMethod, setPaymentMethod] = useState<"phonepe" | "cod">("phonepe");
   const [isProcessing, setIsProcessing] = useState(false);
   const [paymentError, setPaymentError] = useState<string | null>(null);
   const [lastAttemptedOrder, setLastAttemptedOrder] = useState<Order | null>(null);
 
-  // Free COD bot/accidental order safeguard (random math sum)
+  // Free COD bot/accidental order safeguard
   const [codChallenge, setCodChallenge] = useState<{ a: number; b: number }>({ a: 3, b: 5 });
   const [codAnswerInput, setCodAnswerInput] = useState<string>("");
   const [codError, setCodError] = useState<string | null>(null);
 
-  // Generate random numbers for COD challenge whenever COD is chosen
   useEffect(() => {
     if (paymentMethod === "cod") {
       setCodChallenge({
@@ -131,12 +138,13 @@ export const CheckoutPage: React.FC = () => {
     }
   }, [paymentMethod]);
 
-  const safeUpdateMapCenter = (lat: number, lng: number, zoom = 14) => {
+  const safeUpdateMapCenter = (lat: number, lng: number, zoom = 15) => {
     if (!mapInstanceRef.current || !markerRef.current) return;
     try {
       if (Number.isFinite(lat) && Number.isFinite(lng)) {
         mapInstanceRef.current.setView([lat, lng], zoom);
         markerRef.current.setLatLng([lat, lng]);
+        mapInstanceRef.current.invalidateSize();
       }
     } catch (e) {
       console.warn("Map view notice:", e);
@@ -207,7 +215,7 @@ export const CheckoutPage: React.FC = () => {
     };
   }, [currentUser?.uid]);
 
-  // If user returns from cancelled/uncompleted online payment with empty bag, auto-recover items
+  // If user returns with empty bag, auto-recover items
   useEffect(() => {
     if (checkoutItems.length === 0) {
       try {
@@ -236,56 +244,6 @@ export const CheckoutPage: React.FC = () => {
     }
   }, [checkoutItems.length]);
 
-  // Check URL query parameters for return from PhonePe
-  const orderRefQuery = searchParams.get("orderRef");
-  useEffect(() => {
-    if (orderRefQuery) {
-      async function syncReturnedOrder(ref: string) {
-        try {
-          const ord = await getOrderFromFirestore(ref);
-          if (ord) setLastAttemptedOrder(ord);
-        } catch {}
-      }
-      syncReturnedOrder(orderRefQuery);
-    }
-  }, [orderRefQuery]);
-
-  const handleRetryPayment = () => {
-    let orderToRestore = lastAttemptedOrder;
-    if (!orderToRestore) {
-      try {
-        const stored = localStorage.getItem("pending_order_data");
-        if (stored) orderToRestore = JSON.parse(stored);
-      } catch {
-        // ignore
-      }
-    }
-    if (orderToRestore && orderToRestore.items) {
-      if (orderToRestore.isBuyNow && orderToRestore.items.length === 1) {
-        const it = orderToRestore.items[0];
-        startBuyNow(it, it.quantity);
-      } else {
-        orderToRestore.items.forEach((item) => {
-          addToCart(
-            {
-              id: item.id,
-              productId: item.productId,
-              title: item.title,
-              subtitle: item.subtitle,
-              variant: item.variant,
-              price: item.price,
-              regularPrice: item.regularPrice,
-              image: item.image,
-            },
-            item.quantity
-          );
-        });
-      }
-      showToast("Items restored to active cart!");
-    }
-    setPaymentError(null);
-  };
-
   // Leaflet Map Setup in Checkout
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
@@ -312,11 +270,11 @@ export const CheckoutPage: React.FC = () => {
 
           const customIcon = L.divIcon({
             className: "checkout-leaflet-marker",
-            html: `<div style="background-color:#5E3210; width:26px; height:26px; border-radius:50%; border:3px solid #FFF; box-shadow:0 4px 10px rgba(0,0,0,0.3); display:flex; align-items:center; justify-content:center;">
-                    <div style="background:#E08F35; width:10px; height:10px; border-radius:50%;"></div>
+            html: `<div style="background-color:#5E3210; width:30px; height:30px; border-radius:50%; border:3px solid #FFF; box-shadow:0 4px 12px rgba(0,0,0,0.4); display:flex; align-items:center; justify-content:center;">
+                    <div style="background:#E08F35; width:12px; height:12px; border-radius:50%;"></div>
                   </div>`,
-            iconSize: [26, 26],
-            iconAnchor: [13, 13],
+            iconSize: [30, 30],
+            iconAnchor: [15, 15],
           });
 
           const marker = L.marker(coords, {
@@ -368,12 +326,17 @@ export const CheckoutPage: React.FC = () => {
 
           mapInstanceRef.current = map;
           markerRef.current = marker;
+
+          setTimeout(() => {
+            map.invalidateSize();
+          }, 200);
         } else {
           try {
             mapInstanceRef.current.setView(coords, 14);
             if (markerRef.current) {
               markerRef.current.setLatLng(coords);
             }
+            mapInstanceRef.current.invalidateSize();
           } catch {}
         }
       } catch (err) {
@@ -385,6 +348,70 @@ export const CheckoutPage: React.FC = () => {
       clearTimeout(timer);
     };
   }, []);
+
+  // Autocomplete / Search location on map
+  const handleSearchQueryChange = (val: string) => {
+    setSearchQuery(val);
+    if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+
+    if (!val.trim() || val.length < 3) {
+      setSearchResults([]);
+      setIsSearching(false);
+      return;
+    }
+
+    setIsSearching(true);
+    searchTimeoutRef.current = setTimeout(async () => {
+      try {
+        const res = await fetch(
+          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
+            val
+          )}&countrycodes=in&limit=5&addressdetails=1`,
+          {
+            headers: {
+              "User-Agent": "ManopavanaCheckoutLocationPicker/1.0",
+              "Accept-Language": "en",
+            },
+          }
+        );
+        const data = await res.json();
+        setSearchResults(data || []);
+      } catch (err) {
+        console.warn("Search geocode error:", err);
+        setSearchResults([]);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 400);
+  };
+
+  const handleSelectSearchResult = async (item: any) => {
+    const lat = parseFloat(item.lat);
+    const lon = parseFloat(item.lon);
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
+
+    setCoords([lat, lon]);
+    setSearchResults([]);
+    setSearchQuery(item.display_name);
+
+    if (mapInstanceRef.current && markerRef.current) {
+      try {
+        mapInstanceRef.current.setView([lat, lon], 16);
+        markerRef.current.setLatLng([lat, lon]);
+        mapInstanceRef.current.invalidateSize();
+      } catch {}
+    }
+
+    showToast("Map focused on selected location!");
+    const partial = await reverseGeocodeAndSaveAddress(lat, lon);
+    if (partial) {
+      if (partial.addressLine1) setAddressLine1(partial.addressLine1);
+      if (partial.pincode) setPincode(partial.pincode);
+      if (partial.state) setState(partial.state);
+      if (partial.district) setDistrict(partial.district);
+      if (partial.landmark) setLandmark(partial.landmark);
+    }
+  };
 
   const handleStateChange = (newState: string) => {
     setState(newState);
@@ -408,7 +435,7 @@ export const CheckoutPage: React.FC = () => {
           if (Number.isFinite(lat) && Number.isFinite(lng)) {
             const c: [number, number] = [lat, lng];
             setCoords(c);
-            safeUpdateMapCenter(lat, lng, 15);
+            safeUpdateMapCenter(lat, lng, 16);
             showToast("GPS coordinates retrieved! Auto-filling address...");
             const partial = await reverseGeocodeAndSaveAddress(lat, lng);
             if (partial) {
@@ -497,7 +524,6 @@ export const CheckoutPage: React.FC = () => {
 
     updateAddress(finalAddress);
 
-    // Save newly typed address to address book if selected
     if (isAddingNewAddress) {
       saveNewAddress({
         ...finalAddress,
@@ -508,7 +534,6 @@ export const CheckoutPage: React.FC = () => {
     const finalCustomerUid = currentUser.uid;
 
     if (effectiveMethod === "cod") {
-      // Math challenge safeguard verification
       const expected = codChallenge.a + codChallenge.b;
       if (parseInt(codAnswerInput.trim(), 10) !== expected) {
         setCodError(`Incorrect verification answer. What is ${codChallenge.a} + ${codChallenge.b}?`);
@@ -681,7 +706,7 @@ export const CheckoutPage: React.FC = () => {
             Checkout & Dispatch Order
           </h1>
           <p className={`text-xs ${isDark ? "text-[#D6C4B0]" : "text-[#5C402D]"}`}>
-            Pinpoint Bengaluru delivery coordinates and choose payment method
+            Pinpoint delivery coordinates and choose payment method
           </p>
         </div>
 
@@ -777,7 +802,7 @@ export const CheckoutPage: React.FC = () => {
             </div>
             <button
               type="button"
-              onClick={handleRetryPayment}
+              onClick={() => setPaymentError(null)}
               className="px-5 py-2.5 rounded-xl bg-red-700 hover:bg-red-800 text-white font-bold text-xs shrink-0 flex items-center gap-2 cursor-pointer shadow-sm transition-all"
             >
               <RefreshCw className="w-4 h-4 text-amber-200" />
@@ -832,7 +857,7 @@ export const CheckoutPage: React.FC = () => {
                   }`}
                 >
                   <Navigation className="w-3.5 h-3.5" />
-                  <span>GPS Pinpoint</span>
+                  <span>{isLocating ? "Detecting GPS..." : "GPS Pinpoint"}</span>
                 </button>
               </div>
 
@@ -1001,7 +1026,7 @@ export const CheckoutPage: React.FC = () => {
                       className={`w-full px-3.5 py-2.5 text-xs rounded-xl focus:outline-none focus:ring-2 focus:ring-[#E08F35]/40 ${
                         isDark
                           ? "bg-[#150D07] border border-[#362114] text-[#FAF4EA] placeholder-[#8C7A6B]"
-                            : "bg-[#FAF7F2] border border-[#DDD1BE] text-[#23150C] placeholder-[#8C7A6B]"
+                          : "bg-[#FAF7F2] border border-[#DDD1BE] text-[#23150C] placeholder-[#8C7A6B]"
                       }`}
                     />
                   </div>
@@ -1107,23 +1132,66 @@ export const CheckoutPage: React.FC = () => {
                 </div>
               )}
 
-              {/* Interactive OpenStreetMap */}
-              <div className="space-y-1 pt-2">
+              {/* Direct Address Search Input Bar on Checkout */}
+              <div className="relative space-y-1.5 pt-3 border-t border-stone-200 dark:border-stone-800 z-30">
+                <label className={`block text-xs font-semibold ${isDark ? "text-[#FAF4EA]" : "text-[#3D2514]"}`}>
+                  Search Area, Landmark, or Street on Map:
+                </label>
+                <div className="relative flex items-center">
+                  <Search className="absolute left-3.5 w-4 h-4 text-stone-400" />
+                  <input
+                    type="text"
+                    placeholder="e.g. Peenya 2nd Stage, Hassan, Indiranagar, MG Road..."
+                    value={searchQuery}
+                    onChange={(e) => handleSearchQueryChange(e.target.value)}
+                    className={`w-full pl-10 pr-10 py-2.5 text-xs rounded-xl focus:outline-none focus:ring-2 focus:ring-[#E08F35]/50 ${
+                      isDark
+                        ? "bg-[#150D07] border border-[#362114] text-[#FAF4EA] placeholder-[#8C7A6B]"
+                        : "bg-[#FAF7F2] border border-[#DDD1BE] text-[#23150C] placeholder-[#8C7A6B]"
+                    }`}
+                  />
+                  {isSearching && (
+                    <Loader2 className="absolute right-3.5 w-4 h-4 text-[#E08F35] animate-spin" />
+                  )}
+                </div>
+
+                {/* Autocomplete Results Dropdown */}
+                {searchResults.length > 0 && (
+                  <ul className="absolute left-0 right-0 top-full mt-1.5 bg-white dark:bg-[#1C110B] border border-stone-200 dark:border-[#4A301E] rounded-2xl shadow-2xl max-h-56 overflow-y-auto divide-y divide-stone-100 dark:divide-[#2C1D14] z-50">
+                    {searchResults.map((item, idx) => (
+                      <li
+                        key={idx}
+                        onClick={() => handleSelectSearchResult(item)}
+                        className="p-3 text-xs hover:bg-amber-50 dark:hover:bg-[#2C1D14] cursor-pointer flex items-start gap-2.5 transition-colors"
+                      >
+                        <MapPin className="w-4 h-4 text-[#E08F35] shrink-0 mt-0.5" />
+                        <span className="line-clamp-2 text-stone-700 dark:text-stone-200">
+                          {item.display_name}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+
+              {/* Spacious Interactive OpenStreetMap Container */}
+              <div className="space-y-1.5 pt-1">
                 <div
                   className={`flex items-center justify-between text-xs ${
                     isDark ? "text-[#D6C4B0]" : "text-[#5C402D]"
                   }`}
                 >
                   <span className={`font-semibold ${isDark ? "text-[#FAF4EA]" : "text-[#3D2514]"}`}>
-                    Delivery Geolocation Pin (Click map or drag pin to choose location):
+                    Interactive Map (Click anywhere to place pin, or drag marker):
                   </span>
                   <span className="text-[11px] font-mono">
                     {Number(coords?.[0] || 12.9716).toFixed(4)}, {Number(coords?.[1] || 77.5946).toFixed(4)}
                   </span>
                 </div>
+                {/* Enlarged map container from h-36 to h-80/h-96 for comfortable interaction */}
                 <div
                   ref={mapContainerRef}
-                  className={`w-full h-36 rounded-xl border overflow-hidden shadow-inner ${
+                  className={`w-full h-80 sm:h-96 rounded-2xl border overflow-hidden shadow-inner touch-manipulation z-10 ${
                     isDark ? "bg-[#140D07] border-[#362114]" : "bg-[#EFE9DF] border-[#E3D4C0]"
                   }`}
                 />

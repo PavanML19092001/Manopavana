@@ -1,5 +1,14 @@
 import React, { useState, useEffect, useRef } from "react";
-import { MapPin, Navigation, X, CheckCircle2, AlertCircle, Building2 } from "lucide-react";
+import {
+  MapPin,
+  Navigation,
+  X,
+  CheckCircle2,
+  AlertCircle,
+  Building2,
+  Search,
+  Loader2,
+} from "lucide-react";
 import { useStore } from "../context/StoreContext";
 import { INDIAN_STATES_DISTRICTS } from "../constants";
 import L from "leaflet";
@@ -27,6 +36,12 @@ export const LocationModal: React.FC = () => {
     address.lng || 77.5946,
   ]);
   const [isLocating, setIsLocating] = useState(false);
+
+  // Address search states
+  const [searchQuery, setSearchQuery] = useState("");
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const searchTimeoutRef = useRef<any>(null);
 
   // Sync initial state if address updates externally
   useEffect(() => {
@@ -69,7 +84,7 @@ export const LocationModal: React.FC = () => {
         if (!mapInstanceRef.current) {
           const map = L.map(mapContainerRef.current, {
             center: coords,
-            zoom: 13,
+            zoom: 14,
             attributionControl: false,
           });
 
@@ -79,11 +94,11 @@ export const LocationModal: React.FC = () => {
 
           const customIcon = L.divIcon({
             className: "custom-leaflet-marker",
-            html: `<div style="background-color:#E08F35; width:28px; height:28px; border-radius:50%; border:3px solid #FFF; box-shadow:0 4px 10px rgba(0,0,0,0.3); display:flex; align-items:center; justify-content:center;">
+            html: `<div style="background-color:#E08F35; width:30px; height:30px; border-radius:50%; border:3px solid #FFF; box-shadow:0 4px 12px rgba(0,0,0,0.45); display:flex; align-items:center; justify-content:center;">
                     <div style="background:#5E3210; width:10px; height:10px; border-radius:50%;"></div>
                   </div>`,
-            iconSize: [28, 28],
-            iconAnchor: [14, 14],
+            iconSize: [30, 30],
+            iconAnchor: [15, 15],
           });
 
           const marker = L.marker(coords, {
@@ -98,7 +113,7 @@ export const LocationModal: React.FC = () => {
               if (Number.isFinite(lat) && Number.isFinite(lng)) {
                 setCoords([lat, lng]);
                 marker.setLatLng([lat, lng]);
-                showToast("📍 Pin placed! Auto-filling address...");
+                showToast("Pin placed! Auto-filling address...");
                 await reverseGeocode(lat, lng);
               }
             } catch (err) {
@@ -110,7 +125,7 @@ export const LocationModal: React.FC = () => {
             try {
               const latLng = marker.getLatLng();
               setCoords([latLng.lat, latLng.lng]);
-              showToast("📍 Pin moved! Auto-filling address...");
+              showToast("Pin moved! Auto-filling address...");
               await reverseGeocode(latLng.lat, latLng.lng);
             } catch (e) {
               console.warn("Marker drag notice:", e);
@@ -119,18 +134,24 @@ export const LocationModal: React.FC = () => {
 
           mapInstanceRef.current = map;
           markerRef.current = marker;
+
+          // Recalculate dimensions so the map pans smoothly
+          setTimeout(() => {
+            map.invalidateSize();
+          }, 200);
         } else {
           try {
-            mapInstanceRef.current.setView(coords, 13);
+            mapInstanceRef.current.setView(coords, 14);
             if (markerRef.current) {
               markerRef.current.setLatLng(coords);
             }
+            mapInstanceRef.current.invalidateSize();
           } catch {}
         }
       } catch (err) {
         console.warn("Map setup notice:", err);
       }
-    }, 150);
+    }, 180);
 
     return () => {
       clearTimeout(timer);
@@ -147,11 +168,68 @@ export const LocationModal: React.FC = () => {
         if (partial.state) setState(partial.state);
         if (partial.district) setDistrict(partial.district);
         if (partial.landmark) setLandmark(partial.landmark);
-        showToast("📍 Address auto-populated from pin location!");
+        showToast("Address auto-populated from pin location!");
       }
     } catch {
       // ignore network hiccups
     }
+  };
+
+  // Autocomplete / Search location on map
+  const handleSearchQueryChange = (val: string) => {
+    setSearchQuery(val);
+    if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+
+    if (!val.trim() || val.length < 3) {
+      setSearchResults([]);
+      setIsSearching(false);
+      return;
+    }
+
+    setIsSearching(true);
+    searchTimeoutRef.current = setTimeout(async () => {
+      try {
+        const res = await fetch(
+          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
+            val
+          )}&countrycodes=in&limit=5&addressdetails=1`,
+          {
+            headers: {
+              "User-Agent": "ManopavanaLocationPicker/1.0",
+              "Accept-Language": "en",
+            },
+          }
+        );
+        const data = await res.json();
+        setSearchResults(data || []);
+      } catch (err) {
+        console.warn("Search geocode error:", err);
+        setSearchResults([]);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 400);
+  };
+
+  const handleSelectSearchResult = async (item: any) => {
+    const lat = parseFloat(item.lat);
+    const lon = parseFloat(item.lon);
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
+
+    setCoords([lat, lon]);
+    setSearchResults([]);
+    setSearchQuery(item.display_name);
+
+    if (mapInstanceRef.current && markerRef.current) {
+      try {
+        mapInstanceRef.current.setView([lat, lon], 16);
+        markerRef.current.setLatLng([lat, lon]);
+        mapInstanceRef.current.invalidateSize();
+      } catch {}
+    }
+
+    showToast("Map focused on selected location!");
+    await reverseGeocode(lat, lon);
   };
 
   const handleUseGPS = () => {
@@ -169,11 +247,12 @@ export const LocationModal: React.FC = () => {
             setCoords([lat, lng]);
             if (mapInstanceRef.current && markerRef.current) {
               try {
-                mapInstanceRef.current.setView([lat, lng], 15);
+                mapInstanceRef.current.setView([lat, lng], 16);
                 markerRef.current.setLatLng([lat, lng]);
+                mapInstanceRef.current.invalidateSize();
               } catch {}
             }
-            showToast("📍 GPS coordinates retrieved! Auto-filling address...");
+            showToast("GPS coordinates retrieved! Auto-filling address...");
             await reverseGeocode(lat, lng);
           }
         } catch (e) {
@@ -200,7 +279,7 @@ export const LocationModal: React.FC = () => {
   const isBangalorePincode =
     pincode.startsWith("560") ||
     district.toLowerCase().includes("bengaluru") ||
-    state === "Karnataka" && district.toLowerCase().includes("bangalore");
+    (state === "Karnataka" && district.toLowerCase().includes("bangalore"));
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
@@ -249,8 +328,8 @@ export const LocationModal: React.FC = () => {
     setLocationModalOpen(false);
     showToast(
       isBLR
-        ? "📍 Bengaluru delivery location updated!"
-        : "📍 Pan-India delivery location updated via Delhivery Express!"
+        ? "Bengaluru delivery location updated!"
+        : "Pan-India delivery location updated via Delhivery Express!"
     );
   };
 
@@ -263,13 +342,13 @@ export const LocationModal: React.FC = () => {
       role="dialog"
       aria-modal="true"
       aria-labelledby="location-modal-title"
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in"
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-black/85 backdrop-blur-md animate-fade-in"
     >
-      <div className="relative w-full max-w-2xl bg-gradient-to-b from-[#24160F] to-[#140D09] text-[#FDF6EC] rounded-3xl shadow-[0_25px_60px_rgba(0,0,0,0.95)] border border-[#4A301E] overflow-hidden flex flex-col max-h-[92vh]">
+      <div className="relative w-full max-w-3xl bg-gradient-to-b from-[#24160F] to-[#140D09] text-[#FDF6EC] rounded-3xl shadow-[0_25px_60px_rgba(0,0,0,0.95)] border border-[#4A301E] overflow-hidden flex flex-col max-h-[94vh]">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4.5 bg-[#120A06] border-b border-[#3A2417]">
+        <div className="flex items-center justify-between px-6 py-4 bg-[#120A06] border-b border-[#3A2417] shrink-0">
           <div className="flex items-center gap-3">
-            <span className="p-2 rounded-2xl bg-[#D49A37]/20 text-[#F5BC51]">
+            <span className="p-2.5 rounded-2xl bg-[#D49A37]/20 text-[#F5BC51]">
               <MapPin className="w-5 h-5 text-[#F5BC51]" />
             </span>
             <div>
@@ -277,7 +356,7 @@ export const LocationModal: React.FC = () => {
                 Choose Delivery Destination
               </h2>
               <p className="text-xs text-[#A88D77]">
-                1-Click GPS or OpenStreetMap pin for pinpoint Bengaluru doorstep drop-off
+                Search landmark, drag the pin, or click 1-Click GPS
               </p>
             </div>
           </div>
@@ -290,8 +369,8 @@ export const LocationModal: React.FC = () => {
           </button>
         </div>
 
-        {/* Content */}
-        <div className="overflow-y-auto p-6 space-y-5">
+        {/* Content Body */}
+        <div className="overflow-y-auto p-5 sm:p-6 space-y-5">
           {/* Geolocation Quick Trigger */}
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 p-3.5 bg-[#1C110B] border border-[#4A301E] rounded-2xl shadow-inner">
             <div className="flex items-center gap-2.5">
@@ -301,7 +380,7 @@ export const LocationModal: React.FC = () => {
                   Automatic GPS Pinpoint
                 </p>
                 <p className="text-[11px] text-[#A88D77]">
-                  Detect current location to autofill street and coordinate pin
+                  Detect current device location to instantly place map pin
                 </p>
               </div>
             </div>
@@ -309,26 +388,72 @@ export const LocationModal: React.FC = () => {
               type="button"
               onClick={handleUseGPS}
               disabled={isLocating}
-              className="px-4 py-2 text-xs font-semibold text-[#140D09] bg-gradient-to-r from-[#D49A37] to-[#B87C24] hover:brightness-110 disabled:opacity-50 rounded-xl shadow-md transition-all flex items-center justify-center gap-2 shrink-0 cursor-pointer"
+              className="px-4 py-2.5 text-xs font-semibold text-[#140D09] bg-gradient-to-r from-[#D49A37] to-[#B87C24] hover:brightness-110 disabled:opacity-50 rounded-xl shadow-md transition-all flex items-center justify-center gap-2 shrink-0 cursor-pointer"
             >
-              {isLocating ? "Detecting GPS..." : "Use Current Location"}
+              {isLocating ? (
+                <>
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  <span>Detecting GPS...</span>
+                </>
+              ) : (
+                "Use Current Location"
+              )}
             </button>
           </div>
 
-          {/* Leaflet Map Preview */}
+          {/* Direct Address Search Input Bar */}
+          <div className="relative space-y-1.5 z-20">
+            <label className="block text-xs font-semibold text-[#D6BEAA]">
+              Search Area, Landmark, or Street:
+            </label>
+            <div className="relative flex items-center">
+              <Search className="absolute left-3.5 w-4 h-4 text-[#A88D77]" />
+              <input
+                type="text"
+                placeholder="e.g. Peenya 2nd Stage, Indiranagar, Hassan, MG Road..."
+                value={searchQuery}
+                onChange={(e) => handleSearchQueryChange(e.target.value)}
+                className="w-full pl-10 pr-10 py-2.5 text-xs sm:text-sm bg-[#120A06] border border-[#4A301E] rounded-xl focus:outline-none focus:border-[#D49A37] focus:ring-1 focus:ring-[#D49A37]/50 text-[#FDF6EC] placeholder-[#7A6150]"
+              />
+              {isSearching && (
+                <Loader2 className="absolute right-3.5 w-4 h-4 text-[#F5BC51] animate-spin" />
+              )}
+            </div>
+
+            {/* Search Results Dropdown */}
+            {searchResults.length > 0 && (
+              <ul className="absolute left-0 right-0 top-full mt-1.5 bg-[#1C110B] border border-[#4A301E] rounded-2xl shadow-2xl max-h-56 overflow-y-auto divide-y divide-[#2C1D14] z-50">
+                {searchResults.map((item, idx) => (
+                  <li
+                    key={idx}
+                    onClick={() => handleSelectSearchResult(item)}
+                    className="p-3 text-xs hover:bg-[#2C1D14] cursor-pointer flex items-start gap-2.5 text-[#FDF6EC] transition-colors"
+                  >
+                    <MapPin className="w-4 h-4 text-[#F5BC51] shrink-0 mt-0.5" />
+                    <span className="line-clamp-2 text-stone-200">
+                      {item.display_name}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
+          {/* Leaflet Map Preview (Spacious Container) */}
           <div className="space-y-1.5">
             <div className="flex items-center justify-between text-xs text-[#A88D77]">
               <span className="font-semibold text-[#D6BEAA] flex items-center gap-1.5">
                 <MapPin className="w-3.5 h-3.5 text-[#F5BC51]" />
-                Interactive OpenStreetMap (Click anywhere on map or drag pin to select):
+                Interactive Map (Click anywhere to set pin, or drag marker):
               </span>
               <span className="text-[11px] text-[#A88D77] font-mono">
                 {Number(coords?.[0] || 12.9716).toFixed(4)}, {Number(coords?.[1] || 77.5946).toFixed(4)}
               </span>
             </div>
+            {/* Enlarged map container from h-44 to h-80/h-96 for comfortable panning */}
             <div
               ref={mapContainerRef}
-              className="w-full h-44 rounded-2xl border border-[#4A301E] overflow-hidden shadow-inner bg-[#140D09]"
+              className="w-full h-80 sm:h-96 rounded-2xl border border-[#4A301E] overflow-hidden shadow-inner bg-[#140D09] touch-manipulation z-10"
             />
           </div>
 
@@ -491,7 +616,7 @@ export const LocationModal: React.FC = () => {
         </div>
 
         {/* Footer Actions */}
-        <div className="flex items-center justify-between px-6 py-4 bg-[#120A06] border-t border-[#3A2417]">
+        <div className="flex items-center justify-between px-6 py-4 bg-[#120A06] border-t border-[#3A2417] shrink-0">
           <div className="flex items-center gap-2 text-xs text-[#A88D77]">
             <Building2 className="w-4 h-4 text-[#F5BC51]" />
             <span>Peenya 2nd Stage Dispatch Center</span>
