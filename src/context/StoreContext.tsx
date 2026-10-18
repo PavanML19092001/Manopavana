@@ -1133,10 +1133,10 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       return false;
     }
 
-    // Direct Delhivery API cancellation & automated wallet refund
+    // If Delhivery waybill was already generated, void on carrier to restore wallet credit
     if (target.trackingNumber) {
       try {
-        showToast("Notifying Delhivery of cancellation & processing freight credit...");
+        showToast("Notifying Delhivery of order cancellation...");
         await fetch("/api?action=delhivery_cancel_order", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -1409,6 +1409,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       target?.isBuyNow || (buyNowItem !== null && itemsToUse.length === 1 && itemsToUse[0].id === buyNowItem.id)
     );
 
+    // trackingNumber is typed as string | undefined; undefined avoids TypeScript null errors
     const updated: Order = {
       id: target?.id || `ORD-${Date.now().toString().slice(-4)}`,
       orderRef,
@@ -1572,8 +1573,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             ...remoteConfig,
             prices: { ...prev.prices, ...(remoteConfig.prices || {}) },
             stock: { ...prev.stock, ...(remoteConfig.stock || {}) },
-            productDetails: remoteConfig.productDetails || prev.productDetails,
-            policies: remoteConfig.policies || prev.policies,
           };
           try {
             localStorage.setItem("manopavana_cms", JSON.stringify(merged));
