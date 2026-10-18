@@ -33,46 +33,51 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({ order, isOpen, onClo
     <div
       role="dialog"
       aria-modal="true"
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm print:p-0 print:bg-transparent print:static print:block print:inset-auto"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm print:static print:inset-auto print:block print:p-0 print:m-0 print:bg-transparent"
     >
       <style>
         {`
           @media print {
             @page {
               size: A4 portrait;
-              margin: 8mm 12mm;
+              margin: 10mm 12mm;
             }
 
-            /* Collapse all background DOM elements so they don't produce empty pages */
-            body > *:not(#root):not(#__next),
-            #root > *:not([role="dialog"]) {
-              display: none !important;
+            /* 1. Hide the entire application background except our invoice modal */
+            body * {
+              visibility: hidden !important;
             }
 
+            /* 2. Unhide ONLY the printable invoice tree */
+            #printable-invoice,
+            #printable-invoice * {
+              visibility: visible !important;
+            }
+
+            /* 3. Pull the invoice into normal page flow starting at 0,0 */
             html, body {
+              width: 100% !important;
               height: auto !important;
               min-height: 0 !important;
-              overflow: visible !important;
-              background: #ffffff !important;
               margin: 0 !important;
               padding: 0 !important;
+              background: #ffffff !important;
+              overflow: visible !important;
             }
 
-            /* Position invoice naturally on Page 1 without fixed repeated elements */
             #printable-invoice {
-              position: static !important;
-              display: block !important;
+              position: absolute !important;
+              left: 0 !important;
+              top: 0 !important;
               width: 100% !important;
               max-width: 100% !important;
-              height: auto !important;
               margin: 0 !important;
               padding: 0 !important;
-              box-shadow: none !important;
               border: none !important;
-              background: transparent !important;
-              page-break-before: avoid !important;
-              page-break-after: avoid !important;
+              box-shadow: none !important;
+              background: #ffffff !important;
               page-break-inside: avoid !important;
+              page-break-after: avoid !important;
             }
 
             .print\\:hidden {
@@ -82,7 +87,7 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({ order, isOpen, onClo
         `}
       </style>
 
-      <div className="relative w-full max-w-2xl bg-white text-stone-900 rounded-3xl shadow-2xl border border-stone-200 overflow-hidden flex flex-col max-h-[92vh] print:max-h-none print:h-auto print:border-none print:shadow-none print:rounded-none print:overflow-visible">
+      <div className="relative w-full max-w-2xl bg-white text-stone-900 rounded-3xl shadow-2xl border border-stone-200 overflow-hidden flex flex-col max-h-[92vh] print:max-h-none print:h-auto print:border-none print:shadow-none print:rounded-none print:overflow-visible print:static print:block">
         {/* Actions bar (Hidden when printing) */}
         <div className="flex items-center justify-between px-6 py-4 bg-stone-100 border-b border-stone-200 print:hidden">
           <span className="text-sm font-bold font-serif text-stone-900">
