@@ -1,5 +1,5 @@
-import React from "react";
-import { X, Download } from "lucide-react";
+import React, { useRef } from "react";
+import { X, Download, Printer } from "lucide-react";
 import { Order } from "../types";
 import { BUSINESS_CONFIG } from "../constants";
 
@@ -10,11 +10,9 @@ interface InvoiceModalProps {
 }
 
 export const InvoiceModal: React.FC<InvoiceModalProps> = ({ order, isOpen, onClose }) => {
-  if (!isOpen) return null;
+  const invoiceRef = useRef<HTMLDivElement | null>(null);
 
-  const handlePrint = () => {
-    window.print();
-  };
+  if (!isOpen) return null;
 
   const gstRate = 0.05;
   const taxableValue = Math.round((order.subtotal - (order.discount || 0)) / (1 + gstRate));
@@ -29,67 +27,199 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({ order, isOpen, onClo
   const sgst = isBangalore ? Math.round(totalGst / 2) : 0;
   const igst = !isBangalore ? totalGst : 0;
 
+  const handlePrint = () => {
+    if (!invoiceRef.current) return;
+
+    // Create an isolated iframe for clean, single-page printing
+    const printFrame = document.createElement("iframe");
+    printFrame.style.position = "fixed";
+    printFrame.style.right = "0";
+    printFrame.style.bottom = "0";
+    printFrame.style.width = "0";
+    printFrame.style.height = "0";
+    printFrame.style.border = "0";
+
+    document.body.appendChild(printFrame);
+
+    const frameDoc = printFrame.contentWindow?.document;
+    if (!frameDoc) {
+      document.body.removeChild(printFrame);
+      return;
+    }
+
+    const invoiceHtml = invoiceRef.current.innerHTML;
+
+    frameDoc.open();
+    frameDoc.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Invoice #${order.orderRef} - ${BUSINESS_CONFIG.BRAND_NAME}</title>
+          <style>
+            @page {
+              size: A4 portrait;
+              margin: 10mm 14mm;
+            }
+            * {
+              box-sizing: border-box;
+              margin: 0;
+              padding: 0;
+              font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            }
+            body {
+              background: #ffffff;
+              color: #1c1917;
+              font-size: 11px;
+              line-height: 1.4;
+              -webkit-print-color-adjust: exact;
+              print-color-adjust: exact;
+            }
+            .invoice-box {
+              width: 100%;
+              max-width: 100%;
+              margin: 0 auto;
+            }
+            .header {
+              display: flex;
+              justify-content: space-between;
+              align-items: flex-start;
+              border-bottom: 1.5px solid #d6d3d1;
+              padding-bottom: 12px;
+              margin-bottom: 14px;
+            }
+            .brand-name {
+              font-size: 18px;
+              font-weight: 800;
+              color: #1c1917;
+              letter-spacing: 0.5px;
+            }
+            .tagline {
+              font-size: 11px;
+              color: #78716c;
+              margin-top: 2px;
+            }
+            .facility-details {
+              font-size: 10px;
+              color: #57534e;
+              margin-top: 4px;
+              max-width: 320px;
+            }
+            .tax-badge {
+              display: inline-block;
+              padding: 3px 8px;
+              border: 1px solid #d6d3d1;
+              border-radius: 4px;
+              font-size: 10px;
+              font-weight: bold;
+              background-color: #f5f5f4;
+            }
+            .ref-number {
+              font-size: 15px;
+              font-weight: 800;
+              font-family: monospace;
+              margin-top: 4px;
+            }
+            .details-grid {
+              display: grid;
+              grid-template-columns: 1fr 1fr;
+              gap: 16px;
+              background-color: #fafaf9;
+              border: 1px solid #e7e5e4;
+              border-radius: 8px;
+              padding: 12px;
+              margin-bottom: 16px;
+              font-size: 11px;
+            }
+            .section-label {
+              font-size: 10px;
+              font-weight: bold;
+              color: #78716c;
+              text-transform: uppercase;
+              margin-bottom: 4px;
+            }
+            table {
+              width: 100%;
+              border-collapse: collapse;
+              margin-bottom: 14px;
+              font-size: 11px;
+            }
+            th, td {
+              border: 1px solid #d6d3d1;
+              padding: 6px 8px;
+            }
+            th {
+              background-color: #f5f5f4;
+              font-weight: 700;
+              text-transform: uppercase;
+              color: #44403c;
+            }
+            .text-center { text-align: center; }
+            .text-right { text-align: right; }
+            .totals-container {
+              display: flex;
+              justify-content: flex-end;
+              margin-bottom: 16px;
+            }
+            .totals-table {
+              width: 240px;
+              font-family: monospace;
+              font-size: 11px;
+            }
+            .totals-row {
+              display: flex;
+              justify-content: space-between;
+              padding: 3px 0;
+              color: #57534e;
+            }
+            .grand-total {
+              border-top: 1.5px solid #d6d3d1;
+              padding-top: 6px;
+              margin-top: 4px;
+              font-weight: 800;
+              font-size: 14px;
+              color: #1c1917;
+            }
+            .footer-notes {
+              border-top: 1px solid #e7e5e4;
+              padding-top: 12px;
+              display: flex;
+              justify-content: space-between;
+              align-items: flex-end;
+              font-size: 10px;
+              color: #78716c;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="invoice-box">
+            ${invoiceHtml}
+          </div>
+        </body>
+      </html>
+    `);
+    frameDoc.close();
+
+    // Trigger print once iframe finishes parsing DOM
+    setTimeout(() => {
+      printFrame.contentWindow?.focus();
+      printFrame.contentWindow?.print();
+      setTimeout(() => {
+        if (document.body.contains(printFrame)) {
+          document.body.removeChild(printFrame);
+        }
+      }, 1000);
+    }, 250);
+  };
+
   return (
     <div
       role="dialog"
       aria-modal="true"
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm print:static print:inset-auto print:block print:p-0 print:m-0 print:bg-transparent"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
     >
-      <style>
-        {`
-          @media print {
-            @page {
-              size: A4 portrait;
-              margin: 10mm 12mm;
-            }
-
-            /* 1. Hide the entire application background except our invoice modal */
-            body * {
-              visibility: hidden !important;
-            }
-
-            /* 2. Unhide ONLY the printable invoice tree */
-            #printable-invoice,
-            #printable-invoice * {
-              visibility: visible !important;
-            }
-
-            /* 3. Pull the invoice into normal page flow starting at 0,0 */
-            html, body {
-              width: 100% !important;
-              height: auto !important;
-              min-height: 0 !important;
-              margin: 0 !important;
-              padding: 0 !important;
-              background: #ffffff !important;
-              overflow: visible !important;
-            }
-
-            #printable-invoice {
-              position: absolute !important;
-              left: 0 !important;
-              top: 0 !important;
-              width: 100% !important;
-              max-width: 100% !important;
-              margin: 0 !important;
-              padding: 0 !important;
-              border: none !important;
-              box-shadow: none !important;
-              background: #ffffff !important;
-              page-break-inside: avoid !important;
-              page-break-after: avoid !important;
-            }
-
-            .print\\:hidden {
-              display: none !important;
-            }
-          }
-        `}
-      </style>
-
-      <div className="relative w-full max-w-2xl bg-white text-stone-900 rounded-3xl shadow-2xl border border-stone-200 overflow-hidden flex flex-col max-h-[92vh] print:max-h-none print:h-auto print:border-none print:shadow-none print:rounded-none print:overflow-visible print:static print:block">
-        {/* Actions bar (Hidden when printing) */}
-        <div className="flex items-center justify-between px-6 py-4 bg-stone-100 border-b border-stone-200 print:hidden">
+      <div className="relative w-full max-w-2xl bg-white text-stone-900 rounded-3xl shadow-2xl border border-stone-200 overflow-hidden flex flex-col max-h-[92vh]">
+        {/* Modal Action Bar */}
+        <div className="flex items-center justify-between px-6 py-4 bg-stone-100 border-b border-stone-200">
           <span className="text-sm font-bold font-serif text-stone-900">
             Tax Invoice — Order #{order.orderRef}
           </span>
@@ -97,9 +227,9 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({ order, isOpen, onClo
             <button
               type="button"
               onClick={handlePrint}
-              className="px-4 py-2 rounded-xl bg-[#5E3210] hover:bg-[#43230A] text-white font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
+              className="px-4 py-2 rounded-xl bg-[#5E3210] hover:bg-[#43230A] text-white font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer shadow-sm"
             >
-              <Download className="w-3.5 h-3.5" />
+              <Printer className="w-3.5 h-3.5 text-amber-300" />
               <span>Print / Save 1-Page PDF</span>
             </button>
             <button
@@ -112,113 +242,111 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({ order, isOpen, onClo
           </div>
         </div>
 
-        {/* Invoice Page Container */}
-        <div id="printable-invoice" className="p-8 text-xs text-stone-800 space-y-4 print:p-0">
-          <div className="flex justify-between items-start border-b border-stone-300 pb-4">
-            <div>
-              <h1 className="text-lg font-bold font-serif text-stone-900">{BUSINESS_CONFIG.BRAND_NAME}</h1>
-              <p className="text-[11px] text-stone-500">Artisanal Wood-Pressed Cooking Oils</p>
-              <p className="text-[10px] text-stone-600 mt-1 max-w-xs">{BUSINESS_CONFIG.FACILITY_ADDRESS}</p>
-              <p className="text-[10px] text-stone-600 font-mono mt-0.5">
-                GSTIN: <strong>{BUSINESS_CONFIG.GSTIN}</strong> | FSSAI: <strong>{BUSINESS_CONFIG.FSSAI_LICENSE}</strong>
-              </p>
+        {/* Invoice Page Container (Captures HTML for clean printout) */}
+        <div className="overflow-y-auto p-8">
+          <div ref={invoiceRef} className="text-xs text-stone-800 space-y-4">
+            <div className="header">
+              <div>
+                <h1 className="brand-name">{BUSINESS_CONFIG.BRAND_NAME}</h1>
+                <p className="tagline">Artisanal Wood-Pressed Cooking Oils</p>
+                <p className="facility-details">{BUSINESS_CONFIG.FACILITY_ADDRESS}</p>
+                <p className="facility-details font-mono">
+                  GSTIN: <strong>{BUSINESS_CONFIG.GSTIN}</strong> | FSSAI: <strong>{BUSINESS_CONFIG.FSSAI_LICENSE}</strong>
+                </p>
+              </div>
+              <div className="text-right">
+                <span className="tax-badge">TAX INVOICE</span>
+                <p className="ref-number">#{order.orderRef}</p>
+                <p className="tagline">Date: {order.date}</p>
+                <p className="tagline">
+                  Payment: {order.paymentMethod === "cod" ? "Cash on Delivery" : "Online Payment (Paid)"}
+                </p>
+              </div>
             </div>
-            <div className="text-right">
-              <span className="inline-block px-2 py-0.5 rounded bg-stone-100 font-bold text-[10px] border border-stone-300">
-                TAX INVOICE
-              </span>
-              <p className="font-mono font-bold mt-1 text-sm text-stone-900">#{order.orderRef}</p>
-              <p className="text-[10px] text-stone-500">Date: {order.date}</p>
-              <p className="text-[10px] text-stone-500">
-                Payment: {order.paymentMethod === "cod" ? "Cash on Delivery" : "Online Payment (Paid)"}
-              </p>
-            </div>
-          </div>
 
-          <div className="grid grid-cols-2 gap-4 bg-stone-50 p-3 rounded-xl border border-stone-200 text-[11px]">
-            <div>
-              <p className="font-bold text-[10px] text-stone-500 uppercase">Customer Details:</p>
-              <p className="font-bold text-stone-900">{order.shippingAddress.fullName}</p>
-              <p className="text-stone-600">{order.shippingAddress.addressLine1}</p>
-              <p className="text-stone-600">
-                {order.shippingAddress.district || order.shippingAddress.city}, {order.shippingAddress.state} - {order.shippingAddress.pincode}
-              </p>
-              <p className="text-stone-600 font-mono">Phone: +91 {order.shippingAddress.phone}</p>
+            <div className="details-grid">
+              <div>
+                <p className="section-label">Customer Details:</p>
+                <p className="font-bold text-stone-900">{order.shippingAddress.fullName}</p>
+                <p className="text-stone-600">{order.shippingAddress.addressLine1}</p>
+                <p className="text-stone-600">
+                  {order.shippingAddress.district || order.shippingAddress.city}, {order.shippingAddress.state} - {order.shippingAddress.pincode}
+                </p>
+                <p className="text-stone-600 font-mono">Phone: +91 {order.shippingAddress.phone}</p>
+              </div>
+              <div className="text-right">
+                <p className="section-label">Dispatch Center:</p>
+                <p className="font-bold text-stone-900">MANOPAVANA Peenya Hub</p>
+                <p className="text-stone-600">Peenya 2nd Stage, Bangalore - 560058</p>
+                <p className="text-stone-600">State: Karnataka (29)</p>
+              </div>
             </div>
-            <div className="text-right">
-              <p className="font-bold text-[10px] text-stone-500 uppercase">Dispatch Center:</p>
-              <p className="font-bold text-stone-900">MANOPAVANA Peenya Hub</p>
-              <p className="text-stone-600">Peenya 2nd Stage, Bangalore - 560058</p>
-              <p className="text-stone-600">State: Karnataka (29)</p>
-            </div>
-          </div>
 
-          <table className="w-full text-left border-collapse border border-stone-300 text-[11px]">
-            <thead>
-              <tr className="bg-stone-100 text-stone-700 uppercase font-bold border-b border-stone-300">
-                <th className="py-2 px-2.5 border-r border-stone-300">#</th>
-                <th className="py-2 px-2.5 border-r border-stone-300">Item Description</th>
-                <th className="py-2 px-2.5 border-r border-stone-300">HSN</th>
-                <th className="py-2 px-2.5 border-r border-stone-300 text-center">Qty</th>
-                <th className="py-2 px-2.5 border-r border-stone-300 text-right">Price</th>
-                <th className="py-2 px-2.5 text-right">Total</th>
-              </tr>
-            </thead>
-            <tbody>
-              {order.items.map((item, idx) => (
-                <tr key={idx} className="border-b border-stone-200">
-                  <td className="py-2 px-2.5 border-r border-stone-300 text-center font-mono">{idx + 1}</td>
-                  <td className="py-2 px-2.5 border-r border-stone-300 font-semibold">
-                    {item.title} ({item.variant})
-                  </td>
-                  <td className="py-2 px-2.5 border-r border-stone-300 font-mono text-stone-600">
-                    {item.title.toLowerCase().includes("coconut") ? "1513" : "1508"}
-                  </td>
-                  <td className="py-2 px-2.5 border-r border-stone-300 text-center font-bold">{item.quantity}</td>
-                  <td className="py-2 px-2.5 border-r border-stone-300 text-right font-mono">₹{item.price}</td>
-                  <td className="py-2 px-2.5 text-right font-bold font-mono">₹{item.price * item.quantity}</td>
+            <table>
+              <thead>
+                <tr>
+                  <th style={{ width: "35px" }} className="text-center">#</th>
+                  <th>Item Description</th>
+                  <th style={{ width: "70px" }} className="text-center">HSN</th>
+                  <th style={{ width: "45px" }} className="text-center">Qty</th>
+                  <th style={{ width: "75px" }} className="text-right">Price</th>
+                  <th style={{ width: "85px" }} className="text-right">Total</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {order.items.map((item, idx) => (
+                  <tr key={idx}>
+                    <td className="text-center font-mono">{idx + 1}</td>
+                    <td style={{ fontWeight: 600 }}>{item.title} ({item.variant})</td>
+                    <td className="text-center font-mono text-stone-600">
+                      {item.title.toLowerCase().includes("coconut") ? "1513" : "1508"}
+                    </td>
+                    <td className="text-center font-bold">{item.quantity}</td>
+                    <td className="text-right font-mono">₹{item.price}</td>
+                    <td className="text-right font-bold font-mono">₹{item.price * item.quantity}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
 
-          <div className="flex justify-end pt-1">
-            <div className="w-56 space-y-1 text-right text-[11px] font-mono">
-              <div className="flex justify-between text-stone-600">
-                <span>Taxable Amount:</span>
-                <span>₹{taxableValue}</span>
-              </div>
-              {isBangalore ? (
-                <>
-                  <div className="flex justify-between text-stone-600">
-                    <span>CGST (2.5%):</span>
-                    <span>₹{cgst}</span>
-                  </div>
-                  <div className="flex justify-between text-stone-600">
-                    <span>SGST (2.5%):</span>
-                    <span>₹{sgst}</span>
-                  </div>
-                </>
-              ) : (
-                <div className="flex justify-between text-stone-600">
-                  <span>IGST (5%):</span>
-                  <span>₹{igst}</span>
+            <div className="totals-container">
+              <div className="totals-table">
+                <div className="totals-row">
+                  <span>Taxable Amount:</span>
+                  <span>₹{taxableValue}</span>
                 </div>
-              )}
-              <div className="flex justify-between text-stone-600">
-                <span>Shipping:</span>
-                <span>{order.shippingFee === 0 ? "FREE" : `₹${order.shippingFee}`}</span>
-              </div>
-              <div className="flex justify-between font-bold text-sm border-t border-stone-300 pt-1 text-stone-900">
-                <span>Grand Total:</span>
-                <span className="text-[#E08F35]">₹{order.total}</span>
+                {isBangalore ? (
+                  <>
+                    <div className="totals-row">
+                      <span>CGST (2.5%):</span>
+                      <span>₹{cgst}</span>
+                    </div>
+                    <div className="totals-row">
+                      <span>SGST (2.5%):</span>
+                      <span>₹{sgst}</span>
+                    </div>
+                  </>
+                ) : (
+                  <div className="totals-row">
+                    <span>IGST (5%):</span>
+                    <span>₹{igst}</span>
+                  </div>
+                )}
+                <div className="totals-row">
+                  <span>Shipping:</span>
+                  <span>{order.shippingFee === 0 ? "FREE" : `₹${order.shippingFee}`}</span>
+                </div>
+                <div className="totals-row grand-total">
+                  <span>Grand Total:</span>
+                  <span style={{ color: "#E08F35" }}>₹{order.total}</span>
+                </div>
               </div>
             </div>
-          </div>
 
-          <div className="pt-3 border-t border-stone-300 flex justify-between items-end text-[9px] text-stone-500">
-            <p>Computer-generated invoice. Authorized by MANOPAVANA.</p>
-            <p className="font-bold text-stone-800">For MANOPAVANA</p>
+            <div className="footer-notes">
+              <p>Computer-generated invoice. Authorized by MANOPAVANA.</p>
+              <p style={{ fontWeight: "bold", color: "#1c1917" }}>For MANOPAVANA</p>
+            </div>
           </div>
         </div>
       </div>

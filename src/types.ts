@@ -187,9 +187,18 @@ export interface PolicyContent {
 
 export interface ProductDetailOverride {
   name?: string;
+  subtitle?: string;
+  description?: string;
   shortDescription?: string;
+  fullStory?: string;
   imageUrl?: string;
-  benefits?: string[];
+  benefits?: string | string[];
+  cookingUses?: string;
+  smokePoint?: string;
+  extractionMethod?: string;
+  ingredients?: string;
+  shelfLife?: string;
+  [key: string]: any;
 }
 
 export interface StoreCMSConfig {
@@ -244,8 +253,11 @@ export interface StoreCMSConfig {
     shipping?: PolicyContent;
     returns?: PolicyContent;
     privacy?: PolicyContent;
+    [key: string]: PolicyContent | undefined;
   };
 
   // Editable A-to-Z Product Metadata Overrides (keyed by product ID: groundnut, coconut, sesame, combo-3l, combo-1.5l)
   productDetails?: Record<string, ProductDetailOverride>;
+
+  [key: string]: any;
 }
