@@ -1,4 +1,431 @@
 ﻿========================================
+=== FILE: C:\Users\manoj\OneDrive\Documents\Manopavana\Website\ABCD\Manopavana\src\components\admin\StoreFrontCmsPanel.tsx ===
+========================================
+import React, { useState } from "react";
+import {
+  Settings,
+  Image,
+  Video,
+  Type,
+  FileText,
+  DollarSign,
+  Package,
+  Save,
+  ChevronDown,
+  ChevronUp,
+} from "lucide-react";
+import { useStore } from "../../context/StoreContext";
+import { BUSINESS_CONFIG, LEGAL_POLICIES } from "../../constants";
+
+export const StorefrontCMSPanel: React.FC<{ isDark: boolean }> = ({ isDark }) => {
+  const { cmsConfig, updateCMSConfig, showToast } = useStore();
+
+  const [activeTab, setActiveTab] = useState<"brand" | "facility" | "products" | "policies">("brand");
+
+  // Global Brand & Copy
+  const [ticker, setTicker] = useState(cmsConfig?.announcementTicker || "");
+  const [headline, setHeadline] = useState(cmsConfig?.heroHeadline || "");
+  const [subhead, setSubhead] = useState(cmsConfig?.heroSubhead || "");
+  const [tagline, setTagline] = useState(cmsConfig?.brandTagline || "Pure by nature, trusted for life");
+  const [logoUrl, setLogoUrl] = useState(cmsConfig?.brandLogoUrl || "");
+  const [videoUrl, setVideoUrl] = useState(cmsConfig?.chekkuVideoUrl || "");
+  const [threshold, setThreshold] = useState(cmsConfig?.freeShippingThreshold ?? 500);
+  const [stdFee, setStdFee] = useState(cmsConfig?.standardShippingFee ?? 49);
+
+  // Facility & Contact Credentials
+  const [founderName, setFounderName] = useState(cmsConfig?.founderName || BUSINESS_CONFIG.FOUNDER_NAME);
+  const [primaryPhone, setPrimaryPhone] = useState(cmsConfig?.primaryPhone || BUSINESS_CONFIG.PRIMARY_PHONE);
+  const [altPhone, setAltPhone] = useState(cmsConfig?.altPhone || BUSINESS_CONFIG.ALT_PHONE);
+  const [email, setEmail] = useState(cmsConfig?.email || BUSINESS_CONFIG.EMAIL);
+  const [facilityAddress, setFacilityAddress] = useState(cmsConfig?.facilityAddress || BUSINESS_CONFIG.FACILITY_ADDRESS);
+  const [fssaiLicense, setFssaiLicense] = useState(cmsConfig?.fssaiLicense || BUSINESS_CONFIG.FSSAI_LICENSE);
+  const [gstin, setGstin] = useState(cmsConfig?.gstin || BUSINESS_CONFIG.GSTIN);
+  const [blrNotice, setBlrNotice] = useState(cmsConfig?.bangaloreDeliveryNotice || "");
+
+  // Product Catalog Customization
+  const [productDetails, setProductDetails] = useState<Record<string, { name?: string; description?: string; imageUrl?: string }>>(
+    (cmsConfig as any)?.productDetails || {
+      groundnut: {
+        name: "Wood-Pressed Groundnut Oil",
+        description: "Pure cold-pressed oil made from high-grade peanuts.",
+        imageUrl: "https://pub-9e18bb265ecf4224ae1230cf913745ca.r2.dev/groundnut_oil_bottle.png",
+      },
+      coconut: {
+        name: "Wood-Pressed Coconut Oil",
+        description: "Freshly pressed from natural sun-dried copra.",
+        imageUrl: "https://pub-9e18bb265ecf4224ae1230cf913745ca.r2.dev/coconut_oil_bottle.png",
+      },
+      sesame: {
+        name: "Wood-Pressed Sesame (Gingelly) Oil",
+        description: "Cold-pressed with traditional palm jaggery.",
+        imageUrl: "https://pub-9e18bb265ecf4224ae1230cf913745ca.r2.dev/sesame_oil_bottle.png",
+      },
+    }
+  );
+
+  // Policies (A to Z Content)
+  const [policies, setPolicies] = useState((cmsConfig as any)?.policies || {
+    terms: { title: LEGAL_POLICIES.terms.title, content: LEGAL_POLICIES.terms.content },
+    shipping: { title: LEGAL_POLICIES.shipping.title, content: LEGAL_POLICIES.shipping.content },
+    returns: { title: LEGAL_POLICIES.returns.title, content: LEGAL_POLICIES.returns.content },
+    privacy: { title: LEGAL_POLICIES.privacy.title, content: LEGAL_POLICIES.privacy.content },
+  });
+
+  const handleSaveAll = (e: React.FormEvent) => {
+    e.preventDefault();
+    updateCMSConfig((prev) => ({
+      ...prev,
+      announcementTicker: ticker,
+      heroHeadline: headline,
+      heroSubhead: subhead,
+      brandTagline: tagline,
+      brandLogoUrl: logoUrl,
+      chekkuVideoUrl: videoUrl,
+      founderName,
+      primaryPhone,
+      altPhone,
+      email,
+      facilityAddress,
+      fssaiLicense,
+      gstin,
+      bangaloreDeliveryNotice: blrNotice,
+      freeShippingThreshold: Number(threshold),
+      standardShippingFee: Number(stdFee),
+      productDetails,
+      policies,
+    }));
+    showToast("Master storefront settings, product metadata & legal policies synced!");
+  };
+
+  const updateProductItem = (id: string, field: "name" | "description" | "imageUrl", value: string) => {
+    setProductDetails((prev) => ({
+      ...prev,
+      [id]: {
+        ...prev[id],
+        [field]: value,
+      },
+    }));
+  };
+
+  const updatePolicyItem = (key: string, field: "title" | "content", value: string) => {
+    setPolicies((prev: any) => ({
+      ...prev,
+      [key]: {
+        ...prev[key],
+        [field]: value,
+      },
+    }));
+  };
+
+  return (
+    <div
+      className={`rounded-2xl border p-6 shadow-sm space-y-5 ${
+        isDark ? "bg-[#1C120B] border-[#362114]" : "bg-white border-[#E8DEC8]"
+      }`}
+    >
+      <div className="flex items-center justify-between border-b pb-3 border-stone-200 dark:border-stone-800">
+        <div className="flex items-center gap-2">
+          <Settings className="w-5 h-5 text-[#E08F35]" />
+          <h2 className="text-base font-bold font-serif">Master Storefront CMS (A to Z)</h2>
+        </div>
+        <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-500/10 text-amber-600 font-bold">
+          settings/store_config
+        </span>
+      </div>
+
+      {/* Tabs */}
+      <div className="flex flex-wrap gap-2 border-b pb-2 border-stone-200 dark:border-stone-800">
+        {[
+          { key: "brand", label: "Logo & Hero Banner" },
+          { key: "facility", label: "Facility & Legal IDs" },
+          { key: "products", label: "Product Details & Images" },
+          { key: "policies", label: "Customer Legal Policies" },
+        ].map((tab) => (
+          <button
+            key={tab.key}
+            type="button"
+            onClick={() => setActiveTab(tab.key as any)}
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              activeTab === tab.key
+                ? "bg-[#5E3210] text-white shadow-sm"
+                : isDark
+                ? "bg-[#150D07] text-[#D8C8B8] hover:bg-[#24160E]"
+                : "bg-stone-100 text-[#5C4230] hover:bg-stone-200"
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      <form onSubmit={handleSaveAll} className="space-y-4 text-xs">
+        {/* TAB 1: BRAND, LOGO & HERO */}
+        {activeTab === "brand" && (
+          <div className="space-y-3 animate-fade-in">
+            <div>
+              <label className="block font-semibold mb-1">Announcement Ticker</label>
+              <input
+                type="text"
+                value={ticker}
+                onChange={(e) => setTicker(e.target.value)}
+                className="w-full px-3 py-2 rounded-xl border border-stone-300 dark:border-stone-700 bg-transparent"
+              />
+            </div>
+            <div>
+              <label className="block font-semibold mb-1">Brand Tagline</label>
+              <input
+                type="text"
+                value={tagline}
+                onChange={(e) => setTagline(e.target.value)}
+                className="w-full px-3 py-2 rounded-xl border border-stone-300 dark:border-stone-700 bg-transparent"
+              />
+            </div>
+            <div>
+              <label className="block font-semibold mb-1">Logo Image URL</label>
+              <input
+                type="url"
+                value={logoUrl}
+                onChange={(e) => setLogoUrl(e.target.value)}
+                className="w-full px-3 py-2 rounded-xl border border-stone-300 dark:border-stone-700 bg-transparent font-mono text-[11px]"
+              />
+            </div>
+            <div>
+              <label className="block font-semibold mb-1">Hero Background Video URL</label>
+              <input
+                type="url"
+                value={videoUrl}
+                onChange={(e) => setVideoUrl(e.target.value)}
+                className="w-full px-3 py-2 rounded-xl border border-stone-300 dark:border-stone-700 bg-transparent font-mono text-[11px]"
+              />
+            </div>
+            <div>
+              <label className="block font-semibold mb-1">Hero Headline</label>
+              <input
+                type="text"
+                value={headline}
+                onChange={(e) => setHeadline(e.target.value)}
+                className="w-full px-3 py-2 rounded-xl border border-stone-300 dark:border-stone-700 bg-transparent"
+              />
+            </div>
+            <div>
+              <label className="block font-semibold mb-1">Hero Subhead</label>
+              <textarea
+                rows={3}
+                value={subhead}
+                onChange={(e) => setSubhead(e.target.value)}
+                className="w-full px-3 py-2 rounded-xl border border-stone-300 dark:border-stone-700 bg-transparent"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3 pt-2">
+              <div>
+                <label className="block font-semibold mb-1">Free Delivery Threshold (â‚¹)</label>
+                <input
+                  type="number"
+                  value={threshold}
+                  onChange={(e) => setThreshold(Number(e.target.value))}
+                  className="w-full px-3 py-2 rounded-xl border border-stone-300 dark:border-stone-700 bg-transparent"
+                />
+              </div>
+              <div>
+                <label className="block font-semibold mb-1">Standard Delivery Fee (â‚¹)</label>
+                <input
+                  type="number"
+                  value={stdFee}
+                  onChange={(e) => setStdFee(Number(e.target.value))}
+                  className="w-full px-3 py-2 rounded-xl border border-stone-300 dark:border-stone-700 bg-transparent"
+                />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* TAB 2: FACILITY, GST & CONTACT */}
+        {activeTab === "facility" && (
+          <div className="space-y-3 animate-fade-in">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block font-semibold mb-1">Founder / Grievance Officer</label>
+                <input
+                  type="text"
+                  value={founderName}
+                  onChange={(e) => setFounderName(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl border border-stone-300 dark:border-stone-700 bg-transparent"
+                />
+              </div>
+              <div>
+                <label className="block font-semibold mb-1">Support Email</label>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl border border-stone-300 dark:border-stone-700 bg-transparent"
+                />
+              </div>
+              <div>
+                <label className="block font-semibold mb-1">Primary Phone</label>
+                <input
+                  type="text"
+                  value={primaryPhone}
+                  onChange={(e) => setPrimaryPhone(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl border border-stone-300 dark:border-stone-700 bg-transparent"
+                />
+              </div>
+              <div>
+                <label className="block font-semibold mb-1">Alternate Phone</label>
+                <input
+                  type="text"
+                  value={altPhone}
+                  onChange={(e) => setAltPhone(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl border border-stone-300 dark:border-stone-700 bg-transparent"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="block font-semibold mb-1">Peenya Facility Address</label>
+              <input
+                type="text"
+                value={facilityAddress}
+                onChange={(e) => setFacilityAddress(e.target.value)}
+                className="w-full px-3 py-2 rounded-xl border border-stone-300 dark:border-stone-700 bg-transparent"
+              />
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block font-semibold mb-1">FSSAI License Reg.</label>
+                <input
+                  type="text"
+                  value={fssaiLicense}
+                  onChange={(e) => setFssaiLicense(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl border border-stone-300 dark:border-stone-700 bg-transparent font-mono"
+                />
+              </div>
+              <div>
+                <label className="block font-semibold mb-1">GSTIN Number</label>
+                <input
+                  type="text"
+                  value={gstin}
+                  onChange={(e) => setGstin(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl border border-stone-300 dark:border-stone-700 bg-transparent font-mono"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="block font-semibold mb-1">Bangalore Delivery Notice</label>
+              <input
+                type="text"
+                value={blrNotice}
+                onChange={(e) => setBlrNotice(e.target.value)}
+                className="w-full px-3 py-2 rounded-xl border border-stone-300 dark:border-stone-700 bg-transparent"
+              />
+            </div>
+          </div>
+        )}
+
+        {/* TAB 3: PRODUCTS & IMAGES */}
+        {activeTab === "products" && (
+          <div className="space-y-4 animate-fade-in">
+            {["groundnut", "coconut", "sesame"].map((pId) => (
+              <div
+                key={pId}
+                className="p-3.5 rounded-xl border border-stone-200 dark:border-stone-800 space-y-2.5 bg-stone-50/50 dark:bg-black/20"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">
+                    {pId} Oil Configuration
+                  </span>
+                  {productDetails[pId]?.imageUrl && (
+                    <img
+                      src={productDetails[pId].imageUrl}
+                      alt={pId}
+                      className="w-8 h-8 object-contain rounded border border-stone-300 dark:border-stone-700 bg-white"
+                    />
+                  )}
+                </div>
+                <div>
+                  <label className="block text-[11px] font-semibold mb-0.5">Product Title</label>
+                  <input
+                    type="text"
+                    value={productDetails[pId]?.name || ""}
+                    onChange={(e) => updateProductItem(pId, "name", e.target.value)}
+                    className="w-full px-2.5 py-1.5 rounded-lg border border-stone-300 dark:border-stone-700 bg-white dark:bg-transparent text-xs"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-semibold mb-0.5">Short Description</label>
+                  <input
+                    type="text"
+                    value={productDetails[pId]?.description || ""}
+                    onChange={(e) => updateProductItem(pId, "description", e.target.value)}
+                    className="w-full px-2.5 py-1.5 rounded-lg border border-stone-300 dark:border-stone-700 bg-white dark:bg-transparent text-xs"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-semibold mb-0.5">Bottle Image URL (Cloudflare R2 / CDN)</label>
+                  <input
+                    type="url"
+                    value={productDetails[pId]?.imageUrl || ""}
+                    onChange={(e) => updateProductItem(pId, "imageUrl", e.target.value)}
+                    className="w-full px-2.5 py-1.5 rounded-lg border border-stone-300 dark:border-stone-700 bg-white dark:bg-transparent font-mono text-[11px]"
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* TAB 4: LEGAL POLICIES */}
+        {activeTab === "policies" && (
+          <div className="space-y-4 animate-fade-in">
+            {[
+              { key: "terms", label: "Terms & Conditions" },
+              { key: "shipping", label: "Shipping & Delivery Policy" },
+              { key: "returns", label: "Return & Refund Policy" },
+              { key: "privacy", label: "Privacy Policy" },
+            ].map((p) => (
+              <div
+                key={p.key}
+                className="p-3.5 rounded-xl border border-stone-200 dark:border-stone-800 space-y-2 bg-stone-50/50 dark:bg-black/20"
+              >
+                <div className="flex items-center gap-2">
+                  <FileText className="w-4 h-4 text-[#E08F35]" />
+                  <span className="font-bold text-xs">{p.label}</span>
+                </div>
+                <div>
+                  <label className="block text-[11px] font-semibold mb-0.5">Policy Modal Heading</label>
+                  <input
+                    type="text"
+                    value={policies[p.key]?.title || ""}
+                    onChange={(e) => updatePolicyItem(p.key, "title", e.target.value)}
+                    className="w-full px-2.5 py-1.5 rounded-lg border border-stone-300 dark:border-stone-700 bg-white dark:bg-transparent text-xs"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-semibold mb-0.5">Full Policy Verbatim Text</label>
+                  <textarea
+                    rows={4}
+                    value={policies[p.key]?.content || ""}
+                    onChange={(e) => updatePolicyItem(p.key, "content", e.target.value)}
+                    className="w-full px-2.5 py-1.5 rounded-lg border border-stone-300 dark:border-stone-700 bg-white dark:bg-transparent text-xs leading-relaxed"
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <button
+          type="submit"
+          className="w-full py-3.5 rounded-xl bg-[#5E3210] hover:bg-[#43230A] text-white font-bold text-xs shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer mt-4"
+        >
+          <Save className="w-4 h-4 text-amber-300" />
+          <span>Save Changes (Live Firestore Sync)</span>
+        </button>
+      </form>
+    </div>
+  );
+};
+
+========================================
 === FILE: C:\Users\manoj\OneDrive\Documents\Manopavana\Website\ABCD\Manopavana\src\components\AudioPlayer.tsx ===
 ========================================
 import React from "react";
@@ -74,7 +501,9 @@ import { BUSINESS_CONFIG, LEGAL_POLICIES, MEDIA_ASSETS } from "../constants";
 export const Footer: React.FC = () => {
   const { activePolicyModal, setActivePolicyModal, cmsConfig } = useStore();
 
-  const activePolicyData = activePolicyModal ? LEGAL_POLICIES[activePolicyModal] : null;
+  const activePolicyData = activePolicyModal
+  ? (cmsConfig?.policies?.[activePolicyModal] || LEGAL_POLICIES[activePolicyModal])
+  : null;
 
   return (
     <>
@@ -372,7 +801,7 @@ export const FreeShippingNudge: React.FC = () => {
 === FILE: C:\Users\manoj\OneDrive\Documents\Manopavana\Website\ABCD\Manopavana\src\components\InvoiceModal.tsx ===
 ========================================
 import React from "react";
-import { Printer, X, Download } from "lucide-react";
+import { X, Download } from "lucide-react";
 import { Order } from "../types";
 import { BUSINESS_CONFIG } from "../constants";
 
@@ -406,32 +835,57 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({ order, isOpen, onClo
     <div
       role="dialog"
       aria-modal="true"
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm print:p-0 print:bg-white print:fixed print:inset-0"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm print:p-0 print:bg-transparent print:static print:block print:inset-auto"
     >
       <style>
         {`
           @media print {
-            body * { visibility: hidden; }
-            #printable-invoice, #printable-invoice * { visibility: visible; }
-            #printable-invoice {
-              position: absolute;
-              left: 0;
-              top: 0;
-              width: 100%;
-              margin: 0;
-              padding: 15mm;
-              box-shadow: none !important;
-              border: none !important;
-            }
             @page {
               size: A4 portrait;
-              margin: 0;
+              margin: 8mm 12mm;
+            }
+
+            /* 1. Collapse all normal DOM flow so they don't produce empty pages */
+            body > *:not(#root):not(#__next),
+            #root > *:not([role="dialog"]) {
+              display: none !important;
+            }
+
+            html, body {
+              height: auto !important;
+              min-height: 0 !important;
+              overflow: visible !important;
+              background: #ffffff !important;
+              margin: 0 !important;
+              padding: 0 !important;
+            }
+
+            /* 2. Position the invoice naturally at the very top of Page 1 */
+            #printable-invoice {
+              position: static !important;
+              display: block !important;
+              width: 100% !important;
+              max-width: 100% !important;
+              height: auto !important;
+              margin: 0 !important;
+              padding: 0 !important;
+              box-shadow: none !important;
+              border: none !important;
+              background: transparent !important;
+              page-break-before: avoid !important;
+              page-break-after: avoid !important;
+              page-break-inside: avoid !important;
+            }
+
+            /* 3. Hide all non-printable modal elements */
+            .print\\:hidden {
+              display: none !important;
             }
           }
         `}
       </style>
 
-      <div className="relative w-full max-w-2xl bg-white text-stone-900 rounded-3xl shadow-2xl border border-stone-200 overflow-hidden flex flex-col max-h-[92vh] print:max-h-none print:border-none print:shadow-none print:rounded-none">
+      <div className="relative w-full max-w-2xl bg-white text-stone-900 rounded-3xl shadow-2xl border border-stone-200 overflow-hidden flex flex-col max-h-[92vh] print:max-h-none print:h-auto print:border-none print:shadow-none print:rounded-none print:overflow-visible">
         {/* Actions bar (Hidden when printing) */}
         <div className="flex items-center justify-between px-6 py-4 bg-stone-100 border-b border-stone-200 print:hidden">
           <span className="text-sm font-bold font-serif text-stone-900">
@@ -457,7 +911,7 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({ order, isOpen, onClo
         </div>
 
         {/* Invoice Page Container */}
-        <div id="printable-invoice" className="p-8 text-xs text-stone-800 space-y-4">
+        <div id="printable-invoice" className="p-8 text-xs text-stone-800 space-y-4 print:p-0">
           <div className="flex justify-between items-start border-b border-stone-300 pb-4">
             <div>
               <h1 className="text-lg font-bold font-serif text-stone-900">{BUSINESS_CONFIG.BRAND_NAME}</h1>
@@ -839,20 +1293,20 @@ export const LiveOrderTracker = ({
               <span>Call Facility</span>
             </a>
 
-            {!isCancelled && (
-              <button
-                type="button"
-                onClick={() => setIsInvoiceOpen(true)}
-                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
-                  isDark
-                    ? "bg-[#1A1009] border-[#3B2516] text-[#FAF4EA] hover:bg-[#2A1A0F]"
-                    : "bg-white border-[#DDD1BE] text-[#1F120A] hover:bg-[#FAF6EE]"
-                }`}
-              >
-                <FileText className="w-3.5 h-3.5 text-[#E08F35]" />
-                <span>Download Invoice</span>
-              </button>
-            )}
+            {(order.orderStatus === "Dispatched" || order.orderStatus === "Delivered") && (
+  <button
+    type="button"
+    onClick={() => setIsInvoiceOpen(true)}
+    className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+      isDark
+        ? "bg-[#1A1009] border-[#3B2516] text-[#FAF4EA] hover:bg-[#2A1A0F]"
+        : "bg-white border-[#DDD1BE] text-[#1F120A] hover:bg-[#FAF6EE]"
+    }`}
+  >
+    <FileText className="w-3.5 h-3.5 text-[#E08F35]" />
+    <span>Download Invoice</span>
+  </button>
+)}
           </div>
         </div>
 
@@ -1445,7 +1899,16 @@ export const LiveOrderTracker = ({
 === FILE: C:\Users\manoj\OneDrive\Documents\Manopavana\Website\ABCD\Manopavana\src\components\LocationModal.tsx ===
 ========================================
 import React, { useState, useEffect, useRef } from "react";
-import { MapPin, Navigation, X, CheckCircle2, AlertCircle, Building2 } from "lucide-react";
+import {
+  MapPin,
+  Navigation,
+  X,
+  CheckCircle2,
+  AlertCircle,
+  Building2,
+  Search,
+  Loader2,
+} from "lucide-react";
 import { useStore } from "../context/StoreContext";
 import { INDIAN_STATES_DISTRICTS } from "../constants";
 import L from "leaflet";
@@ -1473,6 +1936,12 @@ export const LocationModal: React.FC = () => {
     address.lng || 77.5946,
   ]);
   const [isLocating, setIsLocating] = useState(false);
+
+  // Address search states
+  const [searchQuery, setSearchQuery] = useState("");
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const searchTimeoutRef = useRef<any>(null);
 
   // Sync initial state if address updates externally
   useEffect(() => {
@@ -1515,7 +1984,7 @@ export const LocationModal: React.FC = () => {
         if (!mapInstanceRef.current) {
           const map = L.map(mapContainerRef.current, {
             center: coords,
-            zoom: 13,
+            zoom: 14,
             attributionControl: false,
           });
 
@@ -1525,11 +1994,11 @@ export const LocationModal: React.FC = () => {
 
           const customIcon = L.divIcon({
             className: "custom-leaflet-marker",
-            html: `<div style="background-color:#E08F35; width:28px; height:28px; border-radius:50%; border:3px solid #FFF; box-shadow:0 4px 10px rgba(0,0,0,0.3); display:flex; align-items:center; justify-content:center;">
+            html: `<div style="background-color:#E08F35; width:30px; height:30px; border-radius:50%; border:3px solid #FFF; box-shadow:0 4px 12px rgba(0,0,0,0.45); display:flex; align-items:center; justify-content:center;">
                     <div style="background:#5E3210; width:10px; height:10px; border-radius:50%;"></div>
                   </div>`,
-            iconSize: [28, 28],
-            iconAnchor: [14, 14],
+            iconSize: [30, 30],
+            iconAnchor: [15, 15],
           });
 
           const marker = L.marker(coords, {
@@ -1544,7 +2013,7 @@ export const LocationModal: React.FC = () => {
               if (Number.isFinite(lat) && Number.isFinite(lng)) {
                 setCoords([lat, lng]);
                 marker.setLatLng([lat, lng]);
-                showToast("ðŸ“ Pin placed! Auto-filling address...");
+                showToast("Pin placed! Auto-filling address...");
                 await reverseGeocode(lat, lng);
               }
             } catch (err) {
@@ -1556,7 +2025,7 @@ export const LocationModal: React.FC = () => {
             try {
               const latLng = marker.getLatLng();
               setCoords([latLng.lat, latLng.lng]);
-              showToast("ðŸ“ Pin moved! Auto-filling address...");
+              showToast("Pin moved! Auto-filling address...");
               await reverseGeocode(latLng.lat, latLng.lng);
             } catch (e) {
               console.warn("Marker drag notice:", e);
@@ -1565,18 +2034,24 @@ export const LocationModal: React.FC = () => {
 
           mapInstanceRef.current = map;
           markerRef.current = marker;
+
+          // Recalculate dimensions so the map pans smoothly
+          setTimeout(() => {
+            map.invalidateSize();
+          }, 200);
         } else {
           try {
-            mapInstanceRef.current.setView(coords, 13);
+            mapInstanceRef.current.setView(coords, 14);
             if (markerRef.current) {
               markerRef.current.setLatLng(coords);
             }
+            mapInstanceRef.current.invalidateSize();
           } catch {}
         }
       } catch (err) {
         console.warn("Map setup notice:", err);
       }
-    }, 150);
+    }, 180);
 
     return () => {
       clearTimeout(timer);
@@ -1593,11 +2068,68 @@ export const LocationModal: React.FC = () => {
         if (partial.state) setState(partial.state);
         if (partial.district) setDistrict(partial.district);
         if (partial.landmark) setLandmark(partial.landmark);
-        showToast("ðŸ“ Address auto-populated from pin location!");
+        showToast("Address auto-populated from pin location!");
       }
     } catch {
       // ignore network hiccups
     }
+  };
+
+  // Autocomplete / Search location on map
+  const handleSearchQueryChange = (val: string) => {
+    setSearchQuery(val);
+    if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+
+    if (!val.trim() || val.length < 3) {
+      setSearchResults([]);
+      setIsSearching(false);
+      return;
+    }
+
+    setIsSearching(true);
+    searchTimeoutRef.current = setTimeout(async () => {
+      try {
+        const res = await fetch(
+          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
+            val
+          )}&countrycodes=in&limit=5&addressdetails=1`,
+          {
+            headers: {
+              "User-Agent": "ManopavanaLocationPicker/1.0",
+              "Accept-Language": "en",
+            },
+          }
+        );
+        const data = await res.json();
+        setSearchResults(data || []);
+      } catch (err) {
+        console.warn("Search geocode error:", err);
+        setSearchResults([]);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 400);
+  };
+
+  const handleSelectSearchResult = async (item: any) => {
+    const lat = parseFloat(item.lat);
+    const lon = parseFloat(item.lon);
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
+
+    setCoords([lat, lon]);
+    setSearchResults([]);
+    setSearchQuery(item.display_name);
+
+    if (mapInstanceRef.current && markerRef.current) {
+      try {
+        mapInstanceRef.current.setView([lat, lon], 16);
+        markerRef.current.setLatLng([lat, lon]);
+        mapInstanceRef.current.invalidateSize();
+      } catch {}
+    }
+
+    showToast("Map focused on selected location!");
+    await reverseGeocode(lat, lon);
   };
 
   const handleUseGPS = () => {
@@ -1615,11 +2147,12 @@ export const LocationModal: React.FC = () => {
             setCoords([lat, lng]);
             if (mapInstanceRef.current && markerRef.current) {
               try {
-                mapInstanceRef.current.setView([lat, lng], 15);
+                mapInstanceRef.current.setView([lat, lng], 16);
                 markerRef.current.setLatLng([lat, lng]);
+                mapInstanceRef.current.invalidateSize();
               } catch {}
             }
-            showToast("ðŸ“ GPS coordinates retrieved! Auto-filling address...");
+            showToast("GPS coordinates retrieved! Auto-filling address...");
             await reverseGeocode(lat, lng);
           }
         } catch (e) {
@@ -1646,7 +2179,7 @@ export const LocationModal: React.FC = () => {
   const isBangalorePincode =
     pincode.startsWith("560") ||
     district.toLowerCase().includes("bengaluru") ||
-    state === "Karnataka" && district.toLowerCase().includes("bangalore");
+    (state === "Karnataka" && district.toLowerCase().includes("bangalore"));
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
@@ -1695,8 +2228,8 @@ export const LocationModal: React.FC = () => {
     setLocationModalOpen(false);
     showToast(
       isBLR
-        ? "ðŸ“ Bengaluru delivery location updated!"
-        : "ðŸ“ Pan-India delivery location updated via Delhivery Express!"
+        ? "Bengaluru delivery location updated!"
+        : "Pan-India delivery location updated via Delhivery Express!"
     );
   };
 
@@ -1709,13 +2242,13 @@ export const LocationModal: React.FC = () => {
       role="dialog"
       aria-modal="true"
       aria-labelledby="location-modal-title"
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in"
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-black/85 backdrop-blur-md animate-fade-in"
     >
-      <div className="relative w-full max-w-2xl bg-gradient-to-b from-[#24160F] to-[#140D09] text-[#FDF6EC] rounded-3xl shadow-[0_25px_60px_rgba(0,0,0,0.95)] border border-[#4A301E] overflow-hidden flex flex-col max-h-[92vh]">
+      <div className="relative w-full max-w-3xl bg-gradient-to-b from-[#24160F] to-[#140D09] text-[#FDF6EC] rounded-3xl shadow-[0_25px_60px_rgba(0,0,0,0.95)] border border-[#4A301E] overflow-hidden flex flex-col max-h-[94vh]">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4.5 bg-[#120A06] border-b border-[#3A2417]">
+        <div className="flex items-center justify-between px-6 py-4 bg-[#120A06] border-b border-[#3A2417] shrink-0">
           <div className="flex items-center gap-3">
-            <span className="p-2 rounded-2xl bg-[#D49A37]/20 text-[#F5BC51]">
+            <span className="p-2.5 rounded-2xl bg-[#D49A37]/20 text-[#F5BC51]">
               <MapPin className="w-5 h-5 text-[#F5BC51]" />
             </span>
             <div>
@@ -1723,7 +2256,7 @@ export const LocationModal: React.FC = () => {
                 Choose Delivery Destination
               </h2>
               <p className="text-xs text-[#A88D77]">
-                1-Click GPS or OpenStreetMap pin for pinpoint Bengaluru doorstep drop-off
+                Search landmark, drag the pin, or click 1-Click GPS
               </p>
             </div>
           </div>
@@ -1736,8 +2269,8 @@ export const LocationModal: React.FC = () => {
           </button>
         </div>
 
-        {/* Content */}
-        <div className="overflow-y-auto p-6 space-y-5">
+        {/* Content Body */}
+        <div className="overflow-y-auto p-5 sm:p-6 space-y-5">
           {/* Geolocation Quick Trigger */}
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 p-3.5 bg-[#1C110B] border border-[#4A301E] rounded-2xl shadow-inner">
             <div className="flex items-center gap-2.5">
@@ -1747,7 +2280,7 @@ export const LocationModal: React.FC = () => {
                   Automatic GPS Pinpoint
                 </p>
                 <p className="text-[11px] text-[#A88D77]">
-                  Detect current location to autofill street and coordinate pin
+                  Detect current device location to instantly place map pin
                 </p>
               </div>
             </div>
@@ -1755,26 +2288,72 @@ export const LocationModal: React.FC = () => {
               type="button"
               onClick={handleUseGPS}
               disabled={isLocating}
-              className="px-4 py-2 text-xs font-semibold text-[#140D09] bg-gradient-to-r from-[#D49A37] to-[#B87C24] hover:brightness-110 disabled:opacity-50 rounded-xl shadow-md transition-all flex items-center justify-center gap-2 shrink-0 cursor-pointer"
+              className="px-4 py-2.5 text-xs font-semibold text-[#140D09] bg-gradient-to-r from-[#D49A37] to-[#B87C24] hover:brightness-110 disabled:opacity-50 rounded-xl shadow-md transition-all flex items-center justify-center gap-2 shrink-0 cursor-pointer"
             >
-              {isLocating ? "Detecting GPS..." : "Use Current Location"}
+              {isLocating ? (
+                <>
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  <span>Detecting GPS...</span>
+                </>
+              ) : (
+                "Use Current Location"
+              )}
             </button>
           </div>
 
-          {/* Leaflet Map Preview */}
+          {/* Direct Address Search Input Bar */}
+          <div className="relative space-y-1.5 z-20">
+            <label className="block text-xs font-semibold text-[#D6BEAA]">
+              Search Area, Landmark, or Street:
+            </label>
+            <div className="relative flex items-center">
+              <Search className="absolute left-3.5 w-4 h-4 text-[#A88D77]" />
+              <input
+                type="text"
+                placeholder="e.g. Peenya 2nd Stage, Indiranagar, Hassan, MG Road..."
+                value={searchQuery}
+                onChange={(e) => handleSearchQueryChange(e.target.value)}
+                className="w-full pl-10 pr-10 py-2.5 text-xs sm:text-sm bg-[#120A06] border border-[#4A301E] rounded-xl focus:outline-none focus:border-[#D49A37] focus:ring-1 focus:ring-[#D49A37]/50 text-[#FDF6EC] placeholder-[#7A6150]"
+              />
+              {isSearching && (
+                <Loader2 className="absolute right-3.5 w-4 h-4 text-[#F5BC51] animate-spin" />
+              )}
+            </div>
+
+            {/* Search Results Dropdown */}
+            {searchResults.length > 0 && (
+              <ul className="absolute left-0 right-0 top-full mt-1.5 bg-[#1C110B] border border-[#4A301E] rounded-2xl shadow-2xl max-h-56 overflow-y-auto divide-y divide-[#2C1D14] z-50">
+                {searchResults.map((item, idx) => (
+                  <li
+                    key={idx}
+                    onClick={() => handleSelectSearchResult(item)}
+                    className="p-3 text-xs hover:bg-[#2C1D14] cursor-pointer flex items-start gap-2.5 text-[#FDF6EC] transition-colors"
+                  >
+                    <MapPin className="w-4 h-4 text-[#F5BC51] shrink-0 mt-0.5" />
+                    <span className="line-clamp-2 text-stone-200">
+                      {item.display_name}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
+          {/* Leaflet Map Preview (Spacious Container) */}
           <div className="space-y-1.5">
             <div className="flex items-center justify-between text-xs text-[#A88D77]">
               <span className="font-semibold text-[#D6BEAA] flex items-center gap-1.5">
                 <MapPin className="w-3.5 h-3.5 text-[#F5BC51]" />
-                Interactive OpenStreetMap (Click anywhere on map or drag pin to select):
+                Interactive Map (Click anywhere to set pin, or drag marker):
               </span>
               <span className="text-[11px] text-[#A88D77] font-mono">
                 {Number(coords?.[0] || 12.9716).toFixed(4)}, {Number(coords?.[1] || 77.5946).toFixed(4)}
               </span>
             </div>
+            {/* Enlarged map container from h-44 to h-80/h-96 for comfortable panning */}
             <div
               ref={mapContainerRef}
-              className="w-full h-44 rounded-2xl border border-[#4A301E] overflow-hidden shadow-inner bg-[#140D09]"
+              className="w-full h-80 sm:h-96 rounded-2xl border border-[#4A301E] overflow-hidden shadow-inner bg-[#140D09] touch-manipulation z-10"
             />
           </div>
 
@@ -1937,7 +2516,7 @@ export const LocationModal: React.FC = () => {
         </div>
 
         {/* Footer Actions */}
-        <div className="flex items-center justify-between px-6 py-4 bg-[#120A06] border-t border-[#3A2417]">
+        <div className="flex items-center justify-between px-6 py-4 bg-[#120A06] border-t border-[#3A2417] shrink-0">
           <div className="flex items-center gap-2 text-xs text-[#A88D77]">
             <Building2 className="w-4 h-4 text-[#F5BC51]" />
             <span>Peenya 2nd Stage Dispatch Center</span>
@@ -6588,41 +7167,27 @@ export const AccountPage = () => {
 ========================================
 === FILE: C:\Users\manoj\OneDrive\Documents\Manopavana\Website\ABCD\Manopavana\src\pages\AdminPage.tsx ===
 ========================================
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
+import { StorefrontCMSPanel } from "../components/admin/StoreFrontCmsPanel";
 import {
   Lock,
   ShieldAlert,
-  Settings,
   MapPin,
   ExternalLink,
   MessageCircle,
   Save,
   CheckCircle2,
   Truck,
-  RotateCcw,
   Sparkles,
-  Image,
-  Video,
-  Type,
-  Phone,
   Package,
   Printer,
   Copy,
   Check,
   AlertCircle,
-  Compass,
-  Send,
   Activity,
-  Zap,
-  RefreshCw,
   Trash2,
-  Search,
   Eye,
   Key,
-  HelpCircle,
-  Info,
-  Globe,
-  FileText,
 } from "lucide-react";
 import { useStore } from "../context/StoreContext";
 import { BUSINESS_CONFIG } from "../constants";
@@ -6635,7 +7200,6 @@ export const AdminPage: React.FC = () => {
     authenticateAdmin,
     logoutAdmin,
     cmsConfig,
-    updateCMSConfig,
     orders,
     adminOrders,
     deleteOrder,
@@ -6650,126 +7214,140 @@ export const AdminPage: React.FC = () => {
 
   const [pinInput, setPinInput] = useState("");
   const [pinError, setPinError] = useState(false);
-  const [isVerifyingPin, setIsVerifyingPin] = useState(false);
   const [showCloudflareGuide, setShowCloudflareGuide] = useState(false);
 
-  // Editable storefront configuration state
-  const [ticker, setTicker] = useState(cmsConfig.announcementTicker);
-  const [headline, setHeadline] = useState(cmsConfig.heroHeadline);
-  const [subhead, setSubhead] = useState(cmsConfig.heroSubhead);
-  const [tagline, setTagline] = useState(cmsConfig.brandTagline || "Pure by nature, trusted for life");
-  const [logoUrl, setLogoUrl] = useState(cmsConfig.brandLogoUrl || "");
-  const [videoUrl, setVideoUrl] = useState(cmsConfig.chekkuVideoUrl || "");
-  const [threshold, setThreshold] = useState(cmsConfig.freeShippingThreshold);
-  const [stdFee, setStdFee] = useState(cmsConfig.standardShippingFee);
-
-  // Expanded Business Credentials & Contact State
-  const [founderName, setFounderName] = useState(cmsConfig.founderName || BUSINESS_CONFIG.FOUNDER_NAME);
-  const [primaryPhone, setPrimaryPhone] = useState(cmsConfig.primaryPhone || BUSINESS_CONFIG.PRIMARY_PHONE);
-  const [altPhone, setAltPhone] = useState(cmsConfig.altPhone || BUSINESS_CONFIG.ALT_PHONE);
-  const [email, setEmail] = useState(cmsConfig.email || BUSINESS_CONFIG.EMAIL);
-  const [facilityAddress, setFacilityAddress] = useState(cmsConfig.facilityAddress || BUSINESS_CONFIG.FACILITY_ADDRESS);
-  const [fssaiLicense, setFssaiLicense] = useState(cmsConfig.fssaiLicense || BUSINESS_CONFIG.FSSAI_LICENSE);
-  const [gstin, setGstin] = useState(cmsConfig.gstin || BUSINESS_CONFIG.GSTIN);
-  const [blrNotice, setBlrNotice] = useState(
-    cmsConfig.bangaloreDeliveryNotice || "Same-Day / Next-Day Direct Courier from Peenya Facility"
-  );
-
-  // Catalog Pricing & Live Stock State
-  const [prices, setPrices] = useState(cmsConfig.prices);
-  const [stock, setStock] = useState(cmsConfig.stock);
-
-  // Delhivery Logistics State
+  // Delhivery Logistics & Testing State
   const [checkingPincode, setCheckingPincode] = useState<Record<string, boolean>>({});
   const [pincodeStatus, setPincodeStatus] = useState<
-    Record<string, { serviceable: boolean; cod: boolean; prepaid: boolean; message?: string }>
+    Record<
+      string,
+      { serviceable: boolean; cod: boolean; prepaid: boolean; message?: string }
+    >
   >({});
   const [manifesting, setManifesting] = useState<Record<string, boolean>>({});
   const [manifestError, setManifestError] = useState<Record<string, string>>({});
-  const [fallbackAwb, setFallbackAwb] = useState<Record<string, string>>({});
   const [customAwb, setCustomAwb] = useState<Record<string, string>>({});
   const [copiedPorter, setCopiedPorter] = useState<Record<string, boolean>>({});
 
-  // Bangalore Local Manual Tracking State
+  // Bangalore Local Courier Manual Tracking State
   const [blrCourier, setBlrCourier] = useState<Record<string, string>>({});
   const [blrNotes, setBlrNotes] = useState<Record<string, string>>({});
   const [blrTracking, setBlrTracking] = useState<Record<string, string>>({});
   const [blrStatus, setBlrStatus] = useState<Record<string, OrderStatus>>({});
   const [savedSuccessRef, setSavedSuccessRef] = useState<Record<string, boolean>>({});
 
-  // Sync state when CMS config updates via Firestore
+  // Delhivery Diagnostic State
+  const [pingingApi, setPingingApi] = useState(false);
+  const [pingResult, setPingResult] = useState<{
+    status: string;
+    authenticated: boolean;
+    tokenMasked: string;
+    warehouse: string;
+    originPincode: string;
+    sampleWaybill?: string;
+    latencyMs?: number;
+    message?: string;
+  } | null>(null);
+
+  // Automatic background carrier status sync for active Delhivery orders
   useEffect(() => {
-    setTicker(cmsConfig.announcementTicker);
-    setHeadline(cmsConfig.heroHeadline);
-    setSubhead(cmsConfig.heroSubhead);
-    setTagline(cmsConfig.brandTagline || "Pure by nature, trusted for life");
-    setLogoUrl(cmsConfig.brandLogoUrl || "");
-    setVideoUrl(cmsConfig.chekkuVideoUrl || "");
-    setFounderName(cmsConfig.founderName || BUSINESS_CONFIG.FOUNDER_NAME);
-    setPrimaryPhone(cmsConfig.primaryPhone || BUSINESS_CONFIG.PRIMARY_PHONE);
-    setAltPhone(cmsConfig.altPhone || BUSINESS_CONFIG.ALT_PHONE);
-    setEmail(cmsConfig.email || BUSINESS_CONFIG.EMAIL);
-    setFacilityAddress(cmsConfig.facilityAddress || BUSINESS_CONFIG.FACILITY_ADDRESS);
-    setFssaiLicense(cmsConfig.fssaiLicense || BUSINESS_CONFIG.FSSAI_LICENSE);
-    setGstin(cmsConfig.gstin || BUSINESS_CONFIG.GSTIN);
-    setBlrNotice(cmsConfig.bangaloreDeliveryNotice || "Same-Day / Next-Day Direct Courier from Peenya Facility");
-    setThreshold(cmsConfig.freeShippingThreshold);
-    setStdFee(cmsConfig.standardShippingFee);
-    setPrices(cmsConfig.prices);
-    setStock(cmsConfig.stock);
-  }, [cmsConfig]);
+    const activeDelhiveryOrders = orders.filter(
+      (o) =>
+        o.trackingNumber &&
+        !o.trackingNumber.startsWith("MV-BLR") &&
+        o.orderStatus !== "Delivered" &&
+        o.orderStatus !== "Cancelled"
+    );
+
+    if (activeDelhiveryOrders.length === 0) return;
+
+    const syncActiveShipments = async () => {
+      for (const ord of activeDelhiveryOrders) {
+        try {
+          const res = await fetch(`/api?action=delhivery_track&waybill=${ord.trackingNumber}`);
+          const data = await res.json();
+          const scanStatus = data?.data?.ShipmentData?.[0]?.Shipment?.Status?.Status;
+
+          if (scanStatus) {
+            const mapped = mapDelhiveryToWebStatus(scanStatus);
+            if (mapped && mapped !== ord.orderStatus) {
+              await updateOrderStatus(ord.id || ord.orderRef, mapped);
+            }
+          }
+        } catch (e) {
+          console.warn(`Background sync skipped for ${ord.trackingNumber}:`, e);
+        }
+      }
+    };
+
+    // Run automatically when dashboard opens
+    syncActiveShipments();
+
+    // Helper to map live Delhivery carrier status strings to MANOPAVANA website order stages
+    const mapDelhiveryToWebStatus = (delhiveryStatus: string): "Placed" | "Packed" | "Dispatched" | "Delivered" | "Cancelled" | null => {
+      const s = String(delhiveryStatus || "").toLowerCase();
+
+      if (s.includes("delivered")) {
+        return "Delivered";
+      }
+      if (
+        s.includes("in transit") ||
+        s.includes("dispatched") ||
+        s.includes("out for delivery") ||
+        s.includes("in-transit")
+      ) {
+        return "Dispatched";
+      }
+      if (
+        s.includes("manifest") ||
+        s.includes("ready to ship") ||
+        s.includes("scheduled") ||
+        s.includes("open")
+      ) {
+        return "Packed";
+      }
+      if (s.includes("cancel")) {
+        return "Cancelled";
+      }
+
+      return null;
+    };
+
+    // Re-check automatically every 5 minutes while dashboard remains open
+    const interval = setInterval(syncActiveShipments, 5 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, [orders]);
+
+  const facilityAddress =
+    cmsConfig?.facilityAddress || BUSINESS_CONFIG.FACILITY_ADDRESS;
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsVerifyingPin(true);
-    setPinError(false);
-
-    try {
-      const ok = await authenticateAdmin(pinInput.trim());
-      if (!ok) {
-        setPinError(true);
-      } else {
-        setPinError(false);
-        showToast("Administrator portal unlocked successfully!");
-      }
-    } catch {
+    const ok = await authenticateAdmin(pinInput.trim());
+    if (!ok) {
       setPinError(true);
-    } finally {
-      setIsVerifyingPin(false);
+    } else {
+      setPinError(false);
+      showToast("Administrator portal unlocked successfully!");
     }
   };
 
-  const handleSaveStorefront = (e: React.FormEvent) => {
-    e.preventDefault();
-    updateCMSConfig((prev) => ({
-      ...prev,
-      announcementTicker: ticker,
-      heroHeadline: headline,
-      heroSubhead: subhead,
-      brandTagline: tagline,
-      brandLogoUrl: logoUrl,
-      chekkuVideoUrl: videoUrl,
-      founderName,
-      primaryPhone,
-      altPhone,
-      email,
-      facilityAddress,
-      fssaiLicense,
-      gstin,
-      bangaloreDeliveryNotice: blrNotice,
-      freeShippingThreshold: Number(threshold),
-      standardShippingFee: Number(stdFee),
-      prices,
-      stock,
-    }));
-    showToast("Storefront copy, facility details & prices saved to Firestore live!");
-  };
-
-  const handleToggleStock = (key: keyof typeof stock) => {
-    setStock((prev) => ({
-      ...prev,
-      [key]: !prev[key],
-    }));
+  const handlePingDelhivery = async () => {
+    setPingingApi(true);
+    try {
+      const res = await fetch("/api?action=delhivery_test_connection");
+      const data = await res.json();
+      setPingResult(data);
+      if (data.status === "SUCCESS") {
+        showToast(`Delhivery API connected! Latency: ${data.latencyMs}ms`);
+      } else {
+        showToast(data.message || "Delhivery connection check failed");
+      }
+    } catch {
+      showToast("Error connecting to Delhivery API");
+    } finally {
+      setPingingApi(false);
+    }
   };
 
   const handleSaveBlrTracking = async (orderRef: string, currentOrd: Order) => {
@@ -6779,12 +7357,15 @@ export const AdminPage: React.FC = () => {
           ? blrCourier[orderRef]
           : currentOrd.courier || "MANOPAVANA Peenya Direct Fleet";
       const notesVal =
-        blrNotes[orderRef] !== undefined ? blrNotes[orderRef] : currentOrd.notes || "";
+        blrNotes[orderRef] !== undefined
+          ? blrNotes[orderRef]
+          : currentOrd.notes || "";
       const trackingVal =
         blrTracking[orderRef] !== undefined
           ? blrTracking[orderRef]
           : currentOrd.trackingNumber || "";
-      const statusVal = blrStatus[orderRef] || currentOrd.orderStatus || "Dispatched";
+      const statusVal =
+        blrStatus[orderRef] || currentOrd.orderStatus || "Dispatched";
 
       await updateOrderDetails(orderRef, {
         courier: courierVal,
@@ -6805,23 +7386,31 @@ export const AdminPage: React.FC = () => {
   };
 
   const handleCopyRiderDrop = (ord: Order) => {
+    const addr = (ord?.shippingAddress || {}) as any;
     const mapsLink =
-      ord.shippingAddress.lat && ord.shippingAddress.lng
-        ? `https://www.google.com/maps?q=${ord.shippingAddress.lat},${ord.shippingAddress.lng}`
+      addr.lat && addr.lng
+        ? `https://www.google.com/maps?q=${addr.lat},${addr.lng}`
         : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-            `${ord.shippingAddress.addressLine1}, Bengaluru -${ord.shippingAddress.pincode}`
-          )}`;
-    const text = `ðŸ“¦ MANOPAVANA DROP DETAILS\nOrder: #${ord.orderRef}\nCustomer: ${ord.shippingAddress.fullName}\nPhone: ${ord.shippingAddress.phone}\nAddress: ${ord.shippingAddress.addressLine1}${
-      ord.shippingAddress.landmark ? ` (Near ${ord.shippingAddress.landmark})` : ""
-    }, ${ord.shippingAddress.district || "Bengaluru"} - ${ord.shippingAddress.pincode}\nPayment: ${ord.paymentMethod?.toUpperCase()} (â‚¹${ord.total})\nLocation Pin: ${mapsLink}`;
+          `${addr.addressLine1 || ""}, Bengaluru - ${addr.pincode || ""}`
+        )}`;
+    const text = `ðŸ“¦ MANOPAVANA DROP DETAILS\nOrder: #${ord.orderRef}\nCustomer: ${addr.fullName || "Customer"
+      }\nPhone: ${addr.phone || "N/A"}\nAddress: ${addr.addressLine1 || ""}${addr.landmark ? ` (Near ${addr.landmark})` : ""
+      }, ${addr.district || "Bengaluru"} - ${addr.pincode || ""}\nPayment: ${ord.paymentMethod?.toUpperCase()} (â‚¹${ord.total
+      })\nLocation Pin: ${mapsLink}`;
     navigator.clipboard.writeText(text);
     showToast("ðŸ“‹ Drop address & GPS copied for delivery rider!");
   };
 
-  const handleCheckPincode = async (orderRef: string, pincode: string) => {
+  const handleCheckPincode = async (orderRef: string, pincode?: string) => {
+    if (!pincode) {
+      showToast("No valid pincode provided");
+      return;
+    }
     setCheckingPincode((p) => ({ ...p, [orderRef]: true }));
     try {
-      const res = await fetch(`/api?action=delhivery_check_pincode&pincode=${encodeURIComponent(pincode)}`);
+      const res = await fetch(
+        `/api?action=delhivery_check_pincode&pincode=${encodeURIComponent(pincode)}`
+      );
       const data = await res.json();
       if (data.status === "SUCCESS") {
         setPincodeStatus((p) => ({
@@ -6854,11 +7443,20 @@ export const AdminPage: React.FC = () => {
     setManifesting((p) => ({ ...p, [order.orderRef]: true }));
     setManifestError((p) => ({ ...p, [order.orderRef]: "" }));
 
+    const addr = (order?.shippingAddress || {}) as any;
+    const rawItems = order?.items;
+    const items: any[] = Array.isArray(rawItems)
+      ? rawItems
+      : rawItems && typeof rawItems === "object"
+        ? Object.values(rawItems)
+        : [];
+
     const totalGrams =
-      order.items.reduce((acc, item) => {
-        const is1L = item.variant.includes("1L") || item.variant.includes("3L");
-        const gramsPerUnit = is1L ? 1000 : 550;
-        return acc + gramsPerUnit * item.quantity;
+      items.reduce((acc: number, item: any) => {
+        const variant = String(item?.variant || "");
+        const isLarge = variant.includes("1L") || variant.includes("3L");
+        const gramsPerUnit = isLarge ? 1000 : 550;
+        return acc + gramsPerUnit * (Number(item?.quantity) || 1);
       }, 0) || 1000;
 
     try {
@@ -6867,19 +7465,20 @@ export const AdminPage: React.FC = () => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           orderRef: order.orderRef,
-          customerName: order.shippingAddress.fullName || "Customer",
-          phone: order.shippingAddress.phone,
-          address: `${order.shippingAddress.addressLine1}${
-            order.shippingAddress.landmark ? `, Near ${order.shippingAddress.landmark}` : ""
-          }`,
-          pincode: order.shippingAddress.pincode,
-          city: order.shippingAddress.city || order.shippingAddress.district || "Bengaluru",
-          state: order.shippingAddress.state || "Karnataka",
+          customerName: addr.fullName || "Customer",
+          phone: addr.phone || "",
+          address: `${addr.addressLine1 || ""}${addr.landmark ? `, Near ${addr.landmark}` : ""
+            }`,
+          pincode: addr.pincode || "560058",
+          city: addr.city || addr.district || "Bengaluru",
+          state: addr.state || "Karnataka",
           paymentMode: order.paymentMethod === "cod" ? "COD" : "Prepaid",
-          totalAmount: order.total,
+          totalAmount: order.total || 0,
           weightGrams: totalGrams,
-          productsDesc: order.items.map((i) => `${i.title} (${i.variant})`).join(", "),
-          quantity: order.items.reduce((acc, i) => acc + i.quantity, 0),
+          productsDesc:
+            items.map((i: any) => `${i.title} (${i.variant})`).join(", ") ||
+            "Wood-pressed Cooking Oil",
+          quantity: items.reduce((acc: number, i: any) => acc + (Number(i?.quantity) || 1), 0),
         }),
       });
 
@@ -6892,21 +7491,15 @@ export const AdminPage: React.FC = () => {
           orderStatus: "Dispatched",
         });
         showToast(`Delhivery Shipment Manifested! AWB: #${data.waybill}`);
-      } else if (data.fallbackWaybill) {
-        setFallbackAwb((p) => ({ ...p, [order.orderRef]: data.fallbackWaybill }));
-        setManifestError((p) => ({
-          ...p,
-          [order.orderRef]:
-            data.insufficientBalanceHelp || data.message || "Delhivery wallet recharge needed",
-        }));
-        showToast("Delhivery wallet needs recharge at one.delhivery.com. Fallback AWB ready!");
       } else {
+        const errMsg =
+          data.message ||
+          "Failed to generate waybill. Please verify pickup facility name or Delhivery balance.";
         setManifestError((p) => ({
           ...p,
-          [order.orderRef]:
-            data.insufficientBalanceHelp || data.message || "Failed to create shipment manifest",
+          [order.orderRef]: errMsg,
         }));
-        showToast("Delhivery shipment booking notice");
+        showToast(`Manifest Error: ${errMsg}`);
       }
     } catch {
       setManifestError((p) => ({
@@ -6917,15 +7510,6 @@ export const AdminPage: React.FC = () => {
     } finally {
       setManifesting((p) => ({ ...p, [order.orderRef]: false }));
     }
-  };
-
-  const handleApplyFallbackAwb = async (orderRef: string, awb: string) => {
-    await updateOrderDetails(orderRef, {
-      trackingNumber: awb,
-      courier: "Delhivery Express",
-      orderStatus: "Dispatched",
-    });
-    showToast(`Assigned Delhivery AWB: #${awb}`);
   };
 
   const handleSaveCustomAwb = async (orderRef: string) => {
@@ -6943,15 +7527,43 @@ export const AdminPage: React.FC = () => {
     showToast(`Saved Delhivery AWB #${awb}`);
   };
 
-  const handleCopyPorter = (order: Order) => {
-    const text = `Customer: ${order.shippingAddress.fullName || "Customer"}
-Phone: ${order.shippingAddress.phone}
-Address: ${order.shippingAddress.addressLine1}${
-      order.shippingAddress.landmark ? `, Near ${order.shippingAddress.landmark}` : ""
-    }, ${order.shippingAddress.district || order.shippingAddress.city} - ${
-      order.shippingAddress.pincode
+  const handleStatusChange = async (ord: Order, newStatus: OrderStatus) => {
+    if (newStatus === "Cancelled" && ord.trackingNumber && !ord.trackingNumber.startsWith("MV-BLR")) {
+      try {
+        showToast("Notifying Delhivery of order cancellation...");
+        const res = await fetch("/api?action=delhivery_cancel_order", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ waybill: ord.trackingNumber }),
+        });
+        const data = await res.json();
+        if (data.status === "SUCCESS") {
+          showToast("Delhivery shipment cancelled & wallet credited!");
+        } else {
+          showToast(`Delhivery notice: ${data.message || "Failed to cancel on carrier"}`);
+        }
+      } catch (e) {
+        console.warn("Delhivery cancellation sync notice:", e);
+      }
     }
-Items: ${order.items.map((i) => `${i.title} (${i.variant}) x${i.quantity}`).join(", ")}
+
+    await updateOrderStatus(ord.id || ord.orderRef, newStatus);
+  };
+
+  const handleCopyPorter = (order: Order) => {
+    const addr = (order?.shippingAddress || {}) as any;
+    const rawItems = order?.items;
+    const items: any[] = Array.isArray(rawItems)
+      ? rawItems
+      : rawItems && typeof rawItems === "object"
+        ? Object.values(rawItems)
+        : [];
+
+    const text = `Customer: ${addr.fullName || "Customer"}
+Phone: ${addr.phone || "N/A"}
+Address: ${addr.addressLine1 || ""}${addr.landmark ? `, Near ${addr.landmark}` : ""
+      }, ${addr.district || addr.city || "Bengaluru"} - ${addr.pincode || ""}
+Items: ${items.map((i: any) => `${i.title} (${i.variant}) x${i.quantity}`).join(", ")}
 Order Ref: #${order.orderRef}
 Total: â‚¹${order.total} (${order.paymentMethod?.toUpperCase()})`;
 
@@ -6963,77 +7575,52 @@ Total: â‚¹${order.total} (${order.paymentMethod?.toUpperCase()})`;
     }, 2500);
   };
 
-  // Delhivery Logistics Diagnostic State
-  const [pingingApi, setPingingApi] = useState(false);
-  const [pingResult, setPingResult] = useState<{
-    status: string;
-    authenticated: boolean;
-    tokenMasked: string;
-    warehouse: string;
-    originPincode: string;
-    sampleWaybill?: string;
-    latencyMs?: number;
-    message?: string;
-  } | null>(null);
+  const displayOrders =
+    (adminOrders && adminOrders.length > 0 ? adminOrders : orders) || [];
 
-  const handlePingDelhivery = async () => {
-    setPingingApi(true);
-    try {
-      const res = await fetch("/api?action=delhivery_test_connection");
-      const data = await res.json();
-      setPingResult(data);
-      if (data.status === "SUCCESS") {
-        showToast(`Delhivery API connected! Latency: ${data.latencyMs}ms`);
-      } else {
-        showToast(data.message || "Delhivery connection check failed");
-      }
-    } catch {
-      showToast("Error connecting to Delhivery API");
-    } finally {
-      setPingingApi(false);
-    }
-  };
-
-  // -------------------------------------------------------------
-  // PIN Verification Gate: Prompt only if not authenticated
-  // -------------------------------------------------------------
   if (!isAdminAuthenticated) {
     return (
       <div
-        className={`w-full min-h-[calc(100vh-80px)] py-20 flex items-center justify-center transition-colors px-4 box-border ${
-          isDark ? "bg-[#140D09] text-[#FAF4EA]" : "bg-[#FAF7F2] text-[#24140A]"
-        }`}
+        className={`w-full min-h-[calc(100vh-80px)] py-20 flex items-center justify-center transition-colors px-4 box-border ${isDark ? "bg-[#140D09] text-[#FAF4EA]" : "bg-[#FAF7F2] text-[#24140A]"
+          }`}
       >
         <div className="w-full max-w-md mx-auto text-center">
           <div
-            className={`p-8 rounded-3xl border shadow-xl space-y-6 ${
-              isDark ? "bg-[#1C120B] border-[#362114]" : "bg-white border-[#E8DEC8]"
-            }`}
+            className={`p-8 rounded-3xl border shadow-xl space-y-6 ${isDark
+              ? "bg-[#1C120B] border-[#362114]"
+              : "bg-white border-[#E8DEC8]"
+              }`}
           >
             <div
-              className={`w-16 h-16 mx-auto rounded-full border flex items-center justify-center ${
-                isDark ? "bg-[#150D07] border-[#362114]" : "bg-[#FAF6EE] border-[#DDD1BE]"
-              }`}
+              className={`w-16 h-16 mx-auto rounded-full border flex items-center justify-center ${isDark
+                ? "bg-[#150D07] border-[#362114]"
+                : "bg-[#FAF6EE] border-[#DDD1BE]"
+                }`}
             >
               <Lock className="w-8 h-8 text-[#E08F35]" />
             </div>
 
             <div className="space-y-1">
               <h1
-                className={`text-xl font-bold font-serif ${
-                  isDark ? "text-[#FAF4EA]" : "text-[#1F120A]"
-                }`}
+                className={`text-xl font-bold font-serif ${isDark ? "text-[#FAF4EA]" : "text-[#1F120A]"
+                  }`}
               >
                 MANOPAVANA Administrator Gate
               </h1>
-              <p className={`text-xs ${isDark ? "text-[#D8C8B8]" : "text-[#5C4230]"}`}>
+              <p
+                className={`text-xs ${isDark ? "text-[#D8C8B8]" : "text-[#5C4230]"
+                  }`}
+              >
                 {currentUser?.email ? (
                   <>
-                    Logged in as <span className="font-semibold text-amber-500">{currentUser.email}</span>.
-                    Enter your administrator PIN to unlock the live CMS and dispatch hub.
+                    Logged in as{" "}
+                    <span className="font-semibold text-amber-500">
+                      {currentUser.email}
+                    </span>
+                    . Enter PIN to unlock live CMS & dispatch hub.
                   </>
                 ) : (
-                  <>Enter Security PIN to unlock live store management.</>
+                  <>Enter Master Security PIN to unlock store management.</>
                 )}
               </p>
             </div>
@@ -7049,66 +7636,66 @@ Total: â‚¹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                     setPinInput(e.target.value);
                     setPinError(false);
                   }}
-                  className={`w-full text-center tracking-widest text-lg font-mono font-bold px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#E08F35]/40 transition-colors ${
-                    isDark
-                      ? "bg-[#150D07] border border-[#362114] text-[#FAF4EA] placeholder-[#8A7665]"
-                      : "bg-[#FAF7F2] border border-[#DDD1BE] text-[#1F120A] placeholder-[#8A7665]"
-                  }`}
+                  className={`w-full text-center tracking-widest text-lg font-mono font-bold px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#E08F35]/40 transition-colors ${isDark
+                    ? "bg-[#150D07] border border-[#362114] text-[#FAF4EA] placeholder-[#8A7665]"
+                    : "bg-[#FAF7F2] border border-[#DDD1BE] text-[#1F120A] placeholder-[#8A7665]"
+                    }`}
                 />
                 {pinError && (
                   <p className="text-xs text-red-500 font-semibold mt-1.5">
-                    Invalid PIN. Please enter your administrator PIN.
+                    Invalid PIN. Please enter your secret admin PIN.
                   </p>
                 )}
               </div>
 
               <button
                 type="submit"
-                disabled={isVerifyingPin || !pinInput.trim()}
-                className="w-full py-3 rounded-xl bg-[#5E3210] hover:bg-[#43230A] disabled:opacity-50 text-white font-bold text-xs shadow-md transition-all cursor-pointer"
+                className="w-full py-3 rounded-xl bg-[#5E3210] hover:bg-[#43230A] text-white font-bold text-xs shadow-md transition-all cursor-pointer"
               >
-                {isVerifyingPin ? "Verifying Access..." : "Unlock Administration Portal"}
+                Unlock Administration Portal
               </button>
 
               <button
                 type="button"
                 onClick={() => setShowCloudflareGuide(true)}
-                className={`w-full py-2 rounded-xl text-[11px] font-semibold border flex items-center justify-center gap-1.5 transition-colors cursor-pointer ${
-                  isDark
-                    ? "bg-transparent border-[#362114] text-[#D8C8B8] hover:bg-[#1C120B]"
-                    : "bg-transparent border-[#DDD1BE] text-[#5C4230] hover:bg-[#FAF6EE]"
-                }`}
+                className={`w-full py-2 rounded-xl text-[11px] font-semibold border flex items-center justify-center gap-1.5 transition-colors cursor-pointer ${isDark
+                  ? "bg-transparent border-[#362114] text-[#D8C8B8] hover:bg-[#1C120B]"
+                  : "bg-transparent border-[#DDD1BE] text-[#5C4230] hover:bg-[#FAF6EE]"
+                  }`}
               >
                 <Key className="w-3.5 h-3.5 text-[#E08F35]" />
-                <span>How to configure PIN encrypted in Cloudflare</span>
+                <span>How to store PIN encrypted in Cloudflare</span>
               </button>
             </form>
 
-            <p className={`text-[11px] ${isDark ? "text-[#A89482]" : "text-[#7A5E48]"}`}>
+            <p
+              className={`text-[11px] ${isDark ? "text-[#A89482]" : "text-[#7A5E48]"
+                }`}
+            >
               Authorized Facility: Peenya 2nd Stage, Bangalore â€¢ Edge Verified
             </p>
           </div>
         </div>
 
-        {/* Cloudflare Guide Modal inside Gate */}
         {showCloudflareGuide && (
           <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4">
             <div
-              className={`w-full max-w-xl rounded-3xl p-6 sm:p-8 space-y-5 text-left border shadow-2xl overflow-y-auto max-h-[90vh] ${
-                isDark
-                  ? "bg-[#1C120B] text-[#FAF4EA] border-[#362114]"
-                  : "bg-white text-[#1F120A] border-[#DDD1BE]"
-              }`}
+              className={`w-full max-w-xl rounded-3xl p-6 sm:p-8 space-y-5 text-left border shadow-2xl overflow-y-auto max-h-[90vh] ${isDark
+                ? "bg-[#1C120B] text-[#FAF4EA] border-[#362114]"
+                : "bg-white text-[#1F120A] border-[#DDD1BE]"
+                }`}
             >
               <div className="flex items-center justify-between border-b pb-3 border-stone-200 dark:border-stone-800">
                 <div className="flex items-center gap-2">
                   <Key className="w-5 h-5 text-[#E08F35]" />
-                  <h3 className="font-bold font-serif text-base">Cloudflare Encrypted PIN Setup Guide</h3>
+                  <h3 className="font-bold font-serif text-base">
+                    Cloudflare Encrypted PIN Setup Guide
+                  </h3>
                 </div>
                 <button
                   type="button"
                   onClick={() => setShowCloudflareGuide(false)}
-                  className="px-2.5 py-1 rounded-lg bg-stone-200 dark:bg-stone-800 text-xs font-bold cursor-pointer"
+                  className="px-2.5 py-1 rounded-lg bg-stone-200 dark:bg-stone-800 text-xs font-bold"
                 >
                   âœ• Close
                 </button>
@@ -7116,35 +7703,44 @@ Total: â‚¹${order.total} (${order.paymentMethod?.toUpperCase()})`;
 
               <div className="space-y-3 text-xs leading-relaxed text-stone-700 dark:text-stone-300">
                 <p>
-                  To secure your master PIN on Cloudflare without placing it in client code, set it as an
-                  <strong> Encrypted Environment Variable</strong> inside your Cloudflare Pages Dashboard:
+                  To secure your master PIN on Cloudflare without placing it in
+                  client code, set it as an{" "}
+                  <strong>Encrypted Environment Variable</strong> inside your
+                  Cloudflare Pages Dashboard:
                 </p>
                 <ol className="list-decimal list-inside space-y-2 pl-1">
                   <li>
-                    Log in to <strong>dash.cloudflare.com</strong> and open <strong>Workers & Pages</strong>.
+                    Log in to <strong>dash.cloudflare.com</strong> and open{" "}
+                    <strong>Workers & Pages</strong>.
                   </li>
                   <li>
                     Select your <strong>manopavana</strong> project.
                   </li>
                   <li>
-                    Go to <strong>Settings</strong> âž” <strong>Environment variables</strong>.
+                    Go to <strong>Settings</strong> âž”{" "}
+                    <strong>Environment variables</strong>.
                   </li>
                   <li>
                     Click <strong>Add variable</strong>:
                     <div className="p-3 my-1.5 rounded-xl bg-stone-100 dark:bg-black/40 font-mono text-[11px] border border-amber-500/30 space-y-1">
                       <div>
                         Variable Name:{" "}
-                        <strong className="text-amber-700 dark:text-amber-400">ADMIN_PIN</strong>
+                        <strong className="text-amber-700 dark:text-amber-400">
+                          ADMIN_PIN
+                        </strong>
                       </div>
                       <div>
                         Type: Select{" "}
-                        <strong className="text-emerald-700 dark:text-emerald-400">Encrypt</strong> (KMS
-                        Protected)
+                        <strong className="text-emerald-700 dark:text-emerald-400">
+                          Encrypt
+                        </strong>{" "}
+                        (Stores secret securely in Cloudflare KMS)
                       </div>
                     </div>
                   </li>
                   <li>
-                    Click <strong>Save and Deploy</strong>. The Edge API will verify it automatically on request.
+                    Click <strong>Save and Deploy</strong>. Cloudflare Pages edge
+                    functions will decrypt it safely during admin validation.
                   </li>
                 </ol>
               </div>
@@ -7152,7 +7748,7 @@ Total: â‚¹${order.total} (${order.paymentMethod?.toUpperCase()})`;
               <button
                 type="button"
                 onClick={() => setShowCloudflareGuide(false)}
-                className="w-full py-2.5 rounded-xl bg-[#5E3210] hover:bg-[#43230A] text-white font-bold text-xs shadow-md transition-colors cursor-pointer"
+                className="w-full py-2.5 rounded-xl bg-[#5E3210] hover:bg-[#43230A] text-white font-bold text-xs shadow-md transition-colors"
               >
                 Got it, Continue
               </button>
@@ -7163,17 +7759,13 @@ Total: â‚¹${order.total} (${order.paymentMethod?.toUpperCase()})`;
     );
   }
 
-  // -------------------------------------------------------------
-  // Full Master CMS Portal Interface
-  // -------------------------------------------------------------
   return (
     <div
-      className={`w-full min-h-[calc(100vh-80px)] py-8 transition-colors box-border ${
-        isDark ? "bg-[#140D09] text-[#FAF4EA]" : "bg-[#FAF7F2] text-[#24140A]"
-      }`}
+      className={`w-full min-h-[calc(100vh-80px)] py-8 transition-colors box-border ${isDark ? "bg-[#140D09] text-[#FAF4EA]" : "bg-[#FAF7F2] text-[#24140A]"
+        }`}
     >
       <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8 box-border">
-        {/* Admin Header */}
+        {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-[#3D2514] text-white p-6 rounded-3xl shadow-lg">
           <div className="flex items-center gap-4">
             <div className="p-3 rounded-2xl bg-[#E08F35]/20 text-[#E08F35]">
@@ -7182,7 +7774,7 @@ Total: â‚¹${order.total} (${order.paymentMethod?.toUpperCase()})`;
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="text-xl sm:text-2xl font-bold font-serif">
-                  MANOPAVANA Live Storefront CMS & Dispatch Hub
+                  MANOPAVANA Storefront CMS & Logistics Dispatch Hub
                 </h1>
                 <span className="hidden md:inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-[10px] font-bold border border-emerald-500/30">
                   <Sparkles className="w-3 h-3" />
@@ -7190,7 +7782,8 @@ Total: â‚¹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                 </span>
               </div>
               <p className="text-xs text-[#D6C4B0] mt-0.5">
-                Admin: {currentUser?.email || "Authorized"} â€¢ Facility: {facilityAddress}
+                Admin: {currentUser?.email || "Master PIN Authorized"} â€¢
+                Facility: {facilityAddress}
               </p>
             </div>
           </div>
@@ -7222,11 +7815,10 @@ Total: â‚¹${order.total} (${order.paymentMethod?.toUpperCase()})`;
           </div>
         </div>
 
-        {/* Delhivery Logistics Engine Status */}
+        {/* Delhivery Diagnostics */}
         <div
-          className={`rounded-3xl border p-6 shadow-sm space-y-5 transition-colors ${
-            isDark ? "bg-[#1A1009] border-[#3B2516]" : "bg-white border-[#E8DFC8]"
-          }`}
+          className={`rounded-3xl border p-6 shadow-sm space-y-5 transition-colors ${isDark ? "bg-[#1A1009] border-[#3B2516]" : "bg-white border-[#E8DFC8]"
+            }`}
         >
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b pb-4 border-stone-200 dark:border-stone-800">
             <div className="flex items-center gap-3">
@@ -7244,9 +7836,9 @@ Total: â‚¹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                   </span>
                 </div>
                 <p className="text-xs text-[#6A523E] dark:text-[#C4B29E]">
-                  Registered Warehouse:{" "}
+                  Registered Facilities:{" "}
                   <span className="font-semibold text-amber-700 dark:text-amber-400">
-                    MANOPAVANA_PEENYA (Bangalore 560058)
+                    MANOPAVANA B2C & MANOPAVANA_PEENYA (Bangalore 560058)
                   </span>
                 </p>
               </div>
@@ -7259,8 +7851,13 @@ Total: â‚¹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                 disabled={pingingApi}
                 className="px-3.5 py-2 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-[#5E3210] dark:text-amber-200 border border-amber-500/30 text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs"
               >
-                <Activity className={`w-3.5 h-3.5 text-[#E08F35] ${pingingApi ? "animate-spin" : ""}`} />
-                <span>{pingingApi ? "Testing Connection..." : "Ping Delhivery API"}</span>
+                <Activity
+                  className={`w-3.5 h-3.5 text-[#E08F35] ${pingingApi ? "animate-spin" : ""
+                    }`}
+                />
+                <span>
+                  {pingingApi ? "Testing Connection..." : "Ping Delhivery API"}
+                </span>
               </button>
 
               <a
@@ -7275,507 +7872,60 @@ Total: â‚¹${order.total} (${order.paymentMethod?.toUpperCase()})`;
             </div>
           </div>
 
-          {/* Live Ping Status */}
           {pingResult && (
             <div
-              className={`p-3.5 rounded-2xl border text-xs flex flex-wrap items-center justify-between gap-3 ${
-                pingResult.authenticated
-                  ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-800 dark:text-emerald-300"
-                  : "bg-red-500/10 border-red-500/30 text-red-800 dark:text-red-300"
-              }`}
+              className={`p-3.5 rounded-2xl border text-xs flex flex-wrap items-center justify-between gap-3 ${pingResult.authenticated
+                ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-800 dark:text-emerald-300"
+                : "bg-red-500/10 border-red-500/30 text-red-800 dark:text-red-300"
+                }`}
             >
               <div className="flex items-center gap-2">
                 <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600" />
                 <div>
-                  <span className="font-bold">Live API Status: {pingResult.message}</span>
+                  <span className="font-bold">
+                    Live API Status: {pingResult.message}
+                  </span>
                   <span className="block text-[11px] opacity-80 font-mono">
-                    Origin Hub: {pingResult.originPincode} â€¢ Registered Warehouse: {pingResult.warehouse} â€¢
-                    Latency: {pingResult.latencyMs}ms
+                    Origin Hub: {pingResult.originPincode} â€¢ Registered Facility:{" "}
+                    {pingResult.warehouse} â€¢ Latency: {pingResult.latencyMs}ms
                   </span>
                 </div>
               </div>
               {pingResult.sampleWaybill && (
                 <span className="px-2.5 py-1 rounded bg-white/60 dark:bg-black/40 font-mono text-[11px] font-bold border border-emerald-500/20">
-                  Waybill Reserved: #{pingResult.sampleWaybill}
+                  Waybill Sample: #{pingResult.sampleWaybill}
                 </span>
               )}
             </div>
           )}
         </div>
 
+        {/* Two-Column Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-          {/* Left Column: Storefront Copy, Branding, Facility Credentials & Catalog Pricing */}
+          {/* Left Column: CMS Panel */}
           <div className="lg:col-span-6 space-y-6">
-            <div
-              className={`rounded-2xl border p-6 shadow-2xs space-y-5 ${
-                isDark ? "bg-[#1C120B] border-[#362114]" : "bg-white border-[#E8DEC8]"
-              }`}
-            >
-              <div
-                className={`flex items-center justify-between border-b pb-3 ${
-                  isDark ? "border-[#2D1B10]" : "border-[#EFE8DC]"
-                }`}
-              >
-                <div className="flex items-center gap-2">
-                  <Settings className="w-4 h-4 text-[#E08F35]" />
-                  <h2
-                    className={`text-sm font-bold font-serif ${
-                      isDark ? "text-[#FAF4EA]" : "text-[#1F120A]"
-                    }`}
-                  >
-                    Global Branding, Copy & Pricing
-                  </h2>
-                </div>
-                <span
-                  className={`text-[10px] font-mono px-2 py-0.5 rounded border ${
-                    isDark
-                      ? "bg-[#150D07] border-[#362114] text-[#A89482]"
-                      : "bg-[#FAF6EE] border-[#E8DEC8] text-[#6A523E]"
-                  }`}
-                >
-                  settings/store_config
-                </span>
-              </div>
-
-              <form onSubmit={handleSaveStorefront} className="space-y-4 text-xs">
-                {/* Announcement Ticker */}
-                <div>
-                  <label
-                    className={`block font-semibold mb-1 ${
-                      isDark ? "text-[#FAF4EA]" : "text-[#4A3220]"
-                    }`}
-                  >
-                    Announcement Bar Ticker Text
-                  </label>
-                  <input
-                    type="text"
-                    value={ticker}
-                    onChange={(e) => setTicker(e.target.value)}
-                    className={`w-full px-3.5 py-2.5 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#E08F35]/40 transition-colors ${
-                      isDark
-                        ? "bg-[#150D07] border border-[#362114] text-[#FAF4EA]"
-                        : "bg-white border border-[#DDD1BE] text-[#1F120A]"
-                    }`}
-                  />
-                </div>
-
-                {/* Brand Tagline */}
-                <div>
-                  <label
-                    className={`block font-semibold mb-1 flex items-center gap-1.5 ${
-                      isDark ? "text-[#FAF4EA]" : "text-[#4A3220]"
-                    }`}
-                  >
-                    <Type className="w-3.5 h-3.5 text-[#E08F35]" />
-                    Brand Tagline (Under MANOPAVANA logo)
-                  </label>
-                  <input
-                    type="text"
-                    value={tagline}
-                    onChange={(e) => setTagline(e.target.value)}
-                    placeholder="Pure by nature, trusted for life"
-                    className={`w-full px-3.5 py-2.5 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#E08F35]/40 transition-colors ${
-                      isDark
-                        ? "bg-[#150D07] border border-[#362114] text-[#FAF4EA]"
-                        : "bg-white border border-[#DDD1BE] text-[#1F120A]"
-                    }`}
-                  />
-                </div>
-
-                {/* Logo URL */}
-                <div>
-                  <label
-                    className={`block font-semibold mb-1 flex items-center gap-1.5 ${
-                      isDark ? "text-[#FAF4EA]" : "text-[#4A3220]"
-                    }`}
-                  >
-                    <Image className="w-3.5 h-3.5 text-[#E08F35]" />
-                    Brand Logo Image URL
-                  </label>
-                  <input
-                    type="url"
-                    value={logoUrl}
-                    onChange={(e) => setLogoUrl(e.target.value)}
-                    placeholder="https://..."
-                    className={`w-full px-3.5 py-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#E08F35]/40 font-mono text-[11px] transition-colors ${
-                      isDark
-                        ? "bg-[#150D07] border border-[#362114] text-[#FAF4EA]"
-                        : "bg-white border border-[#DDD1BE] text-[#1F120A]"
-                    }`}
-                  />
-                </div>
-
-                {/* Background Video URL */}
-                <div>
-                  <label
-                    className={`block font-semibold mb-1 flex items-center gap-1.5 ${
-                      isDark ? "text-[#FAF4EA]" : "text-[#4A3220]"
-                    }`}
-                  >
-                    <Video className="w-3.5 h-3.5 text-[#E08F35]" />
-                    Background Chekku Video URL (Hero section)
-                  </label>
-                  <input
-                    type="url"
-                    value={videoUrl}
-                    onChange={(e) => setVideoUrl(e.target.value)}
-                    placeholder="https://..."
-                    className={`w-full px-3.5 py-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#E08F35]/40 font-mono text-[11px] transition-colors ${
-                      isDark
-                        ? "bg-[#150D07] border border-[#362114] text-[#FAF4EA]"
-                        : "bg-white border border-[#DDD1BE] text-[#1F120A]"
-                    }`}
-                  />
-                </div>
-
-                {/* Hero Headline */}
-                <div>
-                  <label
-                    className={`block font-semibold mb-1 ${
-                      isDark ? "text-[#FAF4EA]" : "text-[#4A3220]"
-                    }`}
-                  >
-                    Hero Headline
-                  </label>
-                  <input
-                    type="text"
-                    value={headline}
-                    onChange={(e) => setHeadline(e.target.value)}
-                    className={`w-full px-3.5 py-2.5 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#E08F35]/40 transition-colors ${
-                      isDark
-                        ? "bg-[#150D07] border border-[#362114] text-[#FAF4EA]"
-                        : "bg-white border border-[#DDD1BE] text-[#1F120A]"
-                    }`}
-                  />
-                </div>
-
-                {/* Hero Subhead */}
-                <div>
-                  <label
-                    className={`block font-semibold mb-1 ${
-                      isDark ? "text-[#FAF4EA]" : "text-[#4A3220]"
-                    }`}
-                  >
-                    Hero Subhead Paragraph
-                  </label>
-                  <textarea
-                    rows={3}
-                    value={subhead}
-                    onChange={(e) => setSubhead(e.target.value)}
-                    className={`w-full px-3.5 py-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#E08F35]/40 transition-colors ${
-                      isDark
-                        ? "bg-[#150D07] border border-[#362114] text-[#FAF4EA]"
-                        : "bg-white border border-[#DDD1BE] text-[#1F120A]"
-                    }`}
-                  />
-                </div>
-
-                {/* Shipping Controls */}
-                <div
-                  className={`grid grid-cols-2 gap-4 pt-2 border-t ${
-                    isDark ? "border-[#2D1B10]" : "border-[#EFE8DC]"
-                  }`}
-                >
-                  <div>
-                    <label
-                      className={`block font-semibold mb-1 ${
-                        isDark ? "text-[#FAF4EA]" : "text-[#4A3220]"
-                      }`}
-                    >
-                      Free Delivery Threshold (â‚¹)
-                    </label>
-                    <input
-                      type="number"
-                      value={threshold}
-                      onChange={(e) => setThreshold(Number(e.target.value))}
-                      className={`w-full px-3.5 py-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#E08F35]/40 transition-colors ${
-                        isDark
-                          ? "bg-[#150D07] border border-[#362114] text-[#FAF4EA]"
-                          : "bg-white border border-[#DDD1BE] text-[#1F120A]"
-                      }`}
-                    />
-                  </div>
-
-                  <div>
-                    <label
-                      className={`block font-semibold mb-1 ${
-                        isDark ? "text-[#FAF4EA]" : "text-[#4A3220]"
-                      }`}
-                    >
-                      Standard Delivery Fee (â‚¹)
-                    </label>
-                    <input
-                      type="number"
-                      value={stdFee}
-                      onChange={(e) => setStdFee(Number(e.target.value))}
-                      className={`w-full px-3.5 py-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#E08F35]/40 transition-colors ${
-                        isDark
-                          ? "bg-[#150D07] border border-[#362114] text-[#FAF4EA]"
-                          : "bg-white border border-[#DDD1BE] text-[#1F120A]"
-                      }`}
-                    />
-                  </div>
-                </div>
-
-                {/* Facility, Legal & Contact Credentials */}
-                <div
-                  className={`pt-3 border-t space-y-3 ${
-                    isDark ? "border-[#2D1B10]" : "border-[#EFE8DC]"
-                  }`}
-                >
-                  <div className="flex items-center gap-1.5 font-bold">
-                    <FileText className="w-4 h-4 text-[#E08F35]" />
-                    <h3 className={isDark ? "text-[#FAF4EA]" : "text-[#1F120A]"}>
-                      Facility Address & Legal Credentials
-                    </h3>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                      <label className={`block font-semibold mb-1 ${isDark ? "text-[#D8C8B8]" : "text-[#5C4230]"}`}>
-                        Founder / Grievance Officer
-                      </label>
-                      <input
-                        type="text"
-                        value={founderName}
-                        onChange={(e) => setFounderName(e.target.value)}
-                        className={`w-full px-3 py-1.5 rounded-lg text-xs ${
-                          isDark
-                            ? "bg-[#150D07] border border-[#362114] text-[#FAF4EA]"
-                            : "bg-white border border-[#DDD1BE] text-[#1F120A]"
-                        }`}
-                      />
-                    </div>
-
-                    <div>
-                      <label className={`block font-semibold mb-1 ${isDark ? "text-[#D8C8B8]" : "text-[#5C4230]"}`}>
-                        Primary WhatsApp / Phone
-                      </label>
-                      <input
-                        type="text"
-                        value={primaryPhone}
-                        onChange={(e) => setPrimaryPhone(e.target.value)}
-                        className={`w-full px-3 py-1.5 rounded-lg text-xs ${
-                          isDark
-                            ? "bg-[#150D07] border border-[#362114] text-[#FAF4EA]"
-                            : "bg-white border border-[#DDD1BE] text-[#1F120A]"
-                        }`}
-                      />
-                    </div>
-
-                    <div>
-                      <label className={`block font-semibold mb-1 ${isDark ? "text-[#D8C8B8]" : "text-[#5C4230]"}`}>
-                        Support Email
-                      </label>
-                      <input
-                        type="email"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        className={`w-full px-3 py-1.5 rounded-lg text-xs ${
-                          isDark
-                            ? "bg-[#150D07] border border-[#362114] text-[#FAF4EA]"
-                            : "bg-white border border-[#DDD1BE] text-[#1F120A]"
-                        }`}
-                      />
-                    </div>
-
-                    <div>
-                      <label className={`block font-semibold mb-1 ${isDark ? "text-[#D8C8B8]" : "text-[#5C4230]"}`}>
-                        Alternate Phone
-                      </label>
-                      <input
-                        type="text"
-                        value={altPhone}
-                        onChange={(e) => setAltPhone(e.target.value)}
-                        className={`w-full px-3 py-1.5 rounded-lg text-xs ${
-                          isDark
-                            ? "bg-[#150D07] border border-[#362114] text-[#FAF4EA]"
-                            : "bg-white border border-[#DDD1BE] text-[#1F120A]"
-                        }`}
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className={`block font-semibold mb-1 ${isDark ? "text-[#D8C8B8]" : "text-[#5C4230]"}`}>
-                      Peenya Facility Address
-                    </label>
-                    <input
-                      type="text"
-                      value={facilityAddress}
-                      onChange={(e) => setFacilityAddress(e.target.value)}
-                      className={`w-full px-3 py-1.5 rounded-lg text-xs ${
-                        isDark
-                          ? "bg-[#150D07] border border-[#362114] text-[#FAF4EA]"
-                          : "bg-white border border-[#DDD1BE] text-[#1F120A]"
-                      }`}
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                      <label className={`block font-semibold mb-1 ${isDark ? "text-[#D8C8B8]" : "text-[#5C4230]"}`}>
-                        FSSAI License Reg.
-                      </label>
-                      <input
-                        type="text"
-                        value={fssaiLicense}
-                        onChange={(e) => setFssaiLicense(e.target.value)}
-                        className={`w-full px-3 py-1.5 rounded-lg text-xs font-mono ${
-                          isDark
-                            ? "bg-[#150D07] border border-[#362114] text-[#FAF4EA]"
-                            : "bg-white border border-[#DDD1BE] text-[#1F120A]"
-                        }`}
-                      />
-                    </div>
-
-                    <div>
-                      <label className={`block font-semibold mb-1 ${isDark ? "text-[#D8C8B8]" : "text-[#5C4230]"}`}>
-                        GSTIN Identification
-                      </label>
-                      <input
-                        type="text"
-                        value={gstin}
-                        onChange={(e) => setGstin(e.target.value)}
-                        className={`w-full px-3 py-1.5 rounded-lg text-xs font-mono ${
-                          isDark
-                            ? "bg-[#150D07] border border-[#362114] text-[#FAF4EA]"
-                            : "bg-white border border-[#DDD1BE] text-[#1F120A]"
-                        }`}
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className={`block font-semibold mb-1 ${isDark ? "text-[#D8C8B8]" : "text-[#5C4230]"}`}>
-                      Bengaluru Delivery Notice Banner
-                    </label>
-                    <input
-                      type="text"
-                      value={blrNotice}
-                      onChange={(e) => setBlrNotice(e.target.value)}
-                      className={`w-full px-3 py-1.5 rounded-lg text-xs ${
-                        isDark
-                          ? "bg-[#150D07] border border-[#362114] text-[#FAF4EA]"
-                          : "bg-white border border-[#DDD1BE] text-[#1F120A]"
-                      }`}
-                    />
-                  </div>
-                </div>
-
-                {/* Catalog Pricing & Live Stock Control */}
-                <div
-                  className={`pt-3 border-t space-y-3 ${
-                    isDark ? "border-[#2D1B10]" : "border-[#EFE8DC]"
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <h3
-                      className={`font-bold ${
-                        isDark ? "text-[#FAF4EA]" : "text-[#1F120A]"
-                      }`}
-                    >
-                      Catalog Pricing & Live Stock Control
-                    </h3>
-                    <span
-                      className={`text-[10px] ${
-                        isDark ? "text-[#A89482]" : "text-[#7A5E48]"
-                      }`}
-                    >
-                      Click badge to toggle stock
-                    </span>
-                  </div>
-
-                  <div className="space-y-2">
-                    {[
-                      { key: "groundnut1L", name: "Groundnut Oil 1L", priceKey: "groundnut1L" },
-                      { key: "groundnut500ml", name: "Groundnut Oil 500ml", priceKey: "groundnut500ml" },
-                      { key: "coconut1L", name: "Coconut Oil 1L", priceKey: "coconut1L" },
-                      { key: "coconut500ml", name: "Coconut Oil 500ml", priceKey: "coconut500ml" },
-                      { key: "sesame1L", name: "Sesame Oil 1L", priceKey: "sesame1L" },
-                      { key: "sesame500ml", name: "Sesame Oil 500ml", priceKey: "sesame500ml" },
-                      { key: "combo3L", name: "3L Trio Essential Box", priceKey: "combo3L" },
-                      { key: "combo1_5L", name: "1.5L Trio Starter Box", priceKey: "combo1_5L" },
-                    ].map((item) => (
-                      <div
-                        key={item.key}
-                        className={`p-2.5 rounded-xl border flex items-center justify-between gap-3 ${
-                          isDark
-                            ? "bg-[#150D07] border-[#362114]"
-                            : "bg-[#FAF6EE] border-[#E5DAC8]"
-                        }`}
-                      >
-                        <span
-                          className={`font-semibold ${
-                            isDark ? "text-[#FAF4EA]" : "text-[#1F120A]"
-                          }`}
-                        >
-                          {item.name}
-                        </span>
-                        <div className="flex items-center gap-2">
-                          <span className={isDark ? "text-[#A89482]" : "text-[#7A5E48]"}>
-                            â‚¹
-                          </span>
-                          <input
-                            type="number"
-                            value={(prices as any)?.[item.priceKey] ?? 0}
-                            onChange={(e) =>
-                              setPrices({ ...prices, [item.priceKey]: Number(e.target.value) })
-                            }
-                            className={`w-20 px-2 py-1 rounded-lg text-right font-bold ${
-                              isDark
-                                ? "bg-[#1C120B] border border-[#3A2417] text-[#E08F35]"
-                                : "bg-white border border-[#DDD1BE] text-[#5E3210]"
-                            }`}
-                          />
-                          <button
-                            type="button"
-                            onClick={() => handleToggleStock(item.key as keyof typeof stock)}
-                            className={`px-3 py-1 rounded-lg text-[10px] font-bold cursor-pointer transition-colors shadow-2xs ${
-                              Boolean((stock as any)?.[item.key] ?? true)
-                                ? "bg-emerald-600 hover:bg-emerald-700 text-white"
-                                : "bg-red-600 hover:bg-red-700 text-white"
-                            }`}
-                          >
-                            {Boolean((stock as any)?.[item.key] ?? true) ? "In Stock" : "Sold Out"}
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <button
-                  type="submit"
-                  className="w-full py-3.5 rounded-xl bg-[#5E3210] hover:bg-[#43230A] text-white font-bold text-xs shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
-                >
-                  <Save className="w-4 h-4 text-amber-300" />
-                  <span>Save Live CMS Changes (Propagate Everywhere)</span>
-                </button>
-              </form>
-            </div>
+            <StorefrontCMSPanel isDark={isDark} />
           </div>
 
-          {/* Right Column: Live Orders Queue & Fulfillment Dispatch */}
+          {/* Right Column: Live Incoming Orders Queue */}
           <div className="lg:col-span-6 space-y-4">
             <div
-              className={`rounded-2xl border p-6 shadow-2xs space-y-4 ${
-                isDark ? "bg-[#1C120B] border-[#362114]" : "bg-white border-[#E8DEC8]"
-              }`}
+              className={`rounded-2xl border p-6 shadow-2xs space-y-4 ${isDark
+                ? "bg-[#1C120B] border-[#362114]"
+                : "bg-white border-[#E8DEC8]"
+                }`}
             >
               <div
-                className={`flex items-center justify-between border-b pb-3 ${
-                  isDark ? "border-[#2D1B10]" : "border-[#EFE8DC]"
-                }`}
+                className={`flex items-center justify-between border-b pb-3 ${isDark ? "border-[#2D1B10]" : "border-[#EFE8DC]"
+                  }`}
               >
                 <div className="flex items-center gap-2">
                   <Truck className="w-4 h-4 text-[#E08F35]" />
                   <h2
-                    className={`text-sm font-bold font-serif ${
-                      isDark ? "text-[#FAF4EA]" : "text-[#1F120A]"
-                    }`}
+                    className={`text-sm font-bold font-serif ${isDark ? "text-[#FAF4EA]" : "text-[#1F120A]"
+                      }`}
                   >
-                    Live Orders & Delivery Dispatch Queue ({adminOrders.length || orders.length})
+                    Live Orders & Delivery Dispatch Queue ({displayOrders.length})
                   </h2>
                 </div>
                 <span className="text-[11px] text-emerald-700 font-bold bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200 flex items-center gap-1">
@@ -7784,119 +7934,130 @@ Total: â‚¹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                 </span>
               </div>
 
-              {adminOrders.length === 0 && orders.length === 0 ? (
+              {displayOrders.length === 0 ? (
                 <div
-                  className={`p-8 text-center space-y-2 ${
-                    isDark ? "text-[#A89482]" : "text-[#6A523E]"
-                  }`}
+                  className={`p-8 text-center space-y-2 ${isDark ? "text-[#A89482]" : "text-[#6A523E]"
+                    }`}
                 >
                   <Package className="w-8 h-8 mx-auto text-[#DDD1BE]" />
-                  <p className="text-xs font-semibold">No customer orders placed yet</p>
+                  <p className="text-xs font-semibold">
+                    No customer orders placed yet
+                  </p>
                   <p className="text-[11px] opacity-80">
-                    New orders will automatically appear here in real time as customers complete checkout.
+                    New orders will automatically appear here in real time as
+                    customers complete checkout.
                   </p>
                 </div>
               ) : (
                 <div className="space-y-4 max-h-[750px] overflow-y-auto pr-1">
-                  {(adminOrders.length > 0 ? adminOrders : orders).map((ord) => {                    
-  const addr = ord.shippingAddress || ({} as any);
-  const items = Array.isArray(ord.items) ? ord.items : [];
+                  {displayOrders.map((ord) => {
+                    const addr = (ord?.shippingAddress || {}) as any;
+                    const rawItems = ord?.items;
+                    const items: any[] = Array.isArray(rawItems)
+                      ? rawItems
+                      : rawItems && typeof rawItems === "object"
+                        ? Object.values(rawItems)
+                        : [];
 
-  const mapsQuery = addr.lat && addr.lng
-    ? `${addr.lat},${addr.lng}`
-    : encodeURIComponent(
-        `${addr.addressLine1 || ""}, ${
-          addr.district || addr.city || "Bengaluru"
-        } ${addr.pincode || ""}`
-      );
-  const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${mapsQuery}`;
+                    const mapsQuery =
+                      addr.lat && addr.lng
+                        ? `${addr.lat},${addr.lng}`
+                        : encodeURIComponent(
+                          `${addr.addressLine1 || ""}, ${addr.district || addr.city || "Bengaluru"
+                          } ${addr.pincode || ""}`
+                        );
+                    const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${mapsQuery}`;
 
-  const cleanPhone = (addr.phone || "").replace(/\D/g, "").slice(-10);
+                    const cleanPhone = (addr.phone || "")
+                      .replace(/\D/g, "")
+                      .slice(-10);
                     const waText = encodeURIComponent(
-                      `Hi ${addr.fullName || "Customer"}, your MANOPAVANA order #${
-                        ord.orderRef
-                      } is currently: ${ord.orderStatus}. Tracking: ${window.location.origin}/account?order=${
-                        ord.orderRef
-                      }`
+                      `Hi ${addr.fullName || "Customer"
+                      }, your MANOPAVANA order #${ord.orderRef
+                      } is currently: ${ord.orderStatus}. Tracking: ${window.location.origin
+                      }/account?order=${ord.orderRef}`
                     );
                     const waUrl = `https://wa.me/91${cleanPhone}?text=${waText}`;
 
-                    const isLocal = Boolean(
-                      ord.shippingAddress?.isBangalore ||
-                        (ord.shippingAddress?.pincode && ord.shippingAddress.pincode.startsWith("560")) ||
-                        ord.shippingAddress?.city?.toLowerCase().includes("bangalore") ||
-                        ord.shippingAddress?.city?.toLowerCase().includes("bengaluru")
-                    );
+                    const isLocal = false;
 
                     return (
                       <div
                         key={ord.orderRef}
-                        className={`p-4 rounded-2xl border space-y-3 shadow-2xs ${
-                          isDark ? "bg-[#150D07] border-[#362114]" : "bg-[#FAF7F2] border-[#E8DEC8]"
-                        }`}
+                        className={`p-4 rounded-2xl border space-y-3 shadow-2xs ${isDark
+                          ? "bg-[#150D07] border-[#362114]"
+                          : "bg-[#FAF7F2] border-[#E8DEC8]"
+                          }`}
                       >
                         <div className="flex items-start justify-between gap-3 text-xs">
                           <div>
                             <div className="flex items-center gap-2">
                               <span
-                                className={`font-bold ${
-                                  isDark ? "text-[#FAF4EA]" : "text-[#1F120A]"
-                                }`}
+                                className={`font-bold ${isDark ? "text-[#FAF4EA]" : "text-[#1F120A]"
+                                  }`}
                               >
                                 #{ord.orderRef}
                               </span>
                               <span
-                                className={`text-[10px] font-bold px-2 py-0.5 rounded border ${
-                                  isDark
-                                    ? "bg-[#1C120B] border-[#3D2514] text-[#E08F35]"
-                                    : "bg-white border-[#DDD1BE] text-[#5E3210]"
-                                }`}
+                                className={`text-[10px] font-bold px-2 py-0.5 rounded border ${isDark
+                                  ? "bg-[#1C120B] border-[#3D2514] text-[#E08F35]"
+                                  : "bg-white border-[#DDD1BE] text-[#5E3210]"
+                                  }`}
                               >
                                 â‚¹{ord.total}
                               </span>
                               <span
-                                className={`text-[10px] ${
-                                  isDark ? "text-[#A89482]" : "text-[#7A5E48]"
-                                }`}
+                                className={`text-[10px] ${isDark ? "text-[#A89482]" : "text-[#7A5E48]"
+                                  }`}
                               >
                                 {ord.paymentMethod?.toUpperCase()}
                               </span>
                             </div>
                             <p
-                              className={`text-[11px] mt-0.5 ${
-                                isDark ? "text-[#D8C8B8]" : "text-[#6A523E]"
-                              }`}
+                              className={`text-[11px] mt-0.5 ${isDark ? "text-[#D8C8B8]" : "text-[#6A523E]"
+                                }`}
                             >
-                              {addr.fullName || "Customer"} â€¢ {ord.shippingAddress.phone}
+                              {addr.fullName || "Customer"} â€¢{" "}
+                              {addr.phone || "No phone"}
                             </p>
                           </div>
 
-                          {/* Order Status Selector */}
+                          {/* Status Selector */}
                           <div className="flex items-center gap-1.5">
                             <select
                               value={ord.orderStatus}
                               onChange={(e) =>
-                                updateOrderStatus(ord.id, e.target.value as OrderStatus)
+                                updateOrderStatus(
+                                  ord.id || ord.orderRef,
+                                  e.target.value as OrderStatus
+                                )
                               }
-                              className={`px-2.5 py-1 rounded-lg text-xs font-bold focus:ring-1 focus:ring-[#E08F35] ${
-                                isDark
-                                  ? "bg-[#1C120B] border border-[#3D2514] text-amber-200"
-                                  : "bg-white border border-[#DDD1BE] text-[#5E3210]"
-                              }`}
+                              className={`px-2.5 py-1 rounded-lg text-xs font-bold focus:ring-1 focus:ring-[#E08F35] ${isDark
+                                ? "bg-[#1C120B] border border-[#3D2514] text-amber-200"
+                                : "bg-white border border-[#DDD1BE] text-[#5E3210]"
+                                }`}
                             >
                               <option value="Placed">Placed</option>
-                              <option value="Payment Incomplete">Payment Incomplete</option>
+                              <option value="Payment Incomplete">
+                                Payment Incomplete
+                              </option>
                               <option value="Packed">Packed</option>
                               <option value="Dispatched">Dispatched</option>
                               <option value="Delivered">Delivered</option>
                               <option value="Cancelled">Cancelled</option>
-                              <option value="Failed (Expired)">Failed (Expired)</option>
+                              <option value="Failed (Expired)">
+                                Failed (Expired)
+                              </option>
                             </select>
 
                             <button
                               type="button"
                               onClick={() => {
-                                if (window.confirm(`Delete order #${ord.orderRef}?`)) {
+                                if (
+                                  window.confirm(
+                                    `Delete order #${ord.orderRef}?`
+                                  )
+                                ) {
                                   deleteOrder(ord.orderRef);
                                 }
                               }}
@@ -7908,43 +8069,40 @@ Total: â‚¹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                           </div>
                         </div>
 
-                        {/* Ordered Items Summary */}
+                        {/* Items Summary */}
                         <div
-                          className={`text-[11px] p-2.5 rounded-xl border space-y-1 ${
-                            isDark
-                              ? "bg-[#1C120B] border-[#362114] text-[#D8C8B8]"
-                              : "bg-white border-[#EFE8DC] text-[#4A3220]"
-                          }`}
+                          className={`text-[11px] p-2.5 rounded-xl border space-y-1 ${isDark
+                            ? "bg-[#1C120B] border-[#362114] text-[#D8C8B8]"
+                            : "bg-white border-[#EFE8DC] text-[#4A3220]"
+                            }`}
                         >
                           <span
-                            className={`font-semibold block ${
-                              isDark ? "text-[#FAF4EA]" : "text-[#1F120A]"
-                            }`}
+                            className={`font-semibold block ${isDark ? "text-[#FAF4EA]" : "text-[#1F120A]"
+                              }`}
                           >
-                            Ordered Items ({ord.items.length}):
+                            Ordered Items ({items.length}):
                           </span>
                           <ul className="list-disc list-inside space-y-0.5">
-                            {ord.items.map((it, idx) => (
+                            {items.map((it: any, idx: number) => (
                               <li key={idx}>
-                                {it.title} ({it.variant}) Ã— {it.quantity} â€” â‚¹{it.price * it.quantity}
+                                {it.title} ({it.variant}) Ã— {it.quantity} â€” â‚¹
+                                {it.price * it.quantity}
                               </li>
                             ))}
                           </ul>
                         </div>
 
-                        {/* Delivery Address */}
+                        {/* Drop Address */}
                         <div
-                          className={`text-[11px] p-2.5 rounded-xl border space-y-1 ${
-                            isDark
-                              ? "bg-[#1C120B] border-[#362114] text-[#D8C8B8]"
-                              : "bg-white border-[#EFE8DC] text-[#4A3220]"
-                          }`}
+                          className={`text-[11px] p-2.5 rounded-xl border space-y-1 ${isDark
+                            ? "bg-[#1C120B] border-[#362114] text-[#D8C8B8]"
+                            : "bg-white border-[#EFE8DC] text-[#4A3220]"
+                            }`}
                         >
                           <div className="flex items-center justify-between gap-2">
                             <span
-                              className={`font-semibold block ${
-                                isDark ? "text-[#FAF4EA]" : "text-[#1F120A]"
-                              }`}
+                              className={`font-semibold block ${isDark ? "text-[#FAF4EA]" : "text-[#1F120A]"
+                                }`}
                             >
                               Delivery Drop Address:
                             </span>
@@ -7961,26 +8119,33 @@ Total: â‚¹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                             )}
                           </div>
                           <p>
-  {addr.addressLine1 || "No street address provided"}
-  {addr.landmark ? `, Near ${addr.landmark}` : ""}, {addr.district || addr.city || "Bengaluru"} - {addr.pincode || ""}
-</p>
+                            {addr.addressLine1 || "No street address provided"}
+                            {addr.landmark ? `, Near ${addr.landmark}` : ""},
+                            {addr.district || addr.city || "Bengaluru"} -{" "}
+                            {addr.pincode || ""}
+                          </p>
                         </div>
 
-                        {/* Bengaluru Local vs Outside Delhivery Dispatch Block */}
+                        {/* Logistics Actions */}
                         {isLocal ? (
                           <div
-                            className={`p-3.5 rounded-xl border space-y-3 text-xs ${
-                              isDark ? "bg-[#191009] border-[#3D2514]" : "bg-[#FDF9F2] border-[#E8DEC8]"
-                            }`}
+                            className={`p-3.5 rounded-xl border space-y-3 text-xs ${isDark
+                              ? "bg-[#191009] border-[#3D2514]"
+                              : "bg-[#FDF9F2] border-[#E8DEC8]"
+                              }`}
                           >
                             <div className="flex flex-wrap items-center justify-between gap-2">
                               <div className="flex items-center gap-1.5 font-bold">
                                 <MapPin className="w-3.5 h-3.5 text-amber-500" />
-                                <span className={isDark ? "text-[#FAF4EA]" : "text-[#1F120A]"}>
+                                <span
+                                  className={
+                                    isDark ? "text-[#FAF4EA]" : "text-[#1F120A]"
+                                  }
+                                >
                                   Bengaluru Direct Delivery (Peenya Hub)
                                 </span>
                                 <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-600 border border-amber-500/20">
-                                  Manual Tracking
+                                  Manual Tracking Mode
                                 </span>
                               </div>
                               <span className="text-[11px] text-stone-500">
@@ -7991,36 +8156,36 @@ Total: â‚¹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-1">
                               <div>
                                 <label
-                                  className={`block text-[11px] font-bold mb-1 ${
-                                    isDark ? "text-[#D8C8B8]" : "text-[#5C4230]"
-                                  }`}
+                                  className={`block text-[11px] font-bold mb-1 ${isDark ? "text-[#D8C8B8]" : "text-[#5C4230]"
+                                    }`}
                                 >
                                   Delivery Partner / Rider
                                 </label>
                                 <input
                                   type="text"
-                                  placeholder="e.g. MANOPAVANA Peenya Direct"
+                                  placeholder="e.g. MANOPAVANA Peenya Direct / Borzo"
                                   value={
                                     blrCourier[ord.orderRef] !== undefined
                                       ? blrCourier[ord.orderRef]
                                       : ord.courier || ""
                                   }
                                   onChange={(e) =>
-                                    setBlrCourier((p) => ({ ...p, [ord.orderRef]: e.target.value }))
+                                    setBlrCourier((p) => ({
+                                      ...p,
+                                      [ord.orderRef]: e.target.value,
+                                    }))
                                   }
-                                  className={`w-full px-2.5 py-1.5 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-[#E08F35] ${
-                                    isDark
-                                      ? "bg-[#140D07] border border-[#362114] text-[#FAF4EA]"
-                                      : "bg-white border border-[#DDD1BE] text-[#1F120A]"
-                                  }`}
+                                  className={`w-full px-2.5 py-1.5 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-[#E08F35] ${isDark
+                                    ? "bg-[#140D07] border border-[#362114] text-[#FAF4EA]"
+                                    : "bg-white border border-[#DDD1BE] text-[#1F120A]"
+                                    }`}
                                 />
                               </div>
 
                               <div>
                                 <label
-                                  className={`block text-[11px] font-bold mb-1 ${
-                                    isDark ? "text-[#D8C8B8]" : "text-[#5C4230]"
-                                  }`}
+                                  className={`block text-[11px] font-bold mb-1 ${isDark ? "text-[#D8C8B8]" : "text-[#5C4230]"
+                                    }`}
                                 >
                                   Rider Contact / Notes
                                 </label>
@@ -8033,23 +8198,24 @@ Total: â‚¹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                                       : ord.notes || ""
                                   }
                                   onChange={(e) =>
-                                    setBlrNotes((p) => ({ ...p, [ord.orderRef]: e.target.value }))
+                                    setBlrNotes((p) => ({
+                                      ...p,
+                                      [ord.orderRef]: e.target.value,
+                                    }))
                                   }
-                                  className={`w-full px-2.5 py-1.5 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-[#E08F35] ${
-                                    isDark
-                                      ? "bg-[#140D07] border border-[#362114] text-[#FAF4EA]"
-                                      : "bg-white border border-[#DDD1BE] text-[#1F120A]"
-                                  }`}
+                                  className={`w-full px-2.5 py-1.5 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-[#E08F35] ${isDark
+                                    ? "bg-[#140D07] border border-[#362114] text-[#FAF4EA]"
+                                    : "bg-white border border-[#DDD1BE] text-[#1F120A]"
+                                    }`}
                                 />
                               </div>
 
                               <div>
                                 <label
-                                  className={`block text-[11px] font-bold mb-1 ${
-                                    isDark ? "text-[#D8C8B8]" : "text-[#5C4230]"
-                                  }`}
+                                  className={`block text-[11px] font-bold mb-1 ${isDark ? "text-[#D8C8B8]" : "text-[#5C4230]"
+                                    }`}
                                 >
-                                  Tracking Number
+                                  Tracking / Waybill Number
                                 </label>
                                 <input
                                   type="text"
@@ -8060,37 +8226,38 @@ Total: â‚¹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                                       : ord.trackingNumber || ""
                                   }
                                   onChange={(e) =>
-                                    setBlrTracking((p) => ({ ...p, [ord.orderRef]: e.target.value }))
+                                    setBlrTracking((p) => ({
+                                      ...p,
+                                      [ord.orderRef]: e.target.value,
+                                    }))
                                   }
-                                  className={`w-full px-2.5 py-1.5 rounded-lg text-xs font-mono focus:outline-none focus:ring-1 focus:ring-[#E08F35] ${
-                                    isDark
-                                      ? "bg-[#140D07] border border-[#362114] text-[#FAF4EA]"
-                                      : "bg-white border border-[#DDD1BE] text-[#1F120A]"
-                                  }`}
+                                  className={`w-full px-2.5 py-1.5 rounded-lg text-xs font-mono focus:outline-none focus:ring-1 focus:ring-[#E08F35] ${isDark
+                                    ? "bg-[#140D07] border border-[#362114] text-[#FAF4EA]"
+                                    : "bg-white border border-[#DDD1BE] text-[#1F120A]"
+                                    }`}
                                 />
                               </div>
 
                               <div>
                                 <label
-                                  className={`block text-[11px] font-bold mb-1 ${
-                                    isDark ? "text-[#D8C8B8]" : "text-[#5C4230]"
-                                  }`}
+                                  className={`block text-[11px] font-bold mb-1 ${isDark ? "text-[#D8C8B8]" : "text-[#5C4230]"
+                                    }`}
                                 >
                                   Fulfillment Status
                                 </label>
+
                                 <select
-                                  value={blrStatus[ord.orderRef] || ord.orderStatus || "Placed"}
-                                  onChange={(e) =>
-                                    setBlrStatus((p) => ({
-                                      ...p,
-                                      [ord.orderRef]: e.target.value as OrderStatus,
-                                    }))
+                                  value={ord.orderStatus}
+                                  onChange={(e) => {
+                                    updateOrderStatus(ord.id || ord.orderRef, e.target.value as OrderStatus)
+
+                                    handleStatusChange(ord, e.target.value as OrderStatus)
                                   }
-                                  className={`w-full px-2.5 py-1.5 rounded-lg text-xs font-bold focus:outline-none focus:ring-1 focus:ring-[#E08F35] ${
-                                    isDark
-                                      ? "bg-[#140D07] border border-[#362114] text-[#FAF4EA]"
-                                      : "bg-white border border-[#DDD1BE] text-[#1F120A]"
-                                  }`}
+                                  }
+                                  className={`px-2.5 py-1 rounded-lg text-xs font-bold focus:ring-1 focus:ring-[#E08F35] ${isDark
+                                      ? "bg-[#1C120B] border border-[#3D2514] text-amber-200"
+                                      : "bg-white border border-[#DDD1BE] text-[#5E3210]"
+                                    }`}
                                 >
                                   <option value="Placed">Placed</option>
                                   <option value="Packed">Packed</option>
@@ -8105,7 +8272,9 @@ Total: â‚¹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                               <div className="flex flex-wrap items-center gap-2">
                                 <button
                                   type="button"
-                                  onClick={() => handleSaveBlrTracking(ord.orderRef, ord)}
+                                  onClick={() =>
+                                    handleSaveBlrTracking(ord.orderRef, ord)
+                                  }
                                   className="px-3.5 py-1.5 rounded-lg bg-[#5E3210] hover:bg-[#43230A] text-white font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
                                 >
                                   <Save className="w-3.5 h-3.5 text-amber-300" />
@@ -8122,11 +8291,10 @@ Total: â‚¹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                                 <button
                                   type="button"
                                   onClick={() => handleCopyRiderDrop(ord)}
-                                  className={`px-3 py-1.5 rounded-lg border text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer ${
-                                    isDark
-                                      ? "bg-[#1E130B] border-[#3D2514] text-[#FAF4EA] hover:bg-[#28180E]"
-                                      : "bg-white border-[#DDD1BE] text-[#5E3210] hover:bg-[#FAF6EE]"
-                                  }`}
+                                  className={`px-3 py-1.5 rounded-lg border text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer ${isDark
+                                    ? "bg-[#1E130B] border-[#3D2514] text-[#FAF4EA] hover:bg-[#28180E]"
+                                    : "bg-white border-[#DDD1BE] text-[#5E3210] hover:bg-[#FAF6EE]"
+                                    }`}
                                 >
                                   <Copy className="w-3.5 h-3.5 text-[#E08F35]" />
                                   <span>Copy Rider Drop Details</span>
@@ -8152,16 +8320,20 @@ Total: â‚¹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                             </div>
                           </div>
                         ) : (
-                          /* Outside Bangalore: Delhivery Shipping Actions */
                           <div
-                            className={`p-3 rounded-xl border space-y-2.5 text-xs ${
-                              isDark ? "bg-[#191009] border-[#3D2514]" : "bg-[#F7F2E8] border-[#DFD4BF]"
-                            }`}
+                            className={`p-3 rounded-xl border space-y-2.5 text-xs ${isDark
+                              ? "bg-[#191009] border-[#3D2514]"
+                              : "bg-[#F7F2E8] border-[#DFD4BF]"
+                              }`}
                           >
                             <div className="flex flex-wrap items-center justify-between gap-2">
                               <div className="flex items-center gap-1.5 font-bold">
                                 <Truck className="w-3.5 h-3.5 text-[#E08F35]" />
-                                <span className={isDark ? "text-[#FAF4EA]" : "text-[#1F120A]"}>
+                                <span
+                                  className={
+                                    isDark ? "text-[#FAF4EA]" : "text-[#1F120A]"
+                                  }
+                                >
                                   Delhivery Logistics Hub (Outside Bengaluru)
                                 </span>
                               </div>
@@ -8169,34 +8341,36 @@ Total: â‚¹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                               <div className="flex items-center gap-2">
                                 {pincodeStatus[ord.orderRef] ? (
                                   <span
-                                    className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                                      pincodeStatus[ord.orderRef].serviceable
-                                        ? "bg-emerald-500/15 text-emerald-600 border border-emerald-500/30"
-                                        : "bg-red-500/15 text-red-600 border border-red-500/30"
-                                    }`}
+                                    className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${pincodeStatus[ord.orderRef].serviceable
+                                      ? "bg-emerald-500/15 text-emerald-600 border border-emerald-500/30"
+                                      : "bg-red-500/15 text-red-600 border border-red-500/30"
+                                      }`}
                                   >
                                     {pincodeStatus[ord.orderRef].serviceable
-                                      ? `Delhivery Deliverable (COD: ${
-                                          pincodeStatus[ord.orderRef].cod ? "Yes" : "No"
-                                        })`
+                                      ? `Delhivery Deliverable (COD: ${pincodeStatus[ord.orderRef].cod
+                                        ? "Yes"
+                                        : "No"
+                                      })`
                                       : "Delhivery Not Serviceable"}
                                   </span>
                                 ) : (
                                   <button
                                     type="button"
                                     onClick={() =>
-                                      handleCheckPincode(ord.orderRef, ord.shippingAddress.pincode)
+                                      handleCheckPincode(
+                                        ord.orderRef,
+                                        addr.pincode
+                                      )
                                     }
                                     disabled={checkingPincode[ord.orderRef]}
-                                    className={`text-[10px] font-bold px-2 py-1 rounded-lg border transition-colors cursor-pointer ${
-                                      isDark
-                                        ? "bg-[#1C120B] border-[#3D2514] text-[#E08F35] hover:bg-[#28180E]"
-                                        : "bg-white border-[#DDD1BE] text-[#5E3210] hover:bg-[#FAF6EE]"
-                                    }`}
+                                    className={`text-[10px] font-bold px-2 py-1 rounded-lg border transition-colors cursor-pointer ${isDark
+                                      ? "bg-[#1C120B] border-[#3D2514] text-[#E08F35] hover:bg-[#28180E]"
+                                      : "bg-white border-[#DDD1BE] text-[#5E3210] hover:bg-[#FAF6EE]"
+                                      }`}
                                   >
                                     {checkingPincode[ord.orderRef]
                                       ? "Checking..."
-                                      : `Verify Pin ${ord.shippingAddress.pincode}`}
+                                      : `Verify Pin ${addr.pincode || ""}`}
                                   </button>
                                 )}
                               </div>
@@ -8204,20 +8378,23 @@ Total: â‚¹${order.total} (${order.paymentMethod?.toUpperCase()})`;
 
                             {ord.trackingNumber ? (
                               <div
-                                className={`p-2.5 rounded-lg border space-y-2 ${
-                                  isDark ? "bg-[#140D07] border-[#362114]" : "bg-white border-[#E5DAC8]"
-                                }`}
+                                className={`p-2.5 rounded-lg border space-y-2 ${isDark
+                                  ? "bg-[#140D07] border-[#362114]"
+                                  : "bg-white border-[#E5DAC8]"
+                                  }`}
                               >
                                 <div className="flex flex-wrap items-center justify-between gap-2">
                                   <div>
-                                    <span className="text-[10px] font-bold text-emerald-600 block flex items-center gap-1">
+                                    <span className="text-[10px] font-bold text-emerald-600 flex items-center gap-1">
                                       <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                                      Shipment Booked ({ord.courier || "Delhivery Express"})
+                                      Shipment Booked (
+                                      {ord.courier || "Delhivery Express"})
                                     </span>
                                     <span
-                                      className={`font-mono text-xs font-bold ${
-                                        isDark ? "text-[#FAF4EA]" : "text-[#1F120A]"
-                                      }`}
+                                      className={`font-mono text-xs font-bold ${isDark
+                                        ? "text-[#FAF4EA]"
+                                        : "text-[#1F120A]"
+                                        }`}
                                     >
                                       AWB: {ord.trackingNumber}
                                     </span>
@@ -8225,15 +8402,16 @@ Total: â‚¹${order.total} (${order.paymentMethod?.toUpperCase()})`;
 
                                   <div className="flex items-center gap-2">
                                     <a
-                                      href={`https://track.delhivery.com/api/p/packing_slip?wbns=${ord.trackingNumber}&pdf=true`}
+                                      href={`/api?action=delhivery_packing_slip&waybill=${encodeURIComponent(
+                                        ord.trackingNumber
+                                      )}`}
                                       target="_blank"
                                       rel="noopener noreferrer"
-                                      className={`px-2.5 py-1 rounded-lg border font-bold text-[11px] flex items-center gap-1 transition-colors ${
-                                        isDark
-                                          ? "bg-[#1E130B] border-[#3D2514] text-[#FAF4EA] hover:bg-[#2A1A0F]"
-                                          : "bg-[#FAF6EE] border-[#DDD1BE] text-[#1F120A] hover:bg-[#EFE8DC]"
-                                      }`}
-                                      title="Print Packing Slip Label"
+                                      className={`px-2.5 py-1 rounded-lg border font-bold text-[11px] flex items-center gap-1 transition-colors ${isDark
+                                        ? "bg-[#1E130B] border-[#3D2514] text-[#FAF4EA] hover:bg-[#2A1A0F]"
+                                        : "bg-[#FAF6EE] border-[#DDD1BE] text-[#1F120A] hover:bg-[#EFE8DC]"
+                                        }`}
+                                      title="Print Delhivery Packing Slip"
                                     >
                                       <Printer className="w-2.5 h-2.5 text-[#E08F35]" />
                                       <span>Print Label</span>
@@ -8253,7 +8431,7 @@ Total: â‚¹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                                     <Truck className="w-3.5 h-3.5 text-amber-300" />
                                     <span>
                                       {manifesting[ord.orderRef]
-                                        ? "Connecting Delhivery..."
+                                        ? "Generating Waybill..."
                                         : "âš¡ 1-Click Manifest"}
                                     </span>
                                   </button>
@@ -8269,15 +8447,16 @@ Total: â‚¹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                                           [ord.orderRef]: e.target.value,
                                         }))
                                       }
-                                      className={`flex-1 px-2.5 py-1 text-xs rounded-lg font-mono focus:outline-none focus:ring-1 focus:ring-[#E08F35] ${
-                                        isDark
-                                          ? "bg-[#140D07] border border-[#362114] text-[#FAF4EA] placeholder-[#8A7665]"
-                                          : "bg-white border border-[#DDD1BE] text-[#1F120A] placeholder-[#8A7665]"
-                                      }`}
+                                      className={`flex-1 px-2.5 py-1 text-xs rounded-lg font-mono focus:outline-none focus:ring-1 focus:ring-[#E08F35] ${isDark
+                                        ? "bg-[#140D07] border border-[#362114] text-[#FAF4EA] placeholder-[#8A7665]"
+                                        : "bg-white border border-[#DDD1BE] text-[#1F120A] placeholder-[#8A7665]"
+                                        }`}
                                     />
                                     <button
                                       type="button"
-                                      onClick={() => handleSaveCustomAwb(ord.orderRef)}
+                                      onClick={() =>
+                                        handleSaveCustomAwb(ord.orderRef)
+                                      }
                                       className="px-2.5 py-1 rounded-lg bg-stone-700 hover:bg-stone-800 text-white text-[11px] font-bold cursor-pointer transition-colors shrink-0"
                                     >
                                       Save AWB
@@ -8289,23 +8468,11 @@ Total: â‚¹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                                   <div className="p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-300 text-[11px] space-y-1">
                                     <div className="flex items-center gap-1 font-bold">
                                       <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                                      <span>Delhivery Dispatch Alert:</span>
+                                      <span>Delhivery Manifest Error:</span>
                                     </div>
-                                    <p className="opacity-90">{manifestError[ord.orderRef]}</p>
-                                    {fallbackAwb[ord.orderRef] && (
-                                      <button
-                                        type="button"
-                                        onClick={() =>
-                                          handleApplyFallbackAwb(
-                                            ord.orderRef,
-                                            fallbackAwb[ord.orderRef]
-                                          )
-                                        }
-                                        className="mt-1 px-2.5 py-1 rounded bg-[#5E3210] text-white font-bold text-[10px] cursor-pointer hover:bg-[#43230A]"
-                                      >
-                                        Assign Generated AWB #{fallbackAwb[ord.orderRef]} & Mark Dispatched
-                                      </button>
-                                    )}
+                                    <p className="opacity-90">
+                                      {manifestError[ord.orderRef]}
+                                    </p>
                                   </div>
                                 )}
                               </div>
@@ -8313,18 +8480,17 @@ Total: â‚¹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                           </div>
                         )}
 
-                        {/* Navigation & WhatsApp Dispatch Links */}
+                        {/* Customer Actions */}
                         <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
                           <div className="flex flex-wrap items-center gap-2">
                             <a
                               href={mapsUrl}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className={`px-3 py-1.5 rounded-lg border text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer ${
-                                isDark
-                                  ? "bg-[#1C120B] border-[#362114] text-amber-200 hover:border-[#E08F35]"
-                                  : "bg-white border-[#DDD1BE] hover:border-[#E08F35] text-[#5E3210]"
-                              }`}
+                              className={`px-3 py-1.5 rounded-lg border text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer ${isDark
+                                ? "bg-[#1C120B] border-[#362114] text-amber-200 hover:border-[#E08F35]"
+                                : "bg-white border-[#DDD1BE] hover:border-[#E08F35] text-[#5E3210]"
+                                }`}
                             >
                               <MapPin className="w-3.5 h-3.5 text-[#E08F35]" />
                               <span>Google Maps Pin</span>
@@ -8334,13 +8500,12 @@ Total: â‚¹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                             <button
                               type="button"
                               onClick={() => handleCopyPorter(ord)}
-                              className={`px-3 py-1.5 rounded-lg border text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer ${
-                                copiedPorter[ord.orderRef]
-                                  ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-600"
-                                  : isDark
+                              className={`px-3 py-1.5 rounded-lg border text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer ${copiedPorter[ord.orderRef]
+                                ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-600"
+                                : isDark
                                   ? "bg-[#1C120B] border-[#362114] text-[#FAF4EA] hover:border-[#E08F35]"
                                   : "bg-white border-[#DDD1BE] hover:border-[#E08F35] text-[#1F120A]"
-                              }`}
+                                }`}
                             >
                               {copiedPorter[ord.orderRef] ? (
                                 <Check className="w-3.5 h-3.5 text-emerald-600" />
@@ -8348,7 +8513,9 @@ Total: â‚¹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                                 <Copy className="w-3.5 h-3.5 text-[#E08F35]" />
                               )}
                               <span>
-                                {copiedPorter[ord.orderRef] ? "Copied for Porter!" : "Copy for Porter"}
+                                {copiedPorter[ord.orderRef]
+                                  ? "Copied for Porter!"
+                                  : "Copy for Porter"}
                               </span>
                             </button>
                           </div>
@@ -8357,14 +8524,11 @@ Total: â‚¹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                             href={
                               ord.trackingNumber
                                 ? `https://wa.me/91${cleanPhone}?text=${encodeURIComponent(
-                                    `Hi ${
-                                      addr.fullName || "Customer"
-                                    }, your MANOPAVANA order #${
-                                      ord.orderRef
-                                    } has been dispatched! Track your parcel live here: https://www.delhivery.com/track/package/${
-                                      ord.trackingNumber
-                                    }`
-                                  )}`
+                                  `Hi ${addr.fullName || "Customer"
+                                  }, your MANOPAVANA order #${ord.orderRef
+                                  } has been dispatched! Track your parcel live here: https://www.delhivery.com/track/package/${ord.trackingNumber
+                                  }`
+                                )}`
                                 : waUrl
                             }
                             target="_blank"
@@ -8373,7 +8537,9 @@ Total: â‚¹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                           >
                             <MessageCircle className="w-3.5 h-3.5" />
                             <span>
-                              {ord.trackingNumber ? "WhatsApp Tracking" : "WhatsApp Dispatch"}
+                              {ord.trackingNumber
+                                ? "WhatsApp Tracking"
+                                : "WhatsApp Dispatch"}
                             </span>
                           </a>
                         </div>
@@ -8887,6 +9053,8 @@ import {
   User,
   LogIn,
   Zap,
+  Search,
+  Loader2,
 } from "lucide-react";
 import L from "leaflet";
 import { useStore, LabeledAddress } from "../context/StoreContext";
@@ -8929,7 +9097,7 @@ export const CheckoutPage: React.FC = () => {
 
   const isDark = themeMode === "dark";
 
-  // Check if Buy Now direct mode is active (ordering single item without touching cart)
+  // Check if Buy Now direct mode is active
   const isBuyNowMode = searchParams.get("mode") === "buynow" && buyNowItem !== null;
   const checkoutItems = isBuyNowMode && buyNowItem ? [buyNowItem] : cart;
 
@@ -8956,7 +9124,7 @@ export const CheckoutPage: React.FC = () => {
     !savedAddresses || savedAddresses.length === 0
   );
 
-  // Address Form State with customer pre-fill
+  // Address Form State
   const [fullName, setFullName] = useState(() => address.fullName || currentUser?.displayName || "");
   const [phone, setPhone] = useState(() => {
     if (address.phone) return address.phone;
@@ -8979,18 +9147,23 @@ export const CheckoutPage: React.FC = () => {
   const [iframePaymentUrl, setIframePaymentUrl] = useState<string | null>(null);
   const [pendingPhonePeRef, setPendingPhonePeRef] = useState<string | null>(null);
 
+  // Address search states for checkout map
+  const [searchQuery, setSearchQuery] = useState("");
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const searchTimeoutRef = useRef<any>(null);
+
   // Payment method state
   const [paymentMethod, setPaymentMethod] = useState<"phonepe" | "cod">("phonepe");
   const [isProcessing, setIsProcessing] = useState(false);
   const [paymentError, setPaymentError] = useState<string | null>(null);
   const [lastAttemptedOrder, setLastAttemptedOrder] = useState<Order | null>(null);
 
-  // Free COD bot/accidental order safeguard (random math sum)
+  // Free COD bot/accidental order safeguard
   const [codChallenge, setCodChallenge] = useState<{ a: number; b: number }>({ a: 3, b: 5 });
   const [codAnswerInput, setCodAnswerInput] = useState<string>("");
   const [codError, setCodError] = useState<string | null>(null);
 
-  // Generate random numbers for COD challenge whenever COD is chosen
   useEffect(() => {
     if (paymentMethod === "cod") {
       setCodChallenge({
@@ -9002,12 +9175,13 @@ export const CheckoutPage: React.FC = () => {
     }
   }, [paymentMethod]);
 
-  const safeUpdateMapCenter = (lat: number, lng: number, zoom = 14) => {
+  const safeUpdateMapCenter = (lat: number, lng: number, zoom = 15) => {
     if (!mapInstanceRef.current || !markerRef.current) return;
     try {
       if (Number.isFinite(lat) && Number.isFinite(lng)) {
         mapInstanceRef.current.setView([lat, lng], zoom);
         markerRef.current.setLatLng([lat, lng]);
+        mapInstanceRef.current.invalidateSize();
       }
     } catch (e) {
       console.warn("Map view notice:", e);
@@ -9078,7 +9252,7 @@ export const CheckoutPage: React.FC = () => {
     };
   }, [currentUser?.uid]);
 
-  // If user returns from cancelled/uncompleted online payment with empty bag, auto-recover items
+  // If user returns with empty bag, auto-recover items
   useEffect(() => {
     if (checkoutItems.length === 0) {
       try {
@@ -9107,56 +9281,6 @@ export const CheckoutPage: React.FC = () => {
     }
   }, [checkoutItems.length]);
 
-  // Check URL query parameters for return from PhonePe
-  const orderRefQuery = searchParams.get("orderRef");
-  useEffect(() => {
-    if (orderRefQuery) {
-      async function syncReturnedOrder(ref: string) {
-        try {
-          const ord = await getOrderFromFirestore(ref);
-          if (ord) setLastAttemptedOrder(ord);
-        } catch {}
-      }
-      syncReturnedOrder(orderRefQuery);
-    }
-  }, [orderRefQuery]);
-
-  const handleRetryPayment = () => {
-    let orderToRestore = lastAttemptedOrder;
-    if (!orderToRestore) {
-      try {
-        const stored = localStorage.getItem("pending_order_data");
-        if (stored) orderToRestore = JSON.parse(stored);
-      } catch {
-        // ignore
-      }
-    }
-    if (orderToRestore && orderToRestore.items) {
-      if (orderToRestore.isBuyNow && orderToRestore.items.length === 1) {
-        const it = orderToRestore.items[0];
-        startBuyNow(it, it.quantity);
-      } else {
-        orderToRestore.items.forEach((item) => {
-          addToCart(
-            {
-              id: item.id,
-              productId: item.productId,
-              title: item.title,
-              subtitle: item.subtitle,
-              variant: item.variant,
-              price: item.price,
-              regularPrice: item.regularPrice,
-              image: item.image,
-            },
-            item.quantity
-          );
-        });
-      }
-      showToast("Items restored to active cart!");
-    }
-    setPaymentError(null);
-  };
-
   // Leaflet Map Setup in Checkout
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
@@ -9183,11 +9307,11 @@ export const CheckoutPage: React.FC = () => {
 
           const customIcon = L.divIcon({
             className: "checkout-leaflet-marker",
-            html: `<div style="background-color:#5E3210; width:26px; height:26px; border-radius:50%; border:3px solid #FFF; box-shadow:0 4px 10px rgba(0,0,0,0.3); display:flex; align-items:center; justify-content:center;">
-                    <div style="background:#E08F35; width:10px; height:10px; border-radius:50%;"></div>
+            html: `<div style="background-color:#5E3210; width:30px; height:30px; border-radius:50%; border:3px solid #FFF; box-shadow:0 4px 12px rgba(0,0,0,0.4); display:flex; align-items:center; justify-content:center;">
+                    <div style="background:#E08F35; width:12px; height:12px; border-radius:50%;"></div>
                   </div>`,
-            iconSize: [26, 26],
-            iconAnchor: [13, 13],
+            iconSize: [30, 30],
+            iconAnchor: [15, 15],
           });
 
           const marker = L.marker(coords, {
@@ -9239,12 +9363,17 @@ export const CheckoutPage: React.FC = () => {
 
           mapInstanceRef.current = map;
           markerRef.current = marker;
+
+          setTimeout(() => {
+            map.invalidateSize();
+          }, 200);
         } else {
           try {
             mapInstanceRef.current.setView(coords, 14);
             if (markerRef.current) {
               markerRef.current.setLatLng(coords);
             }
+            mapInstanceRef.current.invalidateSize();
           } catch {}
         }
       } catch (err) {
@@ -9256,6 +9385,70 @@ export const CheckoutPage: React.FC = () => {
       clearTimeout(timer);
     };
   }, []);
+
+  // Autocomplete / Search location on map
+  const handleSearchQueryChange = (val: string) => {
+    setSearchQuery(val);
+    if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+
+    if (!val.trim() || val.length < 3) {
+      setSearchResults([]);
+      setIsSearching(false);
+      return;
+    }
+
+    setIsSearching(true);
+    searchTimeoutRef.current = setTimeout(async () => {
+      try {
+        const res = await fetch(
+          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
+            val
+          )}&countrycodes=in&limit=5&addressdetails=1`,
+          {
+            headers: {
+              "User-Agent": "ManopavanaCheckoutLocationPicker/1.0",
+              "Accept-Language": "en",
+            },
+          }
+        );
+        const data = await res.json();
+        setSearchResults(data || []);
+      } catch (err) {
+        console.warn("Search geocode error:", err);
+        setSearchResults([]);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 400);
+  };
+
+  const handleSelectSearchResult = async (item: any) => {
+    const lat = parseFloat(item.lat);
+    const lon = parseFloat(item.lon);
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
+
+    setCoords([lat, lon]);
+    setSearchResults([]);
+    setSearchQuery(item.display_name);
+
+    if (mapInstanceRef.current && markerRef.current) {
+      try {
+        mapInstanceRef.current.setView([lat, lon], 16);
+        markerRef.current.setLatLng([lat, lon]);
+        mapInstanceRef.current.invalidateSize();
+      } catch {}
+    }
+
+    showToast("Map focused on selected location!");
+    const partial = await reverseGeocodeAndSaveAddress(lat, lon);
+    if (partial) {
+      if (partial.addressLine1) setAddressLine1(partial.addressLine1);
+      if (partial.pincode) setPincode(partial.pincode);
+      if (partial.state) setState(partial.state);
+      if (partial.district) setDistrict(partial.district);
+      if (partial.landmark) setLandmark(partial.landmark);
+    }
+  };
 
   const handleStateChange = (newState: string) => {
     setState(newState);
@@ -9279,7 +9472,7 @@ export const CheckoutPage: React.FC = () => {
           if (Number.isFinite(lat) && Number.isFinite(lng)) {
             const c: [number, number] = [lat, lng];
             setCoords(c);
-            safeUpdateMapCenter(lat, lng, 15);
+            safeUpdateMapCenter(lat, lng, 16);
             showToast("GPS coordinates retrieved! Auto-filling address...");
             const partial = await reverseGeocodeAndSaveAddress(lat, lng);
             if (partial) {
@@ -9368,7 +9561,6 @@ export const CheckoutPage: React.FC = () => {
 
     updateAddress(finalAddress);
 
-    // Save newly typed address to address book if selected
     if (isAddingNewAddress) {
       saveNewAddress({
         ...finalAddress,
@@ -9379,7 +9571,6 @@ export const CheckoutPage: React.FC = () => {
     const finalCustomerUid = currentUser.uid;
 
     if (effectiveMethod === "cod") {
-      // Math challenge safeguard verification
       const expected = codChallenge.a + codChallenge.b;
       if (parseInt(codAnswerInput.trim(), 10) !== expected) {
         setCodError(`Incorrect verification answer. What is ${codChallenge.a} + ${codChallenge.b}?`);
@@ -9414,9 +9605,7 @@ export const CheckoutPage: React.FC = () => {
           paymentStatus: "COMPLETED",
           orderStatus: "Placed",
           shippingAddress: finalAddress,
-          trackingNumber: isBLR
-            ? `MV-BLR-${Math.floor(10000 + Math.random() * 90000)}`
-            : `MV-DLH-${Math.floor(10000 + Math.random() * 90000)}`,
+          trackingNumber: "",
           courier: isBLR ? "MANOPAVANA Peenya Express Carrier" : "Delhivery Express Logistics",
           customerUid: finalCustomerUid,
           customerPhone: cleanPhone,
@@ -9467,9 +9656,7 @@ export const CheckoutPage: React.FC = () => {
         paymentStatus: "PENDING",
         orderStatus: "Payment Incomplete",
         shippingAddress: finalAddress,
-        trackingNumber: isBLR
-          ? `MV-BLR-${Math.floor(10000 + Math.random() * 90000)}`
-          : `MV-DLH-${Math.floor(10000 + Math.random() * 90000)}`,
+        trackingNumber: "",
         courier: isBLR ? "MANOPAVANA Peenya Express Carrier" : "Delhivery Express Logistics",
         customerUid: finalCustomerUid,
         customerPhone: cleanPhone,
@@ -9552,7 +9739,7 @@ export const CheckoutPage: React.FC = () => {
             Checkout & Dispatch Order
           </h1>
           <p className={`text-xs ${isDark ? "text-[#D6C4B0]" : "text-[#5C402D]"}`}>
-            Pinpoint Bengaluru delivery coordinates and choose payment method
+            Pinpoint delivery coordinates and choose payment method
           </p>
         </div>
 
@@ -9648,7 +9835,7 @@ export const CheckoutPage: React.FC = () => {
             </div>
             <button
               type="button"
-              onClick={handleRetryPayment}
+              onClick={() => setPaymentError(null)}
               className="px-5 py-2.5 rounded-xl bg-red-700 hover:bg-red-800 text-white font-bold text-xs shrink-0 flex items-center gap-2 cursor-pointer shadow-sm transition-all"
             >
               <RefreshCw className="w-4 h-4 text-amber-200" />
@@ -9703,7 +9890,7 @@ export const CheckoutPage: React.FC = () => {
                   }`}
                 >
                   <Navigation className="w-3.5 h-3.5" />
-                  <span>GPS Pinpoint</span>
+                  <span>{isLocating ? "Detecting GPS..." : "GPS Pinpoint"}</span>
                 </button>
               </div>
 
@@ -9872,7 +10059,7 @@ export const CheckoutPage: React.FC = () => {
                       className={`w-full px-3.5 py-2.5 text-xs rounded-xl focus:outline-none focus:ring-2 focus:ring-[#E08F35]/40 ${
                         isDark
                           ? "bg-[#150D07] border border-[#362114] text-[#FAF4EA] placeholder-[#8C7A6B]"
-                            : "bg-[#FAF7F2] border border-[#DDD1BE] text-[#23150C] placeholder-[#8C7A6B]"
+                          : "bg-[#FAF7F2] border border-[#DDD1BE] text-[#23150C] placeholder-[#8C7A6B]"
                       }`}
                     />
                   </div>
@@ -9978,23 +10165,66 @@ export const CheckoutPage: React.FC = () => {
                 </div>
               )}
 
-              {/* Interactive OpenStreetMap */}
-              <div className="space-y-1 pt-2">
+              {/* Direct Address Search Input Bar on Checkout */}
+              <div className="relative space-y-1.5 pt-3 border-t border-stone-200 dark:border-stone-800 z-30">
+                <label className={`block text-xs font-semibold ${isDark ? "text-[#FAF4EA]" : "text-[#3D2514]"}`}>
+                  Search Area, Landmark, or Street on Map:
+                </label>
+                <div className="relative flex items-center">
+                  <Search className="absolute left-3.5 w-4 h-4 text-stone-400" />
+                  <input
+                    type="text"
+                    placeholder="e.g. Peenya 2nd Stage, Hassan, Indiranagar, MG Road..."
+                    value={searchQuery}
+                    onChange={(e) => handleSearchQueryChange(e.target.value)}
+                    className={`w-full pl-10 pr-10 py-2.5 text-xs rounded-xl focus:outline-none focus:ring-2 focus:ring-[#E08F35]/50 ${
+                      isDark
+                        ? "bg-[#150D07] border border-[#362114] text-[#FAF4EA] placeholder-[#8C7A6B]"
+                        : "bg-[#FAF7F2] border border-[#DDD1BE] text-[#23150C] placeholder-[#8C7A6B]"
+                    }`}
+                  />
+                  {isSearching && (
+                    <Loader2 className="absolute right-3.5 w-4 h-4 text-[#E08F35] animate-spin" />
+                  )}
+                </div>
+
+                {/* Autocomplete Results Dropdown */}
+                {searchResults.length > 0 && (
+                  <ul className="absolute left-0 right-0 top-full mt-1.5 bg-white dark:bg-[#1C110B] border border-stone-200 dark:border-[#4A301E] rounded-2xl shadow-2xl max-h-56 overflow-y-auto divide-y divide-stone-100 dark:divide-[#2C1D14] z-50">
+                    {searchResults.map((item, idx) => (
+                      <li
+                        key={idx}
+                        onClick={() => handleSelectSearchResult(item)}
+                        className="p-3 text-xs hover:bg-amber-50 dark:hover:bg-[#2C1D14] cursor-pointer flex items-start gap-2.5 transition-colors"
+                      >
+                        <MapPin className="w-4 h-4 text-[#E08F35] shrink-0 mt-0.5" />
+                        <span className="line-clamp-2 text-stone-700 dark:text-stone-200">
+                          {item.display_name}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+
+              {/* Spacious Interactive OpenStreetMap Container */}
+              <div className="space-y-1.5 pt-1">
                 <div
                   className={`flex items-center justify-between text-xs ${
                     isDark ? "text-[#D6C4B0]" : "text-[#5C402D]"
                   }`}
                 >
                   <span className={`font-semibold ${isDark ? "text-[#FAF4EA]" : "text-[#3D2514]"}`}>
-                    Delivery Geolocation Pin (Click map or drag pin to choose location):
+                    Interactive Map (Click anywhere to place pin, or drag marker):
                   </span>
                   <span className="text-[11px] font-mono">
                     {Number(coords?.[0] || 12.9716).toFixed(4)}, {Number(coords?.[1] || 77.5946).toFixed(4)}
                   </span>
                 </div>
+                {/* Enlarged map container from h-36 to h-80/h-96 for comfortable interaction */}
                 <div
                   ref={mapContainerRef}
-                  className={`w-full h-36 rounded-xl border overflow-hidden shadow-inner ${
+                  className={`w-full h-80 sm:h-96 rounded-2xl border overflow-hidden shadow-inner touch-manipulation z-10 ${
                     isDark ? "bg-[#140D07] border-[#362114]" : "bg-[#EFE9DF] border-[#E3D4C0]"
                   }`}
                 />
@@ -14894,6 +15124,18 @@ export interface LoyaltyState {
   scannedOil?: string;
 }
 
+export interface PolicyContent {
+  title: string;
+  content: string;
+}
+
+export interface ProductDetailOverride {
+  name?: string;
+  shortDescription?: string;
+  imageUrl?: string;
+  benefits?: string[];
+}
+
 export interface StoreCMSConfig {
   announcementTicker: string;
   heroHeadline: string;
@@ -14939,5 +15181,16 @@ export interface StoreCMSConfig {
     combo3L: boolean;
     combo1_5L: boolean;
   };
+
+  // Editable A-to-Z Legal Policies
+  policies?: {
+    terms?: PolicyContent;
+    shipping?: PolicyContent;
+    returns?: PolicyContent;
+    privacy?: PolicyContent;
+  };
+
+  // Editable A-to-Z Product Metadata Overrides (keyed by product ID: groundnut, coconut, sesame, combo-3l, combo-1.5l)
+  productDetails?: Record<string, ProductDetailOverride>;
 }
 

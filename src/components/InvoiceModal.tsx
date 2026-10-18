@@ -1,5 +1,5 @@
 import React from "react";
-import { Printer, X, Download } from "lucide-react";
+import { X, Download } from "lucide-react";
 import { Order } from "../types";
 import { BUSINESS_CONFIG } from "../constants";
 
@@ -31,50 +31,59 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({ order, isOpen, onClo
 
   return (
     <div
-  role="dialog"
-  aria-modal="true"
-  className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm print:p-0 print:bg-white print:static print:inset-auto print:block"
->
+      role="dialog"
+      aria-modal="true"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm print:p-0 print:bg-transparent print:static print:block print:inset-auto"
+    >
       <style>
-  {`
-    @media print {
-      /* Hide all body elements except the modal */
-      body {
-        visibility: hidden !important;
-        margin: 0 !important;
-        padding: 0 !important;
-        background: #fff !important;
-      }
-      
-      /* Only render the printable invoice container */
-      #printable-invoice, #printable-invoice * {
-        visibility: visible !important;
-      }
+        {`
+          @media print {
+            @page {
+              size: A4 portrait;
+              margin: 8mm 12mm;
+            }
 
-      #printable-invoice {
-        position: fixed !important;
-        left: 0 !important;
-        top: 0 !important;
-        width: 100vw !important;
-        height: auto !important;
-        margin: 0 !important;
-        padding: 10mm 15mm !important;
-        box-shadow: none !important;
-        border: none !important;
-        background: #ffffff !important;
-        page-break-after: avoid !important;
-        page-break-inside: avoid !important;
-      }
+            /* 1. Collapse all normal DOM flow so they don't produce empty pages */
+            body > *:not(#root):not(#__next),
+            #root > *:not([role="dialog"]) {
+              display: none !important;
+            }
 
-      @page {
-        size: A4 portrait;
-        margin: 0;
-      }
-    }
-  `}
-</style>
+            html, body {
+              height: auto !important;
+              min-height: 0 !important;
+              overflow: visible !important;
+              background: #ffffff !important;
+              margin: 0 !important;
+              padding: 0 !important;
+            }
 
-      <div className="relative w-full max-w-2xl bg-white text-stone-900 rounded-3xl shadow-2xl border border-stone-200 overflow-hidden flex flex-col max-h-[92vh] print:max-h-none print:border-none print:shadow-none print:rounded-none">
+            /* 2. Position the invoice naturally at the very top of Page 1 */
+            #printable-invoice {
+              position: static !important;
+              display: block !important;
+              width: 100% !important;
+              max-width: 100% !important;
+              height: auto !important;
+              margin: 0 !important;
+              padding: 0 !important;
+              box-shadow: none !important;
+              border: none !important;
+              background: transparent !important;
+              page-break-before: avoid !important;
+              page-break-after: avoid !important;
+              page-break-inside: avoid !important;
+            }
+
+            /* 3. Hide all non-printable modal elements */
+            .print\\:hidden {
+              display: none !important;
+            }
+          }
+        `}
+      </style>
+
+      <div className="relative w-full max-w-2xl bg-white text-stone-900 rounded-3xl shadow-2xl border border-stone-200 overflow-hidden flex flex-col max-h-[92vh] print:max-h-none print:h-auto print:border-none print:shadow-none print:rounded-none print:overflow-visible">
         {/* Actions bar (Hidden when printing) */}
         <div className="flex items-center justify-between px-6 py-4 bg-stone-100 border-b border-stone-200 print:hidden">
           <span className="text-sm font-bold font-serif text-stone-900">
@@ -100,7 +109,7 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({ order, isOpen, onClo
         </div>
 
         {/* Invoice Page Container */}
-        <div id="printable-invoice" className="p-8 text-xs text-stone-800 space-y-4">
+        <div id="printable-invoice" className="p-8 text-xs text-stone-800 space-y-4 print:p-0">
           <div className="flex justify-between items-start border-b border-stone-300 pb-4">
             <div>
               <h1 className="text-lg font-bold font-serif text-stone-900">{BUSINESS_CONFIG.BRAND_NAME}</h1>

@@ -80,42 +80,10 @@ export const AdminPage: React.FC = () => {
     message?: string;
   } | null>(null);
 
-  // Automatic background carrier status sync for active Delhivery orders
-  useEffect(() => {
-    const activeDelhiveryOrders = orders.filter(
-      (o) =>
-        o.trackingNumber &&
-        !o.trackingNumber.startsWith("MV-BLR") &&
-        o.orderStatus !== "Delivered" &&
-        o.orderStatus !== "Cancelled"
-    );
-
-    if (activeDelhiveryOrders.length === 0) return;
-
-    const syncActiveShipments = async () => {
-      for (const ord of activeDelhiveryOrders) {
-        try {
-          const res = await fetch(`/api?action=delhivery_track&waybill=${ord.trackingNumber}`);
-          const data = await res.json();
-          const scanStatus = data?.data?.ShipmentData?.[0]?.Shipment?.Status?.Status;
-          
-          if (scanStatus) {
-            const mapped = mapDelhiveryToWebStatus(scanStatus);
-            if (mapped && mapped !== ord.orderStatus) {
-              await updateOrderStatus(ord.id || ord.orderRef, mapped);
-            }
-          }
-        } catch (e) {
-          console.warn(`Background sync skipped for ${ord.trackingNumber}:`, e);
-        }
-      }
-    };
-
-    // Run automatically when dashboard opens
-    syncActiveShipments();
-
-    // Helper to map live Delhivery carrier status strings to MANOPAVANA website order stages
-  const mapDelhiveryToWebStatus = (delhiveryStatus: string): "Placed" | "Packed" | "Dispatched" | "Delivered" | "Cancelled" | null => {
+  // Helper to map live Delhivery carrier status strings to MANOPAVANA website order stages
+  const mapDelhiveryToWebStatus = (
+    delhiveryStatus: string
+  ): OrderStatus | null => {
     const s = String(delhiveryStatus || "").toLowerCase();
 
     if (s.includes("delivered")) {
@@ -144,10 +112,47 @@ export const AdminPage: React.FC = () => {
     return null;
   };
 
+  // Automatic background carrier status sync for active Delhivery orders
+  useEffect(() => {
+    const activeDelhiveryOrders = orders.filter(
+      (o) =>
+        o.trackingNumber &&
+        !o.trackingNumber.startsWith("MV-BLR") &&
+        o.orderStatus !== "Delivered" &&
+        o.orderStatus !== "Cancelled"
+    );
+
+    if (activeDelhiveryOrders.length === 0) return;
+
+    const syncActiveShipments = async () => {
+      for (const ord of activeDelhiveryOrders) {
+        try {
+          const res = await fetch(
+            `/api?action=delhivery_track&waybill=${ord.trackingNumber}`
+          );
+          const data = await res.json();
+          const scanStatus =
+            data?.data?.ShipmentData?.[0]?.Shipment?.Status?.Status;
+
+          if (scanStatus) {
+            const mapped = mapDelhiveryToWebStatus(scanStatus);
+            if (mapped && mapped !== ord.orderStatus) {
+              await updateOrderStatus(ord.id || ord.orderRef, mapped);
+            }
+          }
+        } catch (e) {
+          console.warn(`Background sync skipped for ${ord.trackingNumber}:`, e);
+        }
+      }
+    };
+
+    // Run automatically when dashboard opens
+    syncActiveShipments();
+
     // Re-check automatically every 5 minutes while dashboard remains open
     const interval = setInterval(syncActiveShipments, 5 * 60 * 1000);
     return () => clearInterval(interval);
-  }, [orders]);
+  }, [orders, updateOrderStatus]);
 
   const facilityAddress =
     cmsConfig?.facilityAddress || BUSINESS_CONFIG.FACILITY_ADDRESS;
@@ -222,12 +227,15 @@ export const AdminPage: React.FC = () => {
       addr.lat && addr.lng
         ? `https://www.google.com/maps?q=${addr.lat},${addr.lng}`
         : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-          `${addr.addressLine1 || ""}, Bengaluru - ${addr.pincode || ""}`
-        )}`;
-    const text = `📦 MANOPAVANA DROP DETAILS\nOrder: #${ord.orderRef}\nCustomer: ${addr.fullName || "Customer"
-      }\nPhone: ${addr.phone || "N/A"}\nAddress: ${addr.addressLine1 || ""}${addr.landmark ? ` (Near ${addr.landmark})` : ""
-      }, ${addr.district || "Bengaluru"} - ${addr.pincode || ""}\nPayment: ${ord.paymentMethod?.toUpperCase()} (₹${ord.total
-      })\nLocation Pin: ${mapsLink}`;
+            `${addr.addressLine1 || ""}, Bengaluru - ${addr.pincode || ""}`
+          )}`;
+    const text = `📦 MANOPAVANA DROP DETAILS\nOrder: #${ord.orderRef}\nCustomer: ${
+      addr.fullName || "Customer"
+    }\nPhone: ${addr.phone || "N/A"}\nAddress: ${addr.addressLine1 || ""}${
+      addr.landmark ? ` (Near ${addr.landmark})` : ""
+    }, ${addr.district || "Bengaluru"} - ${addr.pincode || ""}\nPayment: ${ord.paymentMethod?.toUpperCase()} (₹${
+      ord.total
+    })\nLocation Pin: ${mapsLink}`;
     navigator.clipboard.writeText(text);
     showToast("📋 Drop address & GPS copied for delivery rider!");
   };
@@ -279,8 +287,8 @@ export const AdminPage: React.FC = () => {
     const items: any[] = Array.isArray(rawItems)
       ? rawItems
       : rawItems && typeof rawItems === "object"
-        ? Object.values(rawItems)
-        : [];
+      ? Object.values(rawItems)
+      : [];
 
     const totalGrams =
       items.reduce((acc: number, item: any) => {
@@ -298,8 +306,9 @@ export const AdminPage: React.FC = () => {
           orderRef: order.orderRef,
           customerName: addr.fullName || "Customer",
           phone: addr.phone || "",
-          address: `${addr.addressLine1 || ""}${addr.landmark ? `, Near ${addr.landmark}` : ""
-            }`,
+          address: `${addr.addressLine1 || ""}${
+            addr.landmark ? `, Near ${addr.landmark}` : ""
+          }`,
           pincode: addr.pincode || "560058",
           city: addr.city || addr.district || "Bengaluru",
           state: addr.state || "Karnataka",
@@ -309,7 +318,10 @@ export const AdminPage: React.FC = () => {
           productsDesc:
             items.map((i: any) => `${i.title} (${i.variant})`).join(", ") ||
             "Wood-pressed Cooking Oil",
-          quantity: items.reduce((acc: number, i: any) => acc + (Number(i?.quantity) || 1), 0),
+          quantity: items.reduce(
+            (acc: number, i: any) => acc + (Number(i?.quantity) || 1),
+            0
+          ),
         }),
       });
 
@@ -319,7 +331,7 @@ export const AdminPage: React.FC = () => {
         await updateOrderDetails(order.orderRef, {
           trackingNumber: data.waybill,
           courier: "Delhivery Express",
-          orderStatus: "Dispatched",
+          orderStatus: "Packed",
         });
         showToast(`Delhivery Shipment Manifested! AWB: #${data.waybill}`);
       } else {
@@ -352,14 +364,18 @@ export const AdminPage: React.FC = () => {
     await updateOrderDetails(orderRef, {
       trackingNumber: awb,
       courier: "Delhivery Express",
-      orderStatus: "Dispatched",
+      orderStatus: "Packed",
     });
     setCustomAwb((p) => ({ ...p, [orderRef]: "" }));
     showToast(`Saved Delhivery AWB #${awb}`);
   };
 
   const handleStatusChange = async (ord: Order, newStatus: OrderStatus) => {
-    if (newStatus === "Cancelled" && ord.trackingNumber && !ord.trackingNumber.startsWith("MV-BLR")) {
+    if (
+      newStatus === "Cancelled" &&
+      ord.trackingNumber &&
+      !ord.trackingNumber.startsWith("MV-BLR")
+    ) {
       try {
         showToast("Notifying Delhivery of order cancellation...");
         const res = await fetch("/api?action=delhivery_cancel_order", {
@@ -371,7 +387,9 @@ export const AdminPage: React.FC = () => {
         if (data.status === "SUCCESS") {
           showToast("Delhivery shipment cancelled & wallet credited!");
         } else {
-          showToast(`Delhivery notice: ${data.message || "Failed to cancel on carrier"}`);
+          showToast(
+            `Delhivery notice: ${data.message || "Failed to cancel on carrier"}`
+          );
         }
       } catch (e) {
         console.warn("Delhivery cancellation sync notice:", e);
@@ -387,13 +405,14 @@ export const AdminPage: React.FC = () => {
     const items: any[] = Array.isArray(rawItems)
       ? rawItems
       : rawItems && typeof rawItems === "object"
-        ? Object.values(rawItems)
-        : [];
+      ? Object.values(rawItems)
+      : [];
 
     const text = `Customer: ${addr.fullName || "Customer"}
 Phone: ${addr.phone || "N/A"}
-Address: ${addr.addressLine1 || ""}${addr.landmark ? `, Near ${addr.landmark}` : ""
-      }, ${addr.district || addr.city || "Bengaluru"} - ${addr.pincode || ""}
+Address: ${addr.addressLine1 || ""}${
+      addr.landmark ? `, Near ${addr.landmark}` : ""
+    }, ${addr.district || addr.city || "Bengaluru"} - ${addr.pincode || ""}
 Items: ${items.map((i: any) => `${i.title} (${i.variant}) x${i.quantity}`).join(", ")}
 Order Ref: #${order.orderRef}
 Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
@@ -412,35 +431,42 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
   if (!isAdminAuthenticated) {
     return (
       <div
-        className={`w-full min-h-[calc(100vh-80px)] py-20 flex items-center justify-center transition-colors px-4 box-border ${isDark ? "bg-[#140D09] text-[#FAF4EA]" : "bg-[#FAF7F2] text-[#24140A]"
-          }`}
+        className={`w-full min-h-[calc(100vh-80px)] py-20 flex items-center justify-center transition-colors px-4 box-border ${
+          isDark
+            ? "bg-[#140D09] text-[#FAF4EA]"
+            : "bg-[#FAF7F2] text-[#24140A]"
+        }`}
       >
         <div className="w-full max-w-md mx-auto text-center">
           <div
-            className={`p-8 rounded-3xl border shadow-xl space-y-6 ${isDark
+            className={`p-8 rounded-3xl border shadow-xl space-y-6 ${
+              isDark
                 ? "bg-[#1C120B] border-[#362114]"
                 : "bg-white border-[#E8DEC8]"
-              }`}
+            }`}
           >
             <div
-              className={`w-16 h-16 mx-auto rounded-full border flex items-center justify-center ${isDark
+              className={`w-16 h-16 mx-auto rounded-full border flex items-center justify-center ${
+                isDark
                   ? "bg-[#150D07] border-[#362114]"
                   : "bg-[#FAF6EE] border-[#DDD1BE]"
-                }`}
+              }`}
             >
               <Lock className="w-8 h-8 text-[#E08F35]" />
             </div>
 
             <div className="space-y-1">
               <h1
-                className={`text-xl font-bold font-serif ${isDark ? "text-[#FAF4EA]" : "text-[#1F120A]"
-                  }`}
+                className={`text-xl font-bold font-serif ${
+                  isDark ? "text-[#FAF4EA]" : "text-[#1F120A]"
+                }`}
               >
                 MANOPAVANA Administrator Gate
               </h1>
               <p
-                className={`text-xs ${isDark ? "text-[#D8C8B8]" : "text-[#5C4230]"
-                  }`}
+                className={`text-xs ${
+                  isDark ? "text-[#D8C8B8]" : "text-[#5C4230]"
+                }`}
               >
                 {currentUser?.email ? (
                   <>
@@ -467,10 +493,11 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                     setPinInput(e.target.value);
                     setPinError(false);
                   }}
-                  className={`w-full text-center tracking-widest text-lg font-mono font-bold px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#E08F35]/40 transition-colors ${isDark
+                  className={`w-full text-center tracking-widest text-lg font-mono font-bold px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#E08F35]/40 transition-colors ${
+                    isDark
                       ? "bg-[#150D07] border border-[#362114] text-[#FAF4EA] placeholder-[#8A7665]"
                       : "bg-[#FAF7F2] border border-[#DDD1BE] text-[#1F120A] placeholder-[#8A7665]"
-                    }`}
+                  }`}
                 />
                 {pinError && (
                   <p className="text-xs text-red-500 font-semibold mt-1.5">
@@ -489,10 +516,11 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
               <button
                 type="button"
                 onClick={() => setShowCloudflareGuide(true)}
-                className={`w-full py-2 rounded-xl text-[11px] font-semibold border flex items-center justify-center gap-1.5 transition-colors cursor-pointer ${isDark
+                className={`w-full py-2 rounded-xl text-[11px] font-semibold border flex items-center justify-center gap-1.5 transition-colors cursor-pointer ${
+                  isDark
                     ? "bg-transparent border-[#362114] text-[#D8C8B8] hover:bg-[#1C120B]"
                     : "bg-transparent border-[#DDD1BE] text-[#5C4230] hover:bg-[#FAF6EE]"
-                  }`}
+                }`}
               >
                 <Key className="w-3.5 h-3.5 text-[#E08F35]" />
                 <span>How to store PIN encrypted in Cloudflare</span>
@@ -500,8 +528,9 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
             </form>
 
             <p
-              className={`text-[11px] ${isDark ? "text-[#A89482]" : "text-[#7A5E48]"
-                }`}
+              className={`text-[11px] ${
+                isDark ? "text-[#A89482]" : "text-[#7A5E48]"
+              }`}
             >
               Authorized Facility: Peenya 2nd Stage, Bangalore • Edge Verified
             </p>
@@ -511,10 +540,11 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
         {showCloudflareGuide && (
           <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4">
             <div
-              className={`w-full max-w-xl rounded-3xl p-6 sm:p-8 space-y-5 text-left border shadow-2xl overflow-y-auto max-h-[90vh] ${isDark
+              className={`w-full max-w-xl rounded-3xl p-6 sm:p-8 space-y-5 text-left border shadow-2xl overflow-y-auto max-h-[90vh] ${
+                isDark
                   ? "bg-[#1C120B] text-[#FAF4EA] border-[#362114]"
                   : "bg-white text-[#1F120A] border-[#DDD1BE]"
-                }`}
+              }`}
             >
               <div className="flex items-center justify-between border-b pb-3 border-stone-200 dark:border-stone-800">
                 <div className="flex items-center gap-2">
@@ -592,8 +622,11 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
 
   return (
     <div
-      className={`w-full min-h-[calc(100vh-80px)] py-8 transition-colors box-border ${isDark ? "bg-[#140D09] text-[#FAF4EA]" : "bg-[#FAF7F2] text-[#24140A]"
-        }`}
+      className={`w-full min-h-[calc(100vh-80px)] py-8 transition-colors box-border ${
+        isDark
+          ? "bg-[#140D09] text-[#FAF4EA]"
+          : "bg-[#FAF7F2] text-[#24140A]"
+      }`}
     >
       <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8 box-border">
         {/* Header */}
@@ -648,8 +681,11 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
 
         {/* Delhivery Diagnostics */}
         <div
-          className={`rounded-3xl border p-6 shadow-sm space-y-5 transition-colors ${isDark ? "bg-[#1A1009] border-[#3B2516]" : "bg-white border-[#E8DFC8]"
-            }`}
+          className={`rounded-3xl border p-6 shadow-sm space-y-5 transition-colors ${
+            isDark
+              ? "bg-[#1A1009] border-[#3B2516]"
+              : "bg-white border-[#E8DFC8]"
+          }`}
         >
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b pb-4 border-stone-200 dark:border-stone-800">
             <div className="flex items-center gap-3">
@@ -683,11 +719,14 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                 className="px-3.5 py-2 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-[#5E3210] dark:text-amber-200 border border-amber-500/30 text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs"
               >
                 <Activity
-                  className={`w-3.5 h-3.5 text-[#E08F35] ${pingingApi ? "animate-spin" : ""
-                    }`}
+                  className={`w-3.5 h-3.5 text-[#E08F35] ${
+                    pingingApi ? "animate-spin" : ""
+                  }`}
                 />
                 <span>
-                  {pingingApi ? "Testing Connection..." : "Ping Delhivery API"}
+                  {pingingApi
+                    ? "Testing Connection..."
+                    : "Ping Delhivery API"}
                 </span>
               </button>
 
@@ -705,10 +744,11 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
 
           {pingResult && (
             <div
-              className={`p-3.5 rounded-2xl border text-xs flex flex-wrap items-center justify-between gap-3 ${pingResult.authenticated
+              className={`p-3.5 rounded-2xl border text-xs flex flex-wrap items-center justify-between gap-3 ${
+                pingResult.authenticated
                   ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-800 dark:text-emerald-300"
                   : "bg-red-500/10 border-red-500/30 text-red-800 dark:text-red-300"
-                }`}
+              }`}
             >
               <div className="flex items-center gap-2">
                 <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600" />
@@ -741,20 +781,23 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
           {/* Right Column: Live Incoming Orders Queue */}
           <div className="lg:col-span-6 space-y-4">
             <div
-              className={`rounded-2xl border p-6 shadow-2xs space-y-4 ${isDark
+              className={`rounded-2xl border p-6 shadow-2xs space-y-4 ${
+                isDark
                   ? "bg-[#1C120B] border-[#362114]"
                   : "bg-white border-[#E8DEC8]"
-                }`}
+              }`}
             >
               <div
-                className={`flex items-center justify-between border-b pb-3 ${isDark ? "border-[#2D1B10]" : "border-[#EFE8DC]"
-                  }`}
+                className={`flex items-center justify-between border-b pb-3 ${
+                  isDark ? "border-[#2D1B10]" : "border-[#EFE8DC]"
+                }`}
               >
                 <div className="flex items-center gap-2">
                   <Truck className="w-4 h-4 text-[#E08F35]" />
                   <h2
-                    className={`text-sm font-bold font-serif ${isDark ? "text-[#FAF4EA]" : "text-[#1F120A]"
-                      }`}
+                    className={`text-sm font-bold font-serif ${
+                      isDark ? "text-[#FAF4EA]" : "text-[#1F120A]"
+                    }`}
                   >
                     Live Orders & Delivery Dispatch Queue ({displayOrders.length})
                   </h2>
@@ -767,8 +810,9 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
 
               {displayOrders.length === 0 ? (
                 <div
-                  className={`p-8 text-center space-y-2 ${isDark ? "text-[#A89482]" : "text-[#6A523E]"
-                    }`}
+                  className={`p-8 text-center space-y-2 ${
+                    isDark ? "text-[#A89482]" : "text-[#6A523E]"
+                  }`}
                 >
                   <Package className="w-8 h-8 mx-auto text-[#DDD1BE]" />
                   <p className="text-xs font-semibold">
@@ -787,25 +831,29 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                     const items: any[] = Array.isArray(rawItems)
                       ? rawItems
                       : rawItems && typeof rawItems === "object"
-                        ? Object.values(rawItems)
-                        : [];
+                      ? Object.values(rawItems)
+                      : [];
 
                     const mapsQuery =
                       addr.lat && addr.lng
                         ? `${addr.lat},${addr.lng}`
                         : encodeURIComponent(
-                          `${addr.addressLine1 || ""}, ${addr.district || addr.city || "Bengaluru"
-                          } ${addr.pincode || ""}`
-                        );
+                            `${addr.addressLine1 || ""}, ${
+                              addr.district || addr.city || "Bengaluru"
+                            } ${addr.pincode || ""}`
+                          );
                     const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${mapsQuery}`;
 
                     const cleanPhone = (addr.phone || "")
                       .replace(/\D/g, "")
                       .slice(-10);
                     const waText = encodeURIComponent(
-                      `Hi ${addr.fullName || "Customer"
-                      }, your MANOPAVANA order #${ord.orderRef
-                      } is currently: ${ord.orderStatus}. Tracking: ${window.location.origin
+                      `Hi ${
+                        addr.fullName || "Customer"
+                      }, your MANOPAVANA order #${
+                        ord.orderRef
+                      } is currently: ${ord.orderStatus}. Tracking: ${
+                        window.location.origin
                       }/account?order=${ord.orderRef}`
                     );
                     const waUrl = `https://wa.me/91${cleanPhone}?text=${waText}`;
@@ -815,38 +863,43 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                     return (
                       <div
                         key={ord.orderRef}
-                        className={`p-4 rounded-2xl border space-y-3 shadow-2xs ${isDark
+                        className={`p-4 rounded-2xl border space-y-3 shadow-2xs ${
+                          isDark
                             ? "bg-[#150D07] border-[#362114]"
                             : "bg-[#FAF7F2] border-[#E8DEC8]"
-                          }`}
+                        }`}
                       >
                         <div className="flex items-start justify-between gap-3 text-xs">
                           <div>
                             <div className="flex items-center gap-2">
                               <span
-                                className={`font-bold ${isDark ? "text-[#FAF4EA]" : "text-[#1F120A]"
-                                  }`}
+                                className={`font-bold ${
+                                  isDark ? "text-[#FAF4EA]" : "text-[#1F120A]"
+                                }`}
                               >
                                 #{ord.orderRef}
                               </span>
                               <span
-                                className={`text-[10px] font-bold px-2 py-0.5 rounded border ${isDark
+                                className={`text-[10px] font-bold px-2 py-0.5 rounded border ${
+                                  isDark
                                     ? "bg-[#1C120B] border-[#3D2514] text-[#E08F35]"
                                     : "bg-white border-[#DDD1BE] text-[#5E3210]"
-                                  }`}
+                                }`}
                               >
                                 ₹{ord.total}
                               </span>
                               <span
-                                className={`text-[10px] ${isDark ? "text-[#A89482]" : "text-[#7A5E48]"
-                                  }`}
+                                className={`text-[10px] ${
+                                  isDark ? "text-[#A89482]" : "text-[#7A5E48]"
+                                }`}
                               >
                                 {ord.paymentMethod?.toUpperCase()}
                               </span>
                             </div>
                             <p
-                              className={`text-[11px] mt-0.5 ${isDark ? "text-[#D8C8B8]" : "text-[#6A523E]"
-                                }`}
+                              className={`text-[11px] mt-0.5 ${
+                                isDark ? "text-[#D8C8B8]" : "text-[#6A523E]"
+                              }`}
                             >
                               {addr.fullName || "Customer"} •{" "}
                               {addr.phone || "No phone"}
@@ -858,15 +911,16 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                             <select
                               value={ord.orderStatus}
                               onChange={(e) =>
-                                updateOrderStatus(
-                                  ord.id || ord.orderRef,
+                                handleStatusChange(
+                                  ord,
                                   e.target.value as OrderStatus
                                 )
                               }
-                              className={`px-2.5 py-1 rounded-lg text-xs font-bold focus:ring-1 focus:ring-[#E08F35] ${isDark
+                              className={`px-2.5 py-1 rounded-lg text-xs font-bold focus:ring-1 focus:ring-[#E08F35] ${
+                                isDark
                                   ? "bg-[#1C120B] border border-[#3D2514] text-amber-200"
                                   : "bg-white border border-[#DDD1BE] text-[#5E3210]"
-                                }`}
+                              }`}
                             >
                               <option value="Placed">Placed</option>
                               <option value="Payment Incomplete">
@@ -902,14 +956,16 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
 
                         {/* Items Summary */}
                         <div
-                          className={`text-[11px] p-2.5 rounded-xl border space-y-1 ${isDark
+                          className={`text-[11px] p-2.5 rounded-xl border space-y-1 ${
+                            isDark
                               ? "bg-[#1C120B] border-[#362114] text-[#D8C8B8]"
                               : "bg-white border-[#EFE8DC] text-[#4A3220]"
-                            }`}
+                          }`}
                         >
                           <span
-                            className={`font-semibold block ${isDark ? "text-[#FAF4EA]" : "text-[#1F120A]"
-                              }`}
+                            className={`font-semibold block ${
+                              isDark ? "text-[#FAF4EA]" : "text-[#1F120A]"
+                            }`}
                           >
                             Ordered Items ({items.length}):
                           </span>
@@ -925,15 +981,17 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
 
                         {/* Drop Address */}
                         <div
-                          className={`text-[11px] p-2.5 rounded-xl border space-y-1 ${isDark
+                          className={`text-[11px] p-2.5 rounded-xl border space-y-1 ${
+                            isDark
                               ? "bg-[#1C120B] border-[#362114] text-[#D8C8B8]"
                               : "bg-white border-[#EFE8DC] text-[#4A3220]"
-                            }`}
+                          }`}
                         >
                           <div className="flex items-center justify-between gap-2">
                             <span
-                              className={`font-semibold block ${isDark ? "text-[#FAF4EA]" : "text-[#1F120A]"
-                                }`}
+                              className={`font-semibold block ${
+                                isDark ? "text-[#FAF4EA]" : "text-[#1F120A]"
+                              }`}
                             >
                               Delivery Drop Address:
                             </span>
@@ -960,10 +1018,11 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                         {/* Logistics Actions */}
                         {isLocal ? (
                           <div
-                            className={`p-3.5 rounded-xl border space-y-3 text-xs ${isDark
+                            className={`p-3.5 rounded-xl border space-y-3 text-xs ${
+                              isDark
                                 ? "bg-[#191009] border-[#3D2514]"
                                 : "bg-[#FDF9F2] border-[#E8DEC8]"
-                              }`}
+                            }`}
                           >
                             <div className="flex flex-wrap items-center justify-between gap-2">
                               <div className="flex items-center gap-1.5 font-bold">
@@ -987,8 +1046,9 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-1">
                               <div>
                                 <label
-                                  className={`block text-[11px] font-bold mb-1 ${isDark ? "text-[#D8C8B8]" : "text-[#5C4230]"
-                                    }`}
+                                  className={`block text-[11px] font-bold mb-1 ${
+                                    isDark ? "text-[#D8C8B8]" : "text-[#5C4230]"
+                                  }`}
                                 >
                                   Delivery Partner / Rider
                                 </label>
@@ -1006,17 +1066,19 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                                       [ord.orderRef]: e.target.value,
                                     }))
                                   }
-                                  className={`w-full px-2.5 py-1.5 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-[#E08F35] ${isDark
+                                  className={`w-full px-2.5 py-1.5 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-[#E08F35] ${
+                                    isDark
                                       ? "bg-[#140D07] border border-[#362114] text-[#FAF4EA]"
                                       : "bg-white border border-[#DDD1BE] text-[#1F120A]"
-                                    }`}
+                                  }`}
                                 />
                               </div>
 
                               <div>
                                 <label
-                                  className={`block text-[11px] font-bold mb-1 ${isDark ? "text-[#D8C8B8]" : "text-[#5C4230]"
-                                    }`}
+                                  className={`block text-[11px] font-bold mb-1 ${
+                                    isDark ? "text-[#D8C8B8]" : "text-[#5C4230]"
+                                  }`}
                                 >
                                   Rider Contact / Notes
                                 </label>
@@ -1034,17 +1096,19 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                                       [ord.orderRef]: e.target.value,
                                     }))
                                   }
-                                  className={`w-full px-2.5 py-1.5 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-[#E08F35] ${isDark
+                                  className={`w-full px-2.5 py-1.5 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-[#E08F35] ${
+                                    isDark
                                       ? "bg-[#140D07] border border-[#362114] text-[#FAF4EA]"
                                       : "bg-white border border-[#DDD1BE] text-[#1F120A]"
-                                    }`}
+                                  }`}
                                 />
                               </div>
 
                               <div>
                                 <label
-                                  className={`block text-[11px] font-bold mb-1 ${isDark ? "text-[#D8C8B8]" : "text-[#5C4230]"
-                                    }`}
+                                  className={`block text-[11px] font-bold mb-1 ${
+                                    isDark ? "text-[#D8C8B8]" : "text-[#5C4230]"
+                                  }`}
                                 >
                                   Tracking / Waybill Number
                                 </label>
@@ -1062,29 +1126,36 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                                       [ord.orderRef]: e.target.value,
                                     }))
                                   }
-                                  className={`w-full px-2.5 py-1.5 rounded-lg text-xs font-mono focus:outline-none focus:ring-1 focus:ring-[#E08F35] ${isDark
+                                  className={`w-full px-2.5 py-1.5 rounded-lg text-xs font-mono focus:outline-none focus:ring-1 focus:ring-[#E08F35] ${
+                                    isDark
                                       ? "bg-[#140D07] border border-[#362114] text-[#FAF4EA]"
                                       : "bg-white border border-[#DDD1BE] text-[#1F120A]"
-                                    }`}
+                                  }`}
                                 />
                               </div>
 
                               <div>
                                 <label
-                                  className={`block text-[11px] font-bold mb-1 ${isDark ? "text-[#D8C8B8]" : "text-[#5C4230]"
-                                    }`}
+                                  className={`block text-[11px] font-bold mb-1 ${
+                                    isDark ? "text-[#D8C8B8]" : "text-[#5C4230]"
+                                  }`}
                                 >
                                   Fulfillment Status
                                 </label>
+
                                 <select
                                   value={ord.orderStatus}
                                   onChange={(e) =>
-                                    updateOrderStatus(ord.id || ord.orderRef, e.target.value as OrderStatus)
+                                    handleStatusChange(
+                                      ord,
+                                      e.target.value as OrderStatus
+                                    )
                                   }
-                                  className={`px-2.5 py-1 rounded-lg text-xs font-bold focus:ring-1 focus:ring-[#E08F35] ${isDark
+                                  className={`px-2.5 py-1 rounded-lg text-xs font-bold focus:ring-1 focus:ring-[#E08F35] ${
+                                    isDark
                                       ? "bg-[#1C120B] border border-[#3D2514] text-amber-200"
                                       : "bg-white border border-[#DDD1BE] text-[#5E3210]"
-                                    }`}
+                                  }`}
                                 >
                                   <option value="Placed">Placed</option>
                                   <option value="Packed">Packed</option>
@@ -1118,10 +1189,11 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                                 <button
                                   type="button"
                                   onClick={() => handleCopyRiderDrop(ord)}
-                                  className={`px-3 py-1.5 rounded-lg border text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer ${isDark
+                                  className={`px-3 py-1.5 rounded-lg border text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer ${
+                                    isDark
                                       ? "bg-[#1E130B] border-[#3D2514] text-[#FAF4EA] hover:bg-[#28180E]"
                                       : "bg-white border-[#DDD1BE] text-[#5E3210] hover:bg-[#FAF6EE]"
-                                    }`}
+                                  }`}
                                 >
                                   <Copy className="w-3.5 h-3.5 text-[#E08F35]" />
                                   <span>Copy Rider Drop Details</span>
@@ -1148,10 +1220,11 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                           </div>
                         ) : (
                           <div
-                            className={`p-3 rounded-xl border space-y-2.5 text-xs ${isDark
+                            className={`p-3 rounded-xl border space-y-2.5 text-xs ${
+                              isDark
                                 ? "bg-[#191009] border-[#3D2514]"
                                 : "bg-[#F7F2E8] border-[#DFD4BF]"
-                              }`}
+                            }`}
                           >
                             <div className="flex flex-wrap items-center justify-between gap-2">
                               <div className="flex items-center gap-1.5 font-bold">
@@ -1168,16 +1241,18 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                               <div className="flex items-center gap-2">
                                 {pincodeStatus[ord.orderRef] ? (
                                   <span
-                                    className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${pincodeStatus[ord.orderRef].serviceable
+                                    className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                                      pincodeStatus[ord.orderRef].serviceable
                                         ? "bg-emerald-500/15 text-emerald-600 border border-emerald-500/30"
                                         : "bg-red-500/15 text-red-600 border border-red-500/30"
-                                      }`}
+                                    }`}
                                   >
                                     {pincodeStatus[ord.orderRef].serviceable
-                                      ? `Delhivery Deliverable (COD: ${pincodeStatus[ord.orderRef].cod
-                                        ? "Yes"
-                                        : "No"
-                                      })`
+                                      ? `Delhivery Deliverable (COD: ${
+                                          pincodeStatus[ord.orderRef].cod
+                                            ? "Yes"
+                                            : "No"
+                                        })`
                                       : "Delhivery Not Serviceable"}
                                   </span>
                                 ) : (
@@ -1190,10 +1265,11 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                                       )
                                     }
                                     disabled={checkingPincode[ord.orderRef]}
-                                    className={`text-[10px] font-bold px-2 py-1 rounded-lg border transition-colors cursor-pointer ${isDark
+                                    className={`text-[10px] font-bold px-2 py-1 rounded-lg border transition-colors cursor-pointer ${
+                                      isDark
                                         ? "bg-[#1C120B] border-[#3D2514] text-[#E08F35] hover:bg-[#28180E]"
                                         : "bg-white border-[#DDD1BE] text-[#5E3210] hover:bg-[#FAF6EE]"
-                                      }`}
+                                    }`}
                                   >
                                     {checkingPincode[ord.orderRef]
                                       ? "Checking..."
@@ -1205,10 +1281,11 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
 
                             {ord.trackingNumber ? (
                               <div
-                                className={`p-2.5 rounded-lg border space-y-2 ${isDark
+                                className={`p-2.5 rounded-lg border space-y-2 ${
+                                  isDark
                                     ? "bg-[#140D07] border-[#362114]"
                                     : "bg-white border-[#E5DAC8]"
-                                  }`}
+                                }`}
                               >
                                 <div className="flex flex-wrap items-center justify-between gap-2">
                                   <div>
@@ -1218,10 +1295,11 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                                       {ord.courier || "Delhivery Express"})
                                     </span>
                                     <span
-                                      className={`font-mono text-xs font-bold ${isDark
+                                      className={`font-mono text-xs font-bold ${
+                                        isDark
                                           ? "text-[#FAF4EA]"
                                           : "text-[#1F120A]"
-                                        }`}
+                                      }`}
                                     >
                                       AWB: {ord.trackingNumber}
                                     </span>
@@ -1234,10 +1312,11 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                                       )}`}
                                       target="_blank"
                                       rel="noopener noreferrer"
-                                      className={`px-2.5 py-1 rounded-lg border font-bold text-[11px] flex items-center gap-1 transition-colors ${isDark
+                                      className={`px-2.5 py-1 rounded-lg border font-bold text-[11px] flex items-center gap-1 transition-colors ${
+                                        isDark
                                           ? "bg-[#1E130B] border-[#3D2514] text-[#FAF4EA] hover:bg-[#2A1A0F]"
                                           : "bg-[#FAF6EE] border-[#DDD1BE] text-[#1F120A] hover:bg-[#EFE8DC]"
-                                        }`}
+                                      }`}
                                       title="Print Delhivery Packing Slip"
                                     >
                                       <Printer className="w-2.5 h-2.5 text-[#E08F35]" />
@@ -1274,10 +1353,11 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                                           [ord.orderRef]: e.target.value,
                                         }))
                                       }
-                                      className={`flex-1 px-2.5 py-1 text-xs rounded-lg font-mono focus:outline-none focus:ring-1 focus:ring-[#E08F35] ${isDark
+                                      className={`flex-1 px-2.5 py-1 text-xs rounded-lg font-mono focus:outline-none focus:ring-1 focus:ring-[#E08F35] ${
+                                        isDark
                                           ? "bg-[#140D07] border border-[#362114] text-[#FAF4EA] placeholder-[#8A7665]"
                                           : "bg-white border border-[#DDD1BE] text-[#1F120A] placeholder-[#8A7665]"
-                                        }`}
+                                      }`}
                                     />
                                     <button
                                       type="button"
@@ -1314,10 +1394,11 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                               href={mapsUrl}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className={`px-3 py-1.5 rounded-lg border text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer ${isDark
+                              className={`px-3 py-1.5 rounded-lg border text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer ${
+                                isDark
                                   ? "bg-[#1C120B] border-[#362114] text-amber-200 hover:border-[#E08F35]"
                                   : "bg-white border-[#DDD1BE] hover:border-[#E08F35] text-[#5E3210]"
-                                }`}
+                              }`}
                             >
                               <MapPin className="w-3.5 h-3.5 text-[#E08F35]" />
                               <span>Google Maps Pin</span>
@@ -1327,12 +1408,13 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                             <button
                               type="button"
                               onClick={() => handleCopyPorter(ord)}
-                              className={`px-3 py-1.5 rounded-lg border text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer ${copiedPorter[ord.orderRef]
+                              className={`px-3 py-1.5 rounded-lg border text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer ${
+                                copiedPorter[ord.orderRef]
                                   ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-600"
                                   : isDark
-                                    ? "bg-[#1C120B] border-[#362114] text-[#FAF4EA] hover:border-[#E08F35]"
-                                    : "bg-white border-[#DDD1BE] hover:border-[#E08F35] text-[#1F120A]"
-                                }`}
+                                  ? "bg-[#1C120B] border-[#362114] text-[#FAF4EA] hover:border-[#E08F35]"
+                                  : "bg-white border-[#DDD1BE] hover:border-[#E08F35] text-[#1F120A]"
+                              }`}
                             >
                               {copiedPorter[ord.orderRef] ? (
                                 <Check className="w-3.5 h-3.5 text-emerald-600" />
@@ -1351,11 +1433,14 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                             href={
                               ord.trackingNumber
                                 ? `https://wa.me/91${cleanPhone}?text=${encodeURIComponent(
-                                  `Hi ${addr.fullName || "Customer"
-                                  }, your MANOPAVANA order #${ord.orderRef
-                                  } has been dispatched! Track your parcel live here: https://www.delhivery.com/track/package/${ord.trackingNumber
-                                  }`
-                                )}`
+                                    `Hi ${
+                                      addr.fullName || "Customer"
+                                    }, your MANOPAVANA order #${
+                                      ord.orderRef
+                                    } has been dispatched! Track your parcel live here: https://www.delhivery.com/track/package/${
+                                      ord.trackingNumber
+                                    }`
+                                  )}`
                                 : waUrl
                             }
                             target="_blank"
