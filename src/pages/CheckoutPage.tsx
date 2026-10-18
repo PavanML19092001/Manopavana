@@ -1330,29 +1330,30 @@ export const CheckoutPage: React.FC = () => {
 
                   {/* Math Challenge Box for COD Orders */}
                   {paymentMethod === "cod" && (
-                    <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs space-y-2 mt-3 ml-7">
-                      <p className="font-bold text-[#1F120A] dark:text-[#FAF4EA]">
-                        Quick COD Verification (Prevent Accidental Orders):
-                      </p>
-                      <div className="flex items-center gap-3">
-                        <span className="font-mono font-bold text-sm bg-white dark:bg-black/40 px-3 py-1 rounded-lg border border-amber-400">
+                    <div className="mt-3 p-4 rounded-2xl bg-amber-500/10 border border-amber-500/25 space-y-2.5">
+                      <div className="flex items-center justify-between">
+                        <h4 className="text-xs font-bold text-[#5E3210] dark:text-amber-200">
+                          Quick COD Verification (Prevent Accidental Orders)
+                        </h4>
+                      </div>
+
+                      <div className="flex items-center gap-2.5">
+                        <div className="px-3.5 py-2 rounded-xl bg-amber-200/60 dark:bg-[#2A180D] border border-amber-600/30 font-mono font-bold text-xs text-[#5E3210] dark:text-amber-200 tracking-wider select-none shrink-0">
                           {codChallenge.a} + {codChallenge.b} = ?
-                        </span>
+                        </div>
+
                         <input
                           type="number"
-                          placeholder="Answer"
+                          inputMode="numeric"
+                          placeholder="Enter Answer"
                           value={codAnswerInput}
-                          onChange={(e) => {
-                            setCodAnswerInput(e.target.value);
-                            setCodError(null);
-                          }}
-                          className="w-24 px-3 py-1 text-sm font-bold rounded-lg border border-stone-300 dark:border-stone-700 bg-white dark:bg-[#120A06] text-center"
+                          onChange={(e) => setCodAnswerInput(e.target.value)}
+                          className="w-full px-3.5 py-2 rounded-xl border border-stone-300 dark:border-stone-700 bg-white dark:bg-[#140D07] text-[#1F120A] dark:text-[#FAF4EA] placeholder:text-stone-400 dark:placeholder:text-stone-500 font-mono font-bold text-xs focus:outline-none focus:ring-2 focus:ring-[#E08F35]/50 transition-all"
                         />
                       </div>
+
                       {codError && (
-                        <p className="text-[11px] text-red-600 dark:text-red-400 font-semibold">
-                          {codError}
-                        </p>
+                        <p className="text-[11px] text-red-600 font-semibold">{codError}</p>
                       )}
                     </div>
                   )}

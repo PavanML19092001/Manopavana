@@ -800,23 +800,29 @@ export const ProductPage = () => {
                 Add to Bag
               </button>
             ) : (
-              <div className="flex items-center gap-2 px-2 py-1.5 rounded-xl border border-[#E08F35]">
-                <button
-                  type="button"
-                  onClick={handleDecrement}
-                  className="w-6 h-6 flex items-center justify-center font-bold text-xs"
-                >
-                  -
-                </button>
-                <span className="font-bold text-xs">{currentQuantity}</span>
-                <button
-                  type="button"
-                  onClick={handleIncrement}
-                  className="w-6 h-6 flex items-center justify-center font-bold text-xs"
-                >
-                  +
-                </button>
-              </div>
+<div className="flex items-center justify-between border-2 border-[#E08F35] rounded-full p-1 bg-white dark:bg-[#1A1009] shadow-xs">
+  <button
+    type="button"
+    onClick={() => updateQuantity(`${product.id}-${selectedVolume}`, -1)}
+    className="w-8 h-8 rounded-xl bg-[#5E3210] hover:bg-[#43230A] active:scale-95 text-white flex items-center justify-center font-bold text-base transition-all cursor-pointer shadow-xs"
+    aria-label="Decrease quantity"
+  >
+    <Minus className="w-4 h-4 stroke-[3] text-white" />
+  </button>
+
+  <span className="font-bold text-xs sm:text-sm text-[#1F120A] dark:text-[#FAF4EA] px-3 select-none">
+    {cart.find((i) => i.id === `${product.id}-${selectedVolume}`)?.quantity || 1} in Bag
+  </span>
+
+  <button
+    type="button"
+    onClick={() => updateQuantity(`${product.id}-${selectedVolume}`, 1)}
+    className="w-8 h-8 rounded-xl bg-[#5E3210] hover:bg-[#43230A] active:scale-95 text-white flex items-center justify-center font-bold text-base transition-all cursor-pointer shadow-xs"
+    aria-label="Increase quantity"
+  >
+    <Plus className="w-4 h-4 stroke-[3] text-white" />
+  </button>
+</div>
             )}
             <button
               type="button"

@@ -1133,10 +1133,10 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       return false;
     }
 
-    // If Delhivery waybill was already generated, void on carrier to restore wallet credit
+    // Direct Delhivery API cancellation & automated wallet refund
     if (target.trackingNumber) {
       try {
-        showToast("Notifying Delhivery of order cancellation...");
+        showToast("Notifying Delhivery of cancellation & processing freight credit...");
         await fetch("/api?action=delhivery_cancel_order", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -1409,7 +1409,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       target?.isBuyNow || (buyNowItem !== null && itemsToUse.length === 1 && itemsToUse[0].id === buyNowItem.id)
     );
 
-    // trackingNumber is typed as string | undefined; undefined avoids TypeScript null errors
     const updated: Order = {
       id: target?.id || `ORD-${Date.now().toString().slice(-4)}`,
       orderRef,
@@ -1573,6 +1572,8 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             ...remoteConfig,
             prices: { ...prev.prices, ...(remoteConfig.prices || {}) },
             stock: { ...prev.stock, ...(remoteConfig.stock || {}) },
+            productDetails: remoteConfig.productDetails || prev.productDetails,
+            policies: remoteConfig.policies || prev.policies,
           };
           try {
             localStorage.setItem("manopavana_cms", JSON.stringify(merged));
@@ -1597,46 +1598,65 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const products: Product[] = useMemo(() => {
     return PRODUCTS.map((p) => {
+      // 1. Fetch overrides saved from the CMS panel
+      const overrides = cmsConfig?.productDetails?.[p.id];
+
+      // 2. Read live prices and stock
+      let customPrices = { ...p.prices };
+      let customStock = { ...p.inStock };
+
       if (p.id === "groundnut") {
-        return {
-          ...p,
-          prices: {
-            "1L": cmsConfig.prices?.groundnut1L ?? p.prices["1L"],
-            "500ml": cmsConfig.prices?.groundnut500ml ?? p.prices["500ml"],
-          },
-          inStock: {
-            "1L": cmsConfig.stock?.groundnut1L ?? p.inStock["1L"],
-            "500ml": cmsConfig.stock?.groundnut500ml ?? p.inStock["500ml"],
-          },
+        customPrices = {
+          "1L": cmsConfig.prices?.groundnut1L ?? p.prices["1L"],
+          "500ml": cmsConfig.prices?.groundnut500ml ?? p.prices["500ml"],
+        };
+        customStock = {
+          "1L": cmsConfig.stock?.groundnut1L ?? p.inStock["1L"],
+          "500ml": cmsConfig.stock?.groundnut500ml ?? p.inStock["500ml"],
+        };
+      } else if (p.id === "coconut") {
+        customPrices = {
+          "1L": cmsConfig.prices?.coconut1L ?? p.prices["1L"],
+          "500ml": cmsConfig.prices?.coconut500ml ?? p.prices["500ml"],
+        };
+        customStock = {
+          "1L": cmsConfig.stock?.coconut1L ?? p.inStock["1L"],
+          "500ml": cmsConfig.stock?.coconut500ml ?? p.inStock["500ml"],
+        };
+      } else if (p.id === "sesame") {
+        customPrices = {
+          "1L": cmsConfig.prices?.sesame1L ?? p.prices["1L"],
+          "500ml": cmsConfig.prices?.sesame500ml ?? p.prices["500ml"],
+        };
+        customStock = {
+          "1L": cmsConfig.stock?.sesame1L ?? p.inStock["1L"],
+          "500ml": cmsConfig.stock?.sesame500ml ?? p.inStock["500ml"],
         };
       }
-      if (p.id === "coconut") {
-        return {
-          ...p,
-          prices: {
-            "1L": cmsConfig.prices?.coconut1L ?? p.prices["1L"],
-            "500ml": cmsConfig.prices?.coconut500ml ?? p.prices["500ml"],
-          },
-          inStock: {
-            "1L": cmsConfig.stock?.coconut1L ?? p.inStock["1L"],
-            "500ml": cmsConfig.stock?.coconut500ml ?? p.inStock["500ml"],
-          },
-        };
-      }
-      if (p.id === "sesame") {
-        return {
-          ...p,
-          prices: {
-            "1L": cmsConfig.prices?.sesame1L ?? p.prices["1L"],
-            "500ml": cmsConfig.prices?.sesame500ml ?? p.prices["500ml"],
-          },
-          inStock: {
-            "1L": cmsConfig.stock?.sesame1L ?? p.inStock["1L"],
-            "500ml": cmsConfig.stock?.sesame500ml ?? p.inStock["500ml"],
-          },
-        };
-      }
-      return p;
+
+      // 3. Return product merged with all deep CMS overrides
+      return {
+        ...p,
+        name: overrides?.name || p.name,
+        shortDescription: overrides?.description || overrides?.shortDescription || p.shortDescription,
+        labelImage: overrides?.imageUrl || p.labelImage,
+        images: overrides?.imageUrl ? [overrides.imageUrl, ...p.images.slice(1)] : p.images,
+        smokePoint: overrides?.smokePoint || p.smokePoint,
+        prices: customPrices,
+        inStock: customStock,
+        specs: {
+          ...p.specs,
+          extraction: overrides?.extractionMethod || p.specs.extraction,
+          shelfLife: overrides?.shelfLife || p.specs.shelfLife,
+          bestFor: overrides?.cookingUses || p.specs.bestFor,
+        },
+        features: {
+          ...p.features,
+          usage: overrides?.cookingUses || p.features.usage,
+          process: overrides?.fullStory || p.features.process,
+          quality: overrides?.ingredients || p.features.quality,
+        },
+      };
     });
   }, [cmsConfig]);
 
