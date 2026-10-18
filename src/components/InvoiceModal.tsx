@@ -43,7 +43,7 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({ order, isOpen, onClo
               margin: 8mm 12mm;
             }
 
-            /* 1. Collapse all normal DOM flow so they don't produce empty pages */
+            /* Collapse all background DOM elements so they don't produce empty pages */
             body > *:not(#root):not(#__next),
             #root > *:not([role="dialog"]) {
               display: none !important;
@@ -58,7 +58,7 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({ order, isOpen, onClo
               padding: 0 !important;
             }
 
-            /* 2. Position the invoice naturally at the very top of Page 1 */
+            /* Position invoice naturally on Page 1 without fixed repeated elements */
             #printable-invoice {
               position: static !important;
               display: block !important;
@@ -75,7 +75,6 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({ order, isOpen, onClo
               page-break-inside: avoid !important;
             }
 
-            /* 3. Hide all non-printable modal elements */
             .print\\:hidden {
               display: none !important;
             }

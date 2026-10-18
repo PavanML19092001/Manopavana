@@ -6,8 +6,6 @@ import {
   MapPin,
   ExternalLink,
   MessageCircle,
-  Save,
-  CheckCircle2,
   Truck,
   Sparkles,
   Package,
@@ -15,6 +13,7 @@ import {
   Copy,
   Check,
   AlertCircle,
+  CheckCircle2,
   Activity,
   Trash2,
   Eye,
@@ -47,7 +46,7 @@ export const AdminPage: React.FC = () => {
   const [pinError, setPinError] = useState(false);
   const [showCloudflareGuide, setShowCloudflareGuide] = useState(false);
 
-  // Delhivery Logistics & Testing State
+  // Delhivery Logistics State
   const [checkingPincode, setCheckingPincode] = useState<Record<string, boolean>>({});
   const [pincodeStatus, setPincodeStatus] = useState<
     Record<
@@ -58,14 +57,7 @@ export const AdminPage: React.FC = () => {
   const [manifesting, setManifesting] = useState<Record<string, boolean>>({});
   const [manifestError, setManifestError] = useState<Record<string, string>>({});
   const [customAwb, setCustomAwb] = useState<Record<string, string>>({});
-  const [copiedPorter, setCopiedPorter] = useState<Record<string, boolean>>({});
-
-  // Bangalore Local Courier Manual Tracking State
-  const [blrCourier, setBlrCourier] = useState<Record<string, string>>({});
-  const [blrNotes, setBlrNotes] = useState<Record<string, string>>({});
-  const [blrTracking, setBlrTracking] = useState<Record<string, string>>({});
-  const [blrStatus, setBlrStatus] = useState<Record<string, OrderStatus>>({});
-  const [savedSuccessRef, setSavedSuccessRef] = useState<Record<string, boolean>>({});
+  const [copiedAddress, setCopiedAddress] = useState<Record<string, boolean>>({});
 
   // Delhivery Diagnostic State
   const [pingingApi, setPingingApi] = useState(false);
@@ -80,7 +72,7 @@ export const AdminPage: React.FC = () => {
     message?: string;
   } | null>(null);
 
-  // Helper to map live Delhivery carrier status strings to MANOPAVANA website order stages
+  // Helper to map live Delhivery carrier status strings to website order stages
   const mapDelhiveryToWebStatus = (
     delhiveryStatus: string
   ): OrderStatus | null => {
@@ -112,12 +104,11 @@ export const AdminPage: React.FC = () => {
     return null;
   };
 
-  // Automatic background carrier status sync for active Delhivery orders
+  // Automatic background carrier status sync for all active Delhivery orders
   useEffect(() => {
     const activeDelhiveryOrders = orders.filter(
       (o) =>
-        o.trackingNumber &&
-        !o.trackingNumber.startsWith("MV-BLR") &&
+        Boolean(o.trackingNumber) &&
         o.orderStatus !== "Delivered" &&
         o.orderStatus !== "Cancelled"
     );
@@ -126,9 +117,10 @@ export const AdminPage: React.FC = () => {
 
     const syncActiveShipments = async () => {
       for (const ord of activeDelhiveryOrders) {
+        if (!ord.trackingNumber) continue;
         try {
           const res = await fetch(
-            `/api?action=delhivery_track&waybill=${ord.trackingNumber}`
+            `/api?action=delhivery_track&waybill=${encodeURIComponent(ord.trackingNumber)}`
           );
           const data = await res.json();
           const scanStatus =
@@ -146,10 +138,8 @@ export const AdminPage: React.FC = () => {
       }
     };
 
-    // Run automatically when dashboard opens
     syncActiveShipments();
 
-    // Re-check automatically every 5 minutes while dashboard remains open
     const interval = setInterval(syncActiveShipments, 5 * 60 * 1000);
     return () => clearInterval(interval);
   }, [orders, updateOrderStatus]);
@@ -184,60 +174,6 @@ export const AdminPage: React.FC = () => {
     } finally {
       setPingingApi(false);
     }
-  };
-
-  const handleSaveBlrTracking = async (orderRef: string, currentOrd: Order) => {
-    try {
-      const courierVal =
-        blrCourier[orderRef] !== undefined
-          ? blrCourier[orderRef]
-          : currentOrd.courier || "MANOPAVANA Peenya Direct Fleet";
-      const notesVal =
-        blrNotes[orderRef] !== undefined
-          ? blrNotes[orderRef]
-          : currentOrd.notes || "";
-      const trackingVal =
-        blrTracking[orderRef] !== undefined
-          ? blrTracking[orderRef]
-          : currentOrd.trackingNumber || "";
-      const statusVal =
-        blrStatus[orderRef] || currentOrd.orderStatus || "Dispatched";
-
-      await updateOrderDetails(orderRef, {
-        courier: courierVal,
-        notes: notesVal,
-        trackingNumber: trackingVal,
-        orderStatus: statusVal,
-      });
-
-      setSavedSuccessRef((p) => ({ ...p, [orderRef]: true }));
-      setTimeout(() => {
-        setSavedSuccessRef((p) => ({ ...p, [orderRef]: false }));
-      }, 4000);
-      showToast(`Bengaluru tracking details saved for #${orderRef}`);
-    } catch (err) {
-      console.error("Failed to save tracking:", err);
-      showToast(`Error saving tracking details for #${orderRef}`);
-    }
-  };
-
-  const handleCopyRiderDrop = (ord: Order) => {
-    const addr = (ord?.shippingAddress || {}) as any;
-    const mapsLink =
-      addr.lat && addr.lng
-        ? `https://www.google.com/maps?q=${addr.lat},${addr.lng}`
-        : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-            `${addr.addressLine1 || ""}, Bengaluru - ${addr.pincode || ""}`
-          )}`;
-    const text = `📦 MANOPAVANA DROP DETAILS\nOrder: #${ord.orderRef}\nCustomer: ${
-      addr.fullName || "Customer"
-    }\nPhone: ${addr.phone || "N/A"}\nAddress: ${addr.addressLine1 || ""}${
-      addr.landmark ? ` (Near ${addr.landmark})` : ""
-    }, ${addr.district || "Bengaluru"} - ${addr.pincode || ""}\nPayment: ${ord.paymentMethod?.toUpperCase()} (₹${
-      ord.total
-    })\nLocation Pin: ${mapsLink}`;
-    navigator.clipboard.writeText(text);
-    showToast("📋 Drop address & GPS copied for delivery rider!");
   };
 
   const handleCheckPincode = async (orderRef: string, pincode?: string) => {
@@ -371,11 +307,7 @@ export const AdminPage: React.FC = () => {
   };
 
   const handleStatusChange = async (ord: Order, newStatus: OrderStatus) => {
-    if (
-      newStatus === "Cancelled" &&
-      ord.trackingNumber &&
-      !ord.trackingNumber.startsWith("MV-BLR")
-    ) {
+    if (newStatus === "Cancelled" && ord.trackingNumber) {
       try {
         showToast("Notifying Delhivery of order cancellation...");
         const res = await fetch("/api?action=delhivery_cancel_order", {
@@ -399,7 +331,7 @@ export const AdminPage: React.FC = () => {
     await updateOrderStatus(ord.id || ord.orderRef, newStatus);
   };
 
-  const handleCopyPorter = (order: Order) => {
+  const handleCopyCustomerAddress = (order: Order) => {
     const addr = (order?.shippingAddress || {}) as any;
     const rawItems = order?.items;
     const items: any[] = Array.isArray(rawItems)
@@ -418,10 +350,10 @@ Order Ref: #${order.orderRef}
 Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
 
     navigator.clipboard.writeText(text);
-    setCopiedPorter((p) => ({ ...p, [order.orderRef]: true }));
-    showToast("Copied customer drop details for Porter app!");
+    setCopiedAddress((p) => ({ ...p, [order.orderRef]: true }));
+    showToast("Copied customer shipping details!");
     setTimeout(() => {
-      setCopiedPorter((p) => ({ ...p, [order.orderRef]: false }));
+      setCopiedAddress((p) => ({ ...p, [order.orderRef]: false }));
     }, 2500);
   };
 
@@ -562,7 +494,7 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                 </button>
               </div>
 
-              <div className="space-y-3 text-xs leading-relaxed text-stone-700 dark:text-stone-300">
+              <div className="space-y-3 text-xs leading-relaxed text-stone-700 dark:stone-300">
                 <p>
                   To secure your master PIN on Cloudflare without placing it in
                   client code, set it as an{" "}
@@ -642,7 +574,7 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                 </h1>
                 <span className="hidden md:inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-[10px] font-bold border border-emerald-500/30">
                   <Sparkles className="w-3 h-3" />
-                  Live Two-Way Sync
+                  Live Delhivery Integration Active
                 </span>
               </div>
               <p className="text-xs text-[#D6C4B0] mt-0.5">
@@ -799,7 +731,7 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                       isDark ? "text-[#FAF4EA]" : "text-[#1F120A]"
                     }`}
                   >
-                    Live Orders & Delivery Dispatch Queue ({displayOrders.length})
+                    Live Orders & Delhivery Dispatch Queue ({displayOrders.length})
                   </h2>
                 </div>
                 <span className="text-[11px] text-emerald-700 font-bold bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200 flex items-center gap-1">
@@ -857,8 +789,6 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                       }/account?order=${ord.orderRef}`
                     );
                     const waUrl = `https://wa.me/91${cleanPhone}?text=${waText}`;
-
-                    const isLocal = false;
 
                     return (
                       <div
@@ -995,17 +925,10 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                             >
                               Delivery Drop Address:
                             </span>
-                            {isLocal ? (
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-500 font-bold text-[10px] border border-amber-500/20">
-                                <MapPin className="w-2.5 h-2.5" />
-                                Bengaluru Local (Peenya Facility)
-                              </span>
-                            ) : (
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-500 font-bold text-[10px] border border-blue-500/20">
-                                <Truck className="w-2.5 h-2.5" />
-                                Outside Bengaluru • Delhivery
-                              </span>
-                            )}
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-500 font-bold text-[10px] border border-blue-500/20">
+                              <Truck className="w-2.5 h-2.5" />
+                              Delhivery Logistics Network
+                            </span>
                           </div>
                           <p>
                             {addr.addressLine1 || "No street address provided"}
@@ -1015,377 +938,173 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                           </p>
                         </div>
 
-                        {/* Logistics Actions */}
-                        {isLocal ? (
-                          <div
-                            className={`p-3.5 rounded-xl border space-y-3 text-xs ${
-                              isDark
-                                ? "bg-[#191009] border-[#3D2514]"
-                                : "bg-[#FDF9F2] border-[#E8DEC8]"
-                            }`}
-                          >
-                            <div className="flex flex-wrap items-center justify-between gap-2">
-                              <div className="flex items-center gap-1.5 font-bold">
-                                <MapPin className="w-3.5 h-3.5 text-amber-500" />
-                                <span
-                                  className={
-                                    isDark ? "text-[#FAF4EA]" : "text-[#1F120A]"
-                                  }
-                                >
-                                  Bengaluru Direct Delivery (Peenya Hub)
-                                </span>
-                                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-600 border border-amber-500/20">
-                                  Manual Tracking Mode
-                                </span>
-                              </div>
-                              <span className="text-[11px] text-stone-500">
-                                Direct Doorstep Dispatch • 24-48h Delivery
+                        {/* Delhivery Carrier Dispatch Actions */}
+                        <div
+                          className={`p-3 rounded-xl border space-y-2.5 text-xs ${
+                            isDark
+                              ? "bg-[#191009] border-[#3D2514]"
+                              : "bg-[#F7F2E8] border-[#DFD4BF]"
+                          }`}
+                        >
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <div className="flex items-center gap-1.5 font-bold">
+                              <Truck className="w-3.5 h-3.5 text-[#E08F35]" />
+                              <span
+                                className={
+                                  isDark ? "text-[#FAF4EA]" : "text-[#1F120A]"
+                                }
+                              >
+                                Delhivery Logistics Hub (Pan-India & Bengaluru)
                               </span>
                             </div>
 
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-1">
-                              <div>
-                                <label
-                                  className={`block text-[11px] font-bold mb-1 ${
-                                    isDark ? "text-[#D8C8B8]" : "text-[#5C4230]"
+                            <div className="flex items-center gap-2">
+                              {pincodeStatus[ord.orderRef] ? (
+                                <span
+                                  className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                                    pincodeStatus[ord.orderRef].serviceable
+                                      ? "bg-emerald-500/15 text-emerald-600 border border-emerald-500/30"
+                                      : "bg-red-500/15 text-red-600 border border-red-500/30"
                                   }`}
                                 >
-                                  Delivery Partner / Rider
-                                </label>
-                                <input
-                                  type="text"
-                                  placeholder="e.g. MANOPAVANA Peenya Direct / Borzo"
-                                  value={
-                                    blrCourier[ord.orderRef] !== undefined
-                                      ? blrCourier[ord.orderRef]
-                                      : ord.courier || ""
-                                  }
-                                  onChange={(e) =>
-                                    setBlrCourier((p) => ({
-                                      ...p,
-                                      [ord.orderRef]: e.target.value,
-                                    }))
-                                  }
-                                  className={`w-full px-2.5 py-1.5 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-[#E08F35] ${
-                                    isDark
-                                      ? "bg-[#140D07] border border-[#362114] text-[#FAF4EA]"
-                                      : "bg-white border border-[#DDD1BE] text-[#1F120A]"
-                                  }`}
-                                />
-                              </div>
-
-                              <div>
-                                <label
-                                  className={`block text-[11px] font-bold mb-1 ${
-                                    isDark ? "text-[#D8C8B8]" : "text-[#5C4230]"
-                                  }`}
-                                >
-                                  Rider Contact / Notes
-                                </label>
-                                <input
-                                  type="text"
-                                  placeholder="e.g. Ph: +91 9886012345 • Slot: 4-6 PM"
-                                  value={
-                                    blrNotes[ord.orderRef] !== undefined
-                                      ? blrNotes[ord.orderRef]
-                                      : ord.notes || ""
-                                  }
-                                  onChange={(e) =>
-                                    setBlrNotes((p) => ({
-                                      ...p,
-                                      [ord.orderRef]: e.target.value,
-                                    }))
-                                  }
-                                  className={`w-full px-2.5 py-1.5 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-[#E08F35] ${
-                                    isDark
-                                      ? "bg-[#140D07] border border-[#362114] text-[#FAF4EA]"
-                                      : "bg-white border border-[#DDD1BE] text-[#1F120A]"
-                                  }`}
-                                />
-                              </div>
-
-                              <div>
-                                <label
-                                  className={`block text-[11px] font-bold mb-1 ${
-                                    isDark ? "text-[#D8C8B8]" : "text-[#5C4230]"
-                                  }`}
-                                >
-                                  Tracking / Waybill Number
-                                </label>
-                                <input
-                                  type="text"
-                                  placeholder="e.g. MV-BLR-83801"
-                                  value={
-                                    blrTracking[ord.orderRef] !== undefined
-                                      ? blrTracking[ord.orderRef]
-                                      : ord.trackingNumber || ""
-                                  }
-                                  onChange={(e) =>
-                                    setBlrTracking((p) => ({
-                                      ...p,
-                                      [ord.orderRef]: e.target.value,
-                                    }))
-                                  }
-                                  className={`w-full px-2.5 py-1.5 rounded-lg text-xs font-mono focus:outline-none focus:ring-1 focus:ring-[#E08F35] ${
-                                    isDark
-                                      ? "bg-[#140D07] border border-[#362114] text-[#FAF4EA]"
-                                      : "bg-white border border-[#DDD1BE] text-[#1F120A]"
-                                  }`}
-                                />
-                              </div>
-
-                              <div>
-                                <label
-                                  className={`block text-[11px] font-bold mb-1 ${
-                                    isDark ? "text-[#D8C8B8]" : "text-[#5C4230]"
-                                  }`}
-                                >
-                                  Fulfillment Status
-                                </label>
-
-                                <select
-                                  value={ord.orderStatus}
-                                  onChange={(e) =>
-                                    handleStatusChange(
-                                      ord,
-                                      e.target.value as OrderStatus
-                                    )
-                                  }
-                                  className={`px-2.5 py-1 rounded-lg text-xs font-bold focus:ring-1 focus:ring-[#E08F35] ${
-                                    isDark
-                                      ? "bg-[#1C120B] border border-[#3D2514] text-amber-200"
-                                      : "bg-white border border-[#DDD1BE] text-[#5E3210]"
-                                  }`}
-                                >
-                                  <option value="Placed">Placed</option>
-                                  <option value="Packed">Packed</option>
-                                  <option value="Dispatched">Dispatched</option>
-                                  <option value="Delivered">Delivered</option>
-                                  <option value="Cancelled">Cancelled</option>
-                                </select>
-                              </div>
-                            </div>
-
-                            <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-stone-200 dark:border-stone-800">
-                              <div className="flex flex-wrap items-center gap-2">
+                                  {pincodeStatus[ord.orderRef].serviceable
+                                    ? `Delhivery Deliverable (COD: ${
+                                        pincodeStatus[ord.orderRef].cod
+                                          ? "Yes"
+                                          : "No"
+                                      })`
+                                    : "Delhivery Not Serviceable"}
+                                </span>
+                              ) : (
                                 <button
                                   type="button"
                                   onClick={() =>
-                                    handleSaveBlrTracking(ord.orderRef, ord)
+                                    handleCheckPincode(
+                                      ord.orderRef,
+                                      addr.pincode
+                                    )
                                   }
-                                  className="px-3.5 py-1.5 rounded-lg bg-[#5E3210] hover:bg-[#43230A] text-white font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
-                                >
-                                  <Save className="w-3.5 h-3.5 text-amber-300" />
-                                  <span>Save Tracking Details</span>
-                                </button>
-
-                                {savedSuccessRef[ord.orderRef] && (
-                                  <span className="text-[11px] font-bold text-emerald-600 bg-emerald-500/15 border border-emerald-500/30 px-2.5 py-1 rounded-md flex items-center gap-1 animate-fade-in">
-                                    <Check className="w-3.5 h-3.5 text-emerald-600" />
-                                    <span>Saved to Firestore!</span>
-                                  </span>
-                                )}
-
-                                <button
-                                  type="button"
-                                  onClick={() => handleCopyRiderDrop(ord)}
-                                  className={`px-3 py-1.5 rounded-lg border text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer ${
+                                  disabled={checkingPincode[ord.orderRef]}
+                                  className={`text-[10px] font-bold px-2 py-1 rounded-lg border transition-colors cursor-pointer ${
                                     isDark
-                                      ? "bg-[#1E130B] border-[#3D2514] text-[#FAF4EA] hover:bg-[#28180E]"
+                                      ? "bg-[#1C120B] border-[#3D2514] text-[#E08F35] hover:bg-[#28180E]"
                                       : "bg-white border-[#DDD1BE] text-[#5E3210] hover:bg-[#FAF6EE]"
                                   }`}
                                 >
-                                  <Copy className="w-3.5 h-3.5 text-[#E08F35]" />
-                                  <span>Copy Rider Drop Details</span>
+                                  {checkingPincode[ord.orderRef]
+                                    ? "Checking..."
+                                    : `Verify Pin ${addr.pincode || ""}`}
                                 </button>
-
-                                <a
-                                  href="https://borzodelivery.com/in"
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  onClick={() => handleCopyRiderDrop(ord)}
-                                  className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
-                                >
-                                  <Truck className="w-3.5 h-3.5" />
-                                  <span>Book on Borzo</span>
-                                  <ExternalLink className="w-3 h-3 opacity-80" />
-                                </a>
-                              </div>
-
-                              <div className="text-[11px] text-emerald-600 font-semibold flex items-center gap-1">
-                                <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                                <span>Live on Website Order Tracker</span>
-                              </div>
+                              )}
                             </div>
                           </div>
-                        ) : (
-                          <div
-                            className={`p-3 rounded-xl border space-y-2.5 text-xs ${
-                              isDark
-                                ? "bg-[#191009] border-[#3D2514]"
-                                : "bg-[#F7F2E8] border-[#DFD4BF]"
-                            }`}
-                          >
-                            <div className="flex flex-wrap items-center justify-between gap-2">
-                              <div className="flex items-center gap-1.5 font-bold">
-                                <Truck className="w-3.5 h-3.5 text-[#E08F35]" />
-                                <span
-                                  className={
-                                    isDark ? "text-[#FAF4EA]" : "text-[#1F120A]"
-                                  }
-                                >
-                                  Delhivery Logistics Hub (Outside Bengaluru)
-                                </span>
-                              </div>
 
-                              <div className="flex items-center gap-2">
-                                {pincodeStatus[ord.orderRef] ? (
+                          {ord.trackingNumber ? (
+                            <div
+                              className={`p-2.5 rounded-lg border space-y-2 ${
+                                isDark
+                                  ? "bg-[#140D07] border-[#362114]"
+                                  : "bg-white border-[#E5DAC8]"
+                              }`}
+                            >
+                              <div className="flex flex-wrap items-center justify-between gap-2">
+                                <div>
+                                  <span className="text-[10px] font-bold text-emerald-600 flex items-center gap-1">
+                                    <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                                    Shipment Booked (
+                                    {ord.courier || "Delhivery Express"})
+                                  </span>
                                   <span
-                                    className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                                      pincodeStatus[ord.orderRef].serviceable
-                                        ? "bg-emerald-500/15 text-emerald-600 border border-emerald-500/30"
-                                        : "bg-red-500/15 text-red-600 border border-red-500/30"
+                                    className={`font-mono text-xs font-bold ${
+                                      isDark
+                                        ? "text-[#FAF4EA]"
+                                        : "text-[#1F120A]"
                                     }`}
                                   >
-                                    {pincodeStatus[ord.orderRef].serviceable
-                                      ? `Delhivery Deliverable (COD: ${
-                                          pincodeStatus[ord.orderRef].cod
-                                            ? "Yes"
-                                            : "No"
-                                        })`
-                                      : "Delhivery Not Serviceable"}
+                                    AWB: {ord.trackingNumber}
                                   </span>
-                                ) : (
+                                </div>
+
+                                <div className="flex items-center gap-2">
+                                  <a
+                                    href={`/api?action=delhivery_packing_slip&waybill=${encodeURIComponent(
+                                      ord.trackingNumber || ""
+                                    )}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className={`px-2.5 py-1 rounded-lg border font-bold text-[11px] flex items-center gap-1 transition-colors ${
+                                      isDark
+                                        ? "bg-[#1E130B] border-[#3D2514] text-[#FAF4EA] hover:bg-[#2A1A0F]"
+                                        : "bg-[#FAF6EE] border-[#DDD1BE] text-[#1F120A] hover:bg-[#EFE8DC]"
+                                    }`}
+                                    title="Print Delhivery Packing Slip"
+                                  >
+                                    <Printer className="w-2.5 h-2.5 text-[#E08F35]" />
+                                    <span>Print Label</span>
+                                  </a>
+                                </div>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="space-y-2">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => handleManifestDelhivery(ord)}
+                                  disabled={manifesting[ord.orderRef]}
+                                  className="px-3 py-1.5 rounded-lg bg-[#5E3210] hover:bg-[#43230A] disabled:opacity-50 text-white font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+                                >
+                                  <Truck className="w-3.5 h-3.5 text-amber-300" />
+                                  <span>
+                                    {manifesting[ord.orderRef]
+                                      ? "Generating Waybill..."
+                                      : "⚡ 1-Click Manifest"}
+                                  </span>
+                                </button>
+
+                                <div className="flex items-center gap-1.5 flex-1 min-w-[200px]">
+                                  <input
+                                    type="text"
+                                    placeholder="Or paste AWB from Delhivery One..."
+                                    value={customAwb[ord.orderRef] || ""}
+                                    onChange={(e) =>
+                                      setCustomAwb((p) => ({
+                                        ...p,
+                                        [ord.orderRef]: e.target.value,
+                                      }))
+                                    }
+                                    className={`flex-1 px-2.5 py-1 text-xs rounded-lg font-mono focus:outline-none focus:ring-1 focus:ring-[#E08F35] ${
+                                      isDark
+                                        ? "bg-[#140D07] border border-[#362114] text-[#FAF4EA] placeholder-[#8A7665]"
+                                        : "bg-white border border-[#DDD1BE] text-[#1F120A] placeholder-[#8A7665]"
+                                    }`}
+                                  />
                                   <button
                                     type="button"
                                     onClick={() =>
-                                      handleCheckPincode(
-                                        ord.orderRef,
-                                        addr.pincode
-                                      )
+                                      handleSaveCustomAwb(ord.orderRef)
                                     }
-                                    disabled={checkingPincode[ord.orderRef]}
-                                    className={`text-[10px] font-bold px-2 py-1 rounded-lg border transition-colors cursor-pointer ${
-                                      isDark
-                                        ? "bg-[#1C120B] border-[#3D2514] text-[#E08F35] hover:bg-[#28180E]"
-                                        : "bg-white border-[#DDD1BE] text-[#5E3210] hover:bg-[#FAF6EE]"
-                                    }`}
+                                    className="px-2.5 py-1 rounded-lg bg-stone-700 hover:bg-stone-800 text-white text-[11px] font-bold cursor-pointer transition-colors shrink-0"
                                   >
-                                    {checkingPincode[ord.orderRef]
-                                      ? "Checking..."
-                                      : `Verify Pin ${addr.pincode || ""}`}
+                                    Save AWB
                                   </button>
-                                )}
+                                </div>
                               </div>
+
+                              {manifestError[ord.orderRef] && (
+                                <div className="p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-300 text-[11px] space-y-1">
+                                  <div className="flex items-center gap-1 font-bold">
+                                    <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                                    <span>Delhivery Manifest Error:</span>
+                                  </div>
+                                  <p className="opacity-90">
+                                    {manifestError[ord.orderRef]}
+                                  </p>
+                                </div>
+                              )}
                             </div>
-
-                            {ord.trackingNumber ? (
-                              <div
-                                className={`p-2.5 rounded-lg border space-y-2 ${
-                                  isDark
-                                    ? "bg-[#140D07] border-[#362114]"
-                                    : "bg-white border-[#E5DAC8]"
-                                }`}
-                              >
-                                <div className="flex flex-wrap items-center justify-between gap-2">
-                                  <div>
-                                    <span className="text-[10px] font-bold text-emerald-600 flex items-center gap-1">
-                                      <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                                      Shipment Booked (
-                                      {ord.courier || "Delhivery Express"})
-                                    </span>
-                                    <span
-                                      className={`font-mono text-xs font-bold ${
-                                        isDark
-                                          ? "text-[#FAF4EA]"
-                                          : "text-[#1F120A]"
-                                      }`}
-                                    >
-                                      AWB: {ord.trackingNumber}
-                                    </span>
-                                  </div>
-
-                                  <div className="flex items-center gap-2">
-                                    <a
-                                      href={`/api?action=delhivery_packing_slip&waybill=${encodeURIComponent(
-                                        ord.trackingNumber
-                                      )}`}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className={`px-2.5 py-1 rounded-lg border font-bold text-[11px] flex items-center gap-1 transition-colors ${
-                                        isDark
-                                          ? "bg-[#1E130B] border-[#3D2514] text-[#FAF4EA] hover:bg-[#2A1A0F]"
-                                          : "bg-[#FAF6EE] border-[#DDD1BE] text-[#1F120A] hover:bg-[#EFE8DC]"
-                                      }`}
-                                      title="Print Delhivery Packing Slip"
-                                    >
-                                      <Printer className="w-2.5 h-2.5 text-[#E08F35]" />
-                                      <span>Print Label</span>
-                                    </a>
-                                  </div>
-                                </div>
-                              </div>
-                            ) : (
-                              <div className="space-y-2">
-                                <div className="flex flex-wrap items-center gap-2">
-                                  <button
-                                    type="button"
-                                    onClick={() => handleManifestDelhivery(ord)}
-                                    disabled={manifesting[ord.orderRef]}
-                                    className="px-3 py-1.5 rounded-lg bg-[#5E3210] hover:bg-[#43230A] disabled:opacity-50 text-white font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
-                                  >
-                                    <Truck className="w-3.5 h-3.5 text-amber-300" />
-                                    <span>
-                                      {manifesting[ord.orderRef]
-                                        ? "Generating Waybill..."
-                                        : "⚡ 1-Click Manifest"}
-                                    </span>
-                                  </button>
-
-                                  <div className="flex items-center gap-1.5 flex-1 min-w-[200px]">
-                                    <input
-                                      type="text"
-                                      placeholder="Or paste AWB from Delhivery One..."
-                                      value={customAwb[ord.orderRef] || ""}
-                                      onChange={(e) =>
-                                        setCustomAwb((p) => ({
-                                          ...p,
-                                          [ord.orderRef]: e.target.value,
-                                        }))
-                                      }
-                                      className={`flex-1 px-2.5 py-1 text-xs rounded-lg font-mono focus:outline-none focus:ring-1 focus:ring-[#E08F35] ${
-                                        isDark
-                                          ? "bg-[#140D07] border border-[#362114] text-[#FAF4EA] placeholder-[#8A7665]"
-                                          : "bg-white border border-[#DDD1BE] text-[#1F120A] placeholder-[#8A7665]"
-                                      }`}
-                                    />
-                                    <button
-                                      type="button"
-                                      onClick={() =>
-                                        handleSaveCustomAwb(ord.orderRef)
-                                      }
-                                      className="px-2.5 py-1 rounded-lg bg-stone-700 hover:bg-stone-800 text-white text-[11px] font-bold cursor-pointer transition-colors shrink-0"
-                                    >
-                                      Save AWB
-                                    </button>
-                                  </div>
-                                </div>
-
-                                {manifestError[ord.orderRef] && (
-                                  <div className="p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-300 text-[11px] space-y-1">
-                                    <div className="flex items-center gap-1 font-bold">
-                                      <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                                      <span>Delhivery Manifest Error:</span>
-                                    </div>
-                                    <p className="opacity-90">
-                                      {manifestError[ord.orderRef]}
-                                    </p>
-                                  </div>
-                                )}
-                              </div>
-                            )}
-                          </div>
-                        )}
+                          )}
+                        </div>
 
                         {/* Customer Actions */}
                         <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
@@ -1407,24 +1126,24 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
 
                             <button
                               type="button"
-                              onClick={() => handleCopyPorter(ord)}
+                              onClick={() => handleCopyCustomerAddress(ord)}
                               className={`px-3 py-1.5 rounded-lg border text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer ${
-                                copiedPorter[ord.orderRef]
+                                copiedAddress[ord.orderRef]
                                   ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-600"
                                   : isDark
                                   ? "bg-[#1C120B] border-[#362114] text-[#FAF4EA] hover:border-[#E08F35]"
                                   : "bg-white border-[#DDD1BE] hover:border-[#E08F35] text-[#1F120A]"
                               }`}
                             >
-                              {copiedPorter[ord.orderRef] ? (
+                              {copiedAddress[ord.orderRef] ? (
                                 <Check className="w-3.5 h-3.5 text-emerald-600" />
                               ) : (
                                 <Copy className="w-3.5 h-3.5 text-[#E08F35]" />
                               )}
                               <span>
-                                {copiedPorter[ord.orderRef]
-                                  ? "Copied for Porter!"
-                                  : "Copy for Porter"}
+                                {copiedAddress[ord.orderRef]
+                                  ? "Copied!"
+                                  : "Copy Details"}
                               </span>
                             </button>
                           </div>

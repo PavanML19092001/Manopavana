@@ -1,20 +1,15 @@
 import React, { useState, useEffect } from "react";
 import {
   FileText,
-  Package,
-  CheckCircle2,
   Clock,
   Truck,
   MapPin,
   MessageCircle,
   Phone,
-  Printer,
   ChevronDown,
   ChevronUp,
   RefreshCw,
-  AlertCircle,
   Check,
-  ShieldCheck,
   Banknote,
   CreditCard,
   Building2,
@@ -62,25 +57,19 @@ export const LiveOrderTracker = ({
   const [editLandmark, setEditLandmark] = useState(order.shippingAddress?.landmark || "");
   const [editPincode, setEditPincode] = useState(order.shippingAddress?.pincode || "");
 
-  const isBLR = Boolean(
-    order.shippingAddress?.isBangalore ||
-      (order.shippingAddress?.pincode && order.shippingAddress.pincode.startsWith("560")) ||
-      order.shippingAddress?.city?.toLowerCase().includes("bangalore") ||
-      order.shippingAddress?.city?.toLowerCase().includes("bengaluru")
-  );
-
   const isCod = order.paymentMethod === "cod" || order.paymentMode === "COD";
   const isCancelled = (order.orderStatus as string) === "Cancelled";
 
-  // Allowed to edit or cancel until order leaves Peenya dispatch hub
+  // Allowed to edit or cancel until order leaves dispatch hub
   const canModifyOrCancel =
     order.orderStatus === "Placed" || order.orderStatus === "Packed";
 
+  // Universal: Poll Delhivery tracking for any order with a waybill regardless of pincode
   useEffect(() => {
-    if (!isBLR && order.trackingNumber && order.trackingNumber.length > 5 && !isCancelled) {
+    if (order.trackingNumber && order.trackingNumber.length > 5 && !isCancelled) {
       fetchDelhiveryTracking(order.trackingNumber);
     }
-  }, [order.trackingNumber, isBLR, isCancelled]);
+  }, [order.trackingNumber, isCancelled]);
 
   const fetchDelhiveryTracking = async (waybill: string) => {
     setDelhiveryLoading(true);
@@ -171,10 +160,7 @@ export const LiveOrderTracker = ({
     if (order.orderStatus === "Delivered") {
       return "Delivered Safely to Doorstep";
     }
-    if (isBLR) {
-      return "Expected Doorstep Delivery: Within 24-48 Hours (Direct from Peenya Facility)";
-    }
-    return "Expected Doorstep Delivery: In 3-5 Business Days (Delhivery Express)";
+    return "Expected Doorstep Delivery: In 1-4 Business Days (Delhivery Express)";
   };
 
   return (
@@ -219,15 +205,9 @@ export const LiveOrderTracker = ({
                 </span>
               )}
 
-              {isBLR ? (
-                <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/20">
-                  Bengaluru Doorstep Route
-                </span>
-              ) : (
-                <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-blue-500/10 text-blue-700 dark:text-blue-300 border border-blue-500/20">
-                  Pan-India Route • Delhivery
-                </span>
-              )}
+              <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-blue-500/10 text-blue-700 dark:text-blue-300 border border-blue-500/20">
+                Delhivery Express
+              </span>
             </div>
 
             <p className={`text-xs mt-1.5 ${isDark ? "text-[#D8C8B8]" : "text-[#6A523E]"}`}>
@@ -236,12 +216,12 @@ export const LiveOrderTracker = ({
             </p>
           </div>
 
-          {/* Action Buttons with Dynamic WhatsApp Helpline */}
+          {/* Action Buttons */}
           <div className="flex flex-wrap items-center gap-2">
             <a
               href={`https://wa.me/${BUSINESS_CONFIG.PHONE_RAW}?text=${encodeURIComponent(
                 isCancelled
-                  ? `Hi MANOPAVANA, my order #${order.orderRef} was cancelled. Could you please confirm the refund status of ₹${order.total}?`
+                  ? `Hi MANOPAVANA, my order #${order.orderRef} was cancelled. Could you please confirm the status?`
                   : `Hi MANOPAVANA, I want to track my order #${order.orderRef}. Could you provide the latest dispatch update?`
               )}`}
               target="_blank"
@@ -265,19 +245,19 @@ export const LiveOrderTracker = ({
             </a>
 
             {(order.orderStatus === "Dispatched" || order.orderStatus === "Delivered") && (
-  <button
-    type="button"
-    onClick={() => setIsInvoiceOpen(true)}
-    className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
-      isDark
-        ? "bg-[#1A1009] border-[#3B2516] text-[#FAF4EA] hover:bg-[#2A1A0F]"
-        : "bg-white border-[#DDD1BE] text-[#1F120A] hover:bg-[#FAF6EE]"
-    }`}
-  >
-    <FileText className="w-3.5 h-3.5 text-[#E08F35]" />
-    <span>Download Invoice</span>
-  </button>
-)}
+              <button
+                type="button"
+                onClick={() => setIsInvoiceOpen(true)}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                  isDark
+                    ? "bg-[#1A1009] border-[#3B2516] text-[#FAF4EA] hover:bg-[#2A1A0F]"
+                    : "bg-white border-[#DDD1BE] text-[#1F120A] hover:bg-[#FAF6EE]"
+                }`}
+              >
+                <FileText className="w-3.5 h-3.5 text-[#E08F35]" />
+                <span>Download Invoice</span>
+              </button>
+            )}
           </div>
         </div>
 
@@ -360,7 +340,7 @@ export const LiveOrderTracker = ({
                       Order Cancelled
                     </h4>
                     <p className="text-xs text-stone-600 dark:text-stone-400 mt-0.5">
-                      This order has been cancelled and will not be packed or delivered.
+                      This order has been cancelled and will not be dispatched.
                     </p>
                   </div>
                 </div>
@@ -465,9 +445,7 @@ export const LiveOrderTracker = ({
                   </div>
                   <div className="space-y-1 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
-                      <h4 className="text-sm font-bold">
-                        {isBLR ? "Dispatched for Bengaluru Doorstep Delivery" : "Dispatched via Delhivery Express"}
-                      </h4>
+                      <h4 className="text-sm font-bold">Dispatched via Delhivery Express</h4>
                       {currentStep >= 3 && (
                         <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-blue-500/10 text-blue-600">
                           In Transit
@@ -476,28 +454,16 @@ export const LiveOrderTracker = ({
                     </div>
 
                     <p className={`text-xs ${isDark ? "text-[#D8C8B8]" : "text-[#5C4230]"}`}>
-                      {isBLR ? (
-                        <>
-                          Direct carrier:{" "}
-                          <span className="font-semibold text-[#E08F35]">
-                            {order.courier || "MANOPAVANA Peenya Express Carrier"}
-                          </span>
-                          {order.notes && <span className="block mt-0.5 font-mono text-[11px]">Note: {order.notes}</span>}
-                        </>
-                      ) : (
-                        <>
-                          Carrier: <span className="font-semibold text-blue-600">Delhivery Express Surface</span>
-                          {order.trackingNumber && (
-                            <span className="block mt-0.5 font-mono text-[11px] text-[#E08F35]">
-                              Delhivery Waybill / AWB: #{order.trackingNumber}
-                            </span>
-                          )}
-                        </>
+                      Carrier: <span className="font-semibold text-blue-600">Delhivery Express Surface</span>
+                      {order.trackingNumber && (
+                        <span className="block mt-0.5 font-mono text-[11px] text-[#E08F35]">
+                          Delhivery Waybill / AWB: #{order.trackingNumber}
+                        </span>
                       )}
                     </p>
 
-                    {/* Outside Bangalore Live Delhivery Checkpoints */}
-                    {!isBLR && order.trackingNumber && (
+                    {/* Live Delhivery Transit Scans */}
+                    {order.trackingNumber && (
                       <div
                         className={`mt-3 p-3.5 rounded-2xl border text-xs space-y-2.5 ${
                           isDark ? "bg-[#140D07] border-[#362114]" : "bg-[#FAF7F2] border-[#E8DEC8]"
@@ -571,7 +537,7 @@ export const LiveOrderTracker = ({
                         ) : (
                           !delhiveryLoading && (
                             <p className={`text-[11px] ${isDark ? "text-[#A89482]" : "text-[#7A5E48]"}`}>
-                              {delhiveryError || "Package manifested. Initial hub scan in progress at Delhivery Bengaluru sorting center."}
+                              {delhiveryError || "Package manifested. Initial hub scan in progress at Delhivery sorting center."}
                             </p>
                           )
                         )}

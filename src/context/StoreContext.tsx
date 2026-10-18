@@ -43,7 +43,6 @@ export interface LabeledAddress extends Address {
 }
 
 interface StoreContextType {
-  // Cart
   cart: CartItem[];
   addToCart: (item: Omit<CartItem, "quantity">, qty?: number) => void;
   removeFromCart: (id: string) => void;
@@ -57,17 +56,14 @@ interface StoreContextType {
   freeShippingProgress: number;
   freeShippingShortfall: number;
 
-  // Buy Now direct checkout (leaves regular cart intact)
   buyNowItem: CartItem | null;
   setBuyNowItem: (item: CartItem | null) => void;
   startBuyNow: (item: Omit<CartItem, "quantity">, qty?: number) => void;
   clearBuyNow: () => void;
 
-  // Catalog Products & Combos (synchronized with live CMS prices and stock)
   products: Product[];
   combos: ComboProduct[];
 
-  // Address & Multi-Address Book
   address: Address;
   savedAddresses: LabeledAddress[];
   selectSavedAddress: (id: string) => void;
@@ -78,13 +74,11 @@ interface StoreContextType {
   isLocationModalOpen: boolean;
   setLocationModalOpen: (open: boolean) => void;
 
-  // Firebase Auth
   currentUser: FirebaseUser | null;
   isLoginModalOpen: boolean;
   setLoginModalOpen: (open: boolean) => void;
   logoutUser: () => Promise<void>;
 
-  // Loyalty Program
   loyalty: LoyaltyState;
   activateLoyalty: (oilId: string) => void;
   clearLoyalty: () => void;
@@ -94,11 +88,9 @@ interface StoreContextType {
   openLoyaltyQuiz: (product?: Product) => void;
   closeLoyaltyQuiz: () => void;
 
-  // Audio Engine
   isPlayingAudio: boolean;
   toggleAudio: () => void;
 
-  // Orders
   orders: Order[];
   adminOrders: Order[];
   saveOrder: (order: Order) => Promise<void>;
@@ -109,7 +101,6 @@ interface StoreContextType {
   deleteOrder: (orderRef: string) => Promise<void>;
   cancelOrderWithinWindow: (orderRef: string) => Promise<boolean>;
 
-  // Payment lifecycle modals
   paymentFailedOrder: Order | null;
   setPaymentFailedOrder: (order: Order | null) => void;
   orderSuccessRef: string | null;
@@ -118,12 +109,10 @@ interface StoreContextType {
   switchOrderToCOD: (orderRef: string) => Promise<void>;
   markOrderAsExpired: (orderRef: string) => Promise<void>;
 
-  // Customer Reviews
   reviews: CustomerReview[];
   submitReview: (rev: Omit<CustomerReview, "id">) => Promise<void>;
   deleteReview: (reviewId: string, pin: string) => Promise<boolean>;
 
-  // Admin CMS
   cmsConfig: StoreCMSConfig;
   updateCMSConfig: (updater: (prev: StoreCMSConfig) => StoreCMSConfig) => void;
   isAdminAuthenticated: boolean;
@@ -132,15 +121,12 @@ interface StoreContextType {
   isPreviewStorefront: boolean;
   togglePreviewStorefront: (val: boolean) => void;
 
-  // Modals
   activePolicyModal: "terms" | "shipping" | "returns" | "privacy" | null;
   setActivePolicyModal: (modal: "terms" | "shipping" | "returns" | "privacy" | null) => void;
 
-  // Notification Toast
   toastMessage: string | null;
   showToast: (msg: string) => void;
 
-  // Theme Mode (Blend, Light, Dark)
   themeMode: "blend" | "light" | "dark";
   setThemeMode: (mode: "blend" | "light" | "dark") => void;
 
@@ -168,7 +154,7 @@ const DEFAULT_ADDRESS: Address = {
 };
 
 const DEFAULT_CMS_CONFIG: StoreCMSConfig = {
-  announcementTicker: "FREE Doorstep Delivery across Bengaluru on orders above ₹500 | 100% Marachekku Cold-Pressed",
+  announcementTicker: "FREE Doorstep Delivery across India on orders above ₹500 | 100% Marachekku Cold-Pressed",
   heroHeadline: BUSINESS_CONFIG.HERO_HEADLINE,
   heroSubhead: BUSINESS_CONFIG.HERO_SUBHEAD,
   brandTagline: "Pure by nature, trusted for life",
@@ -182,7 +168,7 @@ const DEFAULT_CMS_CONFIG: StoreCMSConfig = {
   fssaiLicense: BUSINESS_CONFIG.FSSAI_LICENSE,
   gstin: BUSINESS_CONFIG.GSTIN,
   heroHighlights: BUSINESS_CONFIG.HERO_HIGHLIGHTS,
-  bangaloreDeliveryNotice: "Same-Day / Next-Day Direct Courier from Peenya Facility",
+  bangaloreDeliveryNotice: "All Orders Fulfilled via Delhivery Express from Peenya Hub",
   borzoApiKey: "",
   borzoClientId: "",
   delhiveryWarehouse: "MANOPAVANA_PEENYA",
@@ -217,7 +203,6 @@ const DEFAULT_CMS_CONFIG: StoreCMSConfig = {
 const StoreContext = createContext<StoreContextType | null>(null);
 
 export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // Toast notifications (used across all actions and lifecycle hooks)
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const showToast = (msg: string) => {
@@ -227,7 +212,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }, 4000);
   };
 
-  // Admin Authentication State & Customer Storefront Preview Toggle
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState<boolean>(() => {
     return sessionStorage.getItem("manopavana_admin_auth") === "true";
   });
@@ -243,7 +227,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const authenticateAdmin = async (pin: string): Promise<boolean> => {
     const trimmed = String(pin || "").trim();
-    // 1. Try serverless edge endpoint with Cloudflare secret verification
     try {
       const res = await fetch("/api?action=verify_admin_pin", {
         method: "POST",
@@ -262,7 +245,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       console.warn("Cloudflare edge PIN verification notice:", e);
     }
 
-    // 2. Client verification against PIN 1917 or configured PIN
     if (trimmed === "1917" || trimmed === BUSINESS_CONFIG.ADMIN_PIN) {
       setIsAdminAuthenticated(true);
       sessionStorage.setItem("manopavana_admin_auth", "true");
@@ -276,11 +258,9 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     sessionStorage.removeItem("manopavana_admin_auth");
   };
 
-  // 1. User-scoped Cart & Authentication State
   const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(null);
   const [isLoginModalOpen, setLoginModalOpen] = useState(false);
 
-  // Tracks if the active user's cart has finished loading from Firestore to prevent premature overwrite
   const isCartInitializedRef = useRef(false);
   const currentUidRef = useRef<string | null>(null);
   const customerDocUnsubRef = useRef<(() => void) | null>(null);
@@ -298,18 +278,14 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return [];
   });
 
-  // Sync cart to local persistent storage immediately, and debounce sync to Firestore
   useEffect(() => {
     try {
       localStorage.setItem("manopavana_active_cart", JSON.stringify(cart));
-    } catch {
-      // ignore
-    }
+    } catch {}
 
     if (!isCartInitializedRef.current) return;
     if (!currentUser?.uid) return;
 
-    // Debounce Firestore writes to prevent network loops and rapid writes
     if (cartDebounceTimerRef.current) {
       clearTimeout(cartDebounceTimerRef.current);
     }
@@ -342,7 +318,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     };
   }, [cart, currentUser?.uid]);
 
-  // Buy Now direct checkout state (persists across page reloads without touching cart)
   const [buyNowItem, setBuyNowItem] = useState<CartItem | null>(() => {
     try {
       const saved = sessionStorage.getItem("manopavana_buynow_item");
@@ -357,21 +332,16 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setBuyNowItem(directItem);
     try {
       sessionStorage.setItem("manopavana_buynow_item", JSON.stringify(directItem));
-    } catch {
-      // ignore
-    }
+    } catch {}
   };
 
   const clearBuyNow = () => {
     setBuyNowItem(null);
     try {
       sessionStorage.removeItem("manopavana_buynow_item");
-    } catch {
-      // ignore
-    }
+    } catch {}
   };
 
-  // 2. Address & Multi-Address Book (Strictly User-Scoped)
   const [savedAddresses, setSavedAddresses] = useState<LabeledAddress[]>(() => {
     try {
       const raw = localStorage.getItem("manopavana_saved_addresses");
@@ -394,13 +364,11 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const [isLocationModalOpen, setLocationModalOpen] = useState(false);
 
-  // Check on first mount: only open location modal if user has NOT saved an address yet
   useEffect(() => {
     try {
       const isSavedFlag = localStorage.getItem("manopavana_address_saved") === "true";
       let hasValidSavedAddress = isSavedFlag;
 
-      // Check guest address
       const guestSaved = localStorage.getItem("manopavana_address_guest");
       if (guestSaved) {
         const parsed = JSON.parse(guestSaved);
@@ -410,7 +378,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         }
       }
 
-      // Check any user-specific saved address
       for (let i = 0; i < localStorage.length; i++) {
         const key = localStorage.key(i);
         if (key && key.startsWith("manopavana_address_") && key !== "manopavana_address_guest") {
@@ -428,15 +395,11 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }
 
       if (hasValidSavedAddress) {
-        // User has already saved an address - NEVER open modal on refresh!
         setLocationModalOpen(false);
       } else {
-        // User has NOT saved an address yet - open modal so they can set delivery location
         setLocationModalOpen(true);
       }
-    } catch {
-      // safe fallback
-    }
+    } catch {}
   }, []);
 
   const selectSavedAddress = (id: string) => {
@@ -501,11 +464,8 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         if (full.addressLine1?.trim() && full.pincode?.trim()) {
           localStorage.setItem("manopavana_address_saved", "true");
         }
-      } catch {
-        // ignore
-      }
+      } catch {}
 
-      // If customer is logged in, sync saved address to Firestore customer profile safely (no undefined values)
       if (currentUser?.uid) {
         try {
           const profilePayload: Record<string, any> = {
@@ -534,7 +494,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   /**
    * Reverse geocodes device GPS coordinates into full delivery address
-   * with intelligent district resolution and crash-safe handling.
+   * with intelligent district resolution and complete Karnataka alias table.
    */
   const reverseGeocodeAndSaveAddress = async (lat: number, lng: number): Promise<Partial<Address> | null> => {
     try {
@@ -542,17 +502,13 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
       let data: any = null;
 
-      // 1. First try server-side proxy route to avoid CORS or Nominatim rate limits
       try {
         const serverResp = await fetch(`/api?action=reverse_geocode&lat=${lat}&lng=${lng}`);
         if (serverResp.ok) {
           data = await serverResp.json();
         }
-      } catch {
-        // fallback
-      }
+      } catch {}
 
-      // 2. Direct Nominatim fallback if server proxy was unavailable
       if (!data || !data.address) {
         const directResp = await fetch(
           `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`,
@@ -581,7 +537,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       const street = parts.join(", ") || (data.display_name ? data.display_name.split(",").slice(0, 3).join(", ") : "");
       const landmark = addr.amenity || addr.shop || addr.landmark || "";
 
-      // Match canonical state
       let state = addr.state || "Karnataka";
       const stateKeys = Object.keys(INDIAN_STATES_DISTRICTS);
       const matchedState = stateKeys.find(
@@ -595,7 +550,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
       const availableDistricts = INDIAN_STATES_DISTRICTS[state] || INDIAN_STATES_DISTRICTS["Karnataka"];
 
-      // Comprehensive district text blob
       const combinedText = (
         JSON.stringify(addr) + " " + (data.display_name || "")
       ).toLowerCase();
@@ -603,7 +557,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       let isBLR = false;
       let district = "Bengaluru Urban";
 
-      // 1. Bengaluru / Bangalore detection
       if (
         postcode.startsWith("560") ||
         combinedText.includes("bengaluru") ||
@@ -634,7 +587,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           district = "Bengaluru Urban";
         }
       } else if (state === "Karnataka") {
-        // 2. Karnataka District Alias Mapping
         const kaAliases: Record<string, string> = {
           mysore: "Mysuru",
           mysuru: "Mysuru",
@@ -684,7 +636,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             break;
           }
         }
-        // If not found in aliases, match against canonical district list
         if (!found) {
           for (const d of availableDistricts) {
             if (combinedText.includes(d.toLowerCase())) {
@@ -693,13 +644,11 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             }
           }
         }
-        // Safe fallback: NEVER Bagalkote unless explicitly mentioned! Default to Bengaluru Urban
         district = found || "Bengaluru Urban";
         if (district.toLowerCase().includes("bengaluru")) {
           isBLR = true;
         }
       } else {
-        // 3. Pan-India state districts
         let found = "";
         for (const d of availableDistricts) {
           if (combinedText.includes(d.toLowerCase())) {
@@ -730,23 +679,19 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   };
 
-  // 3. Firebase Auth State & Login Sync (Strict User Isolation with Live Firestore Sync)
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      // Clean up previous real-time listener if any
       if (customerDocUnsubRef.current) {
         customerDocUnsubRef.current();
         customerDocUnsubRef.current = null;
       }
 
-      // Temporarily halt cart auto-saving while we load this user's data
       isCartInitializedRef.current = false;
       currentUidRef.current = user?.uid || null;
       setCurrentUser(user);
 
       if (user) {
         try {
-          // 1. Initial sync and creation of customer profile in Firestore
           const profile = await syncCustomerDoc(user);
           if (profile && Array.isArray((profile as any).cart) && (profile as any).cart.length > 0) {
             setCart((profile as any).cart);
@@ -754,7 +699,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
               localStorage.setItem("manopavana_active_cart", JSON.stringify((profile as any).cart));
             } catch {}
           } else {
-            // Check local storage for any active cart
             const localSaved = (() => {
               try {
                 const s = localStorage.getItem("manopavana_active_cart");
@@ -771,7 +715,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             }
           }
 
-          // Extract clean phone and email safely
           let userPhone = (profile as any)?.phone || user.phoneNumber || "";
           if (!userPhone && user.email && user.email.endsWith("@phone.manopavana.com")) {
             userPhone = user.email.split("@")[0];
@@ -779,7 +722,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           const userEmail = (profile as any)?.email || (user.email && !user.email.endsWith("@phone.manopavana.com") ? user.email : "");
           const userName = (profile as any)?.name || user.displayName || "";
 
-          // Populate address book from Firestore
           if (profile && Array.isArray((profile as any).savedAddresses)) {
             setSavedAddresses((profile as any).savedAddresses);
             try {
@@ -806,12 +748,10 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             }));
           }
 
-          // 2. Bind real-time snapshot listener on customers/{user.uid} with loop protection
           customerDocUnsubRef.current = onSnapshot(
             doc(db, "customers", user.uid),
             (snap) => {
               if (!snap.exists()) return;
-              // Ignore local write echoes to prevent continuous infinite feedback loops
               if (snap.metadata.hasPendingWrites || isInternalCartUpdateRef.current) {
                 return;
               }
@@ -840,13 +780,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
                   phone: data.savedAddress.phone || data.phone || prev.phone,
                   email: data.savedAddress.email || data.email || prev.email,
                 }));
-              } else if (data?.name || data?.phone || data?.email) {
-                setAddress((prev) => ({
-                  ...prev,
-                  fullName: data.name || prev.fullName,
-                  phone: data.phone || prev.phone,
-                  email: data.email || prev.email,
-                }));
               }
             },
             (err) => {
@@ -859,7 +792,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           isCartInitializedRef.current = true;
         }
       } else {
-        // User logged out: clear personal orders
         setOrders([]);
         isCartInitializedRef.current = true;
       }
@@ -890,7 +822,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     sessionStorage.removeItem("manopavana_admin_auth");
     setIsAdminAuthenticated(false);
 
-    // Reset address & cart to clean guest state
     setAddress(DEFAULT_ADDRESS);
     try {
       const guestSaved = localStorage.getItem("manopavana_cart_guest");
@@ -903,7 +834,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     showToast("You have signed out. User session cleared.");
   };
 
-  // 4. Loyalty Program
   const [loyalty, setLoyalty] = useState<LoyaltyState>(() => {
     try {
       const saved = localStorage.getItem("manopavana_loyalty");
@@ -913,9 +843,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           return parsed;
         }
       }
-    } catch {
-      // ignore
-    }
+    } catch {}
     return {
       isActive: false,
       expiresAt: 0,
@@ -933,9 +861,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setLoyalty(nextState);
     try {
       localStorage.setItem("manopavana_loyalty", JSON.stringify(nextState));
-    } catch {
-      // ignore
-    }
+    } catch {}
     showToast("🎉 10% Bottle QR Loyalty discount unlocked for 7 days!");
   };
 
@@ -948,9 +874,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setLoyalty(clean);
     try {
       localStorage.removeItem("manopavana_loyalty");
-    } catch {
-      // ignore
-    }
+    } catch {}
   };
 
   const [loyaltyRemainingText, setLoyaltyRemainingText] = useState("");
@@ -974,7 +898,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return () => clearInterval(timer);
   }, [loyalty]);
 
-  // Quiz Modal State
   const [isQuizModalOpen, setIsQuizModalOpen] = useState(false);
   const [quizProduct, setQuizProduct] = useState<Product | null>(null);
 
@@ -987,7 +910,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setIsQuizModalOpen(false);
   };
 
-  // 5. Audio Engine with Autoplay & First Gesture Interaction Fallback
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
@@ -1008,21 +930,16 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         .play()
         .then(() => {
           setIsPlayingAudio(true);
-          // Only remove listeners once audio playback successfully starts
           events.forEach((evt) => {
             document.removeEventListener(evt, triggerPlay, true);
             window.removeEventListener(evt, triggerPlay, true);
           });
         })
-        .catch(() => {
-          // If browser policy blocked this particular event, keep listeners active for next touch
-        });
+        .catch(() => {});
     };
 
-    // 1. Attempt programmatic playback immediately
     triggerPlay();
 
-    // 2. Attach capture listeners so any screen touch on mobile starts playback
     events.forEach((evt) => {
       document.addEventListener(evt, triggerPlay, { capture: true, passive: true });
       window.addEventListener(evt, triggerPlay, { capture: true, passive: true });
@@ -1055,16 +972,13 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   };
 
-  // 6. Orders Management
   const loadStoredOrders = (): Order[] => {
     try {
-      // 1. Primary device-level store for all placed orders
       const allRaw = localStorage.getItem("manopavana_all_orders");
       if (allRaw) {
         const parsed = JSON.parse(allRaw);
         if (Array.isArray(parsed) && parsed.length > 0) return parsed;
       }
-      // 2. Check any user-specific or legacy keys
       const collected: Order[] = [];
       const seen = new Set<string>();
       for (let i = 0; i < localStorage.length; i++) {
@@ -1097,15 +1011,11 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return [];
   };
 
-  // Admin orders queue (all orders across store, subscribed only when admin authenticated)
   const [adminOrders, setAdminOrders] = useState<Order[]>([]);
-
-  // User orders: initialized synchronously so page refreshes NEVER lose orders
   const [orders, setOrders] = useState<Order[]>(() => {
     return loadStoredOrders();
   });
 
-  // Subscribe to all orders ONLY for store administration (manopavana@gmail.com or admin unlocked)
   useEffect(() => {
     if (isAdminAuthenticated || currentUser?.email === "manopavana@gmail.com") {
       const unsubscribe = subscribeAllOrders((allOrders) => {
@@ -1121,9 +1031,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   }, [isAdminAuthenticated, currentUser?.email]);
 
-  // Subscribe strictly to the active user's personal orders in Firestore
   useEffect(() => {
-    // 1. Always load stored orders first so refresh never flashes empty
     const stored = loadStoredOrders();
     if (stored.length > 0) {
       setOrders((prev) => {
@@ -1142,15 +1050,12 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       });
     }
 
-    if (!currentUser?.uid) {
-      return;
-    }
+    if (!currentUser?.uid) return;
 
     const currentUid = currentUser.uid;
     const userEmail = (currentUser.email || "").toLowerCase().trim();
     const userOrdersKey = `manopavana_orders_${currentUid}`;
 
-    // 2. Real-time Firestore sync strictly for this user UID and verified email
     const unsubscribe = subscribeUserOrders(
       currentUid,
       undefined,
@@ -1159,12 +1064,10 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         if (!firestoreOrders || firestoreOrders.length === 0) return;
         setOrders((prev) => {
           const map = new Map<string, Order>();
-          // Remote orders take high priority
           firestoreOrders.forEach((o) => {
             const key = o.orderRef || o.id;
             if (key) map.set(key, o);
           });
-          // Merge with any local orders not yet on server
           prev.forEach((o) => {
             const key = o.orderRef || o.id;
             if (key && !map.has(key)) map.set(key, o);
@@ -1190,7 +1093,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       customerEmail: currentUser?.email || newOrder.customerEmail || newOrder.shippingAddress?.email || null,
     };
 
-    // 1. Immediately update React state with deduplication for active user
     setOrders((prev) => {
       const filtered = prev.filter((o) => o.orderRef !== finalOrder.orderRef && o.id !== finalOrder.id);
       const nextList = [finalOrder, ...filtered];
@@ -1208,12 +1110,10 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       return [finalOrder, ...filtered];
     });
 
-    // Clear pending checkout tracking keys
     localStorage.removeItem("pending_order_ref");
     localStorage.removeItem("pending_order_timestamp");
     localStorage.removeItem("pending_order_data");
 
-    // 2. Sync to real Firestore collection with customerUid (resilient non-fatal)
     try {
       await saveOrderToFirestore(finalOrder, currentUser?.uid);
     } catch (err) {
@@ -1221,79 +1121,86 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   };
 
-  // 15-Minute Cancellation Window Function (Guaranteed 100% Free)
   const cancelOrderWithinWindow = async (orderRef: string): Promise<boolean> => {
-  const target =
-    orders.find((o) => o.orderRef === orderRef) ||
-    adminOrders.find((o) => o.orderRef === orderRef);
+    const target =
+      orders.find((o) => o.orderRef === orderRef) ||
+      adminOrders.find((o) => o.orderRef === orderRef);
 
-  if (!target) return false;
+    if (!target) return false;
 
-  // Rule: Order can be cancelled only before it leaves the facility
-  if (target.orderStatus === "Dispatched" || target.orderStatus === "Delivered") {
-    showToast("This order is already out for delivery and cannot be cancelled.");
-    return false;
-  }
-
-  const isOnlinePayment =
-    target.paymentMethod === "phonepe" ||
-    target.paymentMethod === "online" ||
-    target.paymentMode?.includes("PHONEPE");
-
-  let refundStatus = "CANCELLED";
-
-  // If order was paid online, initiate PhonePe refund
-  if (isOnlinePayment && target.total > 0) {
-    try {
-      showToast("Initiating online refund with PhonePe...");
-      const res = await fetch("/api?action=phonepe_refund", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          orderRef: target.orderRef,
-          originalTransactionId: target.orderRef,
-          amountInRupees: target.total,
-        }),
-      });
-
-      const result = await res.json();
-      if (result.success) {
-        refundStatus = "REFUND_INITIATED";
-        showToast("Online refund initiated successfully! Funds will credit in 3–5 working days.");
-      } else {
-        refundStatus = "REFUND_PENDING_MANUAL";
-        showToast("Order cancelled. Refund queued for processing.");
-      }
-    } catch (err) {
-      console.warn("PhonePe refund trigger error:", err);
-      refundStatus = "REFUND_PENDING_MANUAL";
+    if (target.orderStatus === "Dispatched" || target.orderStatus === "Delivered") {
+      showToast("This order is already out for delivery and cannot be cancelled.");
+      return false;
     }
-  } else {
-    showToast(`Order #${orderRef} cancelled successfully.`);
-  }
 
-  // Update React state and Firestore
-  await updateOrderDetails(orderRef, {
-    orderStatus: "Cancelled",
-    paymentStatus: refundStatus,
-  });
+    // If Delhivery waybill was already generated, void on carrier to restore wallet credit
+    if (target.trackingNumber) {
+      try {
+        showToast("Notifying Delhivery of order cancellation...");
+        await fetch("/api?action=delhivery_cancel_order", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ waybill: target.trackingNumber }),
+        });
+      } catch (err) {
+        console.warn("Delhivery cancellation notice:", err);
+      }
+    }
 
-  return true;
-};
+    const isOnlinePayment =
+      target.paymentMethod === "phonepe" ||
+      target.paymentMethod === "online" ||
+      target.paymentMode?.includes("PHONEPE");
+
+    let refundStatus = "CANCELLED";
+
+    if (isOnlinePayment && target.total > 0) {
+      try {
+        showToast("Initiating online refund with PhonePe...");
+        const res = await fetch("/api?action=phonepe_refund", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            orderRef: target.orderRef,
+            originalTransactionId: target.orderRef,
+            amountInRupees: target.total,
+          }),
+        });
+
+        const result = await res.json();
+        if (result.success) {
+          refundStatus = "REFUND_INITIATED";
+          showToast("Online refund initiated successfully! Funds will credit in 3–5 working days.");
+        } else {
+          refundStatus = "REFUND_PENDING_MANUAL";
+          showToast("Order cancelled. Refund queued for processing.");
+        }
+      } catch (err) {
+        console.warn("PhonePe refund trigger error:", err);
+        refundStatus = "REFUND_PENDING_MANUAL";
+      }
+    } else {
+      showToast(`Order #${orderRef} cancelled successfully.`);
+    }
+
+    await updateOrderDetails(orderRef, {
+      orderStatus: "Cancelled",
+      paymentStatus: refundStatus,
+    });
+
+    return true;
+  };
 
   const getOrder = (refOrId: string): Order | undefined => {
-    // 1. Check current user's exclusive orders
     const userMatch = orders.find(
       (o) => o.id === refOrId || o.orderRef === refOrId || o.trackingNumber === refOrId
     );
     if (userMatch) return userMatch;
 
-    // 2. Check payment failed order in memory
     if (paymentFailedOrder && (paymentFailedOrder.orderRef === refOrId || paymentFailedOrder.id === refOrId)) {
       return paymentFailedOrder;
     }
 
-    // 3. Check pending order in local storage
     try {
       const pendingRaw = localStorage.getItem("pending_order_data");
       if (pendingRaw) {
@@ -1304,7 +1211,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }
     } catch {}
 
-    // 4. Check admin orders ONLY for authenticated store admin
     if (isAdminAuthenticated || currentUser?.email === "manopavana@gmail.com") {
       const adminMatch = adminOrders.find(
         (o) => o.id === refOrId || o.orderRef === refOrId || o.trackingNumber === refOrId
@@ -1388,13 +1294,11 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     showToast(`Order #${orderRef} removed from queue`);
   };
 
-  // Payment Lifecycle State & Modals
   const [paymentFailedOrder, setPaymentFailedOrder] = useState<Order | null>(null);
   const [orderSuccessRef, setOrderSuccessRef] = useState<string | null>(null);
 
   const loadOrderToCartAndRetry = (order: Order) => {
     if (order.items && order.items.length > 0) {
-      // If it was a direct Buy Now item, restore to buyNowItem so bag items are safe
       if (order.isBuyNow && order.items.length === 1) {
         const it = order.items[0];
         startBuyNow({
@@ -1411,9 +1315,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         setCart(order.items);
         try {
           localStorage.setItem("manopavana_active_cart", JSON.stringify(order.items));
-        } catch {
-          // ignore
-        }
+        } catch {}
         if (currentUser?.uid) {
           setDoc(
             doc(db, "customers", currentUser.uid),
@@ -1438,17 +1340,13 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       try {
         const fromDb = await getOrderFromFirestore(orderRef);
         if (fromDb) target = fromDb;
-      } catch {
-        // ignore
-      }
+      } catch {}
     }
     if (!target) {
       try {
         const pendingRaw = localStorage.getItem("pending_order_data");
         if (pendingRaw) target = JSON.parse(pendingRaw);
-      } catch {
-        // ignore
-      }
+      } catch {}
     }
 
     let itemsToUse = target?.items && target.items.length > 0 ? [...target.items] : [];
@@ -1491,7 +1389,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         ? target.total
         : finalSubtotal - finalDiscount + finalShipping;
 
-    // Guarantee full delivery address details
     const finalShippingAddress: Address = {
       ...address,
       ...(target?.shippingAddress || {}),
@@ -1512,6 +1409,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       target?.isBuyNow || (buyNowItem !== null && itemsToUse.length === 1 && itemsToUse[0].id === buyNowItem.id)
     );
 
+    // trackingNumber is typed as string | undefined; undefined avoids TypeScript null errors
     const updated: Order = {
       id: target?.id || `ORD-${Date.now().toString().slice(-4)}`,
       orderRef,
@@ -1528,8 +1426,8 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       paymentStatus: "COMPLETED",
       orderStatus: "Placed",
       shippingAddress: finalShippingAddress,
-      trackingNumber: target?.trackingNumber || `MV-BLR-${Math.floor(10000 + Math.random() * 90000)}`,
-      courier: "MANOPAVANA Peenya Express Carrier",
+      trackingNumber: target?.trackingNumber || undefined,
+      courier: "Delhivery Express",
       customerUid: currentUser?.uid || target?.customerUid || undefined,
       customerPhone: (finalShippingAddress.phone || "").replace(/\D/g, "").slice(-10),
       customerEmail: finalShippingAddress.email || currentUser?.email || undefined,
@@ -1542,18 +1440,14 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         guestRefs.push(orderRef);
         localStorage.setItem("manopavana_guest_order_ids", JSON.stringify(guestRefs));
       }
-    } catch {
-      // ignore
-    }
+    } catch {}
 
     setOrders((prev) => {
       const filtered = prev.filter((o) => o.orderRef !== orderRef);
       const nextList = [updated, ...filtered];
       try {
         localStorage.setItem("manopavana_orders", JSON.stringify(nextList));
-      } catch {
-        // ignore
-      }
+      } catch {}
       return nextList;
     });
 
@@ -1597,9 +1491,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             : o
         )
       ));
-    } catch {
-      // ignore
-    }
+    } catch {}
 
     await updateFirestoreOrderStatus(orderRef, {
       orderStatus: "Failed (Expired)",
@@ -1607,7 +1499,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     });
   };
 
-  // 7. Customer Reviews System (Firestore)
   const [reviews, setReviews] = useState<CustomerReview[]>(CUSTOMER_REVIEWS);
 
   useEffect(() => {
@@ -1652,7 +1543,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   };
 
-  // 8. Admin CMS
   const [cmsConfig, setCmsConfig] = useState<StoreCMSConfig>(() => {
     try {
       const saved = localStorage.getItem("manopavana_cms");
@@ -1662,7 +1552,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           !parsed.brandLogoUrl ||
           parsed.brandLogoUrl === "/logo.svg" ||
           parsed.brandLogoUrl === MEDIA_ASSETS.logoOriginal ||
-          typeof parsed.brandLogoUrl === "string" && parsed.brandLogoUrl.includes("logo-clean")
+          (typeof parsed.brandLogoUrl === "string" && parsed.brandLogoUrl.includes("logo-clean"))
         ) {
           parsed.brandLogoUrl = MEDIA_ASSETS.logo;
         }
@@ -1674,7 +1564,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   });
 
-  // Real-time Firestore snapshot listener on settings/store_config
   useEffect(() => {
     const unsubscribe = subscribeStoreConfig((remoteConfig) => {
       if (remoteConfig) {
@@ -1687,9 +1576,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           };
           try {
             localStorage.setItem("manopavana_cms", JSON.stringify(merged));
-          } catch {
-            // ignore
-          }
+          } catch {}
           return merged;
         });
       }
@@ -1702,15 +1589,12 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       const next = updater(prev);
       try {
         localStorage.setItem("manopavana_cms", JSON.stringify(next));
-      } catch {
-        // ignore
-      }
+      } catch {}
       saveStoreConfigToFirestore(next);
       return next;
     });
   };
 
-  // Derive products and combos live from cmsConfig so prices and stock sync everywhere
   const products: Product[] = useMemo(() => {
     return PRODUCTS.map((p) => {
       if (p.id === "groundnut") {
@@ -1780,12 +1664,10 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     });
   }, [cmsConfig]);
 
-  // 9. Modals
   const [activePolicyModal, setActivePolicyModal] = useState<
     "terms" | "shipping" | "returns" | "privacy" | null
   >(null);
 
-  // 10. Theme Mode: 'blend' (default), 'light', or 'dark'
   const [themeMode, setThemeModeState] = useState<"blend" | "light" | "dark">(() => {
     try {
       const saved = localStorage.getItem("manopavana_theme_mode");
@@ -1802,12 +1684,9 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setThemeModeState(mode);
     try {
       localStorage.setItem("manopavana_theme_mode", mode);
-    } catch {
-      // ignore
-    }
+    } catch {}
   };
 
-  // Cart operations
   const addToCart = (item: Omit<CartItem, "quantity">, qty = 1) => {
     setCart((prev) => {
       const existing = prev.find((i) => i.id === item.id);
@@ -1884,10 +1763,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         customerUid: currentUser.uid,
       };
 
-      // 1. Save directly to Firestore
       await setDoc(doc(db, "reviews", newReview.id), newReview);
-
-      // 2. Update local state so it appears immediately
       setReviews((prev) => [newReview, ...prev]);
       showToast("Thank you! Your verified review has been published.");
       return true;
@@ -1898,7 +1774,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   };
 
-  // Cart Calculations
   const cartCount = useMemo(() => {
     return cart.reduce((acc, curr) => acc + curr.quantity, 0);
   }, [cart]);
@@ -1925,14 +1800,13 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, [cart.length, discountedSubtotal, shippingFee]);
 
   const freeShippingProgress = useMemo(() => {
-  if (discountedSubtotal >= cmsConfig.freeShippingThreshold) return 100;
-  // Floor to prevent 99.8% rounding to 100%
-  return Math.min(99, Math.floor((discountedSubtotal / cmsConfig.freeShippingThreshold) * 100));
-}, [discountedSubtotal, cmsConfig.freeShippingThreshold]);
+    if (discountedSubtotal >= cmsConfig.freeShippingThreshold) return 100;
+    return Math.min(99, Math.floor((discountedSubtotal / cmsConfig.freeShippingThreshold) * 100));
+  }, [discountedSubtotal, cmsConfig.freeShippingThreshold]);
 
   const freeShippingShortfall = useMemo(() => {
-  return Math.max(0, cmsConfig.freeShippingThreshold - discountedSubtotal);
-}, [discountedSubtotal, cmsConfig.freeShippingThreshold]);
+    return Math.max(0, cmsConfig.freeShippingThreshold - discountedSubtotal);
+  }, [discountedSubtotal, cmsConfig.freeShippingThreshold]);
 
   return (
     <StoreContext.Provider
