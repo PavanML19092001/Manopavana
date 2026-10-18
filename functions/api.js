@@ -431,7 +431,7 @@ export async function onRequest(context) {
           if (wbResp.ok) {
             waybillTest = (await wbResp.text()).replace(/[^0-9]/g, "");
           }
-        } catch {}
+        } catch { }
 
         return jsonResponse({
           status: isAuthed ? "SUCCESS" : "FAILED",
@@ -730,12 +730,51 @@ export async function onRequest(context) {
       }
     }
 
+    // ACTION: delhivery_cancel_order (Cancels shipment and triggers wallet refund on Delhivery)
+    if (request.method === "POST" && action === "delhivery_cancel_order") {
+      let body = {};
+      try {
+        body = await request.json();
+      } catch {
+        return jsonResponse({ status: "FAILED", message: "Invalid JSON body" }, 400);
+      }
+
+      const { waybill } = body;
+      if (!waybill) {
+        return jsonResponse({ status: "FAILED", message: "Missing waybill number" }, 400);
+      }
+
+      try {
+        const cancelResp = await fetch("https://track.delhivery.com/api/p/edit", {
+          method: "POST",
+          headers: {
+            Authorization: `Token ${DELHIVERY_TOKEN}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            waybill: String(waybill).trim(),
+            cancellation: "true",
+          }),
+        });
+
+        const cancelData = await cancelResp.json();
+        return jsonResponse({
+          status: cancelResp.ok ? "SUCCESS" : "FAILED",
+          data: cancelData,
+          message: cancelResp.ok
+            ? "Shipment successfully cancelled on Delhivery. Freight refunded to wallet."
+            : "Delhivery cancellation rejected.",
+        });
+      } catch (err) {
+        return jsonResponse({ status: "ERROR", message: err.message }, 500);
+      }
+    }
+
     return jsonResponse(
       {
         status: "FAILED",
-        message: `Unsupported action or method: ${request.method} ${
-          action || "(none)"
-        }`,
+        message: `Unsupported action or method: ${request.method} ${action || "(none)"
+          }`,
       },
       404
     );

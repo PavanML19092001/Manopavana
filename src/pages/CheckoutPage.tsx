@@ -568,9 +568,7 @@ export const CheckoutPage: React.FC = () => {
           paymentStatus: "COMPLETED",
           orderStatus: "Placed",
           shippingAddress: finalAddress,
-          trackingNumber: isBLR
-            ? `MV-BLR-${Math.floor(10000 + Math.random() * 90000)}`
-            : `MV-DLH-${Math.floor(10000 + Math.random() * 90000)}`,
+          trackingNumber: "",
           courier: isBLR ? "MANOPAVANA Peenya Express Carrier" : "Delhivery Express Logistics",
           customerUid: finalCustomerUid,
           customerPhone: cleanPhone,
@@ -621,9 +619,7 @@ export const CheckoutPage: React.FC = () => {
         paymentStatus: "PENDING",
         orderStatus: "Payment Incomplete",
         shippingAddress: finalAddress,
-        trackingNumber: isBLR
-          ? `MV-BLR-${Math.floor(10000 + Math.random() * 90000)}`
-          : `MV-DLH-${Math.floor(10000 + Math.random() * 90000)}`,
+        trackingNumber: "",
         courier: isBLR ? "MANOPAVANA Peenya Express Carrier" : "Delhivery Express Logistics",
         customerUid: finalCustomerUid,
         customerPhone: cleanPhone,
