@@ -677,6 +677,7 @@ export async function onRequest(context) {
     }
 
     // 4. Secure Packing Slip Proxy (Streams raw PDF buffer with Token authentication)
+    // 4. Secure Packing Slip Proxy (Streams raw PDF buffer with Token authentication)
     if (request.method === "GET" && action === "delhivery_packing_slip") {
       const waybill = url.searchParams.get("waybill");
       if (!waybill) {
