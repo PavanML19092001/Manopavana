@@ -676,8 +676,7 @@ export async function onRequest(context) {
       });
     }
 
-    // 4. Secure Packing Slip Proxy (Streams raw PDF buffer with Token authentication)
-    // 4. Secure Packing Slip Proxy (Streams raw PDF buffer with Token authentication)
+    // 4. Secure Packing Slip Proxy (Extracts S3 URL and directly redirects the browser)
     if (request.method === "GET" && action === "delhivery_packing_slip") {
       const waybill = url.searchParams.get("waybill");
       if (!waybill) {
@@ -687,38 +686,66 @@ export async function onRequest(context) {
         );
       }
 
-      const slipResp = await fetch(
-        `https://track.delhivery.com/api/p/packing_slip?wbns=${encodeURIComponent(
-          waybill
-        )}&pdf=true`,
-        {
-          headers: {
-            Authorization: `Token ${DELHIVERY_TOKEN}`,
-          },
-        }
-      );
-
-      if (!slipResp.ok) {
-        const errText = await slipResp.text();
-        return jsonResponse(
+      try {
+        const slipResp = await fetch(
+          `https://track.delhivery.com/api/p/packing_slip?wbns=${encodeURIComponent(
+            waybill
+          )}&pdf=true`,
           {
-            status: "FAILED",
-            message: "Unable to retrieve packing slip from Delhivery",
-            error: errText,
-          },
-          slipResp.status
+            headers: {
+              Authorization: `Token ${DELHIVERY_TOKEN}`,
+            },
+          }
         );
-      }
 
-      const pdfBuffer = await slipResp.arrayBuffer();
-      return new Response(pdfBuffer, {
-        status: 200,
-        headers: {
-          "Content-Type": "application/pdf",
-          "Content-Disposition": `inline; filename="delhivery_label_${waybill}.pdf"`,
-          ...CORS_HEADERS,
-        },
-      });
+        const rawText = await slipResp.text();
+
+        // 1. Parse Delhivery's JSON envelope to extract the direct S3 PDF URL
+        try {
+          const data = JSON.parse(rawText);
+          const downloadUrl =
+            data?.packages?.[0]?.pdf_download_link ||
+            data?.packages_found?.[0]?.pdf_download_link ||
+            data?.pdf_download_link ||
+            data?.download_url;
+
+          if (downloadUrl) {
+            // Direct the browser straight to Amazon S3 to load and display the clean PDF
+            return Response.redirect(downloadUrl, 302);
+          }
+
+          return jsonResponse(
+            {
+              status: "FAILED",
+              message: "Delhivery did not return a valid PDF download link",
+              details: data,
+            },
+            400
+          );
+        } catch {
+          // 2. If Delhivery returned raw PDF bytes instead of JSON
+          if (rawText.startsWith("%PDF")) {
+            const encoder = new TextEncoder();
+            const binaryData = encoder.encode(rawText);
+            return new Response(binaryData, {
+              status: 200,
+              headers: {
+                "Content-Type": "application/pdf",
+                "Content-Length": String(binaryData.byteLength),
+                "Content-Disposition": `inline; filename="delhivery_label_${waybill}.pdf"`,
+                ...CORS_HEADERS,
+              },
+            });
+          }
+
+          return new Response(rawText, {
+            status: slipResp.status,
+            headers: { "Content-Type": "text/html", ...CORS_HEADERS },
+          });
+        }
+      } catch (err) {
+        return jsonResponse({ status: "ERROR", message: err.message }, 502);
+      }
     }
 
     // 5. Delhivery Webhook Push Notification Handler
