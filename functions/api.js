@@ -1,5 +1,5 @@
 /**
- * Cloudflare Pages Functions - PhonePe v2 Payment Gateway Edge Handler
+ * Cloudflare Pages Functions - PhonePe v2 Payment Gateway Edge Handler & Delhivery B2C Logistics Hub
  * Route: /api or /functions/api
  */
 
@@ -19,10 +19,14 @@ async function getOAuthToken(env) {
   const clientId = env.PHONEPE_CLIENT_ID;
   const clientSecret = env.PHONEPE_CLIENT_SECRET;
   const clientVersion = env.PHONEPE_CLIENT_VERSION || "1";
-  const authUrl = env.PHONEPE_AUTH_URL || "https://api.phonepe.com/apis/identity-manager/v1/oauth/token";
+  const authUrl =
+    env.PHONEPE_AUTH_URL ||
+    "https://api.phonepe.com/apis/identity-manager/v1/oauth/token";
 
   if (!clientId || !clientSecret) {
-    throw new Error("Missing PHONEPE_CLIENT_ID or PHONEPE_CLIENT_SECRET in environment variables.");
+    throw new Error(
+      "Missing PHONEPE_CLIENT_ID or PHONEPE_CLIENT_SECRET in environment variables."
+    );
   }
 
   const params = new URLSearchParams();
@@ -41,7 +45,9 @@ async function getOAuthToken(env) {
 
   if (!response.ok) {
     const errorText = await response.text();
-    throw new Error(`PhonePe Auth Token Request Failed (${response.status}): ${errorText}`);
+    throw new Error(
+      `PhonePe Auth Token Request Failed (${response.status}): ${errorText}`
+    );
   }
 
   const data = await response.json();
@@ -83,21 +89,27 @@ export async function onRequest(context) {
   const action = url.searchParams.get("action");
 
   // Read endpoints & configuration from Cloudflare environment variables
-  const PAY_URL = env.PHONEPE_PAY_URL || "https://api.phonepe.com/apis/pg/checkout/v2/pay";
-  const STATUS_URL = env.PHONEPE_STATUS_URL || "https://api.phonepe.com/apis/pg/checkout/v2/order";
-  const REFUND_URL = env.PHONEPE_REFUND_URL || "https://api.phonepe.com/apis/pg/checkout/v2/refund";
+  const PAY_URL =
+    env.PHONEPE_PAY_URL || "https://api.phonepe.com/apis/pg/checkout/v2/pay";
+  const STATUS_URL =
+    env.PHONEPE_STATUS_URL || "https://api.phonepe.com/apis/pg/checkout/v2/order";
+  const REFUND_URL =
+    env.PHONEPE_REFUND_URL || "https://api.phonepe.com/apis/pg/checkout/v2/refund";
   const PRODUCTION_ORIGIN = env.PRODUCTION_ORIGIN || "https://manopavana.com";
 
   try {
     /* -------------------------------------------------------------
-     * ACTION: verify_admin_pin (Encrypted Cloudflare PIN Gate Verification)
+     * ACTION: verify_admin_pin
      * ------------------------------------------------------------- */
     if (request.method === "POST" && action === "verify_admin_pin") {
       let body = {};
       try {
         body = await request.json();
       } catch {
-        return jsonResponse({ status: "FAILED", authorized: false, message: "Invalid JSON body" }, 400);
+        return jsonResponse(
+          { status: "FAILED", authorized: false, message: "Invalid JSON body" },
+          400
+        );
       }
 
       const inputPin = String(body.pin || "").trim();
@@ -105,16 +117,16 @@ export async function onRequest(context) {
 
       let authorized = false;
 
-      // 1. Support encrypted / hashed PIN via ADMIN_PIN_HASH
       if (env.ADMIN_PIN_HASH) {
         const pinBuf = new TextEncoder().encode(inputPin);
         const hashBuf = await crypto.subtle.digest("SHA-256", pinBuf);
         const hashHex = Array.from(new Uint8Array(hashBuf))
           .map((b) => b.toString(16).padStart(2, "0"))
           .join("");
-        authorized = hashHex.toLowerCase() === String(env.ADMIN_PIN_HASH).toLowerCase().trim();
+        authorized =
+          hashHex.toLowerCase() ===
+          String(env.ADMIN_PIN_HASH).toLowerCase().trim();
       } else {
-        // 2. Direct comparison against Cloudflare Pages secret ADMIN_PIN (or default 1917)
         authorized = inputPin === expectedPin;
       }
 
@@ -126,52 +138,71 @@ export async function onRequest(context) {
           message: "PIN verified successfully",
         });
       } else {
-        return jsonResponse({
-          status: "FAILED",
-          authorized: false,
-          message: "Invalid administrator PIN",
-        }, 401);
+        return jsonResponse(
+          {
+            status: "FAILED",
+            authorized: false,
+            message: "Invalid administrator PIN",
+          },
+          401
+        );
       }
     }
 
     /* -------------------------------------------------------------
-     * ACTION: create_order (Initiate PG v2 payment)
+     * ACTION: create_order (PhonePe PG v2)
      * ------------------------------------------------------------- */
     if (request.method === "POST" && action === "create_order") {
       let body = {};
       try {
         body = await request.json();
       } catch {
-        return jsonResponse({ status: "FAILED", message: "Invalid JSON body" }, 400);
+        return jsonResponse(
+          { status: "FAILED", message: "Invalid JSON body" },
+          400
+        );
       }
 
       const { orderRef, amount, phone, redirectBaseUrl } = body;
 
       if (!orderRef) {
-        return jsonResponse({ status: "FAILED", message: "Missing orderRef" }, 400);
+        return jsonResponse(
+          { status: "FAILED", message: "Missing orderRef" },
+          400
+        );
       }
 
       const amountInPaise = Math.round(parseFloat(amount || 0) * 100);
       if (isNaN(amountInPaise) || amountInPaise < 100) {
-        return jsonResponse({ status: "FAILED", message: "Amount must be at least ₹1.00 (100 paise)" }, 400);
+        return jsonResponse(
+          {
+            status: "FAILED",
+            message: "Amount must be at least ₹1.00 (100 paise)",
+          },
+          400
+        );
       }
 
       let token;
       try {
         token = await getOAuthToken(env);
       } catch (authErr) {
-        return jsonResponse({
-          status: "FAILED",
-          message: "Unable to authenticate with payment provider",
-          details: authErr.message,
-        }, 502);
+        return jsonResponse(
+          {
+            status: "FAILED",
+            message: "Unable to authenticate with payment provider",
+            details: authErr.message,
+          },
+          502
+        );
       }
 
-      const cleanPhone = phone ? String(phone).replace(/\D/g, "").slice(-10) : "";
+      const cleanPhone = phone
+        ? String(phone).replace(/\D/g, "").slice(-10)
+        : "";
       const baseOrigin = redirectBaseUrl || PRODUCTION_ORIGIN;
       const redirectUrl = `${baseOrigin}/?orderRef=${encodeURIComponent(orderRef)}`;
 
-      // Official PhonePe PG v2 checkout payload schema
       const checkoutPayload = {
         merchantOrderId: orderRef,
         amount: amountInPaise,
@@ -194,7 +225,7 @@ export async function onRequest(context) {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `O-Bearer ${token}`,
+          Authorization: `O-Bearer ${token}`,
         },
         body: JSON.stringify(checkoutPayload),
       });
@@ -202,11 +233,14 @@ export async function onRequest(context) {
       const payData = await payResponse.json();
 
       if (!payResponse.ok) {
-        return jsonResponse({
-          status: "FAILED",
-          message: payData.message || "Payment initiation failed",
-          raw: payData,
-        }, payResponse.status);
+        return jsonResponse(
+          {
+            status: "FAILED",
+            message: payData.message || "Payment initiation failed",
+            raw: payData,
+          },
+          payResponse.status
+        );
       }
 
       const checkoutRedirect =
@@ -215,11 +249,14 @@ export async function onRequest(context) {
         payData.data?.instrumentResponse?.redirectInfo?.url;
 
       if (!checkoutRedirect) {
-        return jsonResponse({
-          status: "FAILED",
-          message: "No checkout redirect URL provided by PhonePe PG",
-          raw: payData,
-        }, 502);
+        return jsonResponse(
+          {
+            status: "FAILED",
+            message: "No checkout redirect URL provided by PhonePe PG",
+            raw: payData,
+          },
+          502
+        );
       }
 
       return jsonResponse({
@@ -231,24 +268,30 @@ export async function onRequest(context) {
     }
 
     /* -------------------------------------------------------------
-     * ACTION: verify_order (Check transaction status)
+     * ACTION: verify_order (PhonePe PG v2)
      * ------------------------------------------------------------- */
     if (request.method === "GET" && action === "verify_order") {
       const orderRef = url.searchParams.get("orderRef");
       if (!orderRef) {
-        return jsonResponse({ status: "FAILED", message: "Missing orderRef parameter" }, 400);
+        return jsonResponse(
+          { status: "FAILED", message: "Missing orderRef parameter" },
+          400
+        );
       }
 
       let token;
       try {
         token = await getOAuthToken(env);
       } catch (authErr) {
-        return jsonResponse({
-          status: "FAILED",
-          orderRef,
-          paymentStatus: "FAILED",
-          reason: "Auth token acquisition failed: " + authErr.message,
-        }, 502);
+        return jsonResponse(
+          {
+            status: "FAILED",
+            orderRef,
+            paymentStatus: "FAILED",
+            reason: "Auth token acquisition failed: " + authErr.message,
+          },
+          502
+        );
       }
 
       const statusEndpoint = `${STATUS_URL}/${orderRef}/status?details=false`;
@@ -256,7 +299,7 @@ export async function onRequest(context) {
         method: "GET",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `O-Bearer ${token}`,
+          Authorization: `O-Bearer ${token}`,
         },
       });
 
@@ -282,30 +325,39 @@ export async function onRequest(context) {
     }
 
     /* -------------------------------------------------------------
-     * ACTION: phonepe_refund (Automated Online Refund to Original Source)
+     * ACTION: phonepe_refund
      * ------------------------------------------------------------- */
     if (request.method === "POST" && action === "phonepe_refund") {
       let body = {};
       try {
         body = await request.json();
       } catch {
-        return jsonResponse({ status: "FAILED", message: "Invalid JSON body" }, 400);
+        return jsonResponse(
+          { status: "FAILED", message: "Invalid JSON body" },
+          400
+        );
       }
 
       const { orderRef, originalTransactionId, amountInRupees } = body;
       if (!orderRef || !amountInRupees) {
-        return jsonResponse({ status: "FAILED", message: "Missing orderRef or amountInRupees" }, 400);
+        return jsonResponse(
+          { status: "FAILED", message: "Missing orderRef or amountInRupees" },
+          400
+        );
       }
 
       let token;
       try {
         token = await getOAuthToken(env);
       } catch (authErr) {
-        return jsonResponse({
-          status: "FAILED",
-          message: "Unable to authenticate with payment provider for refund",
-          details: authErr.message,
-        }, 502);
+        return jsonResponse(
+          {
+            status: "FAILED",
+            message: "Unable to authenticate with payment provider for refund",
+            details: authErr.message,
+          },
+          502
+        );
       }
 
       const amountInPaise = Math.round(parseFloat(amountInRupees) * 100);
@@ -322,49 +374,60 @@ export async function onRequest(context) {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `O-Bearer ${token}`,
+          Authorization: `O-Bearer ${token}`,
         },
         body: JSON.stringify(refundPayload),
       });
 
       const refundData = await refundResp.json();
-      const isSuccess = refundResp.ok && (
-        refundData.state === "COMPLETED" ||
-        refundData.state === "PENDING" ||
-        refundData.code === "PAYMENT_SUCCESS" ||
-        refundData.code === "PAYMENT_PENDING"
-      );
+      const isSuccess =
+        refundResp.ok &&
+        (refundData.state === "COMPLETED" ||
+          refundData.state === "PENDING" ||
+          refundData.code === "PAYMENT_SUCCESS" ||
+          refundData.code === "PAYMENT_PENDING");
 
-      return jsonResponse({
-        status: isSuccess ? "SUCCESS" : "FAILED",
-        success: isSuccess,
-        refundMerchantId,
-        orderRef,
-        data: refundData,
-      }, refundResp.status);
+      return jsonResponse(
+        {
+          status: isSuccess ? "SUCCESS" : "FAILED",
+          success: isSuccess,
+          refundMerchantId,
+          orderRef,
+          data: refundData,
+        },
+        refundResp.status
+      );
     }
 
     /* -------------------------------------------------------------
      * DELHIVERY LOGISTICS INTEGRATION
      * ------------------------------------------------------------- */
-    const DELHIVERY_TOKEN = env.DELHIVERY_API_TOKEN || "6d43e07bee414f88473e757d0fd9e1134e1afc9a";
-    const DELHIVERY_WAREHOUSE = env.DELHIVERY_WAREHOUSE_NAME || "MANOPAVANA_PEENYA";
+    const DELHIVERY_TOKEN =
+      env.DELHIVERY_API_TOKEN || "6d43e07bee414f88473e757d0fd9e1134e1afc9a";
+    const PRIMARY_PICKUP = "MANOPAVANA B2C";
+    const FALLBACK_PICKUP = "MANOPAVANA_PEENYA";
 
-    // 0. Live Connection & Token Health Check
+    // 0. Live Connection Check
     if (request.method === "GET" && action === "delhivery_test_connection") {
       const start = Date.now();
       try {
-        const checkResp = await fetch(`https://track.delhivery.com/c/api/pin-codes/json/?filter_codes=560058`, {
-          headers: { Authorization: `Token ${DELHIVERY_TOKEN}` },
-        });
+        const checkResp = await fetch(
+          "https://track.delhivery.com/c/api/pin-codes/json/?filter_codes=560058",
+          {
+            headers: { Authorization: `Token ${DELHIVERY_TOKEN}` },
+          }
+        );
         const isAuthed = checkResp.status === 200;
         const latency = Date.now() - start;
 
         let waybillTest = null;
         try {
-          const wbResp = await fetch("https://track.delhivery.com/waybill/api/fetch/json/?count=1", {
-            headers: { Authorization: `Token ${DELHIVERY_TOKEN}` },
-          });
+          const wbResp = await fetch(
+            "https://track.delhivery.com/waybill/api/fetch/json/?count=1",
+            {
+              headers: { Authorization: `Token ${DELHIVERY_TOKEN}` },
+            }
+          );
           if (wbResp.ok) {
             waybillTest = (await wbResp.text()).replace(/[^0-9]/g, "");
           }
@@ -374,7 +437,7 @@ export async function onRequest(context) {
           status: isAuthed ? "SUCCESS" : "FAILED",
           authenticated: isAuthed,
           tokenMasked: `${DELHIVERY_TOKEN.slice(0, 6)}...${DELHIVERY_TOKEN.slice(-4)}`,
-          warehouse: DELHIVERY_WAREHOUSE,
+          warehouse: PRIMARY_PICKUP,
           originPincode: "560058 (Peenya 2nd Stage, Bengaluru)",
           sampleWaybill: waybillTest,
           latencyMs: latency,
@@ -383,25 +446,10 @@ export async function onRequest(context) {
             : "Delhivery API authentication returned non-200 code.",
         });
       } catch (e) {
-        return jsonResponse({ status: "ERROR", message: e?.message || "Connection test failed" }, 502);
-      }
-    }
-
-    // 0b. Fetch Fresh Waybill (AWB) from Delhivery
-    if (request.method === "GET" && action === "delhivery_fetch_waybill") {
-      try {
-        const wbResp = await fetch("https://track.delhivery.com/waybill/api/fetch/json/?count=1", {
-          headers: { Authorization: `Token ${DELHIVERY_TOKEN}` },
-        });
-        const wbText = await wbResp.text();
-        const cleanWb = wbText.replace(/[^0-9]/g, "");
-        return jsonResponse({
-          status: "SUCCESS",
-          waybill: cleanWb || wbText,
-          raw: wbText,
-        });
-      } catch (e) {
-        return jsonResponse({ status: "ERROR", message: e?.message || "Waybill fetch error" }, 502);
+        return jsonResponse(
+          { status: "ERROR", message: e?.message || "Connection test failed" },
+          502
+        );
       }
     }
 
@@ -409,12 +457,18 @@ export async function onRequest(context) {
     if (request.method === "GET" && action === "delhivery_check_pincode") {
       const pincode = url.searchParams.get("pincode");
       if (!pincode || pincode.length !== 6) {
-        return jsonResponse({ status: "FAILED", message: "Valid 6-digit pincode required" }, 400);
+        return jsonResponse(
+          { status: "FAILED", message: "Valid 6-digit pincode required" },
+          400
+        );
       }
 
-      const checkResp = await fetch(`https://track.delhivery.com/c/api/pin-codes/json/?filter_codes=${pincode}`, {
-        headers: { Authorization: `Token ${DELHIVERY_TOKEN}` },
-      });
+      const checkResp = await fetch(
+        `https://track.delhivery.com/c/api/pin-codes/json/?filter_codes=${pincode}`,
+        {
+          headers: { Authorization: `Token ${DELHIVERY_TOKEN}` },
+        }
+      );
       const checkData = await checkResp.json();
       const info = checkData?.delivery_codes?.[0]?.postal_code;
 
@@ -441,13 +495,16 @@ export async function onRequest(context) {
       });
     }
 
-    // 2. Create Delhivery Shipment Manifest
+    // 2. Create Delhivery Shipment Manifest with Automatic Facility Fallback
     if (request.method === "POST" && action === "delhivery_create_shipment") {
       let body = {};
       try {
         body = await request.json();
       } catch {
-        return jsonResponse({ status: "FAILED", message: "Invalid JSON body" }, 400);
+        return jsonResponse(
+          { status: "FAILED", message: "Invalid JSON body" },
+          400
+        );
       }
 
       const {
@@ -463,18 +520,20 @@ export async function onRequest(context) {
         weightGrams = 1000,
         productsDesc = "Pure Cold Pressed Oil",
         quantity = "1",
-        warehouseName = DELHIVERY_WAREHOUSE,
       } = body;
 
       if (!orderRef || !pincode || !phone || !customerName) {
-        return jsonResponse({ status: "FAILED", message: "Missing required order fields" }, 400);
+        return jsonResponse(
+          { status: "FAILED", message: "Missing required order fields" },
+          400
+        );
       }
 
       const cleanPhone = String(phone).replace(/\D/g, "").slice(-10);
       const isCod = String(paymentMode).toUpperCase() === "COD";
       const codAmount = isCod ? Math.round(Number(totalAmount)) : 0;
 
-      const manifestPayload = {
+      const buildPayload = (facilityName) => ({
         shipments: [
           {
             name: customerName,
@@ -490,7 +549,7 @@ export async function onRequest(context) {
             hsn_code: "1512",
             cod_amount: codAmount,
             total_amount: Math.round(Number(totalAmount)),
-            seller_name: "MANOPAVANA B2C",
+            seller_name: "MANOPAVANA",
             quantity: String(quantity),
             weight: Number(weightGrams) || 1000,
             shipping_mode: "Surface",
@@ -498,13 +557,16 @@ export async function onRequest(context) {
           },
         ],
         pickup_location: {
-          name: warehouseName,
+          name: facilityName,
         },
-      };
+      });
 
-      const postData = "format=json&data=" + encodeURIComponent(JSON.stringify(manifestPayload));
+      // Attempt 1: Registered Facility "MANOPAVANA B2C"
+      let currentPayload = buildPayload(PRIMARY_PICKUP);
+      let postData =
+        "format=json&data=" + encodeURIComponent(JSON.stringify(currentPayload));
 
-      const createResp = await fetch("https://track.delhivery.com/api/cmu/create.json", {
+      let createResp = await fetch("https://track.delhivery.com/api/cmu/create.json", {
         method: "POST",
         headers: {
           Authorization: `Token ${DELHIVERY_TOKEN}`,
@@ -513,63 +575,97 @@ export async function onRequest(context) {
         body: postData,
       });
 
-      const createData = await createResp.json();
-      const pkg = createData.packages?.[0];
+      let createData = await createResp.json();
+      let pkg = createData.packages?.[0];
 
       if (createData.success && pkg?.waybill) {
         return jsonResponse({
           status: "SUCCESS",
           waybill: pkg.waybill,
           refnum: pkg.refnum,
-          labelUrl: `https://track.delhivery.com/api/p/packing_slip?wbns=${pkg.waybill}&pdf=true`,
+          pickupLocationUsed: PRIMARY_PICKUP,
+          labelUrl: `/api?action=delhivery_packing_slip&waybill=${pkg.waybill}`,
           trackingUrl: `https://www.delhivery.com/track/package/${pkg.waybill}`,
           raw: createData,
         });
       }
 
-      const remarkMsg = pkg?.remarks?.join(", ") || createData.rmk || "Shipment manifest creation failed";
-      const isInsufficientBalance = remarkMsg.toLowerCase().includes("insufficient balance");
+      // Check for facility-related failure and retry with fallback
+      const remarksText = (pkg?.remarks || []).join(" ").toLowerCase();
+      const rmkText = (createData.rmk || "").toLowerCase();
+      const isPickupIssue =
+        remarksText.includes("pickup") ||
+        remarksText.includes("facility") ||
+        remarksText.includes("location") ||
+        rmkText.includes("pickup") ||
+        rmkText.includes("facility") ||
+        rmkText.includes("location");
 
-      let fallbackWaybill = null;
-      if (isInsufficientBalance) {
-        try {
-          const wbResp = await fetch("https://track.delhivery.com/waybill/api/fetch/json/?count=1", {
-            headers: { Authorization: `Token ${DELHIVERY_TOKEN}` },
+      if (isPickupIssue || !createData.success) {
+        // Attempt 2: Registered Facility "MANOPAVANA_PEENYA"
+        currentPayload = buildPayload(FALLBACK_PICKUP);
+        postData =
+          "format=json&data=" +
+          encodeURIComponent(JSON.stringify(currentPayload));
+
+        createResp = await fetch("https://track.delhivery.com/api/cmu/create.json", {
+          method: "POST",
+          headers: {
+            Authorization: `Token ${DELHIVERY_TOKEN}`,
+            "Content-Type": "application/x-www-form-urlencoded",
+          },
+          body: postData,
+        });
+
+        createData = await createResp.json();
+        pkg = createData.packages?.[0];
+
+        if (createData.success && pkg?.waybill) {
+          return jsonResponse({
+            status: "SUCCESS",
+            waybill: pkg.waybill,
+            refnum: pkg.refnum,
+            pickupLocationUsed: FALLBACK_PICKUP,
+            labelUrl: `/api?action=delhivery_packing_slip&waybill=${pkg.waybill}`,
+            trackingUrl: `https://www.delhivery.com/track/package/${pkg.waybill}`,
+            raw: createData,
           });
-          if (wbResp.ok) {
-            const wbText = await wbResp.text();
-            fallbackWaybill = wbText.replace(/[^0-9]/g, "");
-          }
-        } catch {
-          // ignore fallback error
         }
       }
 
-      return jsonResponse({
-        status: "PARTIAL_OR_FAILED",
-        error: true,
-        message: remarkMsg,
-        isInsufficientBalance,
-        insufficientBalanceHelp: isInsufficientBalance
-          ? "Your Delhivery One account has ₹0 wallet balance. Please recharge ₹200-₹500 at one.delhivery.com to enable auto-manifesting."
-          : null,
-        fallbackWaybill,
-        labelUrl: fallbackWaybill ? `https://track.delhivery.com/api/p/packing_slip?wbns=${fallbackWaybill}&pdf=true` : null,
-        trackingUrl: fallbackWaybill ? `https://www.delhivery.com/track/package/${fallbackWaybill}` : null,
-        raw: createData,
-      });
+      const explicitError =
+        (pkg?.remarks && pkg.remarks.length > 0 ? pkg.remarks.join(", ") : null) ||
+        createData.rmk ||
+        (createData.error ? JSON.stringify(createData.error) : null) ||
+        "Failed to manifest shipment with Delhivery";
+
+      return jsonResponse(
+        {
+          status: "FAILED",
+          error: true,
+          message: explicitError,
+          raw: createData,
+        },
+        400
+      );
     }
 
     // 3. Track Delhivery Waybill
     if (request.method === "GET" && action === "delhivery_track") {
       const waybill = url.searchParams.get("waybill");
       if (!waybill) {
-        return jsonResponse({ status: "FAILED", message: "Missing waybill" }, 400);
+        return jsonResponse(
+          { status: "FAILED", message: "Missing waybill" },
+          400
+        );
       }
 
-      const trackResp = await fetch(`https://track.delhivery.com/api/v1/packages/json/?waybill=${waybill}`, {
-        headers: { Authorization: `Token ${DELHIVERY_TOKEN}` },
-      });
+      const trackResp = await fetch(
+        `https://track.delhivery.com/api/v1/packages/json/?waybill=${waybill}`,
+        {
+          headers: { Authorization: `Token ${DELHIVERY_TOKEN}` },
+        }
+      );
       const trackData = await trackResp.json();
 
       return jsonResponse({
@@ -580,25 +676,76 @@ export async function onRequest(context) {
       });
     }
 
-    // 4. Delhivery Webhook Push Notification Handler
+    // 4. Secure Packing Slip Proxy (Streams raw PDF buffer with Token authentication)
+    if (request.method === "GET" && action === "delhivery_packing_slip") {
+      const waybill = url.searchParams.get("waybill");
+      if (!waybill) {
+        return jsonResponse(
+          { status: "FAILED", message: "Missing waybill parameter" },
+          400
+        );
+      }
+
+      const slipResp = await fetch(
+        `https://track.delhivery.com/api/p/packing_slip?wbns=${encodeURIComponent(
+          waybill
+        )}&pdf=true`,
+        {
+          headers: {
+            Authorization: `Token ${DELHIVERY_TOKEN}`,
+          },
+        }
+      );
+
+      if (!slipResp.ok) {
+        const errText = await slipResp.text();
+        return jsonResponse(
+          {
+            status: "FAILED",
+            message: "Unable to retrieve packing slip from Delhivery",
+            error: errText,
+          },
+          slipResp.status
+        );
+      }
+
+      const pdfBuffer = await slipResp.arrayBuffer();
+      return new Response(pdfBuffer, {
+        status: 200,
+        headers: {
+          "Content-Type": "application/pdf",
+          "Content-Disposition": `inline; filename="delhivery_label_${waybill}.pdf"`,
+          ...CORS_HEADERS,
+        },
+      });
+    }
+
+    // 5. Delhivery Webhook Push Notification Handler
     if (request.method === "POST" && action === "delhivery_webhook") {
       try {
-        const webhookData = await request.json().catch(() => ({}));
-        console.log("[DELHIVERY WEBHOOK RECEIVED]", webhookData);
+        await request.json().catch(() => ({}));
         return jsonResponse({ status: "SUCCESS", received: true });
       } catch {
         return jsonResponse({ status: "ACKNOWLEDGED" });
       }
     }
 
-    return jsonResponse({
-      status: "FAILED",
-      message: `Unsupported action or method: ${request.method} ${action || "(none)"}`,
-    }, 404);
+    return jsonResponse(
+      {
+        status: "FAILED",
+        message: `Unsupported action or method: ${request.method} ${
+          action || "(none)"
+        }`,
+      },
+      404
+    );
   } catch (err) {
-    return jsonResponse({
-      status: "ERROR",
-      message: err.message || "Internal Edge Error",
-    }, 500);
+    return jsonResponse(
+      {
+        status: "ERROR",
+        message: err.message || "Internal Edge Error",
+      },
+      500
+    );
   }
 }
