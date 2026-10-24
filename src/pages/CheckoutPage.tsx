@@ -1123,8 +1123,8 @@ export const CheckoutPage: React.FC = () => {
                   </p>
                   <p className="text-[11px] opacity-90 mt-0.5">
                     {isBangalore
-                      ? "Packed hygienically in Peenya and dispatched fresh via direct carrier."
-                      : "Shipped with real-time Delhivery waybill tracking right here on our website."}
+                      ? "Packed hygienically in Peenya and dispatched fresh via direct carrier with your GPS map pin."
+                      : "Shipped with real-time Delhivery tracking. Your GPS map pin & Google Maps link are sent directly to the courier partner."}
                   </p>
                 </div>
               </div>
@@ -1226,29 +1226,75 @@ export const CheckoutPage: React.FC = () => {
 
                   {/* Math Challenge Box for COD Orders */}
                   {paymentMethod === "cod" && (
-
-                    <div className="p-4 rounded-2xl bg-amber-500/10 border-2 border-amber-500/30 space-y-3">
+                    <div
+                      className={`mt-3 p-4 rounded-2xl border-2 space-y-3 shadow-sm ${
+                        isDark
+                          ? "bg-[#25150C] border-[#E08F35] text-[#FAF4EA]"
+                          : "bg-[#FFF9EE] border-[#C8751B] text-[#1F120A]"
+                      }`}
+                    >
                       <div className="flex items-center gap-2">
-                        <ShieldCheck className="w-4 h-4 text-amber-600 dark:text-amber-400" />
-                        <span className="font-bold text-xs text-stone-900 dark:text-white">
-                          Cash on Delivery Human Verification:
+                        <ShieldCheck className="w-4 h-4 text-[#E08F35] shrink-0" />
+                        <span
+                          className={`font-black text-xs tracking-wide uppercase ${
+                            isDark ? "text-[#F5BC51]" : "text-[#7A4B1A]"
+                          }`}
+                        >
+                          Cash on Delivery Human Verification
                         </span>
                       </div>
 
-                      <p className="text-xs font-semibold text-stone-800 dark:text-stone-200">
-                        Please solve to confirm your order:{" "}
-                        <span className="font-mono text-sm font-black px-2 py-1 rounded-md bg-white dark:bg-[#1C120B] border border-amber-400 text-stone-900 dark:text-amber-300">
-                          {codChallenge.a} + {codChallenge.b} = ?
-                        </span>
-                      </p>
+                      <div className="space-y-1.5">
+                        <p
+                          className={`text-xs font-bold ${
+                            isDark ? "text-[#FAF4EA]" : "text-[#23150C]"
+                          }`}
+                        >
+                          Please solve this simple math question to confirm your COD order:
+                        </p>
+                        <div
+                          className={`flex items-center justify-center p-3 rounded-xl border-2 text-center select-none ${
+                            isDark
+                              ? "bg-[#140D07] border-[#E08F35]/70 text-[#F5BC51]"
+                              : "bg-white border-[#C8751B]/60 text-[#7A4B1A]"
+                          }`}
+                        >
+                          <span className="font-mono text-xl sm:text-2xl font-black tracking-widest">
+                            {codChallenge.a} + {codChallenge.b} = ?
+                          </span>
+                        </div>
+                      </div>
 
-                      <input
-                        type="number"
-                        placeholder="Enter result..."
-                        value={codAnswerInput}
-                        onChange={(e) => setCodAnswerInput(e.target.value)}
-                        className="w-full px-3 py-2 rounded-xl border-2 border-amber-500/40 bg-white dark:bg-[#120A06] text-stone-900 dark:text-white font-bold text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
-                      />
+                      <div>
+                        <label
+                          className={`block text-[11px] font-bold mb-1 ${
+                            isDark ? "text-[#D6C4B0]" : "text-[#5C402D]"
+                          }`}
+                        >
+                          Type the answer number here:
+                        </label>
+                        <input
+                          type="number"
+                          placeholder={`Answer: ${codChallenge.a + codChallenge.b}`}
+                          value={codAnswerInput}
+                          onChange={(e) => {
+                            setCodAnswerInput(e.target.value);
+                            setCodError(null);
+                          }}
+                          className={`w-full px-3.5 py-2.5 rounded-xl border-2 font-bold text-sm focus:outline-none focus:ring-2 focus:ring-[#E08F35] shadow-xs ${
+                            isDark
+                              ? "bg-[#140D07] border-[#5A3820] text-white placeholder-[#8C7A6B]"
+                              : "bg-white border-[#DDD1BE] text-[#1F120A] placeholder-[#8C7A6B]"
+                          }`}
+                        />
+                      </div>
+
+                      {codError && (
+                        <p className="text-xs font-bold text-red-500 flex items-center gap-1.5">
+                          <AlertCircle className="w-4 h-4 shrink-0 text-red-500" />
+                          <span>{codError}</span>
+                        </p>
+                      )}
                     </div>
                   )}
                 </label>

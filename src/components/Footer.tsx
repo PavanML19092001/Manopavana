@@ -31,13 +31,13 @@ export const Footer: React.FC = () => {
                 <div className="w-11 h-11 rounded-none p-1 flex items-center justify-center shrink-0 border-2 border-[#E5DACB] bg-white shadow-xs">
                   <img
                     src={cmsConfig?.brandLogoUrl || MEDIA_ASSETS.logo}
-                    alt={BUSINESS_CONFIG.BRAND_NAME}
+                    alt={cmsConfig?.brandName || BUSINESS_CONFIG.BRAND_NAME}
                     className="w-full h-full object-contain block"
                   />
                 </div>
                 <div className="flex flex-col">
                   <span className="text-xl font-bold font-serif text-[#FDF6EC] tracking-wider">
-                    {BUSINESS_CONFIG.BRAND_NAME}
+                    {cmsConfig?.brandName || BUSINESS_CONFIG.BRAND_NAME}
                   </span>
                   <span className="text-[11px] text-[#F5BC51] font-semibold">
                     {cmsConfig?.brandTagline || "Pure by nature, trusted for life"}
@@ -45,11 +45,11 @@ export const Footer: React.FC = () => {
                 </div>
               </div>
               <p className="text-xs text-[#A88D77] leading-relaxed">
-                {BUSINESS_CONFIG.FACILITY_STATEMENT}
+                {cmsConfig?.facilityStatement || BUSINESS_CONFIG.FACILITY_STATEMENT}
               </p>
               <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#24160F] border border-[#4A301E] text-xs text-[#F5BC51]">
                 <ShieldCheck className="w-4 h-4 shrink-0 text-[#E08F35]" />
-                <span className="font-semibold">{BUSINESS_CONFIG.FSSAI_LICENSE}</span>
+                <span className="font-semibold">{cmsConfig?.fssaiLicense || BUSINESS_CONFIG.FSSAI_LICENSE}</span>
               </div>
             </div>
 
@@ -60,14 +60,14 @@ export const Footer: React.FC = () => {
                 Packaging Facility
               </h4>
               <p className="text-xs text-[#A88D77] leading-relaxed">
-                {BUSINESS_CONFIG.FACILITY_ADDRESS}
+                {cmsConfig?.facilityAddress || BUSINESS_CONFIG.FACILITY_ADDRESS}
               </p>
               <p className="text-[11px] text-[#8C7A6B]">
-                GSTIN: <span className="font-mono text-[#D6BEAA]">{BUSINESS_CONFIG.GSTIN}</span>
+                GSTIN: <span className="font-mono text-[#D6BEAA]">{cmsConfig?.gstin || BUSINESS_CONFIG.GSTIN}</span>
               </p>
               <p className="text-[11px] text-[#8C7A6B]">
                 Founder & Grievance Officer:{" "}
-                <span className="text-[#D6BEAA] font-semibold">{BUSINESS_CONFIG.FOUNDER_NAME}</span>
+                <span className="text-[#D6BEAA] font-semibold">{cmsConfig?.founderName || BUSINESS_CONFIG.FOUNDER_NAME}</span>
               </p>
             </div>
 
@@ -78,34 +78,36 @@ export const Footer: React.FC = () => {
               </h4>
               <div className="space-y-2 text-xs text-[#A88D77]">
                 <a
-                  href={`https://wa.me/${BUSINESS_CONFIG.PHONE_RAW}?text=Hi%20MANOPAVANA,%20I%20have%20an%20inquiry%20about%20your%20wood-pressed%20oils`}
+                  href={`https://wa.me/${(cmsConfig?.primaryPhone || BUSINESS_CONFIG.PRIMARY_PHONE).replace(/\D/g, "")}?text=Hi%20MANOPAVANA,%20I%20have%20an%20inquiry%20about%20your%20wood-pressed%20oils`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-center gap-2 text-emerald-400 hover:text-emerald-300 font-semibold transition-colors"
                 >
                   <MessageCircle className="w-4 h-4 shrink-0" />
-                  <span>WhatsApp Business: +91 91803 01917</span>
+                  <span>WhatsApp Business: {cmsConfig?.primaryPhone || BUSINESS_CONFIG.PRIMARY_PHONE}</span>
                 </a>
                 <a
-                  href={`tel:${BUSINESS_CONFIG.PHONE_RAW}`}
+                  href={`tel:${(cmsConfig?.primaryPhone || BUSINESS_CONFIG.PRIMARY_PHONE).replace(/\D/g, "")}`}
                   className="flex items-center gap-2 hover:text-[#FDF6EC] transition-colors"
                 >
                   <Phone className="w-4 h-4 shrink-0 text-[#E08F35]" />
-                  <span>{BUSINESS_CONFIG.PRIMARY_PHONE}</span>
+                  <span>{cmsConfig?.primaryPhone || BUSINESS_CONFIG.PRIMARY_PHONE}</span>
                 </a>
+                {cmsConfig?.altPhone && (
+                  <a
+                    href={`tel:${cmsConfig.altPhone.replace(/\D/g, "")}`}
+                    className="flex items-center gap-2 hover:text-[#FDF6EC] transition-colors"
+                  >
+                    <Phone className="w-4 h-4 shrink-0 text-[#E08F35]" />
+                    <span>Alt: {cmsConfig.altPhone}</span>
+                  </a>
+                )}
                 <a
-                  href={`tel:${BUSINESS_CONFIG.ALT_PHONE}`}
-                  className="flex items-center gap-2 hover:text-[#FDF6EC] transition-colors"
-                >
-                  <Phone className="w-4 h-4 shrink-0 text-[#E08F35]" />
-                  <span>Alt: +91 {BUSINESS_CONFIG.ALT_PHONE}</span>
-                </a>
-                <a
-                  href={`mailto:${BUSINESS_CONFIG.EMAIL}`}
+                  href={`mailto:${cmsConfig?.email || BUSINESS_CONFIG.EMAIL}`}
                   className="flex items-center gap-2 hover:text-[#FDF6EC] transition-colors"
                 >
                   <Mail className="w-4 h-4 shrink-0 text-[#E08F35]" />
-                  <span>{BUSINESS_CONFIG.EMAIL}</span>
+                  <span>{cmsConfig?.email || BUSINESS_CONFIG.EMAIL}</span>
                 </a>
               </div>
             </div>

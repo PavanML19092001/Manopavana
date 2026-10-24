@@ -520,6 +520,9 @@ export async function onRequest(context) {
         weightGrams = 1000,
         productsDesc = "Pure Cold Pressed Oil",
         quantity = "1",
+        lat,
+        lng,
+        mapsUrl,
       } = body;
 
       if (!orderRef || !pincode || !phone || !customerName) {
@@ -533,33 +536,63 @@ export async function onRequest(context) {
       const isCod = String(paymentMode).toUpperCase() === "COD";
       const codAmount = isCod ? Math.round(Number(totalAmount)) : 0;
 
-      const buildPayload = (facilityName) => ({
-        shipments: [
-          {
-            name: customerName,
-            add: address,
-            pin: String(pincode),
-            city: city || "Bengaluru",
-            state: state || "Karnataka",
-            country: "India",
-            phone: cleanPhone,
-            order: orderRef,
-            payment_mode: isCod ? "COD" : "Prepaid",
-            products_desc: productsDesc,
-            hsn_code: "1512",
-            cod_amount: codAmount,
-            total_amount: Math.round(Number(totalAmount)),
-            seller_name: "MANOPAVANA",
-            quantity: String(quantity),
-            weight: Number(weightGrams) || 1000,
-            shipping_mode: "Surface",
-            address_type: "home",
+      // Extract coordinates and construct direct Google Maps pin link
+      const numLat = Number.isFinite(Number(lat)) && Number(lat) !== 0 ? Number(lat) : null;
+      const numLng = Number.isFinite(Number(lng)) && Number(lng) !== 0 ? Number(lng) : null;
+      const mapLink = mapsUrl || (numLat && numLng ? `https://maps.google.com/?q=${numLat},${numLng}` : null);
+
+      // Delhivery CMU enforces a 250 character limit on the 'add' field.
+      // Append the GPS map pin cleanly to the address so delivery agents see it in the Delhivery rider mobile app.
+      let finalAddress = String(address || "").trim();
+      if (numLat && numLng) {
+        const mapSuffix = ` [Map: https://maps.google.com/?q=${numLat.toFixed(5)},${numLng.toFixed(5)}]`;
+        if (finalAddress.length + mapSuffix.length <= 250) {
+          finalAddress = `${finalAddress}${mapSuffix}`;
+        } else {
+          const maxBase = Math.max(20, 250 - mapSuffix.length - 3);
+          finalAddress = `${finalAddress.slice(0, maxBase)}...${mapSuffix}`;
+        }
+      }
+
+      const buildPayload = (facilityName) => {
+        const shipmentItem = {
+          name: customerName,
+          add: finalAddress,
+          pin: String(pincode),
+          city: city || "Bengaluru",
+          state: state || "Karnataka",
+          country: "India",
+          phone: cleanPhone,
+          order: orderRef,
+          payment_mode: isCod ? "COD" : "Prepaid",
+          products_desc: productsDesc,
+          hsn_code: "1512",
+          cod_amount: codAmount,
+          total_amount: Math.round(Number(totalAmount)),
+          seller_name: "MANOPAVANA",
+          quantity: String(quantity),
+          weight: Number(weightGrams) || 1000,
+          shipping_mode: "Surface",
+          address_type: "home",
+        };
+
+        // Attach GPS coordinates directly to Delhivery payload
+        if (numLat && numLng) {
+          shipmentItem.lat = numLat;
+          shipmentItem.lng = numLng;
+          shipmentItem.geo_location = `${numLat},${numLng}`;
+        }
+        if (mapLink) {
+          shipmentItem.remarks = `Location: ${mapLink}`;
+        }
+
+        return {
+          shipments: [shipmentItem],
+          pickup_location: {
+            name: facilityName,
           },
-        ],
-        pickup_location: {
-          name: facilityName,
-        },
-      });
+        };
+      };
 
       // Attempt 1: Registered Facility "MANOPAVANA B2C"
       let currentPayload = buildPayload(PRIMARY_PICKUP);

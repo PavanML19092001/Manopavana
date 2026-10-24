@@ -121,14 +121,14 @@ export const Navbar: React.FC = () => {
 
   return (
     <header
-      className={`w-full max-w-full sticky top-0 z-40 transition-colors box-border ${isLight
+      className={`w-full max-w-full overflow-x-clip sticky top-0 z-40 transition-colors box-border ${isLight
           ? "bg-white/95 text-[#1F120A] border-b border-[#E5DACB] shadow-sm backdrop-blur-md"
           : isDark
             ? "bg-gradient-to-b from-[#180E08] via-[#120A05] to-[#0D0703] text-[#FAF4EA] border-b border-[#3D2517] shadow-2xl backdrop-blur-md"
             : "bg-gradient-to-b from-[#25150C] via-[#1B0F08] to-[#140C07] text-[#FAF4EA] border-b border-[#D4A373]/30 shadow-2xl backdrop-blur-md"
         }`}
     >
-      {/* 3. COMPACT TOP ANNOUNCEMENT TICKER */}
+      {/* COMPACT TOP ANNOUNCEMENT TICKER */}
       <div
         className={`py-1 px-2 text-[11px] font-bold border-b tracking-wide text-center truncate flex items-center justify-center gap-2 box-border transition-colors ${isLight
             ? "bg-[#4D2811] text-[#FFE8BD] border-[#653517]"
@@ -147,14 +147,14 @@ export const Navbar: React.FC = () => {
         </button>
       </div>
 
-      {/* 2. STREAMLINED 2-ROW MOBILE HEADER (md:hidden) */}
-      <div className="md:hidden w-full flex flex-col">
+      {/* STREAMLINED 2-ROW MOBILE HEADER (md:hidden) */}
+      <div className="md:hidden w-full max-w-full overflow-x-clip flex flex-col box-border">
         {/* ROW 1: BRAND CLUSTER (LEFT) + ACTION CLUSTER (RIGHT) */}
-        <div className="flex items-center justify-between w-full px-3.5 py-2.5">
+        <div className="flex items-center justify-between w-full max-w-full px-3 py-2 box-border">
           {/* Left: Brand Link */}
-          <Link to="/" className="flex items-center gap-2 shrink-0">
+          <Link to="/" className="flex items-center gap-2 min-w-0 flex-1 mr-2">
             <div
-              className={`w-10 h-10 rounded-none p-1 flex items-center justify-center shrink-0 border-2 transition-all shadow-xs ${isLight
+              className={`w-9 h-9 rounded-none p-0.5 flex items-center justify-center shrink-0 border-2 transition-all shadow-xs ${isLight
                   ? "border-[#1F120A] bg-white"
                   : "border-[#E5DACB] bg-white shadow-sm"
                 }`}
@@ -165,15 +165,15 @@ export const Navbar: React.FC = () => {
                 className="w-full h-full object-contain block"
               />
             </div>
-            <div className="flex flex-col">
+            <div className="flex flex-col min-w-0">
               <span
-                className={`text-lg font-black tracking-wider font-serif leading-none ${isLight ? "text-[#1F120A]" : "text-[#FAF4EA]"
+                className={`text-base font-black tracking-wider font-serif leading-none truncate ${isLight ? "text-[#1F120A]" : "text-[#FAF4EA]"
                   }`}
               >
                 {BUSINESS_CONFIG.BRAND_NAME}
               </span>
               <span
-                className={`text-[10px] font-semibold tracking-wide mt-0.5 leading-tight block ${isLight ? "text-[#B86B14]" : "text-[#E08F35]"
+                className={`text-[9px] font-semibold tracking-wide mt-0.5 leading-tight truncate block ${isLight ? "text-[#B86B14]" : "text-[#E08F35]"
                   }`}
               >
                 {cmsConfig.brandTagline || "Pure by nature, trusted for life"}
@@ -182,7 +182,7 @@ export const Navbar: React.FC = () => {
           </Link>
 
           {/* Right: Action Icons Cluster */}
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-1.5 shrink-0">
             {/* Theme Toggle (Blend / Light / Dark) */}
             <button
               type="button"
@@ -198,32 +198,15 @@ export const Navbar: React.FC = () => {
               title={`Theme Mode: ${themeMode.toUpperCase()}`}
             >
               {themeMode === "blend" ? (
-                <Palette className="w-4 h-4 text-[#D49A37]" />
+                <Palette className="w-3.5 h-3.5 text-[#D49A37]" />
               ) : themeMode === "light" ? (
-                <Sun className="w-4 h-4 text-[#B86B14]" />
+                <Sun className="w-3.5 h-3.5 text-[#B86B14]" />
               ) : (
-                <Moon className="w-4 h-4 text-[#F5BC51]" />
+                <Moon className="w-3.5 h-3.5 text-[#F5BC51]" />
               )}
             </button>
 
-            {/* 1. Location Trigger */}
-            {/* Mobile Location Trigger */}
-            <button
-              type="button"
-              onClick={() => setLocationModalOpen(true)}
-              aria-label="Delivery Location"
-              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs transition-colors cursor-pointer ${isLight
-                  ? "bg-[#F3EBE0] border-[#DDD0BF] text-[#78461E] hover:border-[#B86B14]"
-                  : "bg-[#2D1B10] border-[#5A3820] text-[#E08F35] hover:border-[#E08F35]"
-                }`}
-            >
-              <MapPin className="w-3.5 h-3.5 shrink-0" />
-              <span className="font-bold text-[11px] truncate max-w-[90px]">
-                {address.district || address.city || "Set Location"}
-              </span>
-            </button>
-
-            {/* 2. Account / Login with Anchor Dropdown */}
+            {/* Account / Login with Anchor Dropdown */}
             <div ref={mobileUserMenuRef} className="relative">
               <button
                 onClick={() => {
@@ -243,7 +226,7 @@ export const Navbar: React.FC = () => {
                       : "bg-[#2D1B10] border-[#5A3820] text-[#FAF4EA] hover:border-[#E08F35]"
                   }`}
               >
-                <User className={`w-4 h-4 ${isLight ? "text-[#B86B14]" : "text-[#E08F35]"}`} />
+                <User className={`w-3.5 h-3.5 ${isLight ? "text-[#B86B14]" : "text-[#E08F35]"}`} />
               </button>
 
               {/* Mobile User Profile Dropdown */}
@@ -355,11 +338,11 @@ export const Navbar: React.FC = () => {
               )}
             </div>
 
-            {/* 3. Cart Trigger */}
+            {/* Cart Trigger */}
             <Link
               to="/cart"
               aria-label="Shopping Cart"
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-gradient-to-r from-[#D49A37] to-[#B87C24] text-[#140D09] font-black text-xs shadow-md border border-[#F5BC51] cursor-pointer"
+              className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg bg-gradient-to-r from-[#D49A37] to-[#B87C24] text-[#140D09] font-black text-xs shadow-md border border-[#F5BC51] cursor-pointer"
             >
               <ShoppingBag className="w-3.5 h-3.5 text-[#140D09]" />
               <span>Bag</span>
@@ -377,32 +360,50 @@ export const Navbar: React.FC = () => {
                   }`}
                 title="Admin CMS Portal"
               >
-                <ShieldAlert className="w-4 h-4" />
+                <ShieldAlert className="w-3.5 h-3.5" />
               </Link>
             )}
           </div>
         </div>
 
-        {/* ROW 2: SLEEK COMPACT SEARCH INPUT (LIGHT THEMED) */}
-        <div className="px-3.5 pb-2.5 pt-0.5 w-full">
-          <div ref={mobileSearchRef} className="relative w-full">
+        {/* ROW 2: LOCATION TRIGGER PILL + SEARCH INPUT */}
+        <div className="px-3 pb-2 pt-0.5 w-full max-w-full flex items-center gap-2 box-border">
+          {/* Location Trigger Pill */}
+          <button
+            type="button"
+            onClick={() => setLocationModalOpen(true)}
+            aria-label="Delivery Location"
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-full border text-xs shrink-0 transition-colors cursor-pointer ${isLight
+                ? "bg-[#FAF6EE] border-[#DDD0BF] text-[#78461E] hover:border-[#B86B14]"
+                : "bg-[#24150C] border-[#5A3820] text-[#E08F35] hover:border-[#E08F35]"
+              }`}
+          >
+            <MapPin className="w-3.5 h-3.5 text-[#E08F35] shrink-0" />
+            <span className="font-bold text-[11px] truncate max-w-[85px]">
+              {address.district || address.city || "Bengaluru"}
+            </span>
+            <span className="text-[9px] opacity-70">▾</span>
+          </button>
+
+          {/* Search Input Container */}
+          <div ref={mobileSearchRef} className="relative flex-1 min-w-0">
             <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none text-[#7A5538]" />
             <input
               type="text"
-              placeholder="Search wood-pressed groundnut, coconut, sesame oil..."
+              placeholder="Search oils..."
               value={searchQuery}
               onChange={(e) => {
                 setSearchQuery(e.target.value);
                 setIsSearchOpen(true);
               }}
               onFocus={() => setIsSearchOpen(true)}
-              className="w-full h-9 pl-9 pr-8 text-xs rounded-full bg-white text-[#1F120A] placeholder-[#8A7665] border border-[#D8C7B5] hover:border-[#C8751B] focus:border-[#C8751B] focus:outline-none focus:ring-2 focus:ring-[#C8751B]/25 shadow-sm transition-all"
+              className="w-full h-8 pl-8 pr-7 text-xs rounded-full bg-white text-[#1F120A] placeholder-[#8A7665] border border-[#D8C7B5] hover:border-[#C8751B] focus:border-[#C8751B] focus:outline-none focus:ring-1 focus:ring-[#C8751B] shadow-xs transition-all"
             />
             {searchQuery && (
               <button
                 type="button"
                 onClick={() => setSearchQuery("")}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-[#8A7665] hover:text-[#1F120A]"
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#8A7665] hover:text-[#1F120A]"
               >
                 <X className="w-3.5 h-3.5" />
               </button>

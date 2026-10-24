@@ -189,32 +189,103 @@ export interface PolicyContent {
 
 export interface ProductDetailOverride {
   name?: string;
+  kannadaName?: string;
   subtitle?: string;
   description?: string;
   shortDescription?: string;
   fullStory?: string;
+  searchKeywords?: string;
   imageUrl?: string;
+  lightImageUrl?: string;
+  darkImageUrl?: string;
+  studioImageUrl?: string;
+  labelImageUrl?: string;
   benefits?: string | string[];
   cookingUses?: string;
   smokePoint?: string;
   extractionMethod?: string;
   ingredients?: string;
   shelfLife?: string;
+  containerType?: string;
+  fssaiLicense?: string;
+  nutrition?: Partial<ProductNutrition>;
+  quiz?: Partial<ProductQuiz>;
+  pairing?: Partial<CulinaryPairing>;
   [key: string]: any;
+}
+
+export interface CraftsmanshipComparison {
+  metric: string;
+  commercial: string;
+  manopavana: string;
+}
+
+export interface CraftsmanshipConfig {
+  tag?: string;
+  title?: string;
+  subtitle?: string;
+  disclaimer?: string;
+  comparisons?: CraftsmanshipComparison[];
+}
+
+export interface PackagingFeatureItem {
+  title: string;
+  description: string;
+}
+
+export interface PackagingFeaturesConfig {
+  tag?: string;
+  heading?: string;
+  subhead?: string;
+  bottle360Video?: string;
+  items?: PackagingFeatureItem[];
+}
+
+export interface LoyaltyStepsConfig {
+  title?: string;
+  subhead?: string;
+  step1Text?: string;
+  step1Image?: string;
+  step2Text?: string;
+  step2Image?: string;
+  step3Text?: string;
+  step3Image?: string;
+}
+
+export interface ComboDetailOverride {
+  name?: string;
+  heading?: string;
+  volumeLabel?: string;
+  description?: string;
+  image?: string;
+  bullets?: string | string[];
+  includedOils?: string[];
+  regularPrice?: number;
+  loyaltyPrice?: number;
+  mrp?: number;
+  inStock?: boolean;
 }
 
 export interface StoreCMSConfig {
   announcementTicker: string;
-  heroHeadline: string;
-  heroSubhead: string;
+  brandName?: string;
   brandTagline: string;
   brandLogoUrl: string;
+  heroEyebrow?: string;
+  heroHeadline: string;
+  heroSubhead: string;
+  heroCtaPrimaryText?: string;
+  heroCtaSecondaryText?: string;
   chekkuVideoUrl: string;
+  heroFallbackImage?: string;
+  ambientAudioTrack?: string;
+  comboBannerImage?: string;
   founderName?: string;
   primaryPhone?: string;
   altPhone?: string;
   email?: string;
   facilityAddress?: string;
+  facilityStatement?: string;
   fssaiLicense?: string;
   gstin?: string;
   heroHighlights?: string[];
@@ -238,6 +309,16 @@ export interface StoreCMSConfig {
     combo3L: number;
     combo1_5L: number;
   };
+  mrp?: {
+    groundnut1L?: number;
+    groundnut500ml?: number;
+    coconut1L?: number;
+    coconut500ml?: number;
+    sesame1L?: number;
+    sesame500ml?: number;
+    combo3L?: number;
+    combo1_5L?: number;
+  };
   stock: {
     groundnut1L: boolean;
     groundnut500ml: boolean;
@@ -258,8 +339,23 @@ export interface StoreCMSConfig {
     [key: string]: PolicyContent | undefined;
   };
 
-  // Editable A-to-Z Product Metadata Overrides (keyed by product ID: groundnut, coconut, sesame, combo-3l, combo-1.5l)
+  // Editable A-to-Z Product Metadata Overrides (keyed by product ID: groundnut, coconut, sesame)
   productDetails?: Record<string, ProductDetailOverride>;
+
+  // Editable A-to-Z Combo Metadata Overrides (keyed by combo ID: combo-3l, combo-1.5l)
+  comboDetails?: Record<string, ComboDetailOverride>;
+
+  // Editable Craftsmanship & Comparison Matrix
+  craftsmanship?: CraftsmanshipConfig;
+
+  // Editable Packaging & 360 Video Section
+  packagingFeatures?: PackagingFeaturesConfig;
+
+  // Editable Loyalty Steps
+  loyaltySteps?: LoyaltyStepsConfig;
+
+  // Editable FAQs List
+  faqs?: FAQItem[];
 
   [key: string]: any;
 }

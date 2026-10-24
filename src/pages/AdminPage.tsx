@@ -248,6 +248,10 @@ export const AdminPage: React.FC = () => {
       .filter(Boolean)
       .join(", ");
 
+    const lat = Number.isFinite(Number(addr.lat)) && Number(addr.lat) !== 0 ? Number(addr.lat) : undefined;
+    const lng = Number.isFinite(Number(addr.lng)) && Number(addr.lng) !== 0 ? Number(addr.lng) : undefined;
+    const mapsUrl = (lat && lng) ? `https://maps.google.com/?q=${lat},${lng}` : null;
+
     try {
       const res = await fetch(`/api?action=delhivery_create_shipment`, {
         method: "POST",
@@ -270,6 +274,9 @@ export const AdminPage: React.FC = () => {
             (acc: number, i: any) => acc + (Number(i?.quantity) || 1),
             0
           ),
+          lat,
+          lng,
+          mapsUrl,
         }),
       });
 
@@ -352,11 +359,18 @@ export const AdminPage: React.FC = () => {
       ? Object.values(rawItems)
       : [];
 
+    const mapPinUrl = (addr.lat && addr.lng)
+      ? `https://maps.google.com/?q=${addr.lat},${addr.lng}`
+      : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+          `${addr.addressLine1 || ""}, ${addr.district || addr.city || "Bengaluru"} ${addr.pincode || ""}`
+        )}`;
+
     const text = `Customer: ${addr.fullName || "Customer"}
 Phone: ${addr.phone || "N/A"}
 Address: ${addr.addressLine1 || ""}${
       addr.landmark ? `, Near ${addr.landmark}` : ""
     }, ${addr.district || addr.city || "Bengaluru"} - ${addr.pincode || ""}
+Map Location: ${mapPinUrl}${addr.lat && addr.lng ? ` (GPS: ${addr.lat}, ${addr.lng})` : ""}
 Items: ${items.map((i: any) => `${i.title} (${i.variant}) x${i.quantity}`).join(", ")}
 Order Ref: #${order.orderRef}
 Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
@@ -1049,7 +1063,7 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
 
                         {/* Drop Address */}
                         <div
-                          className={`text-[11px] p-2.5 rounded-xl border space-y-1 ${
+                          className={`text-[11px] p-2.5 rounded-xl border space-y-1.5 ${
                             isDark
                               ? "bg-[#1C120B] border-[#362114] text-[#D8C8B8]"
                               : "bg-white border-[#EFE8DC] text-[#4A3220]"
@@ -1074,6 +1088,29 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                             {addr.district || addr.city || "Bengaluru"} -{" "}
                             {addr.pincode || ""}
                           </p>
+                          {/* Map Pin & Coordinates Status */}
+                          {addr.lat && addr.lng ? (
+                            <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-stone-200/60 dark:border-stone-800 text-[10px]">
+                              <span className="inline-flex items-center gap-1 font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
+                                <MapPin className="w-2.5 h-2.5 text-emerald-600 dark:text-emerald-400" />
+                                GPS Pin Attached ({Number(addr.lat).toFixed(4)}, {Number(addr.lng).toFixed(4)})
+                              </span>
+                              <a
+                                href={mapsUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="font-semibold text-blue-600 dark:text-blue-400 hover:underline inline-flex items-center gap-0.5"
+                              >
+                                <span>Verify on Google Maps</span>
+                                <ExternalLink className="w-2.5 h-2.5" />
+                              </a>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-1 text-[10px] text-stone-500 pt-1 border-t border-stone-200/60 dark:border-stone-800">
+                              <MapPin className="w-2.5 h-2.5 text-amber-500" />
+                              <span>Address-level geolocation active</span>
+                            </div>
+                          )}
                         </div>
 
                         {/* Delhivery Carrier Dispatch Actions */}
@@ -1135,6 +1172,27 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                                 </button>
                               )}
                             </div>
+                          </div>
+
+                          {/* Map Location Shared Notice */}
+                          <div className="px-2.5 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex flex-wrap items-center justify-between gap-1.5 text-[11px] text-emerald-800 dark:text-emerald-300 font-medium">
+                            <div className="flex items-center gap-1.5">
+                              <MapPin className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                              <span>
+                                {addr.lat && addr.lng
+                                  ? "GPS Map Coordinates & Navigation Link shared with Delhivery"
+                                  : "Address location pin linked with Delhivery shipment"}
+                              </span>
+                            </div>
+                            <a
+                              href={mapsUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-[10px] font-bold text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-0.5 shrink-0 ml-auto"
+                            >
+                              <span>View Pin</span>
+                              <ExternalLink className="w-2.5 h-2.5" />
+                            </a>
                           </div>
 
                           {ord.trackingNumber ? (

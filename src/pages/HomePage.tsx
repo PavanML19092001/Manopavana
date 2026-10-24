@@ -224,7 +224,7 @@ export const HomePage: React.FC = () => {
                   loop
                   muted
                   playsInline
-                  poster={MEDIA_ASSETS.heroFallbackImage}
+                  poster={cmsConfig.heroFallbackImage || MEDIA_ASSETS.heroFallbackImage}
                   className="w-full h-full object-cover"
                   onError={(e) => {
                     const target = e.currentTarget;
@@ -238,7 +238,7 @@ export const HomePage: React.FC = () => {
 
                 {/* Fallback image if video cannot be played */}
                 <img
-                  src={MEDIA_ASSETS.heroFallbackImage}
+                  src={cmsConfig.heroFallbackImage || MEDIA_ASSETS.heroFallbackImage}
                   alt="MANOPAVANA Artisanal Wood-Pressed Oils"
                   className="hidden w-full h-full object-cover"
                 />
@@ -264,7 +264,7 @@ export const HomePage: React.FC = () => {
                   href="#catalog"
                   className="inline-flex items-center gap-2 px-6 py-2.5 rounded-full bg-[#5E3210] hover:bg-[#43230A] text-white font-black text-xs uppercase tracking-wider shadow-lg hover:shadow-xl transition-all cursor-pointer group"
                 >
-                  <span>Explore The Collection →</span>
+                  <span>{cmsConfig.heroCtaPrimaryText || "Explore The Collection →"}</span>
                 </a>
               </div>
 
@@ -276,7 +276,7 @@ export const HomePage: React.FC = () => {
                     : "bg-amber-100/80 border-amber-300 text-[#7A4B1A]"
                 }`}
               >
-                <span>⚜️ GOOD FOOD STARTS HERE</span>
+                <span>{cmsConfig.heroEyebrow || "⚜️ GOOD FOOD STARTS HERE"}</span>
               </div>
 
               {/* Main Title */}
@@ -285,7 +285,7 @@ export const HomePage: React.FC = () => {
                   isDark ? "text-[#FAF4EA]" : "text-[#1F120A]"
                 }`}
               >
-                {cmsConfig.heroHeadline || "Unrefined by Nature, Bottled Fresh"}
+                {cmsConfig.heroHeadline || BUSINESS_CONFIG.HERO_HEADLINE}
               </h1>
 
               {/* Subtitle */}
@@ -294,39 +294,23 @@ export const HomePage: React.FC = () => {
                   isDark ? "text-[#D8C8B8]" : "text-[#4A3423]"
                 }`}
               >
-                {cmsConfig.heroSubhead ||
-                  "Sourced directly from traditional wood-press artisans, settled naturally, and packed hygienically at our Bangalore facility. Free from chemical solvents, and sealed fresh into food-grade bottles to preserve natural aroma and wholesome nutrients."}
+                {cmsConfig.heroSubhead || BUSINESS_CONFIG.HERO_SUBHEAD}
               </p>
 
-              {/* 3 Highlight Badges in a horizontal row */}
+              {/* Highlight Badges */}
               <div className="flex flex-wrap items-center justify-center lg:justify-start gap-2.5 pt-1">
-                <div
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold ${
-                    isDark
-                      ? "bg-[#1C120B] border-[#3A2417] text-amber-200"
-                      : "bg-white border-[#E0D4C0] text-[#3D2514] shadow-2xs"
-                  }`}
-                >
-                  <span>🪵 Marachekku Pressing</span>
-                </div>
-                <div
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold ${
-                    isDark
-                      ? "bg-[#1C120B] border-[#3A2417] text-amber-200"
-                      : "bg-white border-[#E0D4C0] text-[#3D2514] shadow-2xs"
-                  }`}
-                >
-                  <span>☀️ Natural Sedimentation</span>
-                </div>
-                <div
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold ${
-                    isDark
-                      ? "bg-[#1C120B] border-[#3A2417] text-amber-200"
-                      : "bg-white border-[#E0D4C0] text-[#3D2514] shadow-2xs"
-                  }`}
-                >
-                  <span>🏷️ Direct Bangalore Delivery</span>
-                </div>
+                {(cmsConfig.heroHighlights || BUSINESS_CONFIG.HERO_HIGHLIGHTS).map((hl, i) => (
+                  <div
+                    key={i}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold ${
+                      isDark
+                        ? "bg-[#1C120B] border-[#3A2417] text-amber-200"
+                        : "bg-white border-[#E0D4C0] text-[#3D2514] shadow-2xs"
+                    }`}
+                  >
+                    <span>{hl}</span>
+                  </div>
+                ))}
               </div>
 
               {/* Live Dispatch Location Quick Line */}
@@ -622,24 +606,26 @@ export const HomePage: React.FC = () => {
                         {/* Add to Bag OR Stepper */}
                         {cartItem ? (
                           <div
-                            className={`flex items-center justify-between border-2 border-[#5E3210] rounded-xl px-2 py-1.5 ${
-                              isDark ? "bg-[#140D07]" : "bg-[#FAF6EE]"
+                            className={`flex items-center justify-between border-2 rounded-xl px-2 py-1.5 shadow-2xs ${
+                              isDark
+                                ? "bg-[#140D07] border-[#E08F35]"
+                                : "bg-[#FAF6EE] border-[#C8751B]"
                             }`}
                           >
                             <button
                               type="button"
                               onClick={() => updateQuantity(cartItemId, -1)}
-                              className={`w-7 h-7 rounded-lg border font-black flex items-center justify-center transition-colors cursor-pointer ${
+                              className={`w-7 h-7 sm:w-8 sm:h-8 rounded-lg border flex items-center justify-center font-black active:scale-95 transition-all cursor-pointer shadow-xs ${
                                 isDark
-                                  ? "bg-[#25150C] border-[#4D2E1A] text-[#FAF4EA] hover:bg-[#361E10]"
-                                  : "bg-white border-[#DDD1BE] text-[#5E3210] hover:bg-[#F3EDE2]"
+                                  ? "bg-[#25150C] border-[#5A3820] text-[#F5BC51] hover:bg-[#3D2517]"
+                                  : "bg-white border-[#D8C7B5] text-[#7A4B1A] hover:bg-[#F3EBE0]"
                               }`}
                               aria-label="Decrease quantity"
                             >
-                              <Minus className="w-3.5 h-3.5" />
+                              <Minus className="w-4 h-4 stroke-[3] text-[#E08F35]" />
                             </button>
                             <span
-                              className={`text-xs font-black px-1 ${
+                              className={`text-xs sm:text-sm font-black px-1 ${
                                 isDark ? "text-[#FAF4EA]" : "text-[#1F120A]"
                               }`}
                             >
@@ -648,10 +634,10 @@ export const HomePage: React.FC = () => {
                             <button
                               type="button"
                               onClick={() => updateQuantity(cartItemId, 1)}
-                              className="w-7 h-7 rounded-lg bg-[#5E3210] text-white font-black flex items-center justify-center hover:bg-[#43230A] transition-colors cursor-pointer"
+                              className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-[#E08F35] hover:bg-[#F5BC51] text-[#140D09] border border-[#F5BC51] flex items-center justify-center font-black active:scale-95 transition-all cursor-pointer shadow-xs"
                               aria-label="Increase quantity"
                             >
-                              <Plus className="w-3.5 h-3.5" />
+                              <Plus className="w-4 h-4 stroke-[3] text-[#140D09]" />
                             </button>
                           </div>
                         ) : (
@@ -717,7 +703,7 @@ export const HomePage: React.FC = () => {
                     playsInline
                     className="w-full h-full max-w-full object-cover"
                   >
-                    <source src={MEDIA_ASSETS.bottle360Video} type="video/mp4" />
+                    <source src={cmsConfig.packagingFeatures?.bottle360Video || MEDIA_ASSETS.bottle360Video} type="video/mp4" />
                   </video>
                   <div className="absolute top-3 left-3 px-3 py-1 bg-black/60 backdrop-blur-md rounded-full text-[11px] font-bold text-amber-300 border border-amber-500/30 flex items-center gap-1.5">
                     <Sparkles className="w-3 h-3 text-amber-400" />
@@ -730,26 +716,26 @@ export const HomePage: React.FC = () => {
               <div className="w-full max-w-full lg:col-span-7 space-y-6">
                 <div className="space-y-2">
                   <span className="text-xs font-bold tracking-widest text-[#B86B14] uppercase">
-                    {PACKAGING_FEATURES.tag}
+                    {cmsConfig.packagingFeatures?.tag || PACKAGING_FEATURES.tag}
                   </span>
                   <h2
                     className={`text-2xl sm:text-3xl font-extrabold font-serif ${
                       isDark ? "text-[#FAF4EA]" : "text-[#1F120A]"
                     }`}
                   >
-                    {PACKAGING_FEATURES.heading}
+                    {cmsConfig.packagingFeatures?.heading || PACKAGING_FEATURES.heading}
                   </h2>
                   <p
                     className={`text-sm ${
                       isDark ? "text-[#D8C8B8]" : "text-[#4A3423]"
                     }`}
                   >
-                    {PACKAGING_FEATURES.subhead}
+                    {cmsConfig.packagingFeatures?.subhead || PACKAGING_FEATURES.subhead}
                   </p>
                 </div>
 
                 <div className="grid grid-cols-1 gap-4 pt-2">
-                  {PACKAGING_FEATURES.items.map((feat, idx) => (
+                  {(cmsConfig.packagingFeatures?.items || PACKAGING_FEATURES.items).map((feat, idx) => (
                     <div
                       key={idx}
                       className={`p-4 rounded-2xl border shadow-xs flex items-start gap-4 transition-colors ${
@@ -833,8 +819,9 @@ export const HomePage: React.FC = () => {
               </div>
 
               {/* Combo Section Banner Image */}
-<div className="w-full max-w-4xl mx-auto rounded-3xl overflow-hidden bg-[#1E1108] border border-[#3E2616] p-4 flex items-center justify-center">                <img
-                  src="https://pub-9e18bb265ecf4224ae1230cf913745ca.r2.dev/combo-all-labels.jpg"
+              <div className="w-full max-w-4xl mx-auto rounded-3xl overflow-hidden bg-[#1E1108] border border-[#3E2616] p-4 flex items-center justify-center">
+                <img
+                  src={cmsConfig.comboBannerImage || MEDIA_ASSETS.comboBanner}
                   alt="MANOPAVANA Complete 3-Oil Essential Trio Box"
                   className="w-full h-auto max-h-[480px] object-contain block mx-auto transition-transform duration-300 hover:scale-[1.02]"
                 />
@@ -901,25 +888,25 @@ export const HomePage: React.FC = () => {
 
                       <div className="flex items-center gap-2">
                         {comboCartItem ? (
-                          <div className="flex items-center gap-1.5 border-2 border-[#E08F35] rounded-xl px-2 py-1 bg-[#1A0E07]">
+                          <div className="flex items-center gap-1.5 border-2 border-[#E08F35] rounded-xl p-1 bg-[#1A0E07] shadow-xs">
                             <button
                               type="button"
                               onClick={() => updateQuantity(combo.id, -1)}
-                              className="w-7 h-7 rounded-lg border border-[#D4A373]/40 text-[#FAF4EA] font-black flex items-center justify-center hover:bg-[#25150C] cursor-pointer"
+                              className="w-8 h-8 rounded-lg border border-[#E08F35]/60 bg-[#25150C] text-[#F5BC51] font-black flex items-center justify-center hover:bg-[#3D2517] cursor-pointer shadow-xs active:scale-95 transition-all"
                               aria-label="Decrease quantity"
                             >
-                              <Minus className="w-3.5 h-3.5" />
+                              <Minus className="w-4 h-4 stroke-[3] text-[#F5BC51]" />
                             </button>
-                            <span className="text-xs font-black px-2 text-[#FAF4EA]">
+                            <span className="text-xs sm:text-sm font-black px-2 text-[#FAF4EA]">
                               {comboCartItem.quantity}
                             </span>
                             <button
                               type="button"
                               onClick={() => updateQuantity(combo.id, 1)}
-                              className="w-7 h-7 rounded-lg bg-[#E08F35] text-[#140D09] font-black flex items-center justify-center hover:bg-[#F59E0B] cursor-pointer"
+                              className="w-8 h-8 rounded-lg bg-[#E08F35] text-[#140D09] border border-[#F5BC51] font-black flex items-center justify-center hover:bg-[#F5BC51] cursor-pointer shadow-xs active:scale-95 transition-all"
                               aria-label="Increase quantity"
                             >
-                              <Plus className="w-3.5 h-3.5" />
+                              <Plus className="w-4 h-4 stroke-[3] text-[#140D09]" />
                             </button>
                           </div>
                         ) : (
@@ -1114,21 +1101,21 @@ export const HomePage: React.FC = () => {
         <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8 box-border">
           <div className="text-center max-w-2xl mx-auto space-y-2">
             <span className="text-xs font-bold tracking-widest text-[#C8751B] uppercase">
-              Artisanal Standards
+              {cmsConfig.craftsmanship?.tag || "Artisanal Standards"}
             </span>
             <h2
               className={`text-3xl font-extrabold font-serif ${
                 isDark ? "text-[#FAF4EA]" : "text-[#23150C]"
               }`}
             >
-              Wood-Pressed vs Commercial Refined Oils
+              {cmsConfig.craftsmanship?.title || "Wood-Pressed vs Commercial Refined Oils"}
             </h2>
             <p
               className={`text-xs sm:text-sm ${
                 isDark ? "text-[#D6C4B0]" : "text-[#5C402D]"
               }`}
             >
-              Understand the biological difference between traditional Marachekku extraction and solvent refining.
+              {cmsConfig.craftsmanship?.subtitle || "Understand the biological difference between traditional Marachekku extraction and solvent refining."}
             </p>
           </div>
 
@@ -1173,7 +1160,7 @@ export const HomePage: React.FC = () => {
                     isDark ? "divide-[#2D1B10]" : "divide-[#EFE8DC]"
                   }`}
                 >
-                  {BENCHMARK_COMPARISONS.map((row, idx) => (
+                  {(cmsConfig.craftsmanship?.comparisons || BENCHMARK_COMPARISONS).map((row, idx) => (
                     <tr
                       key={idx}
                       className={
@@ -1217,7 +1204,7 @@ export const HomePage: React.FC = () => {
                   : "bg-[#FAF7F2] border-[#E8DEC8] text-[#7A5E48]"
               }`}
             >
-              {BENCHMARK_DISCLAIMER}
+              {cmsConfig.craftsmanship?.disclaimer || BENCHMARK_DISCLAIMER}
             </div>
           </div>
         </div>
@@ -1618,7 +1605,7 @@ export const HomePage: React.FC = () => {
           </div>
 
           <div className="space-y-3.5">
-            {FAQS.map((faq, idx) => {
+            {(cmsConfig.faqs && cmsConfig.faqs.length > 0 ? cmsConfig.faqs : FAQS).map((faq, idx) => {
               const isOpen = openFaqIndex === idx;
               return (
                 <div

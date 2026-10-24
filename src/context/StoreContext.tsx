@@ -17,6 +17,11 @@ import {
   COMBOS,
   MEDIA_ASSETS,
   INDIAN_STATES_DISTRICTS,
+  BENCHMARK_COMPARISONS,
+  BENCHMARK_DISCLAIMER,
+  PACKAGING_FEATURES,
+  FAQS,
+  LEGAL_POLICIES,
 } from "../constants";
 import {
   auth,
@@ -157,16 +162,23 @@ const DEFAULT_ADDRESS: Address = {
 
 const DEFAULT_CMS_CONFIG: StoreCMSConfig = {
   announcementTicker: "FREE Doorstep Delivery across India on orders above ₹500 | 100% Marachekku Cold-Pressed",
+  brandName: BUSINESS_CONFIG.BRAND_NAME,
   heroHeadline: BUSINESS_CONFIG.HERO_HEADLINE,
   heroSubhead: BUSINESS_CONFIG.HERO_SUBHEAD,
+  heroEyebrow: "⚜️ GOOD FOOD STARTS HERE",
+  heroCtaPrimaryText: "Explore The Collection →",
   brandTagline: "Pure by nature, trusted for life",
   brandLogoUrl: MEDIA_ASSETS.logo,
   chekkuVideoUrl: MEDIA_ASSETS.heroVideo,
+  heroFallbackImage: MEDIA_ASSETS.heroFallbackImage,
+  ambientAudioTrack: MEDIA_ASSETS.ambientAudioTrack,
+  comboBannerImage: MEDIA_ASSETS.comboBanner,
   founderName: BUSINESS_CONFIG.FOUNDER_NAME,
   primaryPhone: BUSINESS_CONFIG.PRIMARY_PHONE,
   altPhone: BUSINESS_CONFIG.ALT_PHONE,
   email: BUSINESS_CONFIG.EMAIL,
   facilityAddress: BUSINESS_CONFIG.FACILITY_ADDRESS,
+  facilityStatement: BUSINESS_CONFIG.FACILITY_STATEMENT,
   fssaiLicense: BUSINESS_CONFIG.FSSAI_LICENSE,
   gstin: BUSINESS_CONFIG.GSTIN,
   heroHighlights: BUSINESS_CONFIG.HERO_HIGHLIGHTS,
@@ -190,6 +202,16 @@ const DEFAULT_CMS_CONFIG: StoreCMSConfig = {
     combo3L: 1299,
     combo1_5L: 699,
   },
+  mrp: {
+    groundnut1L: 399,
+    groundnut500ml: 189,
+    coconut1L: 499,
+    coconut500ml: 269,
+    sesame1L: 499,
+    sesame500ml: 269,
+    combo3L: 1560,
+    combo1_5L: 840,
+  },
   stock: {
     groundnut1L: true,
     groundnut500ml: true,
@@ -200,6 +222,16 @@ const DEFAULT_CMS_CONFIG: StoreCMSConfig = {
     combo3L: true,
     combo1_5L: true,
   },
+  craftsmanship: {
+    tag: "ARTISANAL STANDARDS",
+    title: "The Ancient Marachekku Difference",
+    subtitle: "Understand the biological difference between traditional Marachekku extraction and solvent refining.",
+    disclaimer: BENCHMARK_DISCLAIMER,
+    comparisons: BENCHMARK_COMPARISONS,
+  },
+  packagingFeatures: PACKAGING_FEATURES,
+  faqs: FAQS,
+  policies: LEGAL_POLICIES,
 };
 
 const StoreContext = createContext<StoreContextType | null>(null);
@@ -267,7 +299,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const currentUidRef = useRef<string | null>(null);
   const customerDocUnsubRef = useRef<(() => void) | null>(null);
   const cartDebounceTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const isInternalCartUpdateRef = useRef(false);
+  const lastLocalCartMutationTimeRef = useRef<number>(0);
 
   const [cart, setCart] = useState<CartItem[]>(() => {
     try {
@@ -279,6 +311,9 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     } catch {}
     return [];
   });
+
+  const pendingCartRef = useRef<CartItem[]>(cart);
+  pendingCartRef.current = cart;
 
   useEffect(() => {
     try {
@@ -292,26 +327,23 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       clearTimeout(cartDebounceTimerRef.current);
     }
 
+    const targetUid = currentUser.uid;
+    const cartToSave = cart;
+    const saveTime = Date.now();
+
     cartDebounceTimerRef.current = setTimeout(() => {
       try {
-        isInternalCartUpdateRef.current = true;
         setDoc(
-          doc(db, "customers", currentUser.uid),
-          { cart, updatedAt: serverTimestamp() },
+          doc(db, "customers", targetUid),
+          { cart: cartToSave, cartUpdatedAt: saveTime, updatedAt: serverTimestamp() },
           { merge: true }
-        )
-          .catch((e) => {
-            console.warn("Firestore cart sync error:", e);
-          })
-          .finally(() => {
-            setTimeout(() => {
-              isInternalCartUpdateRef.current = false;
-            }, 600);
-          });
-      } catch {
-        isInternalCartUpdateRef.current = false;
+        ).catch((e) => {
+          console.warn("Firestore cart sync error:", e);
+        });
+      } catch (e) {
+        console.warn("Firestore cart setDoc error:", e);
       }
-    }, 400);
+    }, 250);
 
     return () => {
       if (cartDebounceTimerRef.current) {
@@ -754,12 +786,14 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             doc(db, "customers", user.uid),
             (snap) => {
               if (!snap.exists()) return;
-              if (snap.metadata.hasPendingWrites || isInternalCartUpdateRef.current) {
+              if (snap.metadata.hasPendingWrites) {
                 return;
               }
               const data = snap.data();
-              if (Array.isArray(data?.cart)) {
-                const currentCartStr = localStorage.getItem("manopavana_active_cart") || "[]";
+              // Prevent snapshot echo from stomping active local cart modifications
+              const timeSinceLastLocalMutation = Date.now() - lastLocalCartMutationTimeRef.current;
+              if (timeSinceLastLocalMutation > 3500 && Array.isArray(data?.cart)) {
+                const currentCartStr = JSON.stringify(pendingCartRef.current);
                 const newCartStr = JSON.stringify(data.cart);
                 if (currentCartStr !== newCartStr) {
                   setCart(data.cart);
@@ -1532,7 +1566,22 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             ...prev,
             ...remoteConfig,
             prices: { ...prev.prices, ...(remoteConfig.prices || {}) },
+            mrp: { ...prev.mrp, ...(remoteConfig.mrp || {}) },
             stock: { ...prev.stock, ...(remoteConfig.stock || {}) },
+            policies: { ...prev.policies, ...(remoteConfig.policies || {}) },
+            productDetails: { ...prev.productDetails, ...(remoteConfig.productDetails || {}) },
+            comboDetails: { ...prev.comboDetails, ...(remoteConfig.comboDetails || {}) },
+            craftsmanship: {
+              ...prev.craftsmanship,
+              ...(remoteConfig.craftsmanship || {}),
+              comparisons: remoteConfig.craftsmanship?.comparisons || prev.craftsmanship?.comparisons,
+            },
+            packagingFeatures: {
+              ...prev.packagingFeatures,
+              ...(remoteConfig.packagingFeatures || {}),
+              items: remoteConfig.packagingFeatures?.items || prev.packagingFeatures?.items,
+            },
+            faqs: remoteConfig.faqs || prev.faqs,
           };
           try {
             localStorage.setItem("manopavana_cms", JSON.stringify(merged));
@@ -1562,12 +1611,17 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
       // 2. Read live prices and stock
       let customPrices = { ...p.prices };
+      let customMrp = { ...p.mrp };
       let customStock = { ...p.inStock };
 
       if (p.id === "groundnut") {
         customPrices = {
           "1L": cmsConfig.prices?.groundnut1L ?? p.prices["1L"],
           "500ml": cmsConfig.prices?.groundnut500ml ?? p.prices["500ml"],
+        };
+        customMrp = {
+          "1L": cmsConfig.mrp?.groundnut1L ?? p.mrp["1L"],
+          "500ml": cmsConfig.mrp?.groundnut500ml ?? p.mrp["500ml"],
         };
         customStock = {
           "1L": cmsConfig.stock?.groundnut1L ?? p.inStock["1L"],
@@ -1578,6 +1632,10 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           "1L": cmsConfig.prices?.coconut1L ?? p.prices["1L"],
           "500ml": cmsConfig.prices?.coconut500ml ?? p.prices["500ml"],
         };
+        customMrp = {
+          "1L": cmsConfig.mrp?.coconut1L ?? p.mrp["1L"],
+          "500ml": cmsConfig.mrp?.coconut500ml ?? p.mrp["500ml"],
+        };
         customStock = {
           "1L": cmsConfig.stock?.coconut1L ?? p.inStock["1L"],
           "500ml": cmsConfig.stock?.coconut500ml ?? p.inStock["500ml"],
@@ -1586,6 +1644,10 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         customPrices = {
           "1L": cmsConfig.prices?.sesame1L ?? p.prices["1L"],
           "500ml": cmsConfig.prices?.sesame500ml ?? p.prices["500ml"],
+        };
+        customMrp = {
+          "1L": cmsConfig.mrp?.sesame1L ?? p.mrp["1L"],
+          "500ml": cmsConfig.mrp?.sesame500ml ?? p.mrp["500ml"],
         };
         customStock = {
           "1L": cmsConfig.stock?.sesame1L ?? p.inStock["1L"],
@@ -1597,23 +1659,41 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       return {
         ...p,
         name: overrides?.name || p.name,
+        kannadaName: overrides?.kannadaName || p.kannadaName,
+        subtitle: overrides?.subtitle || p.subtitle,
+        searchKeywords: overrides?.searchKeywords || p.searchKeywords,
         shortDescription: overrides?.description || overrides?.shortDescription || p.shortDescription,
-        labelImage: overrides?.imageUrl || p.labelImage,
+        labelImage: overrides?.labelImageUrl || overrides?.imageUrl || p.labelImage,
         images: overrides?.imageUrl ? [overrides.imageUrl, ...p.images.slice(1)] : p.images,
         smokePoint: overrides?.smokePoint || p.smokePoint,
         prices: customPrices,
+        mrp: customMrp,
         inStock: customStock,
         specs: {
           ...p.specs,
           extraction: overrides?.extractionMethod || p.specs.extraction,
           shelfLife: overrides?.shelfLife || p.specs.shelfLife,
           bestFor: overrides?.cookingUses || p.specs.bestFor,
+          fssai: overrides?.fssaiLicense || p.specs.fssai,
+          container: overrides?.containerType || p.specs.container,
         },
         features: {
           ...p.features,
           usage: overrides?.cookingUses || p.features.usage,
           process: overrides?.fullStory || p.features.process,
           quality: overrides?.ingredients || p.features.quality,
+        },
+        nutrition: {
+          ...p.nutrition,
+          ...(overrides?.nutrition || {}),
+        },
+        quiz: {
+          ...p.quiz,
+          ...(overrides?.quiz || {}),
+        },
+        culinaryPairing: {
+          ...p.culinaryPairing,
+          ...(overrides?.pairing || {}),
         },
       };
     });
@@ -1623,35 +1703,47 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return COMBOS.map((c) => {
       const overrides = cmsConfig?.comboDetails?.[c.id];
       const parsedBullets = overrides?.bullets
-        ? overrides.bullets.split(",").map((b: string) => b.trim()).filter(Boolean)
+        ? (Array.isArray(overrides.bullets)
+            ? overrides.bullets
+            : overrides.bullets.split(",").map((b: string) => b.trim()).filter(Boolean))
         : c.bullets;
 
       if (c.id === "combo-3l") {
-        const reg = cmsConfig.prices?.combo3L ?? c.regularPrice;
+        const reg = overrides?.regularPrice ?? (cmsConfig.prices?.combo3L ?? c.regularPrice);
+        const mrpVal = overrides?.mrp ?? (cmsConfig.mrp?.combo3L ?? c.mrp);
+        const loyVal = overrides?.loyaltyPrice ?? Math.round(reg * 0.9);
         return {
           ...c,
           name: overrides?.name || c.name,
           heading: overrides?.heading || c.heading,
+          volumeLabel: overrides?.volumeLabel || c.volumeLabel,
           description: overrides?.description || c.description,
           image: overrides?.image || c.image,
           bullets: parsedBullets.length > 0 ? parsedBullets : c.bullets,
           regularPrice: reg,
-          loyaltyPrice: Math.round(reg * 0.9),
-          inStock: cmsConfig.stock?.combo3L ?? c.inStock,
+          loyaltyPrice: loyVal,
+          mrp: mrpVal,
+          inStock: overrides?.inStock ?? (cmsConfig.stock?.combo3L ?? c.inStock),
+          includedOils: overrides?.includedOils || c.includedOils,
         };
       }
       if (c.id === "combo-1.5l") {
-        const reg = cmsConfig.prices?.combo1_5L ?? c.regularPrice;
+        const reg = overrides?.regularPrice ?? (cmsConfig.prices?.combo1_5L ?? c.regularPrice);
+        const mrpVal = overrides?.mrp ?? (cmsConfig.mrp?.combo1_5L ?? c.mrp);
+        const loyVal = overrides?.loyaltyPrice ?? Math.round(reg * 0.9);
         return {
           ...c,
           name: overrides?.name || c.name,
           heading: overrides?.heading || c.heading,
+          volumeLabel: overrides?.volumeLabel || c.volumeLabel,
           description: overrides?.description || c.description,
           image: overrides?.image || c.image,
           bullets: parsedBullets.length > 0 ? parsedBullets : c.bullets,
           regularPrice: reg,
-          loyaltyPrice: Math.round(reg * 0.9),
-          inStock: cmsConfig.stock?.combo1_5L ?? c.inStock,
+          loyaltyPrice: loyVal,
+          mrp: mrpVal,
+          inStock: overrides?.inStock ?? (cmsConfig.stock?.combo1_5L ?? c.inStock),
+          includedOils: overrides?.includedOils || c.includedOils,
         };
       }
       return c;
@@ -1682,6 +1774,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const addToCart = (item: Omit<CartItem, "quantity">, qty = 1) => {
+    lastLocalCartMutationTimeRef.current = Date.now();
     setCart((prev) => {
       const existing = prev.find((i) => i.id === item.id);
       if (existing) {
@@ -1693,10 +1786,12 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const removeFromCart = (id: string) => {
+    lastLocalCartMutationTimeRef.current = Date.now();
     setCart((prev) => prev.filter((i) => i.id !== id));
   };
 
   const updateQuantity = (id: string, delta: number) => {
+    lastLocalCartMutationTimeRef.current = Date.now();
     setCart((prev) =>
       prev
         .map((i) => {
@@ -1711,13 +1806,15 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const clearCart = async () => {
+    lastLocalCartMutationTimeRef.current = Date.now();
     setCart([]);
     try {
+      localStorage.removeItem("manopavana_active_cart");
       localStorage.removeItem("manopavana_cart");
       if (currentUser?.uid) {
         await setDoc(
           doc(db, "customers", currentUser.uid),
-          { cart: [] },
+          { cart: [], cartUpdatedAt: Date.now() },
           { merge: true }
         );
       }

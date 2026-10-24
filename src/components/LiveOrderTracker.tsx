@@ -17,6 +17,7 @@ import {
   X,
   AlertTriangle,
   Edit3,
+  ExternalLink,
 } from "lucide-react";
 import { InvoiceModal } from "./InvoiceModal";
 import { Order, OrderStatus } from "../types";
@@ -622,6 +623,38 @@ export const LiveOrderTracker = ({
                   {order.shippingAddress.district || order.shippingAddress.city},{" "}
                   {order.shippingAddress.state} - {order.shippingAddress.pincode}
                 </p>
+                {/* Map Location Link */}
+                {(() => {
+                  const lat = order.shippingAddress.lat;
+                  const lng = order.shippingAddress.lng;
+                  const mapUrl = lat && lng
+                    ? `https://maps.google.com/?q=${lat},${lng}`
+                    : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+                        `${order.shippingAddress.addressLine1 || ""}, ${
+                          order.shippingAddress.district || order.shippingAddress.city || "Bengaluru"
+                        } ${order.shippingAddress.pincode || ""}`
+                      )}`;
+
+                  return (
+                    <div className="pt-2 border-t border-stone-200/60 dark:border-stone-800 flex flex-wrap items-center justify-between gap-2 text-[11px]">
+                      <span className="inline-flex items-center gap-1 font-medium text-emerald-700 dark:text-emerald-400">
+                        <MapPin className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
+                        {lat && lng
+                          ? "GPS Map Location shared with Delhivery carrier"
+                          : "Delivery address geolocated with Delhivery"}
+                      </span>
+                      <a
+                        href={mapUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="font-bold text-[#E08F35] hover:underline inline-flex items-center gap-1"
+                      >
+                        <span>View Map Pin</span>
+                        <ExternalLink className="w-3 h-3" />
+                      </a>
+                    </div>
+                  );
+                })()}
               </div>
             </div>
 

@@ -354,7 +354,10 @@ export default defineConfig(() => {
                       weightGrams = 1000,
                       productsDesc = "Pure Cold Pressed Oil",
                       quantity = "1",
-                      warehouseName = DELHIVERY_WAREHOUSE
+                      warehouseName = DELHIVERY_WAREHOUSE,
+                      lat,
+                      lng,
+                      mapsUrl,
                     } = parsed;
 
                     if (!orderRef || !pincode || !phone || !customerName) {
@@ -367,27 +370,53 @@ export default defineConfig(() => {
                     const isCod = String(paymentMode).toUpperCase() === 'COD';
                     const codAmount = isCod ? Math.round(Number(totalAmount)) : 0;
 
+                    const numLat = Number.isFinite(Number(lat)) && Number(lat) !== 0 ? Number(lat) : null;
+                    const numLng = Number.isFinite(Number(lng)) && Number(lng) !== 0 ? Number(lng) : null;
+                    const mapLink = mapsUrl || (numLat && numLng ? `https://maps.google.com/?q=${numLat},${numLng}` : null);
+
+                    let finalAddress = String(address || "").trim();
+                    if (numLat && numLng) {
+                      const mapSuffix = ` [Map: https://maps.google.com/?q=${numLat.toFixed(5)},${numLng.toFixed(5)}]`;
+                      if (finalAddress.length + mapSuffix.length <= 250) {
+                        finalAddress = `${finalAddress}${mapSuffix}`;
+                      } else {
+                        const maxBase = Math.max(20, 250 - mapSuffix.length - 3);
+                        finalAddress = `${finalAddress.slice(0, maxBase)}...${mapSuffix}`;
+                      }
+                    }
+
+                    const shipmentItem: any = {
+                      name: customerName,
+                      add: finalAddress,
+                      pin: String(pincode),
+                      city: city || "Bengaluru",
+                      state: state || "Karnataka",
+                      country: "India",
+                      phone: cleanPhone,
+                      order: orderRef,
+                      payment_mode: isCod ? "COD" : "Prepaid",
+                      products_desc: productsDesc,
+                      hsn_code: "1512",
+                      cod_amount: codAmount,
+                      total_amount: Math.round(Number(totalAmount)),
+                      seller_name: "MANOPAVANA B2C",
+                      quantity: String(quantity),
+                      weight: Number(weightGrams) || 1000,
+                      shipping_mode: "Surface",
+                      address_type: "home"
+                    };
+
+                    if (numLat && numLng) {
+                      shipmentItem.lat = numLat;
+                      shipmentItem.lng = numLng;
+                      shipmentItem.geo_location = `${numLat},${numLng}`;
+                    }
+                    if (mapLink) {
+                      shipmentItem.remarks = `Location: ${mapLink}`;
+                    }
+
                     const manifestPayload = {
-                      shipments: [{
-                        name: customerName,
-                        add: address,
-                        pin: String(pincode),
-                        city: city || "Bengaluru",
-                        state: state || "Karnataka",
-                        country: "India",
-                        phone: cleanPhone,
-                        order: orderRef,
-                        payment_mode: isCod ? "COD" : "Prepaid",
-                        products_desc: productsDesc,
-                        hsn_code: "1512",
-                        cod_amount: codAmount,
-                        total_amount: Math.round(Number(totalAmount)),
-                        seller_name: "MANOPAVANA B2C",
-                        quantity: String(quantity),
-                        weight: Number(weightGrams) || 1000,
-                        shipping_mode: "Surface",
-                        address_type: "home"
-                      }],
+                      shipments: [shipmentItem],
                       pickup_location: {
                         name: warehouseName
                       }

@@ -569,13 +569,22 @@ export const ProductPage = () => {
                     <span>Add to Bag</span>
                   </button>
                 ) : (
-                  <div className="flex-1 flex items-center justify-between p-1.5 rounded-xl border-2 border-[#5E3210] dark:border-[#E08F35]">
+                  <div className={`flex-1 flex items-center justify-between p-1.5 rounded-xl border-2 ${
+                    isDark
+                      ? "bg-[#140D07] border-[#E08F35]"
+                      : "bg-[#FAF6EE] border-[#C8751B]"
+                  }`}>
                     <button
                       type="button"
                       onClick={handleDecrement}
-                      className="w-9 h-9 rounded-lg bg-stone-100 dark:bg-stone-800 flex items-center justify-center font-bold text-sm hover:bg-stone-200 transition-colors cursor-pointer"
+                      className={`w-9 h-9 rounded-lg flex items-center justify-center font-black active:scale-95 transition-all cursor-pointer border ${
+                        isDark
+                          ? "bg-[#25150C] border-[#5A3820] text-[#F5BC51] hover:bg-[#3D2517]"
+                          : "bg-white border-[#D8C7B5] text-[#7A4B1A] hover:bg-[#F3EBE0]"
+                      }`}
+                      aria-label="Decrease quantity"
                     >
-                      <Minus className="w-4 h-4" />
+                      <Minus className="w-4 h-4 stroke-[3] text-[#E08F35]" />
                     </button>
                     <span className={`font-black text-sm ${isDark ? "text-[#FAF4EA]" : "text-[#23150C]"}`}>
                       {currentQuantity} in Bag
@@ -584,9 +593,10 @@ export const ProductPage = () => {
                       type="button"
                       disabled={!inStock}
                       onClick={handleIncrement}
-                      className="w-9 h-9 rounded-lg bg-stone-100 dark:bg-stone-800 flex items-center justify-center font-bold text-sm hover:bg-stone-200 transition-colors cursor-pointer"
+                      className="w-9 h-9 rounded-lg bg-[#E08F35] hover:bg-[#F5BC51] text-[#140D09] border border-[#F5BC51] flex items-center justify-center font-black active:scale-95 transition-all cursor-pointer shadow-xs"
+                      aria-label="Increase quantity"
                     >
-                      <Plus className="w-4 h-4" />
+                      <Plus className="w-4 h-4 stroke-[3] text-[#140D09]" />
                     </button>
                   </div>
                 )}

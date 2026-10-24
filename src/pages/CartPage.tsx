@@ -11,6 +11,8 @@ import {
   ShieldCheck,
   CheckCircle2,
   Lock,
+  Minus,
+  Plus,
 } from "lucide-react";
 import { useStore } from "../context/StoreContext";
 import { BUSINESS_CONFIG } from "../constants";
@@ -177,114 +179,136 @@ export const CartPage: React.FC = () => {
             {cart.map((item) => (
               <div
                 key={item.id}
-                className={`p-4 sm:p-5 rounded-2xl border shadow-2xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 ${
+                className={`p-4 sm:p-5 rounded-2xl border shadow-2xs transition-all ${
                   isDark ? "bg-[#1C120B] border-[#362114]" : "bg-white border-[#E8DEC8]"
                 }`}
               >
-                <div className="flex items-center gap-4">
-                  <img
-                    src={item.image}
-                    alt={item.title}
-                    className={`w-16 h-20 object-contain p-1 rounded-xl border shrink-0 ${
-                      isDark
-                        ? "bg-[#150D07] border-[#362114]"
-                        : "bg-[#FAF6EE] border-[#E8DEC8]"
-                    }`}
-                  />
-                  <div className="space-y-1">
-                    <h3
-                      className={`text-sm font-bold font-serif ${
-                        isDark ? "text-[#FAF4EA]" : "text-[#23150C]"
+                {/* Mobile & Desktop Clean Item Row */}
+                <div className="flex items-start sm:items-center justify-between gap-3 sm:gap-4">
+                  {/* Image & Product Details */}
+                  <div className="flex items-start sm:items-center gap-3.5 flex-1 min-w-0">
+                    <img
+                      src={item.image}
+                      alt={item.title}
+                      className={`w-16 h-20 sm:w-20 sm:h-22 object-contain p-1 rounded-xl border shrink-0 ${
+                        isDark
+                          ? "bg-[#150D07] border-[#362114]"
+                          : "bg-[#FAF6EE] border-[#E8DEC8]"
                       }`}
-                    >
-                      {item.title}
-                    </h3>
-                    <p className={`text-xs ${isDark ? "text-[#D6C4B0]" : "text-[#5C402D]"}`}>
-                      {item.subtitle} • {item.variant}
-                    </p>
-                    <div className="flex items-baseline gap-2 pt-0.5">
-                      <span
-                        className={`text-sm font-extrabold ${
-                          isDark ? "text-amber-300" : "text-[#C8751B]"
+                    />
+                    <div className="space-y-1 min-w-0 flex-1">
+                      <h3
+                        className={`text-sm sm:text-base font-bold font-serif leading-snug truncate ${
+                          isDark ? "text-[#FAF4EA]" : "text-[#23150C]"
                         }`}
                       >
-                        ₹{item.price}
-                      </span>
-                      {item.regularPrice > item.price && (
+                        {item.title}
+                      </h3>
+                      <p className={`text-xs ${isDark ? "text-[#D6C4B0]" : "text-[#5C402D]"}`}>
+                        {item.subtitle} • <span className="font-semibold">{item.variant}</span>
+                      </p>
+                      <div className="flex items-baseline gap-2 pt-0.5">
                         <span
-                          className={`text-xs line-through ${
-                            isDark ? "text-[#8C7A6B]" : "text-[#8C7A6B]"
+                          className={`text-sm font-extrabold ${
+                            isDark ? "text-amber-300" : "text-[#C8751B]"
                           }`}
                         >
-                          ₹{item.regularPrice}
+                          ₹{item.price}
                         </span>
-                      )}
+                        {item.regularPrice > item.price && (
+                          <span
+                            className="text-xs line-through text-[#8C7A6B]"
+                          >
+                            ₹{item.regularPrice}
+                          </span>
+                        )}
+                        <span className="text-[10px] text-emerald-600 font-semibold">
+                          (GST Incl.)
+                        </span>
+                      </div>
                     </div>
                   </div>
+
+                  {/* Remove Button for Desktop or Top-Right on Mobile */}
+                  <button
+                    type="button"
+                    onClick={() => removeFromCart(item.id)}
+                    aria-label={`Remove ${item.title}`}
+                    className="p-1.5 rounded-lg text-stone-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors shrink-0 cursor-pointer sm:order-last"
+                    title="Remove item"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
                 </div>
 
-                {/* Quantity Stepper & Subtotal */}
+                {/* Bottom Row: Quantity Stepper & Line Item Total */}
                 <div
-                  className={`flex items-center justify-between sm:justify-end gap-5 w-full sm:w-auto pt-2 sm:pt-0 border-t sm:border-t-0 ${
-                    isDark ? "border-[#2D1B10]" : "border-[#FAF6EE]"
+                  className={`flex items-center justify-between mt-3 pt-3 border-t sm:mt-4 sm:pt-4 ${
+                    isDark ? "border-[#2D1B10]" : "border-[#F3ECE1]"
                   }`}
                 >
-                  <div
-                    className={`flex items-center gap-2 p-1 rounded-xl border ${
-                      isDark
-                        ? "bg-[#150D07] border-[#362114]"
-                        : "bg-[#FAF6EE] border-[#E5DAC8]"
-                    }`}
-                  >
-                    <button
-                      type="button"
-                      onClick={() => updateQuantity(item.id, -1)}
-                      className={`w-7 h-7 rounded-lg border text-xs font-bold flex items-center justify-center cursor-pointer ${
-                        isDark
-                          ? "bg-[#25150C] border-[#4D2E1A] text-[#FAF4EA] hover:bg-[#361E10]"
-                          : "bg-white border-[#DDD1BE] text-[#5A381E] hover:bg-[#F3EDE2]"
-                      }`}
-                    >
-                      -
-                    </button>
-                    <span
-                      className={`text-xs font-bold px-1.5 ${
-                        isDark ? "text-[#FAF4EA]" : "text-[#23150C]"
-                      }`}
-                    >
-                      {item.quantity}
+                  {/* High-Contrast Stepper Controls */}
+                  <div className="flex items-center gap-1 sm:gap-2">
+                    <span className={`text-[11px] font-semibold mr-1.5 hidden sm:inline ${
+                      isDark ? "text-[#A8907E]" : "text-[#7A5E48]"
+                    }`}>
+                      Quantity:
                     </span>
-                    <button
-                      type="button"
-                      onClick={() => updateQuantity(item.id, 1)}
-                      className={`w-7 h-7 rounded-lg border text-xs font-bold flex items-center justify-center cursor-pointer ${
+                    <div
+                      className={`flex items-center rounded-xl p-1 border shadow-2xs ${
                         isDark
-                          ? "bg-[#25150C] border-[#4D2E1A] text-[#FAF4EA] hover:bg-[#361E10]"
-                          : "bg-white border-[#DDD1BE] text-[#5A381E] hover:bg-[#F3EDE2]"
+                          ? "bg-[#140D07] border-[#3D2517]"
+                          : "bg-[#FAF6EE] border-[#DDD0BF]"
                       }`}
                     >
-                      +
-                    </button>
+                      {/* Decrement Button */}
+                      <button
+                        type="button"
+                        onClick={() => updateQuantity(item.id, -1)}
+                        className={`w-8 h-8 rounded-lg flex items-center justify-center font-black active:scale-95 transition-all cursor-pointer border ${
+                          isDark
+                            ? "bg-[#25150C] border-[#4D2E1A] text-[#F5BC51] hover:bg-[#361E10]"
+                            : "bg-white border-[#D8C6B2] text-[#5E3210] hover:bg-[#F3EDE2]"
+                        }`}
+                        aria-label="Decrease quantity"
+                      >
+                        <Minus className="w-3.5 h-3.5 stroke-[2.5]" />
+                      </button>
+
+                      {/* Quantity Display */}
+                      <span
+                        className={`w-8 text-center text-xs font-black select-none ${
+                          isDark ? "text-[#FAF4EA]" : "text-[#1F120A]"
+                        }`}
+                      >
+                        {item.quantity}
+                      </span>
+
+                      {/* Increment Button */}
+                      <button
+                        type="button"
+                        onClick={() => updateQuantity(item.id, 1)}
+                        className="w-8 h-8 rounded-lg bg-[#E08F35] hover:bg-[#F5BC51] text-[#140D09] border border-[#F5BC51] flex items-center justify-center font-black active:scale-95 transition-all cursor-pointer shadow-xs"
+                        aria-label="Increase quantity"
+                      >
+                        <Plus className="w-3.5 h-3.5 stroke-[3]" />
+                      </button>
+                    </div>
                   </div>
 
+                  {/* Line Item Total */}
                   <div className="text-right">
+                    <span className={`text-[11px] block ${isDark ? "text-[#A8907E]" : "text-[#8C7A6B]"}`}>
+                      Subtotal
+                    </span>
                     <span
-                      className={`text-base font-black font-serif ${
-                        isDark ? "text-[#FAF4EA]" : "text-[#23150C]"
+                      className={`text-base sm:text-lg font-black font-serif ${
+                        isDark ? "text-[#FAF4EA]" : "text-[#1F120A]"
                       }`}
                     >
                       ₹{item.price * item.quantity}
                     </span>
                   </div>
-
-                  <button
-                    type="button"
-                    onClick={() => removeFromCart(item.id)}
-                    aria-label="Remove item"
-                    className="p-1.5 text-[#8C7A6B] hover:text-red-600 transition-colors cursor-pointer"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
                 </div>
               </div>
             ))}
