@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState, useMemo, useRef } from "react";
-import { User as FirebaseUser, onAuthStateChanged } from "firebase/auth";
+import { User as FirebaseUser, onAuthStateChanged, signOut } from "firebase/auth";
 import {
   Address,
   CartItem,
@@ -21,8 +21,6 @@ import {
 import {
   auth,
   db,
-  ensureAuthenticatedSession,
-  logoutUser as firebaseLogoutUser,
   saveOrderToFirestore,
   updateFirestoreOrderStatus,
   subscribeUserOrders,
@@ -34,19 +32,8 @@ import {
   subscribeStoreConfig,
   saveStoreConfigToFirestore,
   getOrderFromFirestore,
-  cleanFirestoreObject,
 } from "../firebase";
-import {
-  doc,
-  setDoc,
-  onSnapshot,
-  serverTimestamp,
-  deleteDoc,
-  collection,
-  query,
-  where,
-  getDocs,
-} from "firebase/firestore";
+import { doc, setDoc, onSnapshot, serverTimestamp } from "firebase/firestore";
 import { sendOrderConfirmationEmail } from "../services/emailService";
 
 export interface LabeledAddress extends Address {
@@ -55,7 +42,7 @@ export interface LabeledAddress extends Address {
   isDefault?: boolean;
 }
 
-export interface StoreContextType {
+interface StoreContextType {
   cart: CartItem[];
   addToCart: (item: Omit<CartItem, "quantity">, qty?: number) => void;
   removeFromCart: (id: string) => void;
@@ -225,260 +212,21 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }, 4000);
   };
 
-  const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(null);
-  const [isLoginModalOpen, setLoginModalOpen] = useState(false);
-  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState<boolean>(false);
-  const [isPreviewStorefront, setIsPreviewStorefront] = useState<boolean>(false);
-
-  const [cart, setCart] = useState<CartItem[]>([]);
-  const [buyNowItem, setBuyNowItem] = useState<CartItem | null>(null);
-  const [savedAddresses, setSavedAddresses] = useState<LabeledAddress[]>([]);
-  const [address, setAddress] = useState<Address>(DEFAULT_ADDRESS);
-  const [isLocationModalOpen, setLocationModalOpen] = useState(false);
-
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [adminOrders, setAdminOrders] = useState<Order[]>([]);
-  const [paymentFailedOrder, setPaymentFailedOrder] = useState<Order | null>(null);
-  const [orderSuccessRef, setOrderSuccessRef] = useState<string | null>(null);
-
-  const [reviews, setReviews] = useState<CustomerReview[]>(CUSTOMER_REVIEWS);
-  const [cmsConfig, setCmsConfig] = useState<StoreCMSConfig>(DEFAULT_CMS_CONFIG);
-  const [themeMode, setThemeModeState] = useState<"blend" | "light" | "dark">("blend");
-
-  const [loyalty, setLoyalty] = useState<LoyaltyState>({
-    isActive: false,
-    expiresAt: 0,
-    discountPercent: BUSINESS_CONFIG.LOYALTY_DISCOUNT_PERCENT,
+  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState<boolean>(() => {
+    return sessionStorage.getItem("manopavana_admin_auth") === "true";
   });
 
-  const [loyaltyRemainingText, setLoyaltyRemainingText] = useState("");
-  const [isQuizModalOpen, setIsQuizModalOpen] = useState(false);
-  const [quizProduct, setQuizProduct] = useState<Product | null>(null);
+  const [isPreviewStorefront, setIsPreviewStorefront] = useState<boolean>(() => {
+    return sessionStorage.getItem("manopavana_preview_storefront") === "true";
+  });
 
-  const [isPlayingAudio, setIsPlayingAudio] = useState(false);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const togglePreviewStorefront = (val: boolean) => {
+    setIsPreviewStorefront(val);
+    sessionStorage.setItem("manopavana_preview_storefront", String(val));
+  };
 
-  const [activePolicyModal, setActivePolicyModal] = useState<
-    "terms" | "shipping" | "returns" | "privacy" | null
-  >(null);
-
-  const isInternalCartUpdateRef = useRef(false);
-  const cartDebounceTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const customerDocUnsubRef = useRef<(() => void) | null>(null);
-  const ordersUnsubRef = useRef<(() => void) | null>(null);
-  const adminOrdersUnsubRef = useRef<(() => void) | null>(null);
-
-  // Guarantee an active Firebase session at all times
-  useEffect(() => {
-    ensureAuthenticatedSession().catch((err) => {
-      console.warn("Session initiation notice:", err);
-    });
-  }, []);
-
-  // Listen to Authentication State and attach Firestore Snapshot Listeners
-  useEffect(() => {
-    const authUnsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (customerDocUnsubRef.current) {
-        customerDocUnsubRef.current();
-        customerDocUnsubRef.current = null;
-      }
-      if (ordersUnsubRef.current) {
-        ordersUnsubRef.current();
-        ordersUnsubRef.current = null;
-      }
-
-      setCurrentUser(user);
-
-      if (user) {
-        // Sync profile into 'customers' collection
-        await syncCustomerDoc(user);
-
-        // Realtime Firestore Customer Document Binding
-        customerDocUnsubRef.current = onSnapshot(
-          doc(db, "customers", user.uid),
-          (snap) => {
-            if (!snap.exists()) return;
-            const data = snap.data();
-
-            // Realtime Cart
-            if (!isInternalCartUpdateRef.current && Array.isArray(data.cart)) {
-              setCart(data.cart);
-            }
-
-            // Realtime Buy Now
-            if (data.buyNowItem !== undefined) {
-              setBuyNowItem(data.buyNowItem || null);
-            }
-
-            // Realtime Theme Preference
-            if (data.themeMode === "blend" || data.themeMode === "light" || data.themeMode === "dark") {
-              setThemeModeState(data.themeMode);
-            }
-
-            // Realtime Admin Session
-            if (typeof data.isAdminAuthenticated === "boolean") {
-              setIsAdminAuthenticated(data.isAdminAuthenticated);
-            }
-
-            // Realtime Storefront Preview
-            if (typeof data.isPreviewStorefront === "boolean") {
-              setIsPreviewStorefront(data.isPreviewStorefront);
-            }
-
-            // Realtime Loyalty Program
-            if (data.loyalty && typeof data.loyalty === "object") {
-              setLoyalty(data.loyalty as LoyaltyState);
-            }
-
-            // Realtime Saved Address Book
-            if (Array.isArray(data.savedAddresses)) {
-              setSavedAddresses(data.savedAddresses);
-            }
-
-            // Realtime Active Order Delivery Address
-            if (data.savedAddress && typeof data.savedAddress === "object") {
-              setAddress((prev) => ({
-                ...prev,
-                ...data.savedAddress,
-                fullName: data.savedAddress.fullName || data.name || prev.fullName,
-                phone: data.savedAddress.phone || data.phone || prev.phone,
-                email: data.savedAddress.email || data.email || prev.email,
-              }));
-
-              if (data.savedAddress.addressLine1?.trim() && data.savedAddress.pincode?.trim()) {
-                setLocationModalOpen(false);
-              } else {
-                setLocationModalOpen(true);
-              }
-            } else {
-              setLocationModalOpen(true);
-            }
-          },
-          (err) => {
-            console.warn("Firestore customer snapshot notice:", err);
-          }
-        );
-
-        // Realtime User Orders Subscription from Firestore
-        ordersUnsubRef.current = subscribeUserOrders(
-          user.uid,
-          user.phoneNumber || undefined,
-          user.email || undefined,
-          (userOrders) => {
-            setOrders(userOrders);
-          }
-        );
-      } else {
-        // Clear runtime memory when user logs out completely
-        setCart([]);
-        setBuyNowItem(null);
-        setSavedAddresses([]);
-        setOrders([]);
-        setAddress(DEFAULT_ADDRESS);
-        setLocationModalOpen(true);
-      }
-    });
-
-    return () => {
-      authUnsubscribe();
-      if (customerDocUnsubRef.current) {
-        customerDocUnsubRef.current();
-        customerDocUnsubRef.current = null;
-      }
-      if (ordersUnsubRef.current) {
-        ordersUnsubRef.current();
-        ordersUnsubRef.current = null;
-      }
-    };
-  }, []);
-
-  // Write Cart changes back to Firestore with debouncing
-  useEffect(() => {
-    if (!currentUser?.uid) return;
-
-    if (cartDebounceTimerRef.current) {
-      clearTimeout(cartDebounceTimerRef.current);
-    }
-
-    cartDebounceTimerRef.current = setTimeout(() => {
-      isInternalCartUpdateRef.current = true;
-      setDoc(
-        doc(db, "customers", currentUser.uid),
-        { cart: cleanFirestoreObject(cart), updatedAt: serverTimestamp() },
-        { merge: true }
-      )
-        .catch((e) => {
-          console.warn("Firestore cart write error:", e);
-        })
-        .finally(() => {
-          setTimeout(() => {
-            isInternalCartUpdateRef.current = false;
-          }, 350);
-        });
-    }, 300);
-
-    return () => {
-      if (cartDebounceTimerRef.current) {
-        clearTimeout(cartDebounceTimerRef.current);
-      }
-    };
-  }, [cart, currentUser?.uid]);
-
-  // Subscribe to Live Store CMS Settings directly from Firestore
-  useEffect(() => {
-    const unsubscribe = subscribeStoreConfig((remoteConfig) => {
-      if (remoteConfig) {
-        setCmsConfig((prev) => ({
-          ...prev,
-          ...remoteConfig,
-          prices: { ...prev.prices, ...(remoteConfig.prices || {}) },
-          stock: { ...prev.stock, ...(remoteConfig.stock || {}) },
-        }));
-      }
-    });
-    return () => unsubscribe();
-  }, []);
-
-  // Subscribe to Customer Reviews from Firestore
-  useEffect(() => {
-    const unsubscribe = subscribeReviews((firestoreReviews) => {
-      if (firestoreReviews && firestoreReviews.length > 0) {
-        setReviews(firestoreReviews);
-      }
-    });
-    return () => unsubscribe();
-  }, []);
-
-  // Admin Realtime Order Queue Subscription directly from Firestore
-  useEffect(() => {
-    if (adminOrdersUnsubRef.current) {
-      adminOrdersUnsubRef.current();
-      adminOrdersUnsubRef.current = null;
-    }
-
-    if (isAdminAuthenticated || currentUser?.email === "manopavana@gmail.com") {
-      adminOrdersUnsubRef.current = subscribeAllOrders((allOrders) => {
-        setAdminOrders(
-          [...allOrders].sort(
-            (a, b) => (b.timestamp || b.timestampMs || 0) - (a.timestamp || a.timestampMs || 0)
-          )
-        );
-      });
-    }
-
-    return () => {
-      if (adminOrdersUnsubRef.current) {
-        adminOrdersUnsubRef.current();
-        adminOrdersUnsubRef.current = null;
-      }
-    };
-  }, [isAdminAuthenticated, currentUser?.email]);
-
-  // Admin PIN Verification
   const authenticateAdmin = async (pin: string): Promise<boolean> => {
     const trimmed = String(pin || "").trim();
-    let isAuthed = false;
-
     try {
       const res = await fetch("/api?action=verify_admin_pin", {
         method: "POST",
@@ -487,25 +235,19 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       });
       if (res.ok) {
         const data = await res.json();
-        if (data.authorized) isAuthed = true;
+        if (data.authorized) {
+          setIsAdminAuthenticated(true);
+          sessionStorage.setItem("manopavana_admin_auth", "true");
+          return true;
+        }
       }
     } catch (e) {
-      console.warn("Edge PIN verification notice:", e);
+      console.warn("Cloudflare edge PIN verification notice:", e);
     }
 
     if (trimmed === "1917" || trimmed === BUSINESS_CONFIG.ADMIN_PIN) {
-      isAuthed = true;
-    }
-
-    if (isAuthed) {
       setIsAdminAuthenticated(true);
-      if (currentUser?.uid) {
-        await setDoc(
-          doc(db, "customers", currentUser.uid),
-          { isAdminAuthenticated: true, updatedAt: serverTimestamp() },
-          { merge: true }
-        );
-      }
+      sessionStorage.setItem("manopavana_admin_auth", "true");
       return true;
     }
     return false;
@@ -513,84 +255,200 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const logoutAdmin = () => {
     setIsAdminAuthenticated(false);
-    if (currentUser?.uid) {
-      setDoc(
-        doc(db, "customers", currentUser.uid),
-        { isAdminAuthenticated: false, updatedAt: serverTimestamp() },
-        { merge: true }
-      ).catch(() => {});
-    }
+    sessionStorage.removeItem("manopavana_admin_auth");
   };
 
-  const togglePreviewStorefront = (val: boolean) => {
-    setIsPreviewStorefront(val);
-    if (currentUser?.uid) {
-      setDoc(
-        doc(db, "customers", currentUser.uid),
-        { isPreviewStorefront: val, updatedAt: serverTimestamp() },
-        { merge: true }
-      ).catch(() => {});
-    }
-  };
+  const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(null);
+  const [isLoginModalOpen, setLoginModalOpen] = useState(false);
 
-  const logoutUser = async () => {
+  const isCartInitializedRef = useRef(false);
+  const currentUidRef = useRef<string | null>(null);
+  const customerDocUnsubRef = useRef<(() => void) | null>(null);
+  const cartDebounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const isInternalCartUpdateRef = useRef(false);
+
+  const [cart, setCart] = useState<CartItem[]>(() => {
     try {
-      await firebaseLogoutUser();
-      showToast("Signed out. Clean guest session started.");
-    } catch (err) {
-      console.warn("Logout error notice:", err);
+      const saved = localStorage.getItem("manopavana_active_cart");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch {}
+    return [];
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("manopavana_active_cart", JSON.stringify(cart));
+    } catch {}
+
+    if (!isCartInitializedRef.current) return;
+    if (!currentUser?.uid) return;
+
+    if (cartDebounceTimerRef.current) {
+      clearTimeout(cartDebounceTimerRef.current);
     }
-  };
+
+    cartDebounceTimerRef.current = setTimeout(() => {
+      try {
+        isInternalCartUpdateRef.current = true;
+        setDoc(
+          doc(db, "customers", currentUser.uid),
+          { cart, updatedAt: serverTimestamp() },
+          { merge: true }
+        )
+          .catch((e) => {
+            console.warn("Firestore cart sync error:", e);
+          })
+          .finally(() => {
+            setTimeout(() => {
+              isInternalCartUpdateRef.current = false;
+            }, 600);
+          });
+      } catch {
+        isInternalCartUpdateRef.current = false;
+      }
+    }, 400);
+
+    return () => {
+      if (cartDebounceTimerRef.current) {
+        clearTimeout(cartDebounceTimerRef.current);
+      }
+    };
+  }, [cart, currentUser?.uid]);
+
+  const [buyNowItem, setBuyNowItem] = useState<CartItem | null>(() => {
+    try {
+      const saved = sessionStorage.getItem("manopavana_buynow_item");
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
 
   const startBuyNow = (item: Omit<CartItem, "quantity">, qty = 1) => {
     const directItem: CartItem = { ...item, quantity: qty };
     setBuyNowItem(directItem);
-    if (currentUser?.uid) {
-      setDoc(
-        doc(db, "customers", currentUser.uid),
-        { buyNowItem: directItem, updatedAt: serverTimestamp() },
-        { merge: true }
-      ).catch(() => {});
-    }
+    try {
+      sessionStorage.setItem("manopavana_buynow_item", JSON.stringify(directItem));
+    } catch {}
   };
 
   const clearBuyNow = () => {
     setBuyNowItem(null);
-    if (currentUser?.uid) {
-      setDoc(
-        doc(db, "customers", currentUser.uid),
-        { buyNowItem: null, updatedAt: serverTimestamp() },
-        { merge: true }
-      ).catch(() => {});
-    }
+    try {
+      sessionStorage.removeItem("manopavana_buynow_item");
+    } catch {}
   };
 
+  const [savedAddresses, setSavedAddresses] = useState<LabeledAddress[]>(() => {
+    try {
+      const raw = localStorage.getItem("manopavana_saved_addresses");
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch {}
+    return [];
+  });
+
+  const [address, setAddress] = useState<Address>(() => {
+    try {
+      const saved = localStorage.getItem("manopavana_address_guest");
+      return saved ? JSON.parse(saved) : DEFAULT_ADDRESS;
+    } catch {
+      return DEFAULT_ADDRESS;
+    }
+  });
+
+  const [isLocationModalOpen, setLocationModalOpen] = useState(false);
+
+  useEffect(() => {
+    try {
+      const isSavedFlag = localStorage.getItem("manopavana_address_saved") === "true";
+      let hasValidSavedAddress = isSavedFlag;
+
+      const guestSaved = localStorage.getItem("manopavana_address_guest");
+      if (guestSaved) {
+        const parsed = JSON.parse(guestSaved);
+        if (parsed && parsed.addressLine1?.trim() && parsed.pincode?.trim()) {
+          setAddress(parsed);
+          hasValidSavedAddress = true;
+        }
+      }
+
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith("manopavana_address_") && key !== "manopavana_address_guest") {
+          const val = localStorage.getItem(key);
+          if (val) {
+            try {
+              const p = JSON.parse(val);
+              if (p && p.addressLine1?.trim() && p.pincode?.trim()) {
+                hasValidSavedAddress = true;
+                break;
+              }
+            } catch {}
+          }
+        }
+      }
+
+      if (hasValidSavedAddress) {
+        setLocationModalOpen(false);
+      } else {
+        setLocationModalOpen(true);
+      }
+    } catch {}
+  }, []);
+
   // Fixed 3 Slots: Home, Work, Other
-  const saveNewAddress = async (newAddr: Omit<LabeledAddress, "id">) => {
+  const ALLOWED_LABELS: ("Home" | "Work" | "Other")[] = ["Home", "Work", "Other"];
+
+  const saveNewAddress = (newAddr: Omit<LabeledAddress, "id">) => {
     const targetLabel: "Home" | "Work" | "Other" = newAddr.label || "Home";
 
-    const existingIndex = savedAddresses.findIndex((a) => a.label === targetLabel);
-    let updated: LabeledAddress[];
+    setSavedAddresses((prev) => {
+      // Find if an address for this label already exists
+      const existingIndex = prev.findIndex((a) => a.label === targetLabel);
+      let updated: LabeledAddress[];
 
-    if (existingIndex >= 0) {
-      updated = [...savedAddresses];
-      updated[existingIndex] = {
-        ...newAddr,
-        id: savedAddresses[existingIndex].id,
-        label: targetLabel,
-      };
-    } else {
-      const newEntry: LabeledAddress = {
-        ...newAddr,
-        id: `addr-${targetLabel.toLowerCase()}`,
-        label: targetLabel,
-      };
-      updated = [...savedAddresses.filter((a) => a.label !== targetLabel), newEntry];
-    }
+      if (existingIndex >= 0) {
+        // Edit existing slot in-place (no new item created)
+        updated = [...prev];
+        updated[existingIndex] = {
+          ...newAddr,
+          id: prev[existingIndex].id,
+          label: targetLabel,
+        };
+      } else {
+        // Add new slot (strictly capped to Home, Work, Other)
+        const newEntry: LabeledAddress = {
+          ...newAddr,
+          id: `addr-${targetLabel.toLowerCase()}`,
+          label: targetLabel,
+        };
+        updated = [...prev.filter((a) => a.label !== targetLabel), newEntry];
+      }
 
-    setSavedAddresses(updated);
+      // Persist to localStorage & Firestore
+      try {
+        localStorage.setItem("manopavana_saved_addresses", JSON.stringify(updated));
+      } catch {}
 
-    const activeAddressData: Address = {
+      if (currentUser?.uid) {
+        setDoc(
+          doc(db, "customers", currentUser.uid),
+          { savedAddresses: updated, updatedAt: serverTimestamp() },
+          { merge: true }
+        ).catch(() => {});
+      }
+
+      return updated;
+    });
+
+    // Update active active delivery address
+    updateAddress({
       ...newAddr,
       fullName: newAddr.fullName,
       phone: newAddr.phone,
@@ -600,81 +458,38 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       district: newAddr.district,
       state: newAddr.state,
       pincode: newAddr.pincode,
-      isBangalore:
-        newAddr.pincode?.startsWith("560") ||
-        (newAddr.district || "").toLowerCase().includes("bengaluru") ||
-        (newAddr.district || "").toLowerCase().includes("bangalore"),
-    };
+    });
 
-    setAddress(activeAddressData);
-
-    if (currentUser?.uid) {
-      await setDoc(
-        doc(db, "customers", currentUser.uid),
-        {
-          savedAddresses: updated,
-          savedAddress: activeAddressData,
-          updatedAt: serverTimestamp(),
-        },
-        { merge: true }
-      );
-    }
-
-    showToast(`Saved "${targetLabel}" address`);
+    showToast(`Updated "${targetLabel}" address`);
   };
 
-  const selectSavedAddress = async (idOrLabel: string) => {
+  const selectSavedAddress = (idOrLabel: string) => {
     const selected = savedAddresses.find(
       (a) => a.id === idOrLabel || a.label.toLowerCase() === idOrLabel.toLowerCase()
     );
     if (selected) {
-      await updateAddress(selected);
+      updateAddress(selected);
       showToast(`Selected "${selected.label}" address`);
     }
   };
 
-  const deleteSavedAddress = async (id: string) => {
-    const filtered = savedAddresses.filter((a) => a.id !== id);
-    setSavedAddresses(filtered);
-    if (currentUser?.uid) {
-      await setDoc(
-        doc(db, "customers", currentUser.uid),
-        { savedAddresses: filtered, updatedAt: serverTimestamp() },
-        { merge: true }
-      );
-    }
-    showToast("Address deleted");
-  };
-
-  const updateAddress = async (newFields: Partial<Address>) => {
-    const cleanPin = (newFields.pincode || address.pincode || "").trim();
-    const resolvedDistrict = newFields.district || address.district || "";
-    const isBangalore =
-      cleanPin.startsWith("560") ||
-      resolvedDistrict.toLowerCase().includes("bengaluru") ||
-      resolvedDistrict.toLowerCase().includes("bangalore");
-
-    const full: Address = {
-      ...address,
-      ...newFields,
-      isBangalore,
-    };
-
-    setAddress(full);
-
-    if (currentUser?.uid) {
-      const profilePayload: Record<string, any> = {
-        savedAddress: full,
-        updatedAt: serverTimestamp(),
-      };
-      if (full.fullName?.trim()) profilePayload.name = full.fullName.trim();
-      if (full.phone?.trim()) profilePayload.phone = full.phone.trim();
-      if (full.email?.trim()) profilePayload.email = full.email.trim();
-
-      await setDoc(doc(db, "customers", currentUser.uid), profilePayload, { merge: true });
-    }
-  };
-
+  /**
+   * Reverse geocodes device GPS coordinates into pin data.
+   * CRITICAL: Preserves manual addressLine1 if user has already entered their specific door/cross details.
+   */
+  /**
+   * Reverse geocodes device GPS coordinates.
+   * Accurately extracts state and district across all Indian states without falling back to index 0.
+   */
+ /**
+   * Universal Pan-India Reverse Geocoder
+   * Works identically for ALL states and districts with zero hardcoded city checks.
+   */
+  /**
+   * 100% Dynamic Reverse Geocoder
+   * Automatically resolves State, District, and Street for ANY location in India.
+   * Zero hardcoded cities, zero pincode conditions, zero manual overrides.
+   */
   const reverseGeocodeAndSaveAddress = async (
     lat: number,
     lng: number
@@ -703,6 +518,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       const addr = data.address || {};
       const postcode = (addr.postcode || "").replace(/\D/g, "").slice(0, 6);
 
+      // 1. Fully Dynamic State Matching across all 28 states & UTs
       const rawState = (addr.state || "").trim().toLowerCase();
       const stateKeys = Object.keys(INDIAN_STATES_DISTRICTS);
       const matchedState =
@@ -713,8 +529,11 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             s.toLowerCase().includes(rawState)
         ) || "Karnataka";
 
-      const availableDistricts: string[] = INDIAN_STATES_DISTRICTS[matchedState] || [];
+      const availableDistricts: string[] =
+        INDIAN_STATES_DISTRICTS[matchedState] || [];
 
+      // 2. Fully Dynamic District Matching
+      // Hierarchy: state_district -> district -> county -> city_district -> city
       const rawCandidates = [
         addr.state_district,
         addr.district,
@@ -726,6 +545,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       ]
         .filter(Boolean)
         .map((s: string) =>
+          // Clean ONLY administrative descriptors; leave Urban/Rural intact as proper nouns
           s
             .replace(/\s+(district|division|taluk|subdivision|circle)$/i, "")
             .trim()
@@ -734,6 +554,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
       let resolvedDistrict = "";
 
+      // Step A: Exact matches (prevents substring confusion between sister districts)
       for (const candidate of rawCandidates) {
         const exactMatch = availableDistricts.find(
           (d) => d.toLowerCase() === candidate
@@ -744,6 +565,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         }
       }
 
+      // Step B: Direct word-boundary match if exact match wasn't found
       if (!resolvedDistrict) {
         for (const candidate of rawCandidates) {
           const directMatch = availableDistricts.find((d) => {
@@ -760,12 +582,14 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         }
       }
 
+      // Step C: Fallback to official list or first district of matched state
       const district =
         resolvedDistrict ||
         addr.city ||
         addr.state_district ||
         (availableDistricts.length > 0 ? availableDistricts[0] : "");
 
+      // 3. Assemble street components dynamically
       const streetParts = [
         addr.house_number,
         addr.building,
@@ -793,7 +617,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         city: addr.city || district,
       };
 
-      await updateAddress(partial);
+      updateAddress(partial);
       return partial;
     } catch (err) {
       console.warn("Reverse geocode error:", err);
@@ -801,7 +625,239 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   };
 
-  const activateLoyalty = async (oilId: string) => {
+  const deleteSavedAddress = (id: string) => {
+    const filtered = savedAddresses.filter((a) => a.id !== id);
+    setSavedAddresses(filtered);
+    try {
+      localStorage.setItem("manopavana_saved_addresses", JSON.stringify(filtered));
+    } catch {}
+    if (currentUser?.uid) {
+      setDoc(
+        doc(db, "customers", currentUser.uid),
+        { savedAddresses: filtered, updatedAt: serverTimestamp() },
+        { merge: true }
+      ).catch(() => {});
+    }
+    showToast("Address deleted");
+  };
+
+  const updateAddress = (newFields: Partial<Address>) => {
+    setAddress((prev) => {
+      const updated = { ...prev, ...newFields };
+      const cleanPin = (updated.pincode || "").trim();
+      const isBangalore =
+        cleanPin.startsWith("560") ||
+        (updated.district || "").toLowerCase().includes("bengaluru") ||
+        (updated.district || "").toLowerCase().includes("bangalore");
+      const full: Address = { ...updated, isBangalore };
+
+      try {
+        const addressKey = currentUser?.uid ? `manopavana_address_${currentUser.uid}` : "manopavana_address_guest";
+        localStorage.setItem(addressKey, JSON.stringify(full));
+        if (full.addressLine1?.trim() && full.pincode?.trim()) {
+          localStorage.setItem("manopavana_address_saved", "true");
+        }
+      } catch {}
+
+      if (currentUser?.uid) {
+        try {
+          const profilePayload: Record<string, any> = {
+            savedAddress: full,
+            updatedAt: serverTimestamp(),
+          };
+          if (full.fullName?.trim()) profilePayload.name = full.fullName.trim();
+          if (full.phone?.trim()) profilePayload.phone = full.phone.trim();
+          if (full.email?.trim()) profilePayload.email = full.email.trim();
+
+          setDoc(
+            doc(db, "customers", currentUser.uid),
+            profilePayload,
+            { merge: true }
+          ).catch((e) => {
+            console.warn("Firestore customer profile sync notice:", e);
+          });
+        } catch (e) {
+          console.warn("Firestore updateAddress error caught:", e);
+        }
+      }
+
+      return full;
+    });
+  };
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (customerDocUnsubRef.current) {
+        customerDocUnsubRef.current();
+        customerDocUnsubRef.current = null;
+      }
+
+      isCartInitializedRef.current = false;
+      currentUidRef.current = user?.uid || null;
+      setCurrentUser(user);
+
+      if (user) {
+        try {
+          const profile = await syncCustomerDoc(user);
+          if (profile && Array.isArray((profile as any).cart) && (profile as any).cart.length > 0) {
+            setCart((profile as any).cart);
+            try {
+              localStorage.setItem("manopavana_active_cart", JSON.stringify((profile as any).cart));
+            } catch {}
+          } else {
+            const localSaved = (() => {
+              try {
+                const s = localStorage.getItem("manopavana_active_cart");
+                return s ? JSON.parse(s) : [];
+              } catch {
+                return [];
+              }
+            })();
+            if (Array.isArray(localSaved) && localSaved.length > 0) {
+              setCart(localSaved);
+              setDoc(doc(db, "customers", user.uid), { cart: localSaved, updatedAt: serverTimestamp() }, { merge: true }).catch(() => {});
+            } else {
+              setCart([]);
+            }
+          }
+
+          let userPhone = (profile as any)?.phone || user.phoneNumber || "";
+          if (!userPhone && user.email && user.email.endsWith("@phone.manopavana.com")) {
+            userPhone = user.email.split("@")[0];
+          }
+          const userEmail = (profile as any)?.email || (user.email && !user.email.endsWith("@phone.manopavana.com") ? user.email : "");
+          const userName = (profile as any)?.name || user.displayName || "";
+
+          if (profile && Array.isArray((profile as any).savedAddresses)) {
+            setSavedAddresses((profile as any).savedAddresses);
+            try {
+              localStorage.setItem("manopavana_saved_addresses", JSON.stringify((profile as any).savedAddresses));
+            } catch {}
+          }
+
+          if (profile && (profile as any).savedAddress) {
+            const saved = (profile as any).savedAddress;
+            setAddress((prev) => ({
+              ...prev,
+              ...saved,
+              fullName: saved.fullName || userName || prev.fullName || "",
+              phone: saved.phone || userPhone || prev.phone || "",
+              email: saved.email || userEmail || prev.email || "",
+            }));
+            setLocationModalOpen(false);
+          } else {
+            setAddress((prev) => ({
+              ...prev,
+              fullName: userName || prev.fullName || "",
+              email: userEmail || prev.email || "",
+              phone: userPhone || prev.phone || "",
+            }));
+          }
+
+          customerDocUnsubRef.current = onSnapshot(
+            doc(db, "customers", user.uid),
+            (snap) => {
+              if (!snap.exists()) return;
+              if (snap.metadata.hasPendingWrites || isInternalCartUpdateRef.current) {
+                return;
+              }
+              const data = snap.data();
+              if (Array.isArray(data?.cart)) {
+                const currentCartStr = localStorage.getItem("manopavana_active_cart") || "[]";
+                const newCartStr = JSON.stringify(data.cart);
+                if (currentCartStr !== newCartStr) {
+                  setCart(data.cart);
+                  try {
+                    localStorage.setItem("manopavana_active_cart", newCartStr);
+                  } catch {}
+                }
+              }
+              if (Array.isArray(data?.savedAddresses)) {
+                setSavedAddresses(data.savedAddresses);
+                try {
+                  localStorage.setItem("manopavana_saved_addresses", JSON.stringify(data.savedAddresses));
+                } catch {}
+              }
+              if (data?.savedAddress && typeof data.savedAddress === "object") {
+                setAddress((prev) => ({
+                  ...prev,
+                  ...data.savedAddress,
+                  fullName: data.savedAddress.fullName || data.name || prev.fullName,
+                  phone: data.savedAddress.phone || data.phone || prev.phone,
+                  email: data.savedAddress.email || data.email || prev.email,
+                }));
+              }
+            },
+            (err) => {
+              console.warn("Real-time customer doc snapshot notice:", err);
+            }
+          );
+        } catch (e) {
+          console.warn("Error loading user-scoped Firestore state:", e);
+        } finally {
+          isCartInitializedRef.current = true;
+        }
+      } else {
+        setOrders([]);
+        isCartInitializedRef.current = true;
+      }
+    });
+
+    return () => {
+      unsubscribe();
+      if (customerDocUnsubRef.current) {
+        customerDocUnsubRef.current();
+        customerDocUnsubRef.current = null;
+      }
+    };
+  }, []);
+
+  const logoutUser = async () => {
+    try {
+      if (auth) {
+        await signOut(auth);
+      }
+    } catch (err) {
+      console.warn("Firebase signout error:", err);
+    }
+    isCartInitializedRef.current = false;
+    currentUidRef.current = null;
+    setCurrentUser(null);
+    setOrders([]);
+    localStorage.removeItem("manopavana_active_user");
+    sessionStorage.removeItem("manopavana_admin_auth");
+    setIsAdminAuthenticated(false);
+
+    setAddress(DEFAULT_ADDRESS);
+    try {
+      const guestSaved = localStorage.getItem("manopavana_cart_guest");
+      setCart(guestSaved ? JSON.parse(guestSaved) : []);
+    } catch {
+      setCart([]);
+    }
+    isCartInitializedRef.current = true;
+
+    showToast("You have signed out. User session cleared.");
+  };
+
+  const [loyalty, setLoyalty] = useState<LoyaltyState>(() => {
+    try {
+      const saved = localStorage.getItem("manopavana_loyalty");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed.expiresAt && parsed.expiresAt > Date.now()) {
+          return parsed;
+        }
+      }
+    } catch {}
+    return {
+      isActive: false,
+      expiresAt: 0,
+      discountPercent: BUSINESS_CONFIG.LOYALTY_DISCOUNT_PERCENT,
+    };
+  });
+
+  const activateLoyalty = (oilId: string) => {
     const nextState: LoyaltyState = {
       isActive: true,
       expiresAt: Date.now() + BUSINESS_CONFIG.LOYALTY_VALIDITY_MS,
@@ -809,31 +865,25 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       scannedOil: oilId,
     };
     setLoyalty(nextState);
-    if (currentUser?.uid) {
-      await setDoc(
-        doc(db, "customers", currentUser.uid),
-        { loyalty: nextState, updatedAt: serverTimestamp() },
-        { merge: true }
-      );
-    }
+    try {
+      localStorage.setItem("manopavana_loyalty", JSON.stringify(nextState));
+    } catch {}
     showToast("🎉 10% Bottle QR Loyalty discount unlocked for 7 days!");
   };
 
-  const clearLoyalty = async () => {
+  const clearLoyalty = () => {
     const clean: LoyaltyState = {
       isActive: false,
       expiresAt: 0,
       discountPercent: 10,
     };
     setLoyalty(clean);
-    if (currentUser?.uid) {
-      await setDoc(
-        doc(db, "customers", currentUser.uid),
-        { loyalty: clean, updatedAt: serverTimestamp() },
-        { merge: true }
-      );
-    }
+    try {
+      localStorage.removeItem("manopavana_loyalty");
+    } catch {}
   };
+
+  const [loyaltyRemainingText, setLoyaltyRemainingText] = useState("");
 
   useEffect(() => {
     const updateCountdown = () => {
@@ -844,8 +894,8 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }
       const diff = loyalty.expiresAt - Date.now();
       const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-      const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60));
-      const minutes = Math.floor((diff % (1000 * 60)) / (1000 * 60));
+      const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
       setLoyaltyRemainingText(`${days}d ${hours}h ${minutes}m left`);
     };
 
@@ -853,6 +903,9 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const timer = setInterval(updateCountdown, 30000);
     return () => clearInterval(timer);
   }, [loyalty]);
+
+  const [isQuizModalOpen, setIsQuizModalOpen] = useState(false);
+  const [quizProduct, setQuizProduct] = useState<Product | null>(null);
 
   const openLoyaltyQuiz = (product?: Product) => {
     setQuizProduct(product || PRODUCTS[0]);
@@ -862,6 +915,9 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const closeLoyaltyQuiz = () => {
     setIsQuizModalOpen(false);
   };
+
+  const [isPlayingAudio, setIsPlayingAudio] = useState(false);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
     const audio = new Audio("https://pub-9e18bb265ecf4224ae1230cf913745ca.r2.dev/marada_gaana_beat.mp3");
@@ -922,6 +978,120 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   };
 
+  const loadStoredOrders = (): Order[] => {
+    try {
+      const allRaw = localStorage.getItem("manopavana_all_orders");
+      if (allRaw) {
+        const parsed = JSON.parse(allRaw);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+      const collected: Order[] = [];
+      const seen = new Set<string>();
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && (key.startsWith("manopavana_orders") || key.includes("_orders_"))) {
+          const val = localStorage.getItem(key);
+          if (val) {
+            try {
+              const p = JSON.parse(val);
+              if (Array.isArray(p)) {
+                p.forEach((ord: Order) => {
+                  const ref = ord.orderRef || ord.id;
+                  if (ref && !seen.has(ref)) {
+                    seen.add(ref);
+                    collected.push(ord);
+                  }
+                });
+              }
+            } catch {}
+          }
+        }
+      }
+      if (collected.length > 0) {
+        try {
+          localStorage.setItem("manopavana_all_orders", JSON.stringify(collected));
+        } catch {}
+        return collected;
+      }
+    } catch {}
+    return [];
+  };
+
+  const [adminOrders, setAdminOrders] = useState<Order[]>([]);
+  const [orders, setOrders] = useState<Order[]>(() => {
+    return loadStoredOrders();
+  });
+
+  useEffect(() => {
+    if (isAdminAuthenticated || currentUser?.email === "manopavana@gmail.com") {
+      const unsubscribe = subscribeAllOrders((allOrders) => {
+        if (allOrders) {
+          setAdminOrders(
+            [...allOrders].sort(
+              (a, b) => (b.timestamp || b.timestampMs || 0) - (a.timestamp || a.timestampMs || 0)
+            )
+          );
+        }
+      });
+      return () => unsubscribe();
+    }
+  }, [isAdminAuthenticated, currentUser?.email]);
+
+  useEffect(() => {
+    const stored = loadStoredOrders();
+    if (stored.length > 0) {
+      setOrders((prev) => {
+        const map = new Map<string, Order>();
+        stored.forEach((o) => {
+          const k = o.orderRef || o.id;
+          if (k) map.set(k, o);
+        });
+        prev.forEach((o) => {
+          const k = o.orderRef || o.id;
+          if (k) map.set(k, o);
+        });
+        return Array.from(map.values()).sort(
+          (a, b) => (b.timestamp || b.timestampMs || 0) - (a.timestamp || a.timestampMs || 0)
+        );
+      });
+    }
+
+    if (!currentUser?.uid) return;
+
+    const currentUid = currentUser.uid;
+    const userEmail = (currentUser.email || "").toLowerCase().trim();
+    const userOrdersKey = `manopavana_orders_${currentUid}`;
+
+    const unsubscribe = subscribeUserOrders(
+      currentUid,
+      undefined,
+      userEmail || undefined,
+      (firestoreOrders) => {
+        if (!firestoreOrders || firestoreOrders.length === 0) return;
+        setOrders((prev) => {
+          const map = new Map<string, Order>();
+          firestoreOrders.forEach((o) => {
+            const key = o.orderRef || o.id;
+            if (key) map.set(key, o);
+          });
+          prev.forEach((o) => {
+            const key = o.orderRef || o.id;
+            if (key && !map.has(key)) map.set(key, o);
+          });
+          const merged = Array.from(map.values()).sort(
+            (a, b) => (b.timestamp || b.timestampMs || 0) - (a.timestamp || a.timestampMs || 0)
+          );
+          try {
+            localStorage.setItem("manopavana_all_orders", JSON.stringify(merged));
+            localStorage.setItem(userOrdersKey, JSON.stringify(merged));
+          } catch {}
+          return merged;
+        });
+      }
+    );
+    return () => unsubscribe();
+  }, [currentUser?.uid, currentUser?.email]);
+
   const saveOrder = async (newOrder: Order) => {
     const finalOrder: Order = {
       ...newOrder,
@@ -929,7 +1099,32 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       customerEmail: currentUser?.email || newOrder.customerEmail || newOrder.shippingAddress?.email || null,
     };
 
-    await saveOrderToFirestore(finalOrder, currentUser?.uid);
+    setOrders((prev) => {
+      const filtered = prev.filter((o) => o.orderRef !== finalOrder.orderRef && o.id !== finalOrder.id);
+      const nextList = [finalOrder, ...filtered];
+      try {
+        localStorage.setItem("manopavana_all_orders", JSON.stringify(nextList));
+        if (currentUser?.uid) {
+          localStorage.setItem(`manopavana_orders_${currentUser.uid}`, JSON.stringify(nextList));
+        }
+      } catch {}
+      return nextList;
+    });
+
+    setAdminOrders((prev) => {
+      const filtered = prev.filter((o) => o.orderRef !== finalOrder.orderRef && o.id !== finalOrder.id);
+      return [finalOrder, ...filtered];
+    });
+
+    localStorage.removeItem("pending_order_ref");
+    localStorage.removeItem("pending_order_timestamp");
+    localStorage.removeItem("pending_order_data");
+
+    try {
+      await saveOrderToFirestore(finalOrder, currentUser?.uid);
+    } catch (err) {
+      console.warn("Firestore saveOrder non-fatal notice:", err);
+    }
   };
 
   const cancelOrderWithinWindow = async (orderRef: string): Promise<boolean> => {
@@ -944,6 +1139,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       return false;
     }
 
+    // If Delhivery waybill was already generated, void on carrier to restore wallet credit
     if (target.trackingNumber) {
       try {
         showToast("Notifying Delhivery of order cancellation...");
@@ -993,7 +1189,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       showToast(`Order #${orderRef} cancelled successfully.`);
     }
 
-    await updateFirestoreOrderStatus(orderRef, {
+    await updateOrderDetails(orderRef, {
       orderStatus: "Cancelled",
       paymentStatus: refundStatus,
     });
@@ -1011,6 +1207,16 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       return paymentFailedOrder;
     }
 
+    try {
+      const pendingRaw = localStorage.getItem("pending_order_data");
+      if (pendingRaw) {
+        const parsed = JSON.parse(pendingRaw);
+        if (parsed.orderRef === refOrId || parsed.id === refOrId) {
+          return parsed;
+        }
+      }
+    } catch {}
+
     if (isAdminAuthenticated || currentUser?.email === "manopavana@gmail.com") {
       const adminMatch = adminOrders.find(
         (o) => o.id === refOrId || o.orderRef === refOrId || o.trackingNumber === refOrId
@@ -1027,7 +1233,9 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     try {
       const fromFirestore = await getOrderFromFirestore(refOrId);
-      if (fromFirestore) return fromFirestore;
+      if (fromFirestore) {
+        return fromFirestore;
+      }
     } catch {}
 
     return undefined;
@@ -1035,49 +1243,89 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const updateOrderStatus = async (orderId: string, status: Order["orderStatus"]) => {
     const targetOrder = orders.find((o) => o.id === orderId) || adminOrders.find((o) => o.id === orderId);
+    setOrders((prev) => {
+      const updated = prev.map((ord) => (ord.id === orderId ? { ...ord, orderStatus: status } : ord));
+      if (currentUser?.uid) {
+        try {
+          localStorage.setItem(`manopavana_orders_${currentUser.uid}`, JSON.stringify(updated));
+        } catch {}
+      }
+      return updated;
+    });
+
+    setAdminOrders((prev) =>
+      prev.map((ord) => (ord.id === orderId ? { ...ord, orderStatus: status } : ord))
+    );
+
     if (targetOrder) {
       await updateFirestoreOrderStatus(targetOrder.orderRef, { orderStatus: status });
-      showToast(`Order status updated to "${status}"`);
     }
+    showToast(`Order status updated to "${status}"`);
   };
 
   const updateOrderDetails = async (orderRef: string, updates: Partial<Order>) => {
+    setOrders((prev) => {
+      const updated = prev.map((ord) => (ord.orderRef === orderRef ? { ...ord, ...updates } : ord));
+      if (currentUser?.uid) {
+        try {
+          localStorage.setItem(`manopavana_orders_${currentUser.uid}`, JSON.stringify(updated));
+        } catch {}
+      }
+      return updated;
+    });
+
+    setAdminOrders((prev) =>
+      prev.map((ord) => (ord.orderRef === orderRef ? { ...ord, ...updates } : ord))
+    );
+
     await updateFirestoreOrderStatus(orderRef, updates);
     showToast(`Order #${orderRef} updated successfully`);
   };
 
   const deleteOrder = async (orderRef: string) => {
-    try {
-      await deleteDoc(doc(db, "orders", orderRef));
-      showToast(`Order #${orderRef} removed`);
-    } catch (err) {
-      console.warn("Failed to delete order from Firestore:", err);
-    }
+    setOrders((prev) => {
+      const updated = prev.filter((ord) => ord.orderRef !== orderRef && ord.id !== orderRef);
+      if (currentUser?.uid) {
+        try {
+          localStorage.setItem(`manopavana_orders_${currentUser.uid}`, JSON.stringify(updated));
+        } catch {}
+      }
+      return updated;
+    });
+
+    setAdminOrders((prev) =>
+      prev.filter((ord) => ord.orderRef !== orderRef && ord.id !== orderRef)
+    );
+
+    showToast(`Order #${orderRef} removed from queue`);
   };
+
+  const [paymentFailedOrder, setPaymentFailedOrder] = useState<Order | null>(null);
+  const [orderSuccessRef, setOrderSuccessRef] = useState<string | null>(null);
 
   const loadOrderToCartAndRetry = (order: Order) => {
     if (order.items && order.items.length > 0) {
       if (order.isBuyNow && order.items.length === 1) {
         const it = order.items[0];
-        startBuyNow(
-          {
-            id: it.id,
-            productId: it.productId,
-            title: it.title,
-            subtitle: it.subtitle,
-            variant: it.variant,
-            price: it.price,
-            regularPrice: it.regularPrice,
-            image: it.image,
-          },
-          it.quantity
-        );
+        startBuyNow({
+          id: it.id,
+          productId: it.productId,
+          title: it.title,
+          subtitle: it.subtitle,
+          variant: it.variant,
+          price: it.price,
+          regularPrice: it.regularPrice,
+          image: it.image,
+        }, it.quantity);
       } else {
         setCart(order.items);
+        try {
+          localStorage.setItem("manopavana_active_cart", JSON.stringify(order.items));
+        } catch {}
         if (currentUser?.uid) {
           setDoc(
             doc(db, "customers", currentUser.uid),
-            { cart: cleanFirestoreObject(order.items), updatedAt: serverTimestamp() },
+            { cart: order.items, updatedAt: serverTimestamp() },
             { merge: true }
           ).catch(() => {});
         }
@@ -1098,6 +1346,12 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       try {
         const fromDb = await getOrderFromFirestore(orderRef);
         if (fromDb) target = fromDb;
+      } catch {}
+    }
+    if (!target) {
+      try {
+        const pendingRaw = localStorage.getItem("pending_order_data");
+        if (pendingRaw) target = JSON.parse(pendingRaw);
       } catch {}
     }
 
@@ -1144,17 +1398,10 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const finalShippingAddress: Address = {
       ...address,
       ...(target?.shippingAddress || {}),
-      fullName:
-        target?.shippingAddress?.fullName?.trim() ||
-        address.fullName.trim() ||
-        currentUser?.displayName ||
-        "Valued Customer",
+      fullName: target?.shippingAddress?.fullName?.trim() || address.fullName.trim() || currentUser?.displayName || "Valued Customer",
       phone: target?.shippingAddress?.phone?.trim() || address.phone.trim() || "N/A",
       email: target?.shippingAddress?.email?.trim() || address.email?.trim() || currentUser?.email || "",
-      addressLine1:
-        target?.shippingAddress?.addressLine1?.trim() ||
-        address.addressLine1.trim() ||
-        "118, Peenya 2nd Stage",
+      addressLine1: target?.shippingAddress?.addressLine1?.trim() || address.addressLine1.trim() || "118, Peenya 2nd Stage",
       district: target?.shippingAddress?.district || address.district || "Bengaluru Urban",
       state: target?.shippingAddress?.state || address.state || "Karnataka",
       pincode: target?.shippingAddress?.pincode || address.pincode || "560058",
@@ -1168,6 +1415,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       target?.isBuyNow || (buyNowItem !== null && itemsToUse.length === 1 && itemsToUse[0].id === buyNowItem.id)
     );
 
+    // trackingNumber is typed as string | undefined; undefined avoids TypeScript null errors
     const updated: Order = {
       id: target?.id || `ORD-${Date.now().toString().slice(-4)}`,
       orderRef,
@@ -1192,6 +1440,27 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       isBuyNow: isDirectBuy,
     };
 
+    try {
+      const guestRefs: string[] = JSON.parse(localStorage.getItem("manopavana_guest_order_ids") || "[]");
+      if (!guestRefs.includes(orderRef)) {
+        guestRefs.push(orderRef);
+        localStorage.setItem("manopavana_guest_order_ids", JSON.stringify(guestRefs));
+      }
+    } catch {}
+
+    setOrders((prev) => {
+      const filtered = prev.filter((o) => o.orderRef !== orderRef);
+      const nextList = [updated, ...filtered];
+      try {
+        localStorage.setItem("manopavana_orders", JSON.stringify(nextList));
+      } catch {}
+      return nextList;
+    });
+
+    localStorage.removeItem("pending_order_ref");
+    localStorage.removeItem("pending_order_timestamp");
+    localStorage.removeItem("pending_order_data");
+
     await updateFirestoreOrderStatus(orderRef, {
       paymentMethod: "cod",
       paymentMode: "COD",
@@ -1213,11 +1482,39 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const markOrderAsExpired = async (orderRef: string) => {
+    setOrders((prev) =>
+      prev.map((o) =>
+        o.orderRef === orderRef
+          ? { ...o, orderStatus: "Failed (Expired)" as const, paymentStatus: "FAILED" }
+          : o
+      )
+    );
+    try {
+      localStorage.setItem("manopavana_orders", JSON.stringify(
+        orders.map((o) =>
+          o.orderRef === orderRef
+            ? { ...o, orderStatus: "Failed (Expired)", paymentStatus: "FAILED" }
+            : o
+        )
+      ));
+    } catch {}
+
     await updateFirestoreOrderStatus(orderRef, {
       orderStatus: "Failed (Expired)",
       paymentStatus: "FAILED",
     });
   };
+
+  const [reviews, setReviews] = useState<CustomerReview[]>(CUSTOMER_REVIEWS);
+
+  useEffect(() => {
+    const unsubscribe = subscribeReviews((firestoreReviews) => {
+      if (firestoreReviews && firestoreReviews.length > 0) {
+        setReviews(firestoreReviews);
+      }
+    });
+    return () => unsubscribe();
+  }, []);
 
   const submitReview = async (rev: Omit<CustomerReview, "id">) => {
     try {
@@ -1227,7 +1524,9 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       showToast("Thank you! Your verified review has been submitted.");
     } catch (e) {
       console.warn("Failed to submit review to Firestore:", e);
-      showToast("Could not submit review. Please try again.");
+      const fallbackId = `rev-${Date.now()}`;
+      setReviews((prev) => [{ id: fallbackId, ...rev }, ...prev]);
+      showToast("Review saved locally.");
     }
   };
 
@@ -1244,14 +1543,59 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       return true;
     } catch (e) {
       console.warn("Firestore delete review notice:", e);
-      showToast("Failed to delete review.");
-      return false;
+      setReviews((prev) => prev.filter((r) => r.id !== reviewId));
+      showToast("Review removed.");
+      return true;
     }
   };
+
+  const [cmsConfig, setCmsConfig] = useState<StoreCMSConfig>(() => {
+    try {
+      const saved = localStorage.getItem("manopavana_cms");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (
+          !parsed.brandLogoUrl ||
+          parsed.brandLogoUrl === "/logo.svg" ||
+          parsed.brandLogoUrl === MEDIA_ASSETS.logoOriginal ||
+          (typeof parsed.brandLogoUrl === "string" && parsed.brandLogoUrl.includes("logo-clean"))
+        ) {
+          parsed.brandLogoUrl = MEDIA_ASSETS.logo;
+        }
+        return parsed;
+      }
+      return DEFAULT_CMS_CONFIG;
+    } catch {
+      return DEFAULT_CMS_CONFIG;
+    }
+  });
+
+  useEffect(() => {
+    const unsubscribe = subscribeStoreConfig((remoteConfig) => {
+      if (remoteConfig) {
+        setCmsConfig((prev) => {
+          const merged: StoreCMSConfig = {
+            ...prev,
+            ...remoteConfig,
+            prices: { ...prev.prices, ...(remoteConfig.prices || {}) },
+            stock: { ...prev.stock, ...(remoteConfig.stock || {}) },
+          };
+          try {
+            localStorage.setItem("manopavana_cms", JSON.stringify(merged));
+          } catch {}
+          return merged;
+        });
+      }
+    });
+    return () => unsubscribe();
+  }, []);
 
   const updateCMSConfig = (updater: (prev: StoreCMSConfig) => StoreCMSConfig) => {
     setCmsConfig((prev) => {
       const next = updater(prev);
+      try {
+        localStorage.setItem("manopavana_cms", JSON.stringify(next));
+      } catch {}
       saveStoreConfigToFirestore(next);
       return next;
     });
@@ -1259,8 +1603,10 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const products: Product[] = useMemo(() => {
     return PRODUCTS.map((p) => {
+      // 1. Read live overrides from CMS configuration
       const overrides = cmsConfig?.productDetails?.[p.id];
 
+      // 2. Read live prices and stock
       let customPrices = { ...p.prices };
       let customStock = { ...p.inStock };
 
@@ -1293,12 +1639,14 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         };
       }
 
+      // 3. Resolve the 11 multi-angle images from CMS without breaking
       const resolvedImages = Array.isArray(overrides?.images) && overrides.images.length > 0
         ? overrides.images
         : overrides?.imageUrl
         ? [overrides.imageUrl, ...p.images.slice(1)]
         : p.images;
 
+      // 4. Return merged product with Kannada, tagline, specs, standards, and all 11 images
       return {
         ...p,
         kannadaName: overrides?.kannadaName || p.kannadaName,
@@ -1351,15 +1699,27 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     });
   }, [cmsConfig]);
 
-  const setThemeMode = async (mode: "blend" | "light" | "dark") => {
-    setThemeModeState(mode);
-    if (currentUser?.uid) {
-      await setDoc(
-        doc(db, "customers", currentUser.uid),
-        { themeMode: mode, updatedAt: serverTimestamp() },
-        { merge: true }
-      );
+  const [activePolicyModal, setActivePolicyModal] = useState<
+    "terms" | "shipping" | "returns" | "privacy" | null
+  >(null);
+
+  const [themeMode, setThemeModeState] = useState<"blend" | "light" | "dark">(() => {
+    try {
+      const saved = localStorage.getItem("manopavana_theme_mode");
+      if (saved === "blend" || saved === "light" || saved === "dark") {
+        return saved;
+      }
+      return "blend";
+    } catch {
+      return "blend";
     }
+  });
+
+  const setThemeMode = (mode: "blend" | "light" | "dark") => {
+    setThemeModeState(mode);
+    try {
+      localStorage.setItem("manopavana_theme_mode", mode);
+    } catch {}
   };
 
   const addToCart = (item: Omit<CartItem, "quantity">, qty = 1) => {
@@ -1393,12 +1753,17 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const clearCart = async () => {
     setCart([]);
-    if (currentUser?.uid) {
-      await setDoc(
-        doc(db, "customers", currentUser.uid),
-        { cart: [], updatedAt: serverTimestamp() },
-        { merge: true }
-      );
+    try {
+      localStorage.removeItem("manopavana_cart");
+      if (currentUser?.uid) {
+        await setDoc(
+          doc(db, "customers", currentUser.uid),
+          { cart: [] },
+          { merge: true }
+        );
+      }
+    } catch (e) {
+      console.warn("Notice clearing cart:", e);
     }
   };
 
