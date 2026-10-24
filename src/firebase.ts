@@ -5,7 +5,6 @@ import {
   signInWithPopup,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
-  signInAnonymously,
   signOut,
   User as FirebaseUser,
 } from "firebase/auth";
@@ -25,12 +24,11 @@ import {
   increment,
   arrayUnion,
   getDocFromServer,
-  Unsubscribe,
 } from "firebase/firestore";
 import firebaseConfig from "../firebase-applet-config.json";
 import { CustomerReview, Order, StoreCMSConfig } from "./types";
 
-// Initialize Firebase app safely
+// Initialize Firebase safely with provisioned Database ID
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 export const auth = getAuth(app);
 export const db = getFirestore(app, (firebaseConfig as any).firestoreDatabaseId);
@@ -84,13 +82,13 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
   console.warn("Firestore Error: ", JSON.stringify(errInfo));
 }
 
-// Check live database connectivity
+// Test live database connectivity at boot
 async function testFirestoreConnection() {
   try {
     await getDocFromServer(doc(db, "test", "connection"));
   } catch (error) {
     if (error instanceof Error && error.message.includes("the client is offline")) {
-      console.warn("Firestore offline notice. Please verify network connectivity.");
+      console.warn("Firestore offline notice. Please verify network.");
     }
   }
 }
@@ -117,17 +115,6 @@ export function formatLoginIdentifier(input: string): string {
     return `${digits}@phone.manopavana.com`;
   }
   return cleaned.toLowerCase();
-}
-
-/**
- * Ensure an authenticated session exists (signs in anonymously if no session)
- */
-export async function ensureAuthenticatedSession(): Promise<FirebaseUser> {
-  if (auth.currentUser) {
-    return auth.currentUser;
-  }
-  const cred = await signInAnonymously(auth);
-  return cred.user;
 }
 
 /**
@@ -163,6 +150,7 @@ export async function signInWithPhoneOrEmail(identifier: string, password = "man
     return cred.user;
   } catch (err: unknown) {
     const error = err as { code?: string; message?: string };
+    // If user does not exist yet, automatically create account
     if (
       error.code === "auth/user-not-found" ||
       error.code === "auth/invalid-credential" ||
@@ -182,79 +170,15 @@ export async function signInWithPhoneOrEmail(identifier: string, password = "man
 }
 
 /**
- * Sign out current user and initialize a clean anonymous guest session
+ * Sign out current user
  */
 export async function logoutUser() {
   await signOut(auth);
-  await signInAnonymously(auth);
 }
 
 /**
- * Sanitize object for Firestore:
- * Preserves Date and Firestore FieldValues (serverTimestamp, increment, arrayUnion)
- * Strips undefined values to prevent SDK errors.
- */
-export function cleanFirestoreObject(obj: any): any {
-  if (obj === undefined) return null;
-  if (obj === null) return null;
-  if (typeof obj !== "object") return obj;
-  if (obj instanceof Date) return obj;
-
-  if (
-    (obj as any)._methodName ||
-    (obj as any).constructor?.name === "FieldValueImpl" ||
-    (obj as any)._delegate
-  ) {
-    return obj;
-  }
-
-  if (Array.isArray(obj)) {
-    return obj.map(cleanFirestoreObject);
-  }
-
-  const cleaned: Record<string, any> = {};
-  for (const [key, val] of Object.entries(obj)) {
-    if (val === undefined) {
-      continue;
-    } else if (val && typeof val === "object") {
-      cleaned[key] = cleanFirestoreObject(val);
-    } else {
-      cleaned[key] = val;
-    }
-  }
-  return cleaned;
-}
-
-/**
- * Link past guest orders matching phone or email to customer UID
- */
-async function linkPastOrdersToCustomer(userUid: string, phone: string, email: string) {
-  try {
-    const ordersCol = collection(db, "orders");
-    const queries = [];
-    if (phone && phone.length === 10) {
-      queries.push(query(ordersCol, where("customerPhone", "==", phone)));
-    }
-    if (email && email.includes("@")) {
-      queries.push(query(ordersCol, where("customerEmail", "==", email.toLowerCase())));
-    }
-
-    for (const q of queries) {
-      const snap = await getDocs(q);
-      for (const d of snap.docs) {
-        const orderData = d.data();
-        if (!orderData.customerUid || orderData.customerUid !== userUid) {
-          await setDoc(d.ref, { customerUid: userUid, updatedAt: serverTimestamp() }, { merge: true });
-        }
-      }
-    }
-  } catch (err) {
-    handleFirestoreError(err, OperationType.UPDATE, "orders");
-  }
-}
-
-/**
- * Sync & Deduplicate customer details in Firestore 'customers' collection
+ * Sync & Deduplicate customer details in Firestore 'customers' collection:
+ * Merges profile, savedAddress, and cart seamlessly.
  */
 export async function syncCustomerDoc(
   user: FirebaseUser,
@@ -274,6 +198,7 @@ export async function syncCustomerDoc(
     let existingData: Record<string, unknown> = snap.exists() ? snap.data() : {};
     let matchedDocRef = customerRef;
 
+    // Search for existing customer profile by email or phone
     const customersCol = collection(db, "customers");
 
     if (canonicalEmail) {
@@ -329,11 +254,9 @@ export async function syncCustomerDoc(
       mergedPayload.totalSpent = 0;
     }
 
+    // Preserve existing savedAddress and cart if already on file
     if (existingData.savedAddress) {
       mergedPayload.savedAddress = existingData.savedAddress;
-    }
-    if (Array.isArray(existingData.savedAddresses)) {
-      mergedPayload.savedAddresses = existingData.savedAddresses;
     }
     if (Array.isArray(existingData.cart)) {
       mergedPayload.cart = existingData.cart;
@@ -345,15 +268,79 @@ export async function syncCustomerDoc(
       await setDoc(customerRef, cleanPayload, { merge: true });
     }
 
-    if (resolvedPhone || resolvedEmail) {
-      linkPastOrdersToCustomer(user.uid, resolvedPhone, resolvedEmail);
-    }
+    // Link any past guest orders matching this phone or email to this user UID
+    linkPastOrdersToCustomer(user.uid, resolvedPhone, resolvedEmail);
 
     return { ...existingData, ...cleanPayload };
   } catch (e) {
     handleFirestoreError(e, OperationType.WRITE, `customers/${user.uid}`);
     return null;
   }
+}
+
+/**
+ * Link past guest orders matching phone or email to the customer's UID
+ */
+async function linkPastOrdersToCustomer(userUid: string, phone: string, email: string) {
+  try {
+    const ordersCol = collection(db, "orders");
+    const queries = [];
+    if (phone && phone.length === 10) {
+      queries.push(query(ordersCol, where("customerPhone", "==", phone)));
+    }
+    if (email && email.includes("@")) {
+      queries.push(query(ordersCol, where("customerEmail", "==", email.toLowerCase())));
+    }
+
+    for (const q of queries) {
+      const snap = await getDocs(q);
+      for (const d of snap.docs) {
+        const orderData = d.data();
+        if (!orderData.customerUid || orderData.customerUid !== userUid) {
+          await setDoc(d.ref, { customerUid: userUid, updatedAt: serverTimestamp() }, { merge: true });
+        }
+      }
+    }
+  } catch (err) {
+    handleFirestoreError(err, OperationType.UPDATE, "orders");
+  }
+}
+
+/**
+ * Sanitize object for Firestore:
+ * Preserves Date and Firestore FieldValues (serverTimestamp, increment, arrayUnion)
+ * Strips undefined values to prevent SDK errors.
+ */
+export function cleanFirestoreObject(obj: any): any {
+  if (obj === undefined) return null;
+  if (obj === null) return null;
+  if (typeof obj !== "object") return obj;
+  if (obj instanceof Date) return obj;
+
+  // Preserve Firestore sentinel field values
+  if (
+    (obj as any)._methodName ||
+    (obj as any).constructor?.name === "FieldValueImpl" ||
+    (obj as any)._delegate
+  ) {
+    return obj;
+  }
+
+  if (Array.isArray(obj)) {
+    return obj.map(cleanFirestoreObject);
+  }
+
+  const cleaned: Record<string, any> = {};
+  for (const [key, val] of Object.entries(obj)) {
+    if (val === undefined) {
+      continue;
+    } else if (val && typeof val === "object") {
+      cleaned[key] = cleanFirestoreObject(val);
+    } else {
+      cleaned[key] = val;
+    }
+  }
+  return cleaned;
 }
 
 /**
@@ -375,7 +362,7 @@ export async function getOrderFromFirestore(orderRef: string): Promise<Order | n
 }
 
 /**
- * Save order document directly to Firestore 'orders' collection
+ * Save order document in Firestore 'orders' collection
  */
 export async function saveOrderToFirestore(order: Order, userUid?: string): Promise<boolean> {
   try {
@@ -383,7 +370,7 @@ export async function saveOrderToFirestore(order: Order, userUid?: string): Prom
     const cleanPhone = extractCleanPhone(order.shippingAddress?.phone);
     const cleanEmail = (order.shippingAddress?.email || "").toLowerCase().trim();
 
-    const uid = userUid || order.customerUid || (order as any).firebaseUid || auth.currentUser?.uid || null;
+    const uid = userUid || order.customerUid || (order as any).firebaseUid || null;
     const rawPayload = {
       ...order,
       customerUid: uid,
@@ -396,6 +383,7 @@ export async function saveOrderToFirestore(order: Order, userUid?: string): Prom
 
     const sanitizedPayload = cleanFirestoreObject(rawPayload);
 
+    // 5-second race timeout to guarantee non-hanging behavior
     await Promise.race([
       setDoc(orderDocRef, sanitizedPayload, { merge: true }),
       new Promise((_, reject) => setTimeout(() => reject(new Error("Firestore save timeout")), 5000)),
@@ -422,7 +410,7 @@ export async function saveOrderToFirestore(order: Order, userUid?: string): Prom
 }
 
 /**
- * Update order status or details in Firestore
+ * Update order status or payment status in Firestore
  */
 export async function updateFirestoreOrderStatus(
   orderRef: string,
@@ -447,14 +435,14 @@ export async function updateFirestoreOrderStatus(
 }
 
 /**
- * Listen to orders for a specific user in real-time directly from Firestore
+ * Listen to orders for a specific user in real-time.
  */
 export function subscribeUserOrders(
   userUid: string | undefined,
   phone: string | undefined,
   email: string | undefined,
   callback: (orders: Order[]) => void
-): Unsubscribe {
+) {
   try {
     const ordersCol = collection(db, "orders");
     const cleanEmail = (email || "").toLowerCase().trim();
@@ -475,7 +463,9 @@ export function subscribeUserOrders(
         (snapshot) => {
           snapshot.forEach((d) => {
             const data = d.data() as Order;
-            aggregatedMap.set(d.id, data);
+            if (!data.customerUid || data.customerUid === userUid || (data as any).firebaseUid === userUid) {
+              aggregatedMap.set(d.id, data);
+            }
           });
           emitAggregated();
         },
@@ -493,7 +483,9 @@ export function subscribeUserOrders(
         (snapshot) => {
           snapshot.forEach((d) => {
             const data = d.data() as Order;
-            aggregatedMap.set(d.id, data);
+            if (!data.customerUid || data.customerUid === userUid) {
+              aggregatedMap.set(d.id, data);
+            }
           });
           emitAggregated();
         },
@@ -516,7 +508,7 @@ export function subscribeUserOrders(
 /**
  * Listen to all reviews from Firestore 'reviews' collection
  */
-export function subscribeReviews(callback: (reviews: CustomerReview[]) => void): Unsubscribe {
+export function subscribeReviews(callback: (reviews: CustomerReview[]) => void) {
   try {
     const reviewsCol = collection(db, "reviews");
     const q = query(reviewsCol, orderBy("createdAt", "desc"));
@@ -531,14 +523,6 @@ export function subscribeReviews(callback: (reviews: CustomerReview[]) => void):
       },
       (error) => {
         handleFirestoreError(error, OperationType.LIST, "reviews");
-        // Fallback without ordering
-        return onSnapshot(reviewsCol, (fallbackSnap) => {
-          const fallbackList: CustomerReview[] = [];
-          fallbackSnap.forEach((d) => {
-            fallbackList.push({ id: d.id, ...(d.data() as Omit<CustomerReview, "id">) });
-          });
-          callback(fallbackList);
-        });
       }
     );
   } catch (err) {
@@ -600,7 +584,7 @@ export async function saveStoreConfigToFirestore(config: StoreCMSConfig) {
 /**
  * Subscribe to store CMS configuration in Firestore 'settings/store_config'
  */
-export function subscribeStoreConfig(callback: (config: StoreCMSConfig) => void): Unsubscribe {
+export function subscribeStoreConfig(callback: (config: StoreCMSConfig) => void) {
   try {
     const configDocRef = doc(db, "settings", "store_config");
     return onSnapshot(
@@ -623,7 +607,7 @@ export function subscribeStoreConfig(callback: (config: StoreCMSConfig) => void)
 /**
  * Listen to all orders for admin dispatch queue
  */
-export function subscribeAllOrders(callback: (orders: Order[]) => void): Unsubscribe {
+export function subscribeAllOrders(callback: (orders: Order[]) => void) {
   try {
     const ordersCol = collection(db, "orders");
     const q = query(ordersCol, orderBy("createdAt", "desc"));
@@ -638,6 +622,7 @@ export function subscribeAllOrders(callback: (orders: Order[]) => void): Unsubsc
       },
       (error) => {
         handleFirestoreError(error, OperationType.LIST, "orders");
+        // Fallback without orderBy
         return onSnapshot(ordersCol, (snapshot) => {
           const list: Order[] = [];
           snapshot.forEach((d) => {
