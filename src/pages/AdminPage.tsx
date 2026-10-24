@@ -234,18 +234,25 @@ export const AdminPage: React.FC = () => {
         return acc + gramsPerUnit * (Number(item?.quantity) || 1);
       }, 0) || 1000;
 
+    // Build the complete manual address line for carrier dispatch
+    const fullStreetAddress = [
+      addr.addressLine1?.trim(),
+      addr.landmark?.trim() ? `Near ${addr.landmark.trim()}` : "",
+      addr.district || addr.city,
+    ]
+      .filter(Boolean)
+      .join(", ");
+
     try {
       const res = await fetch(`/api?action=delhivery_create_shipment`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           orderRef: order.orderRef,
-          customerName: addr.fullName || "Customer",
-          phone: addr.phone || "",
-          address: `${addr.addressLine1 || ""}${
-            addr.landmark ? `, Near ${addr.landmark}` : ""
-          }`,
-          pincode: addr.pincode || "560058",
+          customerName: addr.fullName?.trim() || "Customer",
+          phone: (addr.phone || "").replace(/\D/g, "").slice(-10),
+          address: fullStreetAddress,
+          pincode: (addr.pincode || "560058").replace(/\D/g, "").slice(0, 6),
           city: addr.city || addr.district || "Bengaluru",
           state: addr.state || "Karnataka",
           paymentMode: order.paymentMethod === "cod" ? "COD" : "Prepaid",
@@ -760,6 +767,10 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                   {displayOrders.map((ord) => {
                     const addr = (ord?.shippingAddress || {}) as any;
                     const rawItems = ord?.items;
+                    const isUnfulfillable =
+  ord.orderStatus === "Cancelled" ||
+  ord.orderStatus === "Failed (Expired)" ||
+  ord.orderStatus === "Payment Incomplete";
                     const items: any[] = Array.isArray(rawItems)
                       ? rawItems
                       : rawItems && typeof rawItems === "object"
@@ -1045,7 +1056,18 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                                 </div>
                               </div>
                             </div>
+                          ) : isUnfulfillable ? (
+                            /* Blocked Booking for Incomplete, Expired, and Cancelled orders */
+                            <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-400 text-xs font-bold flex items-center gap-2">
+                              <AlertCircle className="w-4 h-4 shrink-0" />
+                              <span>
+                                {ord.orderStatus === "Payment Incomplete"
+                                  ? "Payment Incomplete — Awaiting Customer Settlement"
+                                  : "Order Cancelled — Shipment Booking Disabled"}
+                              </span>
+                            </div>
                           ) : (
+                            /* Active manifest controls for confirmed orders (Placed / Packed / Dispatched) */
                             <div className="space-y-2">
                               <div className="flex flex-wrap items-center gap-2">
                                 <button
@@ -1104,6 +1126,7 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                               )}
                             </div>
                           )}
+
                         </div>
 
                         {/* Customer Actions */}
