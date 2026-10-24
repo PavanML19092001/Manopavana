@@ -24,6 +24,7 @@ import {
   increment,
   arrayUnion,
   getDocFromServer,
+  FieldValue,
 } from "firebase/firestore";
 import firebaseConfig from "../firebase-applet-config.json";
 import { CustomerReview, Order, StoreCMSConfig } from "./types";
@@ -319,8 +320,9 @@ export function cleanFirestoreObject(obj: any): any {
 
   // Preserve Firestore sentinel field values
   if (
+    obj instanceof FieldValue ||
     (obj as any)._methodName ||
-    (obj as any).constructor?.name === "FieldValueImpl" ||
+    (obj as any).constructor?.name?.includes("FieldValue") ||
     (obj as any)._delegate
   ) {
     return obj;
@@ -362,13 +364,13 @@ export async function getOrderFromFirestore(orderRef: string): Promise<Order | n
 }
 
 /**
- * Save order document in Firestore 'orders' collection
+ * Save order document in Firestore 'orders' collection dynamically and fast
  */
 export async function saveOrderToFirestore(order: Order, userUid?: string): Promise<boolean> {
   try {
     const orderDocRef = doc(db, "orders", order.orderRef);
-    const cleanPhone = extractCleanPhone(order.shippingAddress?.phone);
-    const cleanEmail = (order.shippingAddress?.email || "").toLowerCase().trim();
+    const cleanPhone = extractCleanPhone(order.shippingAddress?.phone || order.customerPhone || "");
+    const cleanEmail = (order.shippingAddress?.email || order.customerEmail || "").toLowerCase().trim();
 
     const uid = userUid || order.customerUid || (order as any).firebaseUid || null;
     const rawPayload = {
@@ -383,11 +385,7 @@ export async function saveOrderToFirestore(order: Order, userUid?: string): Prom
 
     const sanitizedPayload = cleanFirestoreObject(rawPayload);
 
-    // 5-second race timeout to guarantee non-hanging behavior
-    await Promise.race([
-      setDoc(orderDocRef, sanitizedPayload, { merge: true }),
-      new Promise((_, reject) => setTimeout(() => reject(new Error("Firestore save timeout")), 5000)),
-    ]);
+    await setDoc(orderDocRef, sanitizedPayload, { merge: true });
 
     if (uid) {
       const customerRef = doc(db, "customers", uid);
@@ -398,6 +396,7 @@ export async function saveOrderToFirestore(order: Order, userUid?: string): Prom
           totalSpent: increment(order.total || 0),
           lastOrderRef: order.orderRef,
           lastOrderAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
         },
         { merge: true }
       ).catch(() => {});
@@ -423,10 +422,7 @@ export async function updateFirestoreOrderStatus(
       updatedAt: serverTimestamp(),
     });
 
-    await Promise.race([
-      setDoc(orderDocRef, cleanUpdates, { merge: true }),
-      new Promise((_, reject) => setTimeout(() => reject(new Error("Firestore update timeout")), 5000)),
-    ]);
+    await setDoc(orderDocRef, cleanUpdates, { merge: true });
     return true;
   } catch (err) {
     handleFirestoreError(err, OperationType.UPDATE, `orders/${orderRef}`);
@@ -605,35 +601,54 @@ export function subscribeStoreConfig(callback: (config: StoreCMSConfig) => void)
 }
 
 /**
- * Listen to all orders for admin dispatch queue
+ * Listen to all orders for admin dispatch queue (real-time stream)
  */
 export function subscribeAllOrders(callback: (orders: Order[]) => void) {
   try {
     const ordersCol = collection(db, "orders");
-    const q = query(ordersCol, orderBy("createdAt", "desc"));
     return onSnapshot(
-      q,
+      ordersCol,
       (snapshot) => {
         const list: Order[] = [];
         snapshot.forEach((d) => {
           list.push(d.data() as Order);
         });
+        list.sort((a, b) => {
+          const timeA = b.timestampMs || b.timestamp || (b.createdAt && typeof b.createdAt === "object" && (b.createdAt as any).toMillis ? (b.createdAt as any).toMillis() : 0);
+          const timeB = a.timestampMs || a.timestamp || (a.createdAt && typeof a.createdAt === "object" && (a.createdAt as any).toMillis ? (a.createdAt as any).toMillis() : 0);
+          return timeA - timeB;
+        });
         callback(list);
       },
       (error) => {
         handleFirestoreError(error, OperationType.LIST, "orders");
-        // Fallback without orderBy
-        return onSnapshot(ordersCol, (snapshot) => {
-          const list: Order[] = [];
-          snapshot.forEach((d) => {
-            list.push(d.data() as Order);
-          });
-          callback(list);
-        });
       }
     );
   } catch (err) {
     handleFirestoreError(err, OperationType.LIST, "orders");
     return () => {};
+  }
+}
+
+/**
+ * Fetch all orders once directly from Firestore (one-time fetch for admin)
+ */
+export async function fetchAllOrdersOnce(): Promise<Order[]> {
+  try {
+    const ordersCol = collection(db, "orders");
+    const snap = await getDocs(ordersCol);
+    const list: Order[] = [];
+    snap.forEach((d) => {
+      list.push(d.data() as Order);
+    });
+    list.sort((a, b) => {
+      const timeA = b.timestampMs || b.timestamp || (b.createdAt && typeof b.createdAt === "object" && (b.createdAt as any).toMillis ? (b.createdAt as any).toMillis() : 0);
+      const timeB = a.timestampMs || a.timestamp || (a.createdAt && typeof a.createdAt === "object" && (a.createdAt as any).toMillis ? (a.createdAt as any).toMillis() : 0);
+      return timeA - timeB;
+    });
+    return list;
+  } catch (err) {
+    handleFirestoreError(err, OperationType.LIST, "orders");
+    return [];
   }
 }

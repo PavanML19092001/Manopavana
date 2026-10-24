@@ -153,6 +153,8 @@ export interface Order {
   customerPhone?: string | null;
   customerEmail?: string | null;
   isBuyNow?: boolean;
+  createdAt?: any;
+  updatedAt?: any;
 }
 
 export interface CustomerReview {

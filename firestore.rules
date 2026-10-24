@@ -25,7 +25,7 @@ service cloud.firestore {
 
     // Test connection doc
     match /test/{testDoc} {
-      allow read: if true;
+      allow read, write: if true;
     }
 
     // Customer profile & persistent cart

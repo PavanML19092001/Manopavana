@@ -16,16 +16,38 @@ import {
   Layers,
   ChevronDown,
   ChevronUp,
+  Truck,
+  RefreshCw,
+  ExternalLink,
+  MessageCircle,
+  Search,
+  User,
+  MapPin,
+  CreditCard,
+  Clock,
+  Check,
 } from "lucide-react";
 import { useStore } from "../../context/StoreContext";
-import { BUSINESS_CONFIG, LEGAL_POLICIES } from "../../constants";
+import { BUSINESS_CONFIG, LEGAL_POLICIES, COMBOS } from "../../constants";
+import { OrderStatus } from "../../types";
 
 export const StorefrontCMSPanel: React.FC<{ isDark: boolean }> = ({ isDark }) => {
-  const { cmsConfig, updateCMSConfig, showToast } = useStore();
+  const {
+    cmsConfig,
+    updateCMSConfig,
+    showToast,
+    adminOrders,
+    refreshAdminOrders,
+    updateOrderStatus,
+  } = useStore();
 
   const [activeTab, setActiveTab] = useState<
-    "brand" | "facility" | "pricing_stock" | "products" | "policies"
-  >("products");
+    "orders" | "products" | "combos" | "pricing_stock" | "brand" | "facility" | "policies"
+  >("orders");
+
+  const [orderSearch, setOrderSearch] = useState("");
+  const [orderStatusFilter, setOrderStatusFilter] = useState<string>("all");
+  const [isRefreshingOrders, setIsRefreshingOrders] = useState(false);
 
   // Tab 1: Global Brand & Copy
   const [ticker, setTicker] = useState(cmsConfig?.announcementTicker || "");
@@ -148,6 +170,36 @@ export const StorefrontCMSPanel: React.FC<{ isDark: boolean }> = ({ isDark }) =>
     }
   );
 
+  const [comboDetails, setComboDetails] = useState<
+    Record<
+      string,
+      {
+        name?: string;
+        heading?: string;
+        description?: string;
+        image?: string;
+        bullets?: string;
+      }
+    >
+  >(
+    (cmsConfig as any)?.comboDetails || {
+      "combo-3l": {
+        name: "Artisanal Pure Trio 3L (Groundnut, Coconut & Sesame)",
+        heading: "Mara Chekku Kitchen Pantry Trio",
+        description: "1L Groundnut + 1L Coconut + 1L Sesame Oil cold-pressed with traditional marachekku craftsmanship.",
+        image: "https://pub-9e18bb265ecf4224ae1230cf913745ca.r2.dev/combo_pack_3l.png",
+        bullets: "1L Mara Chekku Groundnut Oil, 1L Sun-Dried Copra Coconut Oil, 1L Palm Jaggery Infused Sesame Oil, Handcrafted in Peenya Bengaluru, Zero chemical processing",
+      },
+      "combo-1.5l": {
+        name: "Artisanal Pure Starter Trio 1.5L (3 x 500ml)",
+        heading: "Mara Chekku Trial Kitchen Trio",
+        description: "500ml Groundnut + 500ml Coconut + 500ml Sesame Oil for discovering pure wood-pressed aromas.",
+        image: "https://pub-9e18bb265ecf4224ae1230cf913745ca.r2.dev/combo_pack_1_5l.png",
+        bullets: "500ml Mara Chekku Groundnut Oil, 500ml Copra Coconut Oil, 500ml Gingelly Sesame Oil, Perfect discovery tasting trio",
+      },
+    }
+  );
+
   const handleSaveAll = (e: React.FormEvent) => {
     e.preventDefault();
     updateCMSConfig((prev) => ({
@@ -171,9 +223,10 @@ export const StorefrontCMSPanel: React.FC<{ isDark: boolean }> = ({ isDark }) =>
       prices,
       stock,
       productDetails,
+      comboDetails,
       policies,
     }));
-    showToast("Master storefront settings, product catalog, prices & legal policies synced!");
+    showToast("Master storefront settings, product catalog, combos, prices & policies synced!");
   };
 
   const updateProductField = (
@@ -244,9 +297,11 @@ export const StorefrontCMSPanel: React.FC<{ isDark: boolean }> = ({ isDark }) =>
       {/* Responsive Navigation Tabs */}
       <div className="flex flex-wrap gap-2 border-b pb-2 border-stone-200 dark:border-stone-800">
         {[
-          { key: "products", label: "Product Pages (A-Z Content)" },
+          { key: "orders", label: `Live Orders Log (${adminOrders.length})` },
+          { key: "products", label: "Product Pages (A-Z)" },
+          { key: "combos", label: "Combo Packs (A-Z)" },
           { key: "pricing_stock", label: "Prices & Inventory" },
-          { key: "brand", label: "Logo & Hero Banner" },
+          { key: "brand", label: "Brand & Hero Banner" },
           { key: "facility", label: "Facility & Legal IDs" },
           { key: "policies", label: "Customer Policies" },
         ].map((tab) => (
@@ -254,7 +309,7 @@ export const StorefrontCMSPanel: React.FC<{ isDark: boolean }> = ({ isDark }) =>
             key={tab.key}
             type="button"
             onClick={() => setActiveTab(tab.key as any)}
-            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
               activeTab === tab.key
                 ? "bg-[#5E3210] text-white shadow-sm"
                 : isDark
@@ -262,12 +317,343 @@ export const StorefrontCMSPanel: React.FC<{ isDark: boolean }> = ({ isDark }) =>
                 : "bg-stone-100 text-[#5C4230] hover:bg-stone-200"
             }`}
           >
-            {tab.label}
+            {tab.key === "orders" && (
+              <span className={`w-2 h-2 rounded-full ${adminOrders.length > 0 ? "bg-emerald-400 animate-pulse" : "bg-stone-400"}`} />
+            )}
+            <span>{tab.label}</span>
           </button>
         ))}
       </div>
 
       <form onSubmit={handleSaveAll} className="space-y-4 text-xs">
+        {/* TAB: LIVE ORDERS LOG */}
+        {activeTab === "orders" && (
+          <div className="space-y-4 animate-fade-in">
+            {/* Header Controls */}
+            <div className="p-4 rounded-xl border border-stone-200 dark:border-stone-800 bg-stone-50/60 dark:bg-black/20 space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <h3 className="font-bold text-sm text-[#1F120A] dark:text-[#FAF4EA] flex items-center gap-1.5">
+                    <Truck className="w-4 h-4 text-[#E08F35]" />
+                    <span>Live Customer Orders & Database Hub</span>
+                  </h3>
+                  <p className="text-[11px] text-[#6A523E] dark:text-[#C4B29E]">
+                    Real-time Firestore stream • {adminOrders.length} total orders logged
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  disabled={isRefreshingOrders}
+                  onClick={async () => {
+                    setIsRefreshingOrders(true);
+                    await refreshAdminOrders();
+                    setIsRefreshingOrders(false);
+                  }}
+                  className="px-3 py-1.5 rounded-lg bg-[#E08F35]/15 hover:bg-[#E08F35]/25 text-[#5E3210] dark:text-amber-200 border border-[#E08F35]/30 text-xs font-bold flex items-center gap-1.5 cursor-pointer shrink-0 transition-colors"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 text-[#E08F35] ${isRefreshingOrders ? "animate-spin" : ""}`} />
+                  <span>{isRefreshingOrders ? "Syncing..." : "Sync Live Orders"}</span>
+                </button>
+              </div>
+
+              {/* Search & Status Filters */}
+              <div className="flex flex-col sm:flex-row gap-2 pt-1">
+                <div className="relative flex-1">
+                  <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-stone-400" />
+                  <input
+                    type="text"
+                    placeholder="Search by Order #, Customer Name, Phone, Pincode..."
+                    value={orderSearch}
+                    onChange={(e) => setOrderSearch(e.target.value)}
+                    className="w-full pl-8 pr-3 py-2 rounded-lg border border-stone-300 dark:border-stone-700 bg-white dark:bg-transparent text-xs"
+                  />
+                </div>
+
+                <div className="flex flex-wrap gap-1">
+                  {["all", "Placed", "Packed", "Dispatched", "Delivered", "Cancelled"].map((st) => (
+                    <button
+                      key={st}
+                      type="button"
+                      onClick={() => setOrderStatusFilter(st)}
+                      className={`px-2.5 py-1.5 rounded-lg text-[11px] font-bold capitalize cursor-pointer transition-colors ${
+                        orderStatusFilter === st
+                          ? "bg-[#5E3210] text-white"
+                          : "bg-white dark:bg-stone-800 text-stone-600 dark:text-stone-300 border border-stone-200 dark:border-stone-700"
+                      }`}
+                    >
+                      {st}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Orders List */}
+            {(() => {
+              const filtered = adminOrders.filter((ord) => {
+                const q = orderSearch.toLowerCase().trim();
+                const matchesSearch =
+                  !q ||
+                  ord.orderRef.toLowerCase().includes(q) ||
+                  (ord.shippingAddress?.fullName || "").toLowerCase().includes(q) ||
+                  (ord.shippingAddress?.phone || "").includes(q) ||
+                  (ord.shippingAddress?.pincode || "").includes(q) ||
+                  (ord.shippingAddress?.city || "").toLowerCase().includes(q);
+
+                const matchesStatus =
+                  orderStatusFilter === "all" || ord.orderStatus === orderStatusFilter;
+
+                return matchesSearch && matchesStatus;
+              });
+
+              if (filtered.length === 0) {
+                return (
+                  <div className="p-8 text-center rounded-xl border border-dashed border-stone-300 dark:border-stone-700 text-stone-500 space-y-2">
+                    <Package className="w-8 h-8 mx-auto text-stone-400" />
+                    <p className="font-semibold text-xs">No orders matching your filter</p>
+                    <p className="text-[11px] opacity-75">
+                      New orders placed by customers anywhere on the store will stream directly here.
+                    </p>
+                  </div>
+                );
+              }
+
+              return (
+                <div className="space-y-3 max-h-[600px] overflow-y-auto pr-1">
+                  {filtered.map((ord) => {
+                    const addr = (ord.shippingAddress || {}) as any;
+                    const items = Array.isArray(ord.items) ? ord.items : [];
+                    const cleanPhone = (addr.phone || "").replace(/\D/g, "").slice(-10);
+                    const waUrl = cleanPhone
+                      ? `https://wa.me/91${cleanPhone}?text=Hi%20${encodeURIComponent(addr.fullName || "Customer")},%20regarding%20your%20MANOPAVANA%20order%20${ord.orderRef}`
+                      : null;
+
+                    return (
+                      <div
+                        key={ord.orderRef}
+                        className="p-3.5 rounded-xl border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900/40 shadow-2xs space-y-2.5"
+                      >
+                        <div className="flex flex-wrap items-center justify-between gap-2 border-b pb-2 border-stone-100 dark:border-stone-800">
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold font-mono text-sm text-[#E08F35]">
+                              #{ord.orderRef}
+                            </span>
+                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/20">
+                              ₹{ord.total}
+                            </span>
+                            <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-stone-100 dark:bg-stone-800 uppercase text-stone-600 dark:text-stone-300">
+                              {ord.paymentMethod || "COD"}
+                            </span>
+                            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                              ord.paymentStatus === "COMPLETED" || ord.paymentStatus === "PHONEPE_PAID"
+                                ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
+                                : "bg-amber-500/15 text-amber-700 dark:text-amber-300"
+                            }`}>
+                              {ord.paymentStatus || "PENDING"}
+                            </span>
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] text-stone-400">Status:</span>
+                            <select
+                              value={ord.orderStatus}
+                              onChange={(e) => updateOrderStatus(ord.id || ord.orderRef, e.target.value as OrderStatus)}
+                              className="px-2 py-1 rounded text-xs font-bold border border-stone-300 dark:border-stone-700 bg-white dark:bg-stone-800 cursor-pointer text-[#5E3210] dark:text-amber-200"
+                            >
+                              <option value="Placed">Placed</option>
+                              <option value="Packed">Packed</option>
+                              <option value="Dispatched">Dispatched</option>
+                              <option value="Delivered">Delivered</option>
+                              <option value="Cancelled">Cancelled</option>
+                              <option value="Payment Incomplete">Payment Incomplete</option>
+                            </select>
+                          </div>
+                        </div>
+
+                        {/* Customer & Address Details */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] text-stone-600 dark:text-stone-300">
+                          <div>
+                            <p className="font-bold text-stone-800 dark:text-stone-100 flex items-center gap-1">
+                              <User className="w-3 h-3 text-[#E08F35]" />
+                              <span>{addr.fullName || "Customer"}</span>
+                            </p>
+                            <p className="flex items-center gap-1 text-[10px] text-stone-500">
+                              <span>Phone: {addr.phone || "N/A"}</span>
+                              {waUrl && (
+                                <a
+                                  href={waUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-emerald-600 font-bold hover:underline inline-flex items-center gap-0.5 ml-1"
+                                >
+                                  <MessageCircle className="w-2.5 h-2.5" />
+                                  <span>WhatsApp</span>
+                                </a>
+                              )}
+                            </p>
+                            {addr.email && <p className="text-[10px] text-stone-400">{addr.email}</p>}
+                          </div>
+
+                          <div>
+                            <p className="flex items-start gap-1">
+                              <MapPin className="w-3 h-3 text-[#E08F35] shrink-0 mt-0.5" />
+                              <span className="line-clamp-2">
+                                {addr.addressLine1}
+                                {addr.landmark ? `, Near ${addr.landmark}` : ""}, {addr.city || addr.district} - {addr.pincode}
+                              </span>
+                            </p>
+                            {ord.trackingNumber && (
+                              <p className="text-[10px] font-mono text-emerald-600 font-bold mt-0.5">
+                                AWB: #{ord.trackingNumber} ({ord.courier || "Delhivery"})
+                              </p>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Items list */}
+                        <div className="pt-1 border-t border-stone-100 dark:border-stone-800">
+                          <p className="text-[10px] font-bold uppercase tracking-wider text-stone-400 mb-1">
+                            Items ({items.length})
+                          </p>
+                          <div className="space-y-1">
+                            {items.map((it: any, idx: number) => (
+                              <div key={idx} className="flex items-center justify-between text-[11px]">
+                                <span>
+                                  {it.title || it.name} <span className="font-bold text-amber-600">({it.variant})</span> x{it.quantity}
+                                </span>
+                                <span className="font-mono font-semibold">₹{(Number(it.price) || 0) * (Number(it.quantity) || 1)}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
+          </div>
+        )}
+
+        {/* TAB: COMBOS (TRIO PACKS) EDITING */}
+        {activeTab === "combos" && (
+          <div className="space-y-4 animate-fade-in">
+            {["combo-3l", "combo-1.5l"].map((comboId) => {
+              const comboKey = comboId === "combo-3l" ? "combo3L" : "combo1_5L";
+              const cData = comboDetails[comboId] || {};
+              return (
+                <div
+                  key={comboId}
+                  className="p-4 rounded-xl border border-stone-200 dark:border-stone-800 space-y-3 bg-stone-50/50 dark:bg-black/20"
+                >
+                  <div className="flex items-center justify-between border-b pb-2 border-stone-200 dark:border-stone-800">
+                    <span className="font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">
+                      {comboId === "combo-3l" ? "Trio 3L Combo Pack" : "Trio 1.5L Trial Combo Pack"}
+                    </span>
+                    <label className="flex items-center gap-1.5 cursor-pointer">
+                      <span className="text-[11px] font-bold">In Stock:</span>
+                      <input
+                        type="checkbox"
+                        checked={Boolean(stock[comboKey])}
+                        onChange={() => toggleStock(comboKey)}
+                        className="rounded accent-amber-600 cursor-pointer"
+                      />
+                    </label>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[11px] font-semibold mb-1">Combo Display Title</label>
+                      <input
+                        type="text"
+                        value={cData.name || ""}
+                        onChange={(e) =>
+                          setComboDetails((prev) => ({
+                            ...prev,
+                            [comboId]: { ...prev[comboId], name: e.target.value },
+                          }))
+                        }
+                        className="w-full px-2.5 py-1.5 rounded-lg border border-stone-300 dark:border-stone-700 bg-white dark:bg-transparent text-xs"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-semibold mb-1">Price (₹)</label>
+                      <input
+                        type="number"
+                        value={prices[comboKey] || 0}
+                        onChange={(e) => updatePrice(comboKey, Number(e.target.value))}
+                        className="w-full px-2.5 py-1.5 rounded-lg border border-stone-300 dark:border-stone-700 bg-white dark:bg-transparent text-xs"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-semibold mb-1">Heading / Subhead</label>
+                      <input
+                        type="text"
+                        value={cData.heading || ""}
+                        onChange={(e) =>
+                          setComboDetails((prev) => ({
+                            ...prev,
+                            [comboId]: { ...prev[comboId], heading: e.target.value },
+                          }))
+                        }
+                        className="w-full px-2.5 py-1.5 rounded-lg border border-stone-300 dark:border-stone-700 bg-white dark:bg-transparent text-xs"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-semibold mb-1">Product Image URL</label>
+                      <input
+                        type="text"
+                        value={cData.image || ""}
+                        onChange={(e) =>
+                          setComboDetails((prev) => ({
+                            ...prev,
+                            [comboId]: { ...prev[comboId], image: e.target.value },
+                          }))
+                        }
+                        className="w-full px-2.5 py-1.5 rounded-lg border border-stone-300 dark:border-stone-700 bg-white dark:bg-transparent text-xs"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-semibold mb-1">Description</label>
+                    <textarea
+                      rows={2}
+                      value={cData.description || ""}
+                      onChange={(e) =>
+                        setComboDetails((prev) => ({
+                          ...prev,
+                          [comboId]: { ...prev[comboId], description: e.target.value },
+                        }))
+                      }
+                      className="w-full px-2.5 py-1.5 rounded-lg border border-stone-300 dark:border-stone-700 bg-white dark:bg-transparent text-xs"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-semibold mb-1">Key Highlights / Bullets (Comma-separated)</label>
+                    <input
+                      type="text"
+                      value={cData.bullets || ""}
+                      onChange={(e) =>
+                        setComboDetails((prev) => ({
+                          ...prev,
+                          [comboId]: { ...prev[comboId], bullets: e.target.value },
+                        }))
+                      }
+                      className="w-full px-2.5 py-1.5 rounded-lg border border-stone-300 dark:border-stone-700 bg-white dark:bg-transparent text-xs"
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
         {/* TAB 1: PRODUCT PAGES (A to Z EDITING) */}
         {activeTab === "products" && (
           <div className="space-y-4 animate-fade-in">

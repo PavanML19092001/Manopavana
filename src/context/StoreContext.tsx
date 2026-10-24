@@ -25,6 +25,7 @@ import {
   updateFirestoreOrderStatus,
   subscribeUserOrders,
   subscribeAllOrders,
+  fetchAllOrdersOnce,
   subscribeReviews,
   addReviewToFirestore,
   deleteReviewFromFirestore,
@@ -93,6 +94,7 @@ interface StoreContextType {
 
   orders: Order[];
   adminOrders: Order[];
+  refreshAdminOrders: () => Promise<void>;
   saveOrder: (order: Order) => Promise<void>;
   getOrder: (refOrId: string) => Order | undefined;
   getOrderAsync: (refOrId: string) => Promise<Order | undefined>;
@@ -972,59 +974,33 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   };
 
-  const loadStoredOrders = (): Order[] => {
+  const [adminOrders, setAdminOrders] = useState<Order[]>([]);
+  const [orders, setOrders] = useState<Order[]>([]);
+
+  const refreshAdminOrders = async () => {
     try {
-      const allRaw = localStorage.getItem("manopavana_all_orders");
-      if (allRaw) {
-        const parsed = JSON.parse(allRaw);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      }
-      const collected: Order[] = [];
-      const seen = new Set<string>();
-      for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        if (key && (key.startsWith("manopavana_orders") || key.includes("_orders_"))) {
-          const val = localStorage.getItem(key);
-          if (val) {
-            try {
-              const p = JSON.parse(val);
-              if (Array.isArray(p)) {
-                p.forEach((ord: Order) => {
-                  const ref = ord.orderRef || ord.id;
-                  if (ref && !seen.has(ref)) {
-                    seen.add(ref);
-                    collected.push(ord);
-                  }
-                });
-              }
-            } catch {}
-          }
-        }
-      }
-      if (collected.length > 0) {
-        try {
-          localStorage.setItem("manopavana_all_orders", JSON.stringify(collected));
-        } catch {}
-        return collected;
-      }
-    } catch {}
-    return [];
+      const all = await fetchAllOrdersOnce();
+      setAdminOrders(all);
+      showToast(`Synced ${all.length} live orders from database`);
+    } catch (e) {
+      console.warn("Failed to refresh admin orders:", e);
+    }
   };
 
-  const [adminOrders, setAdminOrders] = useState<Order[]>([]);
-  const [orders, setOrders] = useState<Order[]>(() => {
-    return loadStoredOrders();
-  });
-
   useEffect(() => {
-    if (isAdminAuthenticated || currentUser?.email === "manopavana@gmail.com") {
+    // Purge any legacy unpartitioned leaking keys from localStorage
+    try {
+      localStorage.removeItem("manopavana_all_orders");
+    } catch {}
+
+    if (isAdminAuthenticated || currentUser?.email === "manopavana@gmail.com" || currentUser?.email === "pavanml19092001@gmail.com") {
+      fetchAllOrdersOnce().then((all) => {
+        if (all && all.length > 0) setAdminOrders(all);
+      }).catch(() => {});
+
       const unsubscribe = subscribeAllOrders((allOrders) => {
         if (allOrders) {
-          setAdminOrders(
-            [...allOrders].sort(
-              (a, b) => (b.timestamp || b.timestampMs || 0) - (a.timestamp || a.timestampMs || 0)
-            )
-          );
+          setAdminOrders(allOrders);
         }
       });
       return () => unsubscribe();
@@ -1032,55 +1008,40 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, [isAdminAuthenticated, currentUser?.email]);
 
   useEffect(() => {
-    const stored = loadStoredOrders();
-    if (stored.length > 0) {
-      setOrders((prev) => {
-        const map = new Map<string, Order>();
-        stored.forEach((o) => {
-          const k = o.orderRef || o.id;
-          if (k) map.set(k, o);
-        });
-        prev.forEach((o) => {
-          const k = o.orderRef || o.id;
-          if (k) map.set(k, o);
-        });
-        return Array.from(map.values()).sort(
-          (a, b) => (b.timestamp || b.timestampMs || 0) - (a.timestamp || a.timestampMs || 0)
-        );
-      });
+    if (!currentUser?.uid) {
+      setOrders([]);
+      return;
     }
-
-    if (!currentUser?.uid) return;
 
     const currentUid = currentUser.uid;
     const userEmail = (currentUser.email || "").toLowerCase().trim();
     const userOrdersKey = `manopavana_orders_${currentUid}`;
+
+    // Load exclusively from this user's private local cache
+    try {
+      const userCached = localStorage.getItem(userOrdersKey);
+      if (userCached) {
+        const parsed = JSON.parse(userCached);
+        if (Array.isArray(parsed)) {
+          setOrders(parsed.filter((o: Order) => !o.customerUid || o.customerUid === currentUid));
+        }
+      }
+    } catch {}
 
     const unsubscribe = subscribeUserOrders(
       currentUid,
       undefined,
       userEmail || undefined,
       (firestoreOrders) => {
-        if (!firestoreOrders || firestoreOrders.length === 0) return;
-        setOrders((prev) => {
-          const map = new Map<string, Order>();
-          firestoreOrders.forEach((o) => {
-            const key = o.orderRef || o.id;
-            if (key) map.set(key, o);
-          });
-          prev.forEach((o) => {
-            const key = o.orderRef || o.id;
-            if (key && !map.has(key)) map.set(key, o);
-          });
-          const merged = Array.from(map.values()).sort(
-            (a, b) => (b.timestamp || b.timestampMs || 0) - (a.timestamp || a.timestampMs || 0)
-          );
-          try {
-            localStorage.setItem("manopavana_all_orders", JSON.stringify(merged));
-            localStorage.setItem(userOrdersKey, JSON.stringify(merged));
-          } catch {}
-          return merged;
-        });
+        if (!firestoreOrders) return;
+        // Strictly filter to ensure zero leakage across different users
+        const verifiedOrders = firestoreOrders.filter(
+          (o) => !o.customerUid || o.customerUid === currentUid
+        );
+        setOrders(verifiedOrders);
+        try {
+          localStorage.setItem(userOrdersKey, JSON.stringify(verifiedOrders));
+        } catch {}
       }
     );
     return () => unsubscribe();
@@ -1093,15 +1054,15 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       customerEmail: currentUser?.email || newOrder.customerEmail || newOrder.shippingAddress?.email || null,
     };
 
+    // Update state immediately for zero lag
     setOrders((prev) => {
       const filtered = prev.filter((o) => o.orderRef !== finalOrder.orderRef && o.id !== finalOrder.id);
       const nextList = [finalOrder, ...filtered];
-      try {
-        localStorage.setItem("manopavana_all_orders", JSON.stringify(nextList));
-        if (currentUser?.uid) {
+      if (currentUser?.uid) {
+        try {
           localStorage.setItem(`manopavana_orders_${currentUser.uid}`, JSON.stringify(nextList));
-        }
-      } catch {}
+        } catch {}
+      }
       return nextList;
     });
 
@@ -1114,11 +1075,10 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     localStorage.removeItem("pending_order_timestamp");
     localStorage.removeItem("pending_order_data");
 
-    try {
-      await saveOrderToFirestore(finalOrder, currentUser?.uid);
-    } catch (err) {
-      console.warn("Firestore saveOrder non-fatal notice:", err);
-    }
+    // Dynamic database persistence in background
+    saveOrderToFirestore(finalOrder, currentUser?.uid).catch((err) => {
+      console.warn("Firestore saveOrder notice:", err);
+    });
   };
 
   const cancelOrderWithinWindow = async (orderRef: string): Promise<boolean> => {
@@ -1661,10 +1621,20 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const combos: ComboProduct[] = useMemo(() => {
     return COMBOS.map((c) => {
+      const overrides = cmsConfig?.comboDetails?.[c.id];
+      const parsedBullets = overrides?.bullets
+        ? overrides.bullets.split(",").map((b: string) => b.trim()).filter(Boolean)
+        : c.bullets;
+
       if (c.id === "combo-3l") {
         const reg = cmsConfig.prices?.combo3L ?? c.regularPrice;
         return {
           ...c,
+          name: overrides?.name || c.name,
+          heading: overrides?.heading || c.heading,
+          description: overrides?.description || c.description,
+          image: overrides?.image || c.image,
+          bullets: parsedBullets.length > 0 ? parsedBullets : c.bullets,
           regularPrice: reg,
           loyaltyPrice: Math.round(reg * 0.9),
           inStock: cmsConfig.stock?.combo3L ?? c.inStock,
@@ -1674,6 +1644,11 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         const reg = cmsConfig.prices?.combo1_5L ?? c.regularPrice;
         return {
           ...c,
+          name: overrides?.name || c.name,
+          heading: overrides?.heading || c.heading,
+          description: overrides?.description || c.description,
+          image: overrides?.image || c.image,
+          bullets: parsedBullets.length > 0 ? parsedBullets : c.bullets,
           regularPrice: reg,
           loyaltyPrice: Math.round(reg * 0.9),
           inStock: cmsConfig.stock?.combo1_5L ?? c.inStock,
@@ -1873,6 +1848,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         toggleAudio,
         orders,
         adminOrders,
+        refreshAdminOrders,
         saveOrder,
         getOrder,
         getOrderAsync,

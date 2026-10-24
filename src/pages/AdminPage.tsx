@@ -32,6 +32,7 @@ export const AdminPage: React.FC = () => {
     cmsConfig,
     orders,
     adminOrders,
+    refreshAdminOrders,
     deleteOrder,
     updateOrderStatus,
     updateOrderDetails,
@@ -41,6 +42,10 @@ export const AdminPage: React.FC = () => {
   } = useStore();
 
   const isDark = themeMode === "dark";
+
+  const [adminOrderSearch, setAdminOrderSearch] = useState("");
+  const [adminStatusFilter, setAdminStatusFilter] = useState<string>("all");
+  const [isSyncingOrders, setIsSyncingOrders] = useState(false);
 
   const [pinInput, setPinInput] = useState("");
   const [pinError, setPinError] = useState(false);
@@ -364,8 +369,32 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
     }, 2500);
   };
 
-  const displayOrders =
-    (adminOrders && adminOrders.length > 0 ? adminOrders : orders) || [];
+  const rawOrders = (adminOrders && adminOrders.length > 0 ? adminOrders : orders) || [];
+
+  const displayOrders = rawOrders.filter((ord) => {
+    const q = adminOrderSearch.toLowerCase().trim();
+    const matchesSearch =
+      !q ||
+      ord.orderRef.toLowerCase().includes(q) ||
+      (ord.shippingAddress?.fullName || "").toLowerCase().includes(q) ||
+      (ord.shippingAddress?.phone || "").includes(q) ||
+      (ord.shippingAddress?.pincode || "").includes(q) ||
+      (ord.shippingAddress?.city || "").toLowerCase().includes(q);
+
+    const matchesStatus =
+      adminStatusFilter === "all" || ord.orderStatus === adminStatusFilter;
+
+    return matchesSearch && matchesStatus;
+  });
+
+  const totalRevenue = rawOrders.reduce(
+    (acc, o) => acc + (o.orderStatus !== "Cancelled" ? Number(o.total) || 0 : 0),
+    0
+  );
+  const pendingDispatchCount = rawOrders.filter(
+    (o) => o.orderStatus === "Placed" || o.orderStatus === "Packed"
+  ).length;
+  const deliveredCount = rawOrders.filter((o) => o.orderStatus === "Delivered").length;
 
   if (!isAdminAuthenticated) {
     return (
@@ -710,6 +739,62 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
           )}
         </div>
 
+        {/* Executive Metric Cards */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          <div
+            className={`p-4 rounded-2xl border shadow-2xs ${
+              isDark ? "bg-[#1C120B] border-[#362114]" : "bg-white border-[#E8DEC8]"
+            }`}
+          >
+            <p className="text-[11px] font-semibold text-stone-500 uppercase tracking-wider">
+              Total Store Revenue
+            </p>
+            <p className="text-xl sm:text-2xl font-bold font-serif text-[#E08F35] mt-1">
+              ₹{totalRevenue.toLocaleString("en-IN")}
+            </p>
+            <p className="text-[10px] text-stone-400 mt-0.5">from {rawOrders.length} orders logged</p>
+          </div>
+          <div
+            className={`p-4 rounded-2xl border shadow-2xs ${
+              isDark ? "bg-[#1C120B] border-[#362114]" : "bg-white border-[#E8DEC8]"
+            }`}
+          >
+            <p className="text-[11px] font-semibold text-stone-500 uppercase tracking-wider">
+              Total Orders Logged
+            </p>
+            <p className="text-xl sm:text-2xl font-bold font-serif text-[#5E3210] dark:text-amber-200 mt-1">
+              {rawOrders.length}
+            </p>
+            <p className="text-[10px] text-stone-400 mt-0.5">In live database</p>
+          </div>
+          <div
+            className={`p-4 rounded-2xl border shadow-2xs ${
+              isDark ? "bg-[#1C120B] border-[#362114]" : "bg-white border-[#E8DEC8]"
+            }`}
+          >
+            <p className="text-[11px] font-semibold text-stone-500 uppercase tracking-wider">
+              Pending Dispatch
+            </p>
+            <p className="text-xl sm:text-2xl font-bold font-serif text-amber-600 mt-1">
+              {pendingDispatchCount}
+            </p>
+            <p className="text-[10px] text-stone-400 mt-0.5">Placed or Packed</p>
+          </div>
+          <div
+            className={`p-4 rounded-2xl border shadow-2xs ${
+              isDark ? "bg-[#1C120B] border-[#362114]" : "bg-white border-[#E8DEC8]"
+            }`}
+          >
+            <p className="text-[11px] font-semibold text-stone-500 uppercase tracking-wider">
+              Delivered Successfully
+            </p>
+            <p className="text-xl sm:text-2xl font-bold font-serif text-emerald-600 mt-1">
+              {deliveredCount}
+            </p>
+            <p className="text-[10px] text-stone-400 mt-0.5">Fulfilled orders</p>
+          </div>
+        </div>
+
         {/* Two-Column Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
           {/* Left Column: CMS Panel */}
@@ -727,7 +812,7 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
               }`}
             >
               <div
-                className={`flex items-center justify-between border-b pb-3 ${
+                className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b pb-3 ${
                   isDark ? "border-[#2D1B10]" : "border-[#EFE8DC]"
                 }`}
               >
@@ -738,13 +823,55 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                       isDark ? "text-[#FAF4EA]" : "text-[#1F120A]"
                     }`}
                   >
-                    Live Orders & Delhivery Dispatch Queue ({displayOrders.length})
+                    Live Orders & Delhivery Queue ({displayOrders.length})
                   </h2>
                 </div>
-                <span className="text-[11px] text-emerald-700 font-bold bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200 flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse" />
-                  Real-Time Firestore
-                </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    disabled={isSyncingOrders}
+                    onClick={async () => {
+                      setIsSyncingOrders(true);
+                      await refreshAdminOrders();
+                      setIsSyncingOrders(false);
+                    }}
+                    className="px-2.5 py-1 rounded-lg text-xs font-bold bg-[#E08F35]/15 hover:bg-[#E08F35]/25 text-[#5E3210] dark:text-amber-200 border border-[#E08F35]/30 flex items-center gap-1 cursor-pointer transition-colors"
+                  >
+                    <Activity className={`w-3 h-3 text-[#E08F35] ${isSyncingOrders ? "animate-spin" : ""}`} />
+                    <span>{isSyncingOrders ? "Syncing..." : "Sync DB"}</span>
+                  </button>
+                  <span className="text-[11px] text-emerald-700 font-bold bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200 flex items-center gap-1 shrink-0">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse" />
+                    Live Firestore
+                  </span>
+                </div>
+              </div>
+
+              {/* Order Search & Quick Filter Pills */}
+              <div className="space-y-2">
+                <input
+                  type="text"
+                  placeholder="Filter by Order Ref, Customer Name, Phone, Pincode..."
+                  value={adminOrderSearch}
+                  onChange={(e) => setAdminOrderSearch(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl text-xs border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900/40"
+                />
+                <div className="flex flex-wrap gap-1">
+                  {["all", "Placed", "Packed", "Dispatched", "Delivered", "Cancelled"].map((st) => (
+                    <button
+                      key={st}
+                      type="button"
+                      onClick={() => setAdminStatusFilter(st)}
+                      className={`px-2.5 py-1 rounded-lg text-[10px] font-bold capitalize cursor-pointer transition-colors ${
+                        adminStatusFilter === st
+                          ? "bg-[#5E3210] text-white"
+                          : "bg-stone-100 dark:bg-stone-800 text-stone-600 dark:text-stone-300 border border-stone-200 dark:border-stone-700"
+                      }`}
+                    >
+                      {st}
+                    </button>
+                  ))}
+                </div>
               </div>
 
               {displayOrders.length === 0 ? (
