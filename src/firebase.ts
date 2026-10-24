@@ -1,5 +1,13 @@
 import { initializeApp, getApps, getApp } from "firebase/app";
-import { getAuth, GoogleAuthProvider } from "firebase/auth";
+import {
+  getAuth,
+  GoogleAuthProvider,
+  signInWithPopup,
+  signOut,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  updateProfile,
+} from "firebase/auth";
 import {
   getFirestore,
   collection,
@@ -49,7 +57,104 @@ export const cleanPayload = (data: any): any => {
 };
 
 /**
- * 1. ORDER SERVICES
+ * 1. AUTHENTICATION SERVICES
+ */
+
+// Google Sign-In
+export const signInWithGoogle = async () => {
+  try {
+    const result = await signInWithPopup(auth, googleProvider);
+    if (result.user) {
+      await syncCustomerDoc(result.user);
+    }
+    return result.user;
+  } catch (error) {
+    console.error("Google sign-in error:", error);
+    throw error;
+  }
+};
+
+// Phone / Email Universal Authenticator
+export const signInWithPhoneOrEmail = async (
+  identifier: string,
+  passOrOtp: string,
+  displayName?: string
+) => {
+  const cleanId = (identifier || "").trim().toLowerCase();
+  const isPhone = /^\d{10}$/.test(cleanId.replace(/\D/g, ""));
+  const emailToUse = isPhone
+    ? `${cleanId.replace(/\D/g, "").slice(-10)}@phone.manopavana.com`
+    : cleanId;
+  const passwordToUse = passOrOtp || "ManoPavana@2026";
+
+  try {
+    const cred = await signInWithEmailAndPassword(auth, emailToUse, passwordToUse);
+    if (displayName && (!cred.user.displayName || cred.user.displayName !== displayName)) {
+      await updateProfile(cred.user, { displayName });
+    }
+    await syncCustomerDoc(cred.user);
+    return cred.user;
+  } catch (err: any) {
+    // If account does not exist, create it seamlessly
+    if (
+      err.code === "auth/user-not-found" ||
+      err.code === "auth/invalid-credential" ||
+      err.code === "auth/wrong-password"
+    ) {
+      try {
+        const newCred = await createUserWithEmailAndPassword(auth, emailToUse, passwordToUse);
+        if (displayName) {
+          await updateProfile(newCred.user, { displayName });
+        }
+        await syncCustomerDoc(newCred.user);
+        return newCred.user;
+      } catch (createErr) {
+        console.error("Account creation fallback error:", createErr);
+        throw createErr;
+      }
+    }
+    console.error("Authentication error:", err);
+    throw err;
+  }
+};
+
+// Logout
+export const logoutUser = async () => {
+  try {
+    await signOut(auth);
+  } catch (error) {
+    console.error("Sign-out error:", error);
+    throw error;
+  }
+};
+
+/**
+ * 2. CUSTOMER PROFILES (Live cart & saved addresses)
+ */
+export const syncCustomerDoc = async (user: any) => {
+  if (!user || !user.uid) return null;
+  const userRef = doc(db, "customers", user.uid);
+  const snap = await getDoc(userRef);
+
+  if (!snap.exists()) {
+    const initialProfile = {
+      uid: user.uid,
+      email: user.email || "",
+      phone: user.phoneNumber || "",
+      name: user.displayName || "",
+      cart: [],
+      savedAddresses: [],
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    };
+    await setDoc(userRef, initialProfile, { merge: true });
+    return initialProfile;
+  }
+  return snap.data();
+};
+
+/**
+ * 3. ORDER SERVICES
  */
 
 // Writes order document directly to /orders/{orderRef}
@@ -152,32 +257,7 @@ export const subscribeAllOrders = (callback: (orders: Order[]) => void) => {
 };
 
 /**
- * 2. CUSTOMER PROFILES (Live cart & saved addresses)
- */
-export const syncCustomerDoc = async (user: any) => {
-  if (!user || !user.uid) return null;
-  const userRef = doc(db, "customers", user.uid);
-  const snap = await getDoc(userRef);
-
-  if (!snap.exists()) {
-    const initialProfile = {
-      uid: user.uid,
-      email: user.email || "",
-      phone: user.phoneNumber || "",
-      name: user.displayName || "",
-      cart: [],
-      savedAddresses: [],
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-    };
-    await setDoc(userRef, initialProfile, { merge: true });
-    return initialProfile;
-  }
-  return snap.data();
-};
-
-/**
- * 3. STORE CMS CONFIGURATION
+ * 4. STORE CMS CONFIGURATION
  */
 export const subscribeStoreConfig = (callback: (cfg: Partial<StoreCMSConfig> | null) => void) => {
   const cfgDoc = doc(db, "settings", "store_cms");
@@ -202,7 +282,7 @@ export const saveStoreConfigToFirestore = async (cfg: StoreCMSConfig) => {
 };
 
 /**
- * 4. CUSTOMER REVIEWS
+ * 5. CUSTOMER REVIEWS
  */
 export const subscribeReviews = (callback: (reviews: CustomerReview[]) => void) => {
   const q = collection(db, "reviews");
