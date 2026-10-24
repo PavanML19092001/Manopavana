@@ -18,7 +18,6 @@ import {
   deleteDoc,
   query,
   where,
-  orderBy,
   onSnapshot,
   serverTimestamp,
   addDoc,
@@ -26,12 +25,12 @@ import {
 import { Order, CustomerReview, StoreCMSConfig } from "./types";
 
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "",
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "manopavana-store.firebaseapp.com",
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "manopavana-store",
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "manopavana-store.firebasestorage.app",
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "",
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || "",
 };
 
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
@@ -60,7 +59,6 @@ export const cleanPayload = (data: any): any => {
  * 1. AUTHENTICATION SERVICES
  */
 
-// Google Sign-In
 export const signInWithGoogle = async () => {
   try {
     const result = await signInWithPopup(auth, googleProvider);
@@ -74,7 +72,6 @@ export const signInWithGoogle = async () => {
   }
 };
 
-// Phone / Email Universal Authenticator
 export const signInWithPhoneOrEmail = async (
   identifier: string,
   passOrOtp: string,
@@ -95,7 +92,6 @@ export const signInWithPhoneOrEmail = async (
     await syncCustomerDoc(cred.user);
     return cred.user;
   } catch (err: any) {
-    // If account does not exist, create it seamlessly
     if (
       err.code === "auth/user-not-found" ||
       err.code === "auth/invalid-credential" ||
@@ -118,7 +114,6 @@ export const signInWithPhoneOrEmail = async (
   }
 };
 
-// Logout
 export const logoutUser = async () => {
   try {
     await signOut(auth);
@@ -129,35 +124,37 @@ export const logoutUser = async () => {
 };
 
 /**
- * 2. CUSTOMER PROFILES (Live cart & saved addresses)
+ * 2. CUSTOMER PROFILES
  */
 export const syncCustomerDoc = async (user: any) => {
   if (!user || !user.uid) return null;
   const userRef = doc(db, "customers", user.uid);
-  const snap = await getDoc(userRef);
-
-  if (!snap.exists()) {
-    const initialProfile = {
-      uid: user.uid,
-      email: user.email || "",
-      phone: user.phoneNumber || "",
-      name: user.displayName || "",
-      cart: [],
-      savedAddresses: [],
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-    };
-    await setDoc(userRef, initialProfile, { merge: true });
-    return initialProfile;
+  try {
+    const snap = await getDoc(userRef);
+    if (!snap.exists()) {
+      const initialProfile = {
+        uid: user.uid,
+        email: user.email || "",
+        phone: user.phoneNumber || "",
+        name: user.displayName || "",
+        cart: [],
+        savedAddresses: [],
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      };
+      await setDoc(userRef, initialProfile, { merge: true });
+      return initialProfile;
+    }
+    return snap.data();
+  } catch (e) {
+    console.warn("syncCustomerDoc error:", e);
+    return null;
   }
-  return snap.data();
 };
 
 /**
  * 3. ORDER SERVICES
  */
-
-// Writes order document directly to /orders/{orderRef}
 export const saveOrderToFirestore = async (order: Order, uid?: string | null): Promise<void> => {
   if (!order || !order.orderRef) {
     throw new Error("Missing orderRef in order payload");
@@ -168,7 +165,7 @@ export const saveOrderToFirestore = async (order: Order, uid?: string | null): P
   const sanitizedOrder = cleanPayload({
     ...order,
     customerUid: userUid,
-    firebaseUid: userUid, // Satisfies rules: customerUid == uid || firebaseUid == uid
+    firebaseUid: userUid,
     total: Number(order.total) || 0,
     subtotal: Number(order.subtotal) || 0,
     discount: Number(order.discount) || 0,
@@ -204,11 +201,10 @@ export const updateFirestoreOrderStatus = async (
   await updateDoc(doc(db, "orders", orderRef), sanitized);
 };
 
-// Real-time listener for current user: strictly isolated by customerUid
 export const subscribeUserOrders = (
   uid: string,
   _legacyArg: any,
-  userEmail: string | undefined,
+  _userEmail: string | undefined,
   callback: (orders: Order[]) => void
 ) => {
   if (!uid) {
@@ -216,89 +212,116 @@ export const subscribeUserOrders = (
     return () => {};
   }
 
-  const q = query(
-    collection(db, "orders"),
-    where("customerUid", "==", uid)
-  );
-
-  return onSnapshot(
-    q,
-    (snapshot) => {
-      const ordersList: Order[] = [];
-      snapshot.forEach((d) => {
-        ordersList.push(d.data() as Order);
-      });
-      ordersList.sort((a, b) => (b.timestamp || b.timestampMs || 0) - (a.timestamp || a.timestampMs || 0));
-      callback(ordersList);
-    },
-    (err) => {
-      console.warn("User orders subscription notice:", err);
-    }
-  );
+  try {
+    const q = query(collection(db, "orders"), where("customerUid", "==", uid));
+    return onSnapshot(
+      q,
+      (snapshot) => {
+        const ordersList: Order[] = [];
+        snapshot.forEach((d) => {
+          ordersList.push(d.data() as Order);
+        });
+        ordersList.sort((a, b) => (b.timestamp || b.timestampMs || 0) - (a.timestamp || a.timestampMs || 0));
+        callback(ordersList);
+      },
+      (err) => {
+        console.warn("User orders subscription notice:", err);
+        callback([]);
+      }
+    );
+  } catch (err) {
+    console.warn("subscribeUserOrders query build error:", err);
+    callback([]);
+    return () => {};
+  }
 };
 
-// Real-time listener for Admin only (manopavana@gmail.com)
 export const subscribeAllOrders = (callback: (orders: Order[]) => void) => {
-  const q = collection(db, "orders");
-  return onSnapshot(
-    q,
-    (snapshot) => {
-      const all: Order[] = [];
-      snapshot.forEach((d) => {
-        all.push(d.data() as Order);
-      });
-      all.sort((a, b) => (b.timestamp || b.timestampMs || 0) - (a.timestamp || a.timestampMs || 0));
-      callback(all);
-    },
-    (err) => {
-      console.warn("Admin orders subscription notice:", err);
-    }
-  );
+  try {
+    const q = collection(db, "orders");
+    return onSnapshot(
+      q,
+      (snapshot) => {
+        const all: Order[] = [];
+        snapshot.forEach((d) => {
+          all.push(d.data() as Order);
+        });
+        all.sort((a, b) => (b.timestamp || b.timestampMs || 0) - (a.timestamp || a.timestampMs || 0));
+        callback(all);
+      },
+      (err) => {
+        console.warn("Admin orders subscription notice:", err);
+        callback([]);
+      }
+    );
+  } catch (err) {
+    console.warn("subscribeAllOrders error:", err);
+    callback([]);
+    return () => {};
+  }
 };
 
 /**
  * 4. STORE CMS CONFIGURATION
  */
 export const subscribeStoreConfig = (callback: (cfg: Partial<StoreCMSConfig> | null) => void) => {
-  const cfgDoc = doc(db, "settings", "store_cms");
-  return onSnapshot(
-    cfgDoc,
-    (snap) => {
-      if (snap.exists()) {
-        callback(snap.data() as Partial<StoreCMSConfig>);
-      } else {
+  try {
+    const cfgDoc = doc(db, "settings", "store_cms");
+    return onSnapshot(
+      cfgDoc,
+      (snap) => {
+        if (snap.exists()) {
+          callback(snap.data() as Partial<StoreCMSConfig>);
+        } else {
+          callback(null);
+        }
+      },
+      (err) => {
+        console.warn("Store config subscription notice:", err);
         callback(null);
       }
-    },
-    (err) => {
-      console.warn("Store config subscription notice:", err);
-    }
-  );
+    );
+  } catch (e) {
+    console.warn("subscribeStoreConfig error:", e);
+    callback(null);
+    return () => {};
+  }
 };
 
 export const saveStoreConfigToFirestore = async (cfg: StoreCMSConfig) => {
-  const clean = cleanPayload(cfg);
-  await setDoc(doc(db, "settings", "store_cms"), clean, { merge: true });
+  try {
+    const clean = cleanPayload(cfg);
+    await setDoc(doc(db, "settings", "store_cms"), clean, { merge: true });
+  } catch (e) {
+    console.warn("saveStoreConfig error:", e);
+  }
 };
 
 /**
  * 5. CUSTOMER REVIEWS
  */
 export const subscribeReviews = (callback: (reviews: CustomerReview[]) => void) => {
-  const q = collection(db, "reviews");
-  return onSnapshot(
-    q,
-    (snapshot) => {
-      const list: CustomerReview[] = [];
-      snapshot.forEach((d) => {
-        list.push({ id: d.id, ...d.data() } as CustomerReview);
-      });
-      callback(list);
-    },
-    (err) => {
-      console.warn("Reviews subscription notice:", err);
-    }
-  );
+  try {
+    const q = collection(db, "reviews");
+    return onSnapshot(
+      q,
+      (snapshot) => {
+        const list: CustomerReview[] = [];
+        snapshot.forEach((d) => {
+          list.push({ id: d.id, ...d.data() } as CustomerReview);
+        });
+        callback(list);
+      },
+      (err) => {
+        console.warn("Reviews subscription notice:", err);
+        callback([]);
+      }
+    );
+  } catch (e) {
+    console.warn("subscribeReviews error:", e);
+    callback([]);
+    return () => {};
+  }
 };
 
 export const addReviewToFirestore = async (rev: Omit<CustomerReview, "id">): Promise<string> => {
