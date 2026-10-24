@@ -8,7 +8,7 @@ export const AudioPlayer: React.FC = () => {
   return (
     <aside
       aria-label="Artisanal Ambience Player"
-      className="fixed bottom-5 right-5 z-40 group"
+      className="hidden md:block fixed bottom-5 right-5 z-40 group"
     >
       <button
         onClick={toggleAudio}

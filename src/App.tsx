@@ -351,7 +351,7 @@ export default function App() {
       <Navbar />
 
       <ErrorBoundary>
-        <main className="w-full max-w-full overflow-x-hidden flex-1 box-border">
+        <main className="w-full max-w-full overflow-x-hidden flex-1 box-border pb-20 md:pb-0">
           <Routes>
             <Route path="/" element={<HomePage />} />
             <Route path="/product/:id" element={<ProductPage />} />

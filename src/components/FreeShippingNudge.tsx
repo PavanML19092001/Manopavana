@@ -29,7 +29,7 @@ export const FreeShippingNudge: React.FC = () => {
   return (
     <aside
       aria-label="Free Delivery Progress Bar"
-      className="fixed bottom-3 left-1/2 -translate-x-1/2 z-40 w-[92%] max-w-md animate-fade-in"
+      className="fixed bottom-[74px] md:bottom-3 left-1/2 -translate-x-1/2 z-40 w-[92%] max-w-md animate-fade-in"
     >
       <div
         className={`p-3 rounded-2xl shadow-2xl border backdrop-blur-md transition-all ${
