@@ -83,59 +83,61 @@ export const Navbar: React.FC = () => {
 
   const searchResults = searchQuery.trim()
     ? [
-      ...products.filter((p) => {
-        const q = searchQuery.toLowerCase();
-        return (
-          p.name.toLowerCase().includes(q) ||
-          p.searchKeywords.toLowerCase().includes(q) ||
-          p.shortDescription.toLowerCase().includes(q)
-        );
-      }).map((p) => ({
-        id: p.id,
-        title: p.name,
-        subtitle: "1 Litre Bottle",
-        price: p.prices["1L"],
-        regularPrice: p.mrp["1L"],
-        variant: "1L" as const,
-        image: p.images[0] || p.labelImage,
-        url: `/product/${p.id}`,
-      })),
-      ...combos.filter((c) => {
-        const q = searchQuery.toLowerCase();
-        return (
-          c.name.toLowerCase().includes(q) ||
-          c.searchKeywords.toLowerCase().includes(q)
-        );
-      }).map((c) => ({
-        id: c.id,
-        title: c.name,
-        subtitle: c.volumeLabel,
-        price: loyalty.isActive ? c.loyaltyPrice : c.regularPrice,
-        regularPrice: c.mrp,
-        variant: (c.id === "combo-3l" ? "3L Trio" : "1.5L Trio") as any,
-        image: c.image,
-        url: "/#combos",
-      })),
-    ]
+        ...products.filter((p) => {
+          const q = searchQuery.toLowerCase();
+          return (
+            p.name.toLowerCase().includes(q) ||
+            p.searchKeywords.toLowerCase().includes(q) ||
+            p.shortDescription.toLowerCase().includes(q)
+          );
+        }).map((p) => ({
+          id: p.id,
+          title: p.name,
+          subtitle: "1 Litre Bottle",
+          price: p.prices["1L"],
+          regularPrice: p.mrp["1L"],
+          variant: "1L" as const,
+          image: p.images[0] || p.labelImage,
+          url: `/product/${p.id}`,
+        })),
+        ...combos.filter((c) => {
+          const q = searchQuery.toLowerCase();
+          return (
+            c.name.toLowerCase().includes(q) ||
+            c.searchKeywords.toLowerCase().includes(q)
+          );
+        }).map((c) => ({
+          id: c.id,
+          title: c.name,
+          subtitle: c.volumeLabel,
+          price: loyalty.isActive ? c.loyaltyPrice : c.regularPrice,
+          regularPrice: c.mrp,
+          variant: (c.id === "combo-3l" ? "3L Trio" : "1.5L Trio") as any,
+          image: c.image,
+          url: "/#combos",
+        })),
+      ]
     : [];
 
   return (
     <header
-      className={`w-full max-w-full sticky top-0 z-40 transition-colors box-border ${isLight
+      className={`w-full max-w-full sticky top-0 z-40 transition-colors box-border ${
+        isLight
           ? "bg-white/95 text-[#1F120A] border-b border-[#E5DACB] shadow-sm backdrop-blur-md"
           : isDark
-            ? "bg-gradient-to-b from-[#180E08] via-[#120A05] to-[#0D0703] text-[#FAF4EA] border-b border-[#3D2517] shadow-2xl backdrop-blur-md"
-            : "bg-gradient-to-b from-[#25150C] via-[#1B0F08] to-[#140C07] text-[#FAF4EA] border-b border-[#D4A373]/30 shadow-2xl backdrop-blur-md"
-        }`}
+          ? "bg-gradient-to-b from-[#180E08] via-[#120A05] to-[#0D0703] text-[#FAF4EA] border-b border-[#3D2517] shadow-2xl backdrop-blur-md"
+          : "bg-gradient-to-b from-[#25150C] via-[#1B0F08] to-[#140C07] text-[#FAF4EA] border-b border-[#D4A373]/30 shadow-2xl backdrop-blur-md"
+      }`}
     >
       {/* 3. COMPACT TOP ANNOUNCEMENT TICKER */}
       <div
-        className={`py-1 px-2 text-[11px] font-bold border-b tracking-wide text-center truncate flex items-center justify-center gap-2 box-border transition-colors ${isLight
+        className={`py-1 px-2 text-[11px] font-bold border-b tracking-wide text-center truncate flex items-center justify-center gap-2 box-border transition-colors ${
+          isLight
             ? "bg-[#4D2811] text-[#FFE8BD] border-[#653517]"
             : isDark
-              ? "bg-[#0A0503] text-[#F5BC51] border-[#2A160C]"
-              : "bg-[#0D0603] text-[#F5BC51] border-[#3D2212]"
-          }`}
+            ? "bg-[#0A0503] text-[#F5BC51] border-[#2A160C]"
+            : "bg-[#0D0603] text-[#F5BC51] border-[#3D2212]"
+        }`}
       >
         <Sparkles className="w-3.5 h-3.5 text-[#E08F35] shrink-0 animate-pulse" />
         <span className="truncate">{cmsConfig.announcementTicker}</span>
@@ -154,10 +156,11 @@ export const Navbar: React.FC = () => {
           {/* Left: Brand Link */}
           <Link to="/" className="flex items-center gap-2 shrink-0">
             <div
-              className={`w-10 h-10 rounded-none p-1 flex items-center justify-center shrink-0 border-2 transition-all shadow-xs ${isLight
+              className={`w-10 h-10 rounded-none p-1 flex items-center justify-center shrink-0 border-2 transition-all shadow-xs ${
+                isLight
                   ? "border-[#1F120A] bg-white"
                   : "border-[#E5DACB] bg-white shadow-sm"
-                }`}
+              }`}
             >
               <img
                 src={cmsConfig.brandLogoUrl || MEDIA_ASSETS.logo}
@@ -167,14 +170,16 @@ export const Navbar: React.FC = () => {
             </div>
             <div className="flex flex-col">
               <span
-                className={`text-lg font-black tracking-wider font-serif leading-none ${isLight ? "text-[#1F120A]" : "text-[#FAF4EA]"
-                  }`}
+                className={`text-lg font-black tracking-wider font-serif leading-none ${
+                  isLight ? "text-[#1F120A]" : "text-[#FAF4EA]"
+                }`}
               >
                 {BUSINESS_CONFIG.BRAND_NAME}
               </span>
               <span
-                className={`text-[10px] font-semibold tracking-wide mt-0.5 leading-tight block ${isLight ? "text-[#B86B14]" : "text-[#E08F35]"
-                  }`}
+                className={`text-[10px] font-semibold tracking-wide mt-0.5 leading-tight block ${
+                  isLight ? "text-[#B86B14]" : "text-[#E08F35]"
+                }`}
               >
                 {cmsConfig.brandTagline || "Pure by nature, trusted for life"}
               </span>
@@ -191,10 +196,11 @@ export const Navbar: React.FC = () => {
                 setThemeMode(nextMode);
               }}
               aria-label="Toggle theme mode"
-              className={`p-1.5 rounded-lg border text-xs transition-colors cursor-pointer flex items-center justify-center ${isLight
+              className={`p-1.5 rounded-lg border text-xs transition-colors cursor-pointer flex items-center justify-center ${
+                isLight
                   ? "bg-[#F3EBE0] border-[#DDD0BF] text-[#78461E] hover:border-[#B86B14]"
                   : "bg-[#2D1B10] border-[#5A3820] text-[#E08F35] hover:border-[#E08F35]"
-                }`}
+              }`}
               title={`Theme Mode: ${themeMode.toUpperCase()}`}
             >
               {themeMode === "blend" ? (
@@ -207,20 +213,16 @@ export const Navbar: React.FC = () => {
             </button>
 
             {/* 1. Location Trigger */}
-            {/* Mobile Location Trigger */}
             <button
-              type="button"
               onClick={() => setLocationModalOpen(true)}
               aria-label="Delivery Location"
-              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs transition-colors cursor-pointer ${isLight
+              className={`p-1.5 rounded-lg border text-xs transition-colors cursor-pointer ${
+                isLight
                   ? "bg-[#F3EBE0] border-[#DDD0BF] text-[#78461E] hover:border-[#B86B14]"
                   : "bg-[#2D1B10] border-[#5A3820] text-[#E08F35] hover:border-[#E08F35]"
-                }`}
+              }`}
             >
-              <MapPin className="w-3.5 h-3.5 shrink-0" />
-              <span className="font-bold text-[11px] truncate max-w-[90px]">
-                {address.district || address.city || "Set Location"}
-              </span>
+              <MapPin className="w-4 h-4" />
             </button>
 
             {/* 2. Account / Login with Anchor Dropdown */}
@@ -234,14 +236,15 @@ export const Navbar: React.FC = () => {
                   }
                 }}
                 aria-label="Account Login or Profile"
-                className={`p-1.5 rounded-lg border text-xs transition-colors cursor-pointer ${currentUser
+                className={`p-1.5 rounded-lg border text-xs transition-colors cursor-pointer ${
+                  currentUser
                     ? isLight
                       ? "bg-[#EFE4D4] border-[#B86B14] text-[#1F120A] shadow-xs"
                       : "bg-[#3D2514] border-[#E08F35] text-[#FAF4EA] shadow-xs"
                     : isLight
-                      ? "bg-[#F3EBE0] border-[#DDD0BF] text-[#78461E] hover:border-[#B86B14]"
-                      : "bg-[#2D1B10] border-[#5A3820] text-[#FAF4EA] hover:border-[#E08F35]"
-                  }`}
+                    ? "bg-[#F3EBE0] border-[#DDD0BF] text-[#78461E] hover:border-[#B86B14]"
+                    : "bg-[#2D1B10] border-[#5A3820] text-[#FAF4EA] hover:border-[#E08F35]"
+                }`}
               >
                 <User className={`w-4 h-4 ${isLight ? "text-[#B86B14]" : "text-[#E08F35]"}`} />
               </button>
@@ -249,10 +252,11 @@ export const Navbar: React.FC = () => {
               {/* Mobile User Profile Dropdown */}
               {currentUser && isUserDropdownOpen && (
                 <div
-                  className={`absolute right-0 top-full mt-2 w-64 rounded-2xl shadow-2xl overflow-hidden z-50 animate-fade-in divide-y border ${isLight
+                  className={`absolute right-0 top-full mt-2 w-64 rounded-2xl shadow-2xl overflow-hidden z-50 animate-fade-in divide-y border ${
+                    isLight
                       ? "bg-white border-[#DDD0BF] divide-[#EFE8DC] text-[#1F120A]"
                       : "bg-[#1B0F08] border-[#4D2E1A] divide-[#2D1B10] text-[#FAF4EA]"
-                    }`}
+                  }`}
                 >
                   {/* Greeting Banner */}
                   <div className={`px-4 py-3 ${isLight ? "bg-[#FAF6EE]" : "bg-[#120904]"}`}>
@@ -276,10 +280,11 @@ export const Navbar: React.FC = () => {
                     <Link
                       to="/account?tab=profile"
                       onClick={() => setIsUserDropdownOpen(false)}
-                      className={`flex items-center gap-2.5 px-4 py-2.5 transition-colors ${isLight
+                      className={`flex items-center gap-2.5 px-4 py-2.5 transition-colors ${
+                        isLight
                           ? "text-[#3D2514] hover:bg-[#FAF6EE] hover:text-[#B86B14]"
                           : "text-[#FAF4EA] hover:bg-[#25150C] hover:text-[#E08F35]"
-                        }`}
+                      }`}
                     >
                       <User className="w-4 h-4 text-[#D4A373]" />
                       <span>👤 My Profile</span>
@@ -288,10 +293,11 @@ export const Navbar: React.FC = () => {
                     <Link
                       to="/account?tab=orders"
                       onClick={() => setIsUserDropdownOpen(false)}
-                      className={`flex items-center gap-2.5 px-4 py-2.5 transition-colors ${isLight
+                      className={`flex items-center gap-2.5 px-4 py-2.5 transition-colors ${
+                        isLight
                           ? "text-[#3D2514] hover:bg-[#FAF6EE] hover:text-[#B86B14]"
                           : "text-[#FAF4EA] hover:bg-[#25150C] hover:text-[#E08F35]"
-                        }`}
+                      }`}
                     >
                       <Package className="w-4 h-4 text-[#D4A373]" />
                       <span>📦 My Orders</span>
@@ -300,10 +306,11 @@ export const Navbar: React.FC = () => {
                     <Link
                       to="/account?tab=addresses"
                       onClick={() => setIsUserDropdownOpen(false)}
-                      className={`flex items-center gap-2.5 px-4 py-2.5 transition-colors ${isLight
+                      className={`flex items-center gap-2.5 px-4 py-2.5 transition-colors ${
+                        isLight
                           ? "text-[#3D2514] hover:bg-[#FAF6EE] hover:text-[#B86B14]"
                           : "text-[#FAF4EA] hover:bg-[#25150C] hover:text-[#E08F35]"
-                        }`}
+                      }`}
                     >
                       <MapPin className="w-4 h-4 text-[#D4A373]" />
                       <span>📍 Delivery Address</span>
@@ -315,10 +322,11 @@ export const Navbar: React.FC = () => {
                         setIsUserDropdownOpen(false);
                         openLoyaltyQuiz();
                       }}
-                      className={`w-full flex items-center gap-2.5 px-4 py-2.5 transition-colors text-left cursor-pointer ${isLight
+                      className={`w-full flex items-center gap-2.5 px-4 py-2.5 transition-colors text-left cursor-pointer ${
+                        isLight
                           ? "text-[#3D2514] hover:bg-[#FAF6EE] hover:text-[#B86B14]"
                           : "text-[#FAF4EA] hover:bg-[#25150C] hover:text-[#E08F35]"
-                        }`}
+                      }`}
                     >
                       <QrCode className="w-4 h-4 text-[#E08F35]" />
                       <span>🏷️ 10% Loyalty QR</span>
@@ -328,8 +336,9 @@ export const Navbar: React.FC = () => {
                       <Link
                         to="/admin"
                         onClick={() => setIsUserDropdownOpen(false)}
-                        className={`flex items-center gap-2.5 px-4 py-2.5 transition-colors ${isLight ? "text-amber-700 hover:bg-[#FAF6EE]" : "text-amber-300 hover:bg-[#25150C]"
-                          }`}
+                        className={`flex items-center gap-2.5 px-4 py-2.5 transition-colors ${
+                          isLight ? "text-amber-700 hover:bg-[#FAF6EE]" : "text-amber-300 hover:bg-[#25150C]"
+                        }`}
                       >
                         <ShieldAlert className="w-4 h-4 text-[#E08F35]" />
                         <span>🛡️ Admin CMS Portal</span>
@@ -373,8 +382,9 @@ export const Navbar: React.FC = () => {
               <Link
                 to="/admin"
                 aria-label="Admin Portal"
-                className={`p-1 transition-colors ${isLight ? "text-[#8C5D38] hover:text-[#1F120A]" : "text-[#D4A373] hover:text-[#FAF4EA]"
-                  }`}
+                className={`p-1 transition-colors ${
+                  isLight ? "text-[#8C5D38] hover:text-[#1F120A]" : "text-[#D4A373] hover:text-[#FAF4EA]"
+                }`}
                 title="Admin CMS Portal"
               >
                 <ShieldAlert className="w-4 h-4" />
@@ -473,10 +483,11 @@ export const Navbar: React.FC = () => {
         {/* Left: Brand Link */}
         <Link to="/" className="flex items-center gap-3 shrink-0 group">
           <div
-            className={`w-11 h-11 rounded-none p-1 flex items-center justify-center shrink-0 border-2 transition-all shadow-xs group-hover:scale-105 ${isLight
+            className={`w-11 h-11 rounded-none p-1 flex items-center justify-center shrink-0 border-2 transition-all shadow-xs group-hover:scale-105 ${
+              isLight
                 ? "border-[#1F120A] bg-white"
                 : "border-[#E5DACB] bg-white shadow-sm"
-              }`}
+            }`}
           >
             <img
               src={cmsConfig.brandLogoUrl || MEDIA_ASSETS.logo}
@@ -581,26 +592,21 @@ export const Navbar: React.FC = () => {
         {/* Right: Actions Cluster */}
         <div className="flex items-center gap-2.5 shrink-0">
           {/* Location Trigger */}
-          {/* Desktop Location Trigger */}
           <button
-            type="button"
             onClick={() => setLocationModalOpen(true)}
-            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs transition-colors cursor-pointer ${isLight
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs transition-colors cursor-pointer ${
+              isLight
                 ? "bg-[#FAF6EE] border-[#DDD0BF] text-[#7A4B1A] hover:border-[#C8751B]"
                 : "bg-[#2D1B10] border-[#5A3820] text-[#E08F35] hover:border-[#E08F35]"
-              }`}
+            }`}
           >
-            <MapPin className="w-3.5 h-3.5 text-[#E08F35] shrink-0" />
+            <MapPin className="w-3.5 h-3.5 text-[#E08F35]" />
             <div className="text-left flex flex-col leading-tight">
-              {/* Dynamic State / Region Label */}
-              <span className={`text-[9px] font-semibold uppercase tracking-wider ${isLight ? "text-[#8C5D30]" : "text-[#D4A373]"}`}>
-                {address.state || "Deliver To"}
+              <span className={`text-[9px] font-semibold uppercase ${isLight ? "text-[#8C5D30]" : "text-[#D4A373]"}`}>
+                Bengaluru
               </span>
-              {/* Dynamic City & Pincode Label */}
-              <span className={`font-bold truncate max-w-[120px] ${isLight ? "text-[#1F120A]" : "text-[#FAF4EA]"}`}>
-                {address.pincode
-                  ? `${address.district || address.city || "Location"} (${address.pincode})`
-                  : "Set Location"}
+              <span className={`font-bold truncate max-w-[110px] ${isLight ? "text-[#1F120A]" : "text-[#FAF4EA]"}`}>
+                {address.pincode ? `${address.city} (${address.pincode})` : "Set Location"}
               </span>
             </div>
           </button>
@@ -608,14 +614,15 @@ export const Navbar: React.FC = () => {
           {/* Bottle Loyalty QR */}
           <button
             onClick={() => openLoyaltyQuiz()}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-bold transition-all cursor-pointer ${loyalty.isActive
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-bold transition-all cursor-pointer ${
+              loyalty.isActive
                 ? isLight
                   ? "bg-amber-100/90 text-[#7A4B1A] border-[#D49A37] shadow-xs"
                   : "bg-[#2D1B10] text-[#F5BC51] border-[#E08F35] shadow-xs"
                 : isLight
-                  ? "bg-[#FAF6EE] text-[#7A5538] border-[#DDD0BF] hover:border-[#C8751B]"
-                  : "bg-[#2D1B10] text-[#D4A373] border-[#5A3820] hover:border-[#E08F35]"
-              }`}
+                ? "bg-[#FAF6EE] text-[#7A5538] border-[#DDD0BF] hover:border-[#C8751B]"
+                : "bg-[#2D1B10] text-[#D4A373] border-[#5A3820] hover:border-[#E08F35]"
+            }`}
           >
             <QrCode className="w-3.5 h-3.5 text-[#E08F35]" />
             <span>
@@ -624,17 +631,19 @@ export const Navbar: React.FC = () => {
           </button>
 
           {/* Theme Selector (Blend / Light / Dark) */}
-          <div className={`flex items-center ${isLight ? "bg-[#FAF6EE] border-[#DDD0BF]" : "bg-[#24150C] border-[#5A3820]"
-            } border rounded-lg p-0.5 text-[11px] font-bold`}>
+          <div className={`flex items-center ${
+            isLight ? "bg-[#FAF6EE] border-[#DDD0BF]" : "bg-[#24150C] border-[#5A3820]"
+          } border rounded-lg p-0.5 text-[11px] font-bold`}>
             <button
               type="button"
               onClick={() => setThemeMode("blend")}
-              className={`px-2 py-1 rounded-md transition-all flex items-center gap-1 cursor-pointer ${themeMode === "blend"
+              className={`px-2 py-1 rounded-md transition-all flex items-center gap-1 cursor-pointer ${
+                themeMode === "blend"
                   ? "bg-[#D49A37] text-[#140D09] shadow-xs"
                   : isLight
-                    ? "text-[#7A5538] hover:text-[#1F120A]"
-                    : "text-[#D4A373] hover:text-[#FAF4EA]"
-                }`}
+                  ? "text-[#7A5538] hover:text-[#1F120A]"
+                  : "text-[#D4A373] hover:text-[#FAF4EA]"
+              }`}
               title="Harmonious Blend: Signature mixture of dark hero/combos & warm linen catalog"
             >
               <Palette className="w-3 h-3" />
@@ -643,12 +652,13 @@ export const Navbar: React.FC = () => {
             <button
               type="button"
               onClick={() => setThemeMode("light")}
-              className={`px-2 py-1 rounded-md transition-all flex items-center gap-1 cursor-pointer ${themeMode === "light"
+              className={`px-2 py-1 rounded-md transition-all flex items-center gap-1 cursor-pointer ${
+                themeMode === "light"
                   ? "bg-[#D49A37] text-[#140D09] shadow-xs"
                   : isLight
-                    ? "text-[#7A5538] hover:text-[#1F120A]"
-                    : "text-[#D4A373] hover:text-[#FAF4EA]"
-                }`}
+                  ? "text-[#7A5538] hover:text-[#1F120A]"
+                  : "text-[#D4A373] hover:text-[#FAF4EA]"
+              }`}
               title="Warm Light: Crisp ivory & cream parchment"
             >
               <Sun className="w-3 h-3" />
@@ -657,12 +667,13 @@ export const Navbar: React.FC = () => {
             <button
               type="button"
               onClick={() => setThemeMode("dark")}
-              className={`px-2 py-1 rounded-md transition-all flex items-center gap-1 cursor-pointer ${themeMode === "dark"
+              className={`px-2 py-1 rounded-md transition-all flex items-center gap-1 cursor-pointer ${
+                themeMode === "dark"
                   ? "bg-[#D49A37] text-[#140D09] shadow-xs"
                   : isLight
-                    ? "text-[#7A5538] hover:text-[#1F120A]"
-                    : "text-[#D4A373] hover:text-[#FAF4EA]"
-                }`}
+                  ? "text-[#7A5538] hover:text-[#1F120A]"
+                  : "text-[#D4A373] hover:text-[#FAF4EA]"
+              }`}
               title="Teakwood Dark: Midnight teakwood luxury"
             >
               <Moon className="w-3 h-3" />
@@ -680,14 +691,15 @@ export const Navbar: React.FC = () => {
                   setLoginModalOpen(true);
                 }
               }}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs transition-colors cursor-pointer ${currentUser
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs transition-colors cursor-pointer ${
+                currentUser
                   ? isLight
                     ? "bg-[#F3EDE2] border-[#C8751B] text-[#1F120A] shadow-xs"
                     : "bg-[#3D2514] border-[#E08F35] text-[#FAF4EA] shadow-xs"
                   : isLight
-                    ? "bg-[#FAF6EE] border-[#DDD0BF] text-[#1F120A] hover:border-[#C8751B]"
-                    : "bg-[#2D1B10] border-[#5A3820] text-[#FAF4EA] hover:border-[#E08F35]"
-                }`}
+                  ? "bg-[#FAF6EE] border-[#DDD0BF] text-[#1F120A] hover:border-[#C8751B]"
+                  : "bg-[#2D1B10] border-[#5A3820] text-[#FAF4EA] hover:border-[#E08F35]"
+              }`}
             >
               <User className="w-3.5 h-3.5 text-[#E08F35]" />
               <span>
@@ -697,10 +709,11 @@ export const Navbar: React.FC = () => {
 
             {/* Desktop User Profile Dropdown */}
             {currentUser && isUserDropdownOpen && (
-              <div className={`absolute right-0 top-full mt-2 w-72 ${isLight
+              <div className={`absolute right-0 top-full mt-2 w-72 ${
+                isLight
                   ? "bg-[#FCFAF7] border-[#DDD0BF] divide-[#EFE8DC]"
                   : "bg-[#1B0F08] border-[#4D2E1A] divide-[#2D1B10]"
-                } border rounded-2xl shadow-2xl overflow-hidden z-50 animate-fade-in divide-y`}>
+              } border rounded-2xl shadow-2xl overflow-hidden z-50 animate-fade-in divide-y`}>
                 {/* Greeting Banner */}
                 <div className={`px-4 py-3 ${isLight ? "bg-[#F5EDE1]" : "bg-[#120904]"}`}>
                   <div className="flex items-center gap-2.5">
@@ -723,8 +736,9 @@ export const Navbar: React.FC = () => {
                   <Link
                     to="/account?tab=profile"
                     onClick={() => setIsUserDropdownOpen(false)}
-                    className={`flex items-center gap-2.5 px-4 py-2.5 ${isLight ? "text-[#24140A] hover:bg-[#F3EDE2] hover:text-[#C8751B]" : "text-[#FAF4EA] hover:bg-[#25150C] hover:text-[#E08F35]"
-                      } transition-colors`}
+                    className={`flex items-center gap-2.5 px-4 py-2.5 ${
+                      isLight ? "text-[#24140A] hover:bg-[#F3EDE2] hover:text-[#C8751B]" : "text-[#FAF4EA] hover:bg-[#25150C] hover:text-[#E08F35]"
+                    } transition-colors`}
                   >
                     <User className={`w-4 h-4 ${isLight ? "text-[#7A5538]" : "text-[#D4A373]"}`} />
                     <span>👤 My Profile</span>
@@ -733,8 +747,9 @@ export const Navbar: React.FC = () => {
                   <Link
                     to="/account?tab=orders"
                     onClick={() => setIsUserDropdownOpen(false)}
-                    className={`flex items-center gap-2.5 px-4 py-2.5 ${isLight ? "text-[#24140A] hover:bg-[#F3EDE2] hover:text-[#C8751B]" : "text-[#FAF4EA] hover:bg-[#25150C] hover:text-[#E08F35]"
-                      } transition-colors`}
+                    className={`flex items-center gap-2.5 px-4 py-2.5 ${
+                      isLight ? "text-[#24140A] hover:bg-[#F3EDE2] hover:text-[#C8751B]" : "text-[#FAF4EA] hover:bg-[#25150C] hover:text-[#E08F35]"
+                    } transition-colors`}
                   >
                     <Package className={`w-4 h-4 ${isLight ? "text-[#7A5538]" : "text-[#D4A373]"}`} />
                     <span>📦 My Orders</span>
@@ -743,8 +758,9 @@ export const Navbar: React.FC = () => {
                   <Link
                     to="/account?tab=addresses"
                     onClick={() => setIsUserDropdownOpen(false)}
-                    className={`flex items-center gap-2.5 px-4 py-2.5 ${isLight ? "text-[#24140A] hover:bg-[#F3EDE2] hover:text-[#C8751B]" : "text-[#FAF4EA] hover:bg-[#25150C] hover:text-[#E08F35]"
-                      } transition-colors`}
+                    className={`flex items-center gap-2.5 px-4 py-2.5 ${
+                      isLight ? "text-[#24140A] hover:bg-[#F3EDE2] hover:text-[#C8751B]" : "text-[#FAF4EA] hover:bg-[#25150C] hover:text-[#E08F35]"
+                    } transition-colors`}
                   >
                     <MapPin className={`w-4 h-4 ${isLight ? "text-[#7A5538]" : "text-[#D4A373]"}`} />
                     <span>📍 Delivery Address</span>
@@ -756,8 +772,9 @@ export const Navbar: React.FC = () => {
                       setIsUserDropdownOpen(false);
                       openLoyaltyQuiz();
                     }}
-                    className={`w-full flex items-center gap-2.5 px-4 py-2.5 ${isLight ? "text-[#24140A] hover:bg-[#F3EDE2] hover:text-[#C8751B]" : "text-[#FAF4EA] hover:bg-[#25150C] hover:text-[#E08F35]"
-                      } transition-colors text-left cursor-pointer`}
+                    className={`w-full flex items-center gap-2.5 px-4 py-2.5 ${
+                      isLight ? "text-[#24140A] hover:bg-[#F3EDE2] hover:text-[#C8751B]" : "text-[#FAF4EA] hover:bg-[#25150C] hover:text-[#E08F35]"
+                    } transition-colors text-left cursor-pointer`}
                   >
                     <QrCode className="w-4 h-4 text-[#E08F35]" />
                     <span>🏷️ 10% Loyalty QR</span>
@@ -767,8 +784,9 @@ export const Navbar: React.FC = () => {
                     <Link
                       to="/admin"
                       onClick={() => setIsUserDropdownOpen(false)}
-                      className={`flex items-center gap-2.5 px-4 py-2.5 ${isLight ? "text-amber-800 hover:bg-[#F3EDE2]" : "text-amber-300 hover:bg-[#25150C]"
-                        } transition-colors font-semibold`}
+                      className={`flex items-center gap-2.5 px-4 py-2.5 ${
+                        isLight ? "text-amber-800 hover:bg-[#F3EDE2]" : "text-amber-300 hover:bg-[#25150C]"
+                      } transition-colors font-semibold`}
                     >
                       <ShieldAlert className="w-4 h-4 text-[#E08F35]" />
                       <span>🛡️ Admin CMS Portal</span>

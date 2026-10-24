@@ -73,8 +73,8 @@ export const CheckoutPage: React.FC = () => {
     checkoutItems.length === 0
       ? 0
       : checkoutDiscountedSubtotal >= (cmsConfig?.freeShippingThreshold || BUSINESS_CONFIG.FREE_SHIPPING_THRESHOLD)
-        ? 0
-        : (cmsConfig?.standardShippingFee || BUSINESS_CONFIG.STANDARD_SHIPPING_FEE);
+      ? 0
+      : (cmsConfig?.standardShippingFee || BUSINESS_CONFIG.STANDARD_SHIPPING_FEE);
   const checkoutTotal =
     checkoutItems.length === 0 ? 0 : checkoutDiscountedSubtotal + checkoutShippingFee;
 
@@ -158,8 +158,8 @@ export const CheckoutPage: React.FC = () => {
       const cleanPhone = currentUser.phoneNumber
         ? currentUser.phoneNumber.replace(/\D/g, "").slice(-10)
         : currentUser.email?.endsWith("@phone.manopavana.com")
-          ? currentUser.email.split("@")[0]
-          : "";
+        ? currentUser.email.split("@")[0]
+        : "";
       if (!phone && cleanPhone) setPhone(cleanPhone);
     }
     if (address) {
@@ -337,7 +337,7 @@ export const CheckoutPage: React.FC = () => {
               markerRef.current.setLatLng(coords);
             }
             mapInstanceRef.current.invalidateSize();
-          } catch { }
+          } catch {}
         }
       } catch (err) {
         console.warn("Map setup notice:", err);
@@ -399,7 +399,7 @@ export const CheckoutPage: React.FC = () => {
         mapInstanceRef.current.setView([lat, lon], 16);
         markerRef.current.setLatLng([lat, lon]);
         mapInstanceRef.current.invalidateSize();
-      } catch { }
+      } catch {}
     }
 
     showToast("Map focused on selected location!");
@@ -548,7 +548,7 @@ export const CheckoutPage: React.FC = () => {
           updateFirestoreOrderStatus(prevPendingRef, {
             orderStatus: "Replaced by COD" as any,
             paymentStatus: "REPLACED",
-          }).catch(() => { });
+          }).catch(() => {});
         }
 
         const orderRef = `MV-${Date.now().toString().slice(-6)}`;
@@ -661,7 +661,7 @@ export const CheckoutPage: React.FC = () => {
             setIsProcessing(false);
             try {
               window.open(data.redirectUrl, "_blank");
-            } catch { }
+            } catch {}
             return;
           } else {
             window.location.href = data.redirectUrl;
@@ -688,14 +688,16 @@ export const CheckoutPage: React.FC = () => {
 
   return (
     <div
-      className={`w-full min-h-[calc(100vh-80px)] py-8 transition-colors box-border ${isDark ? "bg-[#140D09] text-[#FAF4EA]" : "bg-[#FAF6F0] text-[#23150C]"
-        }`}
+      className={`w-full min-h-[calc(100vh-80px)] py-8 transition-colors box-border ${
+        isDark ? "bg-[#140D09] text-[#FAF4EA]" : "bg-[#FAF6F0] text-[#23150C]"
+      }`}
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
         <div>
           <h1
-            className={`text-2xl sm:text-3xl font-extrabold font-serif ${isDark ? "text-[#FAF4EA]" : "text-[#23150C]"
-              }`}
+            className={`text-2xl sm:text-3xl font-extrabold font-serif ${
+              isDark ? "text-[#FAF4EA]" : "text-[#23150C]"
+            }`}
           >
             Checkout & Dispatch Order
           </h1>
@@ -731,6 +733,59 @@ export const CheckoutPage: React.FC = () => {
           </div>
         )}
 
+        {/* Logged-in Customer Confirmation Banner */}
+        {currentUser && (
+          <div className="p-4 rounded-2xl bg-emerald-500/10 border-2 border-emerald-500/40 flex items-center justify-between gap-4 text-xs shadow-xs">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-emerald-500/20 text-emerald-600 border border-emerald-500/30 flex items-center justify-center shrink-0">
+                <CheckCircle2 className="w-5 h-5" />
+              </div>
+              <div>
+                <p className="font-bold text-xs text-[#1F120A] dark:text-[#FAF4EA]">
+                  Account Synced & Details Pre-Filled
+                </p>
+                <p className="text-[11px] text-[#6A523E] dark:text-[#D6C4B0] mt-0.5">
+                  Logged in as <strong className="text-emerald-700 dark:text-emerald-300">{fullName || currentUser.displayName || phone || currentUser.email}</strong>. Delivery address loaded from Firestore.
+                </p>
+              </div>
+            </div>
+            <span className="text-[10px] font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-500/15 px-2.5 py-1 rounded-full border border-emerald-500/30 shrink-0">
+              ✓ Firestore Synced
+            </span>
+          </div>
+        )}
+
+        {/* Direct Buy indicator banner */}
+        {isBuyNowMode && buyNowItem && (
+          <div className="p-4 rounded-2xl bg-gradient-to-r from-amber-950/70 to-[#361E10] border-2 border-[#E08F35]/70 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs text-amber-200 shadow-md">
+            <div className="flex items-center gap-3">
+              <span className="px-2.5 py-1 rounded-lg bg-[#E08F35] text-black font-black text-[10px] tracking-wider uppercase">
+                Direct Buy
+              </span>
+              <div>
+                <p className="font-bold text-white">
+                  Ordering {buyNowItem.title} ({buyNowItem.variant}) only
+                </p>
+                <p className="text-[11px] text-[#D6C4B0] mt-0.5">
+                  Your regular bag ({cart.length} item{cart.length === 1 ? "" : "s"}) remains safely preserved.
+                </p>
+              </div>
+            </div>
+            {cart.length > 0 && (
+              <button
+                type="button"
+                onClick={() => {
+                  clearBuyNow();
+                  navigate("/checkout");
+                }}
+                className="px-3 py-1.5 rounded-lg bg-black/40 hover:bg-black/60 border border-amber-500/40 text-amber-300 font-bold text-xs transition-colors shrink-0 cursor-pointer"
+              >
+                Checkout Full Bag Instead ({cart.length}) →
+              </button>
+            )}
+          </div>
+        )}
+
         {/* Failure recovery banner */}
         {paymentError && (
           <div className="p-4 sm:p-5 rounded-2xl bg-red-50 border-2 border-red-300 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 text-red-950 text-xs shadow-md">
@@ -752,22 +807,40 @@ export const CheckoutPage: React.FC = () => {
           </div>
         )}
 
+        {/* Pan-India Delivery route badge if outside Bangalore */}
+        {!isBangalore && pincode && (
+          <div className="p-4 rounded-2xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-between gap-3 text-xs text-blue-900 dark:text-blue-200">
+            <div className="flex items-center gap-2.5">
+              <Truck className="w-5 h-5 text-blue-600 dark:text-blue-400 shrink-0" />
+              <span>
+                Pincode <strong>{pincode}</strong> is outside Bengaluru — fulfilled directly via <strong>Delhivery Express Logistics</strong> with live order tracking on our website!
+              </span>
+            </div>
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-blue-600 text-white shrink-0">
+              Pan-India Delivery
+            </span>
+          </div>
+        )}
+
         <form onSubmit={handlePlaceOrder} className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
           {/* Left Column: Delivery Address & Map Geocoding */}
           <div className="lg:col-span-7 space-y-6">
             <div
-              className={`rounded-2xl border p-6 shadow-2xs space-y-4 ${isDark ? "bg-[#1C120B] border-[#362114]" : "bg-white border-[#E8DEC8]"
-                }`}
+              className={`rounded-2xl border p-6 shadow-2xs space-y-4 ${
+                isDark ? "bg-[#1C120B] border-[#362114]" : "bg-white border-[#E8DEC8]"
+              }`}
             >
               <div
-                className={`flex items-center justify-between border-b pb-3 ${isDark ? "border-[#2D1B10]" : "border-[#EFE8DC]"
-                  }`}
+                className={`flex items-center justify-between border-b pb-3 ${
+                  isDark ? "border-[#2D1B10]" : "border-[#EFE8DC]"
+                }`}
               >
                 <div className="flex items-center gap-2">
                   <MapPin className="w-4 h-4 text-[#E08F35]" />
                   <h2
-                    className={`text-base font-bold font-serif ${isDark ? "text-[#FAF4EA]" : "text-[#23150C]"
-                      }`}
+                    className={`text-base font-bold font-serif ${
+                      isDark ? "text-[#FAF4EA]" : "text-[#23150C]"
+                    }`}
                   >
                     Shipping Address
                   </h2>
@@ -775,8 +848,9 @@ export const CheckoutPage: React.FC = () => {
                 <button
                   type="button"
                   onClick={handleGPSDetect}
-                  className={`text-xs font-semibold flex items-center gap-1 cursor-pointer ${isDark ? "text-amber-300 hover:text-amber-200" : "text-[#5E3210] hover:text-[#E08F35]"
-                    }`}
+                  className={`text-xs font-semibold flex items-center gap-1 cursor-pointer ${
+                    isDark ? "text-amber-300 hover:text-amber-200" : "text-[#5E3210] hover:text-[#E08F35]"
+                  }`}
                 >
                   <Navigation className="w-3.5 h-3.5" />
                   <span>{isLocating ? "Detecting GPS..." : "GPS Pinpoint"}</span>
@@ -811,14 +885,15 @@ export const CheckoutPage: React.FC = () => {
                               safeUpdateMapCenter(addr.lat!, addr.lng!, 15);
                             }
                           }}
-                          className={`p-3.5 rounded-xl border text-xs cursor-pointer transition-all ${isSelected
+                          className={`p-3.5 rounded-xl border text-xs cursor-pointer transition-all ${
+                            isSelected
                               ? isDark
                                 ? "bg-amber-950/40 border-[#E08F35] ring-2 ring-[#E08F35]/40"
                                 : "bg-amber-50/80 border-[#E08F35] ring-2 ring-[#E08F35]/40"
                               : isDark
-                                ? "bg-[#150D07] border-[#362114] hover:border-[#4D2E1A]"
-                                : "bg-[#FAF7F2] border-[#E8DEC8] hover:border-[#DDD1BE]"
-                            }`}
+                              ? "bg-[#150D07] border-[#362114] hover:border-[#4D2E1A]"
+                              : "bg-[#FAF7F2] border-[#E8DEC8] hover:border-[#DDD1BE]"
+                          }`}
                         >
                           <div className="flex items-center justify-between font-bold mb-1">
                             <span className="flex items-center gap-1.5">
@@ -841,12 +916,13 @@ export const CheckoutPage: React.FC = () => {
                         setSelectedAddressId("new");
                         setIsAddingNewAddress(true);
                       }}
-                      className={`p-3.5 rounded-xl border-2 border-dashed flex items-center justify-center gap-2 cursor-pointer text-xs font-bold transition-all ${isAddingNewAddress
+                      className={`p-3.5 rounded-xl border-2 border-dashed flex items-center justify-center gap-2 cursor-pointer text-xs font-bold transition-all ${
+                        isAddingNewAddress
                           ? "border-[#E08F35] bg-amber-500/10 text-[#E08F35]"
                           : isDark
-                            ? "border-[#362114] text-[#A88D77] hover:border-[#E08F35]"
-                            : "border-[#DDD1BE] text-[#7A5E48] hover:border-[#E08F35]"
-                        }`}
+                          ? "border-[#362114] text-[#A88D77] hover:border-[#E08F35]"
+                          : "border-[#DDD1BE] text-[#7A5E48] hover:border-[#E08F35]"
+                      }`}
                     >
                       <span>+ Deliver to a Different Address</span>
                     </div>
@@ -868,12 +944,13 @@ export const CheckoutPage: React.FC = () => {
                           key={lbl}
                           type="button"
                           onClick={() => setAddressLabel(lbl)}
-                          className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${addressLabel === lbl
+                          className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                            addressLabel === lbl
                               ? "bg-[#5E3210] text-white shadow-xs"
                               : isDark
-                                ? "bg-[#150D07] border border-[#362114] text-[#A88D77]"
-                                : "bg-[#FAF7F2] border border-[#DDD1BE] text-[#5C402D]"
-                            }`}
+                              ? "bg-[#150D07] border border-[#362114] text-[#A88D77]"
+                              : "bg-[#FAF7F2] border border-[#DDD1BE] text-[#5C402D]"
+                          }`}
                         >
                           {lbl}
                         </button>
@@ -885,8 +962,9 @@ export const CheckoutPage: React.FC = () => {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label
-                        className={`block text-xs font-semibold mb-1 ${isDark ? "text-[#FAF4EA]" : "text-[#3D2514]"
-                          }`}
+                        className={`block text-xs font-semibold mb-1 ${
+                          isDark ? "text-[#FAF4EA]" : "text-[#3D2514]"
+                        }`}
                       >
                         Recipient Name *
                       </label>
@@ -896,17 +974,19 @@ export const CheckoutPage: React.FC = () => {
                         placeholder="e.g. Manoj Kumar"
                         value={fullName}
                         onChange={(e) => setFullName(e.target.value)}
-                        className={`w-full px-3.5 py-2.5 text-xs rounded-xl focus:outline-none focus:ring-2 focus:ring-[#E08F35]/40 ${isDark
+                        className={`w-full px-3.5 py-2.5 text-xs rounded-xl focus:outline-none focus:ring-2 focus:ring-[#E08F35]/40 ${
+                          isDark
                             ? "bg-[#150D07] border border-[#362114] text-[#FAF4EA] placeholder-[#8C7A6B]"
                             : "bg-[#FAF7F2] border border-[#DDD1BE] text-[#23150C] placeholder-[#8C7A6B]"
-                          }`}
+                        }`}
                       />
                     </div>
 
                     <div>
                       <label
-                        className={`block text-xs font-semibold mb-1 ${isDark ? "text-[#FAF4EA]" : "text-[#3D2514]"
-                          }`}
+                        className={`block text-xs font-semibold mb-1 ${
+                          isDark ? "text-[#FAF4EA]" : "text-[#3D2514]"
+                        }`}
                       >
                         WhatsApp Contact Number *
                       </label>
@@ -916,18 +996,20 @@ export const CheckoutPage: React.FC = () => {
                         placeholder="e.g. 9180301917"
                         value={phone}
                         onChange={(e) => setPhone(e.target.value)}
-                        className={`w-full px-3.5 py-2.5 text-xs rounded-xl focus:outline-none focus:ring-2 focus:ring-[#E08F35]/40 ${isDark
+                        className={`w-full px-3.5 py-2.5 text-xs rounded-xl focus:outline-none focus:ring-2 focus:ring-[#E08F35]/40 ${
+                          isDark
                             ? "bg-[#150D07] border border-[#362114] text-[#FAF4EA] placeholder-[#8C7A6B]"
                             : "bg-[#FAF7F2] border border-[#DDD1BE] text-[#23150C] placeholder-[#8C7A6B]"
-                          }`}
+                        }`}
                       />
                     </div>
                   </div>
 
                   <div>
                     <label
-                      className={`block text-xs font-semibold mb-1 ${isDark ? "text-[#FAF4EA]" : "text-[#3D2514]"
-                        }`}
+                      className={`block text-xs font-semibold mb-1 ${
+                        isDark ? "text-[#FAF4EA]" : "text-[#3D2514]"
+                      }`}
                     >
                       Flat / House / Street Address *
                     </label>
@@ -937,28 +1019,31 @@ export const CheckoutPage: React.FC = () => {
                       placeholder="e.g. 118, Raghavendra Layout, Thigalarapalya"
                       value={addressLine1}
                       onChange={(e) => setAddressLine1(e.target.value)}
-                      className={`w-full px-3.5 py-2.5 text-xs rounded-xl focus:outline-none focus:ring-2 focus:ring-[#E08F35]/40 ${isDark
+                      className={`w-full px-3.5 py-2.5 text-xs rounded-xl focus:outline-none focus:ring-2 focus:ring-[#E08F35]/40 ${
+                        isDark
                           ? "bg-[#150D07] border border-[#362114] text-[#FAF4EA] placeholder-[#8C7A6B]"
                           : "bg-[#FAF7F2] border border-[#DDD1BE] text-[#23150C] placeholder-[#8C7A6B]"
-                        }`}
+                      }`}
                     />
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div>
                       <label
-                        className={`block text-xs font-semibold mb-1 ${isDark ? "text-[#FAF4EA]" : "text-[#3D2514]"
-                          }`}
+                        className={`block text-xs font-semibold mb-1 ${
+                          isDark ? "text-[#FAF4EA]" : "text-[#3D2514]"
+                        }`}
                       >
                         State *
                       </label>
                       <select
                         value={state}
                         onChange={(e) => handleStateChange(e.target.value)}
-                        className={`w-full px-3.5 py-2.5 text-xs rounded-xl focus:outline-none focus:ring-2 focus:ring-[#E08F35]/40 ${isDark
+                        className={`w-full px-3.5 py-2.5 text-xs rounded-xl focus:outline-none focus:ring-2 focus:ring-[#E08F35]/40 ${
+                          isDark
                             ? "bg-[#150D07] border border-[#362114] text-[#FAF4EA]"
                             : "bg-[#FAF7F2] border border-[#DDD1BE] text-[#23150C]"
-                          }`}
+                        }`}
                       >
                         {Object.keys(INDIAN_STATES_DISTRICTS).map((s) => (
                           <option key={s} value={s}>
@@ -970,18 +1055,20 @@ export const CheckoutPage: React.FC = () => {
 
                     <div>
                       <label
-                        className={`block text-xs font-semibold mb-1 ${isDark ? "text-[#FAF4EA]" : "text-[#3D2514]"
-                          }`}
+                        className={`block text-xs font-semibold mb-1 ${
+                          isDark ? "text-[#FAF4EA]" : "text-[#3D2514]"
+                        }`}
                       >
                         District *
                       </label>
                       <select
                         value={district}
                         onChange={(e) => setDistrict(e.target.value)}
-                        className={`w-full px-3.5 py-2.5 text-xs rounded-xl focus:outline-none focus:ring-2 focus:ring-[#E08F35]/40 ${isDark
+                        className={`w-full px-3.5 py-2.5 text-xs rounded-xl focus:outline-none focus:ring-2 focus:ring-[#E08F35]/40 ${
+                          isDark
                             ? "bg-[#150D07] border border-[#362114] text-[#FAF4EA]"
                             : "bg-[#FAF7F2] border border-[#DDD1BE] text-[#23150C]"
-                          }`}
+                        }`}
                       >
                         {!((INDIAN_STATES_DISTRICTS[state] || []).includes(district)) && district && (
                           <option value={district}>{district}</option>
@@ -996,8 +1083,9 @@ export const CheckoutPage: React.FC = () => {
 
                     <div>
                       <label
-                        className={`block text-xs font-semibold mb-1 ${isDark ? "text-[#FAF4EA]" : "text-[#3D2514]"
-                          }`}
+                        className={`block text-xs font-semibold mb-1 ${
+                          isDark ? "text-[#FAF4EA]" : "text-[#3D2514]"
+                        }`}
                       >
                         Pincode * (560xxx for BLR)
                       </label>
@@ -1008,18 +1096,20 @@ export const CheckoutPage: React.FC = () => {
                         placeholder="560058"
                         value={pincode}
                         onChange={(e) => setPincode(e.target.value)}
-                        className={`w-full px-3.5 py-2.5 text-xs rounded-xl focus:outline-none focus:ring-2 focus:ring-[#E08F35]/40 ${isDark
+                        className={`w-full px-3.5 py-2.5 text-xs rounded-xl focus:outline-none focus:ring-2 focus:ring-[#E08F35]/40 ${
+                          isDark
                             ? "bg-[#150D07] border border-[#362114] text-[#FAF4EA]"
                             : "bg-[#FAF7F2] border border-[#DDD1BE] text-[#23150C]"
-                          }`}
+                        }`}
                       />
                     </div>
                   </div>
 
                   <div>
                     <label
-                      className={`block text-xs font-semibold mb-1 ${isDark ? "text-[#FAF4EA]" : "text-[#3D2514]"
-                        }`}
+                      className={`block text-xs font-semibold mb-1 ${
+                        isDark ? "text-[#FAF4EA]" : "text-[#3D2514]"
+                      }`}
                     >
                       Landmark (Optional)
                     </label>
@@ -1028,10 +1118,11 @@ export const CheckoutPage: React.FC = () => {
                       placeholder="e.g. Near Peenya 2nd Stage Water Tank"
                       value={landmark}
                       onChange={(e) => setLandmark(e.target.value)}
-                      className={`w-full px-3.5 py-2.5 text-xs rounded-xl focus:outline-none focus:ring-2 focus:ring-[#E08F35]/40 ${isDark
+                      className={`w-full px-3.5 py-2.5 text-xs rounded-xl focus:outline-none focus:ring-2 focus:ring-[#E08F35]/40 ${
+                        isDark
                           ? "bg-[#150D07] border border-[#362114] text-[#FAF4EA]"
                           : "bg-[#FAF7F2] border border-[#DDD1BE] text-[#23150C]"
-                        }`}
+                      }`}
                     />
                   </div>
                 </div>
@@ -1049,10 +1140,11 @@ export const CheckoutPage: React.FC = () => {
                     placeholder="e.g. Peenya 2nd Stage, Hassan, Indiranagar, MG Road..."
                     value={searchQuery}
                     onChange={(e) => handleSearchQueryChange(e.target.value)}
-                    className={`w-full pl-10 pr-10 py-2.5 text-xs rounded-xl focus:outline-none focus:ring-2 focus:ring-[#E08F35]/50 ${isDark
+                    className={`w-full pl-10 pr-10 py-2.5 text-xs rounded-xl focus:outline-none focus:ring-2 focus:ring-[#E08F35]/50 ${
+                      isDark
                         ? "bg-[#150D07] border border-[#362114] text-[#FAF4EA] placeholder-[#8C7A6B]"
                         : "bg-[#FAF7F2] border border-[#DDD1BE] text-[#23150C] placeholder-[#8C7A6B]"
-                      }`}
+                    }`}
                   />
                   {isSearching && (
                     <Loader2 className="absolute right-3.5 w-4 h-4 text-[#E08F35] animate-spin" />
@@ -1081,8 +1173,9 @@ export const CheckoutPage: React.FC = () => {
               {/* Spacious Interactive OpenStreetMap Container */}
               <div className="space-y-1.5 pt-1">
                 <div
-                  className={`flex items-center justify-between text-xs ${isDark ? "text-[#D6C4B0]" : "text-[#5C402D]"
-                    }`}
+                  className={`flex items-center justify-between text-xs ${
+                    isDark ? "text-[#D6C4B0]" : "text-[#5C402D]"
+                  }`}
                 >
                   <span className={`font-semibold ${isDark ? "text-[#FAF4EA]" : "text-[#3D2514]"}`}>
                     Interactive Map (Click anywhere to place pin, or drag marker):
@@ -1094,21 +1187,23 @@ export const CheckoutPage: React.FC = () => {
                 {/* Enlarged map container from h-36 to h-80/h-96 for comfortable interaction */}
                 <div
                   ref={mapContainerRef}
-                  className={`w-full h-80 sm:h-96 rounded-2xl border overflow-hidden shadow-inner touch-manipulation z-10 ${isDark ? "bg-[#140D07] border-[#362114]" : "bg-[#EFE9DF] border-[#E3D4C0]"
-                    }`}
+                  className={`w-full h-80 sm:h-96 rounded-2xl border overflow-hidden shadow-inner touch-manipulation z-10 ${
+                    isDark ? "bg-[#140D07] border-[#362114]" : "bg-[#EFE9DF] border-[#E3D4C0]"
+                  }`}
                 />
               </div>
 
               {/* Delivery Service Confirmation */}
               <div
-                className={`p-3.5 rounded-xl border text-xs flex items-center gap-3 ${isBangalore
+                className={`p-3.5 rounded-xl border text-xs flex items-center gap-3 ${
+                  isBangalore
                     ? isDark
                       ? "bg-emerald-950/40 border-emerald-800/40 text-emerald-200"
                       : "bg-emerald-50 border-emerald-200 text-emerald-900"
                     : isDark
-                      ? "bg-blue-950/40 border-blue-800/40 text-blue-200"
-                      : "bg-blue-50 border-blue-200 text-blue-900"
-                  }`}
+                    ? "bg-blue-950/40 border-blue-800/40 text-blue-200"
+                    : "bg-blue-50 border-blue-200 text-blue-900"
+                }`}
               >
                 {isBangalore ? (
                   <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0" />
@@ -1132,17 +1227,20 @@ export const CheckoutPage: React.FC = () => {
 
             {/* Payment Method Selector */}
             <div
-              className={`rounded-2xl border p-6 shadow-2xs space-y-4 ${isDark ? "bg-[#1C120B] border-[#362114]" : "bg-white border-[#E8DEC8]"
-                }`}
+              className={`rounded-2xl border p-6 shadow-2xs space-y-4 ${
+                isDark ? "bg-[#1C120B] border-[#362114]" : "bg-white border-[#E8DEC8]"
+              }`}
             >
               <div
-                className={`flex items-center gap-2 border-b pb-3 ${isDark ? "border-[#2D1B10]" : "border-[#EFE8DC]"
-                  }`}
+                className={`flex items-center gap-2 border-b pb-3 ${
+                  isDark ? "border-[#2D1B10]" : "border-[#EFE8DC]"
+                }`}
               >
                 <CreditCard className="w-4 h-4 text-[#E08F35]" />
                 <h2
-                  className={`text-base font-bold font-serif ${isDark ? "text-[#FAF4EA]" : "text-[#23150C]"
-                    }`}
+                  className={`text-base font-bold font-serif ${
+                    isDark ? "text-[#FAF4EA]" : "text-[#23150C]"
+                  }`}
                 >
                   Choose Payment Method
                 </h2>
@@ -1151,14 +1249,15 @@ export const CheckoutPage: React.FC = () => {
               <div className="space-y-3">
                 {/* Option 1: Online Payment */}
                 <label
-                  className={`p-4 rounded-xl border flex items-start justify-between cursor-pointer transition-all ${paymentMethod === "phonepe"
+                  className={`p-4 rounded-xl border flex items-start justify-between cursor-pointer transition-all ${
+                    paymentMethod === "phonepe"
                       ? isDark
                         ? "bg-amber-950/40 border-[#E08F35] ring-2 ring-[#E08F35]/30"
                         : "bg-amber-50/70 border-[#E08F35] ring-2 ring-[#E08F35]/30"
                       : isDark
-                        ? "border-[#362114] hover:border-[#4D2E1A]"
-                        : "border-[#E8DEC8] hover:border-[#DDD1BE]"
-                    }`}
+                      ? "border-[#362114] hover:border-[#4D2E1A]"
+                      : "border-[#E8DEC8] hover:border-[#DDD1BE]"
+                  }`}
                 >
                   <div className="flex items-start gap-3">
                     <input
@@ -1170,14 +1269,16 @@ export const CheckoutPage: React.FC = () => {
                     />
                     <div>
                       <span
-                        className={`text-xs font-bold block ${isDark ? "text-[#FAF4EA]" : "text-[#23150C]"
-                          }`}
+                        className={`text-xs font-bold block ${
+                          isDark ? "text-[#FAF4EA]" : "text-[#23150C]"
+                        }`}
                       >
                         Online Payment (UPI, PhonePe, GPay, Cards, NetBanking)
                       </span>
                       <span
-                        className={`text-[11px] block mt-0.5 ${isDark ? "text-[#D6C4B0]" : "text-[#5C402D]"
-                          }`}
+                        className={`text-[11px] block mt-0.5 ${
+                          isDark ? "text-[#D6C4B0]" : "text-[#5C402D]"
+                        }`}
                       >
                         Instant order confirmation & automated digital receipt
                       </span>
@@ -1188,14 +1289,15 @@ export const CheckoutPage: React.FC = () => {
 
                 {/* Option 2: Cash on Delivery */}
                 <label
-                  className={`p-4 rounded-xl border flex flex-col cursor-pointer transition-all ${paymentMethod === "cod"
+                  className={`p-4 rounded-xl border flex flex-col cursor-pointer transition-all ${
+                    paymentMethod === "cod"
                       ? isDark
                         ? "bg-amber-950/40 border-[#E08F35] ring-2 ring-[#E08F35]/30"
                         : "bg-amber-50/70 border-[#E08F35] ring-2 ring-[#E08F35]/30"
                       : isDark
-                        ? "border-[#362114] hover:border-[#4D2E1A]"
-                        : "border-[#E8DEC8] hover:border-[#DDD1BE]"
-                    }`}
+                      ? "border-[#362114] hover:border-[#4D2E1A]"
+                      : "border-[#E8DEC8] hover:border-[#DDD1BE]"
+                  }`}
                 >
                   <div className="flex items-start justify-between">
                     <div className="flex items-start gap-3">
@@ -1208,14 +1310,16 @@ export const CheckoutPage: React.FC = () => {
                       />
                       <div>
                         <span
-                          className={`text-xs font-bold block ${isDark ? "text-[#FAF4EA]" : "text-[#23150C]"
-                            }`}
+                          className={`text-xs font-bold block ${
+                            isDark ? "text-[#FAF4EA]" : "text-[#23150C]"
+                          }`}
                         >
                           Cash on Delivery (COD)
                         </span>
                         <span
-                          className={`text-[11px] block mt-0.5 ${isDark ? "text-[#D6C4B0]" : "text-[#5C402D]"
-                            }`}
+                          className={`text-[11px] block mt-0.5 ${
+                            isDark ? "text-[#D6C4B0]" : "text-[#5C402D]"
+                          }`}
                         >
                           Pay cash or UPI directly to our delivery executive at doorstep
                         </span>
@@ -1226,29 +1330,31 @@ export const CheckoutPage: React.FC = () => {
 
                   {/* Math Challenge Box for COD Orders */}
                   {paymentMethod === "cod" && (
-
-                    <div className="p-4 rounded-2xl bg-amber-500/10 border-2 border-amber-500/30 space-y-3">
-                      <div className="flex items-center gap-2">
-                        <ShieldCheck className="w-4 h-4 text-amber-600 dark:text-amber-400" />
-                        <span className="font-bold text-xs text-stone-900 dark:text-white">
-                          Cash on Delivery Human Verification:
-                        </span>
+                    <div className="mt-3 p-4 rounded-2xl bg-amber-500/10 border border-amber-500/25 space-y-2.5">
+                      <div className="flex items-center justify-between">
+                        <h4 className="text-xs font-bold text-[#5E3210] dark:text-amber-200">
+                          Quick COD Verification (Prevent Accidental Orders)
+                        </h4>
                       </div>
 
-                      <p className="text-xs font-semibold text-stone-800 dark:text-stone-200">
-                        Please solve to confirm your order:{" "}
-                        <span className="font-mono text-sm font-black px-2 py-1 rounded-md bg-white dark:bg-[#1C120B] border border-amber-400 text-stone-900 dark:text-amber-300">
+                      <div className="flex items-center gap-2.5">
+                        <div className="px-3.5 py-2 rounded-xl bg-amber-200/60 dark:bg-[#2A180D] border border-amber-600/30 font-mono font-bold text-xs text-[#5E3210] dark:text-amber-200 tracking-wider select-none shrink-0">
                           {codChallenge.a} + {codChallenge.b} = ?
-                        </span>
-                      </p>
+                        </div>
 
-                      <input
-                        type="number"
-                        placeholder="Enter result..."
-                        value={codAnswerInput}
-                        onChange={(e) => setCodAnswerInput(e.target.value)}
-                        className="w-full px-3 py-2 rounded-xl border-2 border-amber-500/40 bg-white dark:bg-[#120A06] text-stone-900 dark:text-white font-bold text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
-                      />
+                        <input
+                          type="number"
+                          inputMode="numeric"
+                          placeholder="Enter Answer"
+                          value={codAnswerInput}
+                          onChange={(e) => setCodAnswerInput(e.target.value)}
+                          className="w-full px-3.5 py-2 rounded-xl border border-stone-300 dark:border-stone-700 bg-white dark:bg-[#140D07] text-[#1F120A] dark:text-[#FAF4EA] placeholder:text-stone-400 dark:placeholder:text-stone-500 font-mono font-bold text-xs focus:outline-none focus:ring-2 focus:ring-[#E08F35]/50 transition-all"
+                        />
+                      </div>
+
+                      {codError && (
+                        <p className="text-[11px] text-red-600 font-semibold">{codError}</p>
+                      )}
                     </div>
                   )}
                 </label>
@@ -1259,12 +1365,14 @@ export const CheckoutPage: React.FC = () => {
           {/* Right Column: Order Summary & Place Order Button */}
           <div className="lg:col-span-5 space-y-6">
             <div
-              className={`rounded-2xl border p-6 shadow-2xs space-y-4 ${isDark ? "bg-[#1C120B] border-[#362114]" : "bg-white border-[#E8DEC8]"
-                }`}
+              className={`rounded-2xl border p-6 shadow-2xs space-y-4 ${
+                isDark ? "bg-[#1C120B] border-[#362114]" : "bg-white border-[#E8DEC8]"
+              }`}
             >
               <h2
-                className={`text-base font-bold font-serif border-b pb-3 ${isDark ? "text-[#FAF4EA] border-[#2D1B10]" : "text-[#23150C] border-[#EFE8DC]"
-                  }`}
+                className={`text-base font-bold font-serif border-b pb-3 ${
+                  isDark ? "text-[#FAF4EA] border-[#2D1B10]" : "text-[#23150C] border-[#EFE8DC]"
+                }`}
               >
                 Order Summary ({checkoutItems.length} {checkoutItems.length === 1 ? "item" : "items"})
               </h2>

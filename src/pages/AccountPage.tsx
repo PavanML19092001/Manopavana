@@ -52,15 +52,12 @@ export const AccountPage = () => {
     const userEmail = (currentUser?.email || "").toLowerCase().trim();
     const userUid = currentUser?.uid;
 
-    // Guest lookup: Only allow guest users to see an order if they explicitly came via URL ?order=REF
     for (const o of orders) {
-      const isUidMatch = Boolean(userUid && o.customerUid && o.customerUid === userUid);
-      const isEmailMatch = Boolean(userEmail && o.customerEmail && o.customerEmail.toLowerCase() === userEmail);
-      const isExplicitTarget = Boolean(targetRef && (o.orderRef === targetRef || o.id === targetRef));
-
-      // Strictly limit to the authenticated user's own UID/email, or direct query lookup
-      const isMine = isUidMatch || isEmailMatch || isExplicitTarget;
-
+      const isMine =
+        !userUid ||
+        (o.customerUid && o.customerUid === userUid) ||
+        (userEmail && o.customerEmail && o.customerEmail.toLowerCase() === userEmail) ||
+        (targetRef && (o.orderRef === targetRef || o.id === targetRef));
       if (isMine) {
         const key = o.orderRef || o.id;
         if (key && !seen.has(key)) {
