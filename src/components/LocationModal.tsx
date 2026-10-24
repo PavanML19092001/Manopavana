@@ -63,19 +63,39 @@ export const LocationModal: React.FC = () => {
   const mapInstanceRef = useRef<L.Map | null>(null);
   const markerRef = useRef<L.Marker | null>(null);
 
+  // Updates local input fields immediately upon geocode return
+  const reverseGeocode = async (lat: number, lon: number) => {
+    try {
+      if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
+      const partial = await reverseGeocodeAndSaveAddress(lat, lon);
+      if (partial) {
+        if (partial.addressLine1) setAddressLine1(partial.addressLine1);
+        if (partial.pincode) setPincode(partial.pincode);
+        if (partial.state) setState(partial.state);
+        if (partial.district) setDistrict(partial.district);
+        if (partial.landmark !== undefined) setLandmark(partial.landmark);
+        showToast("Address auto-filled from selected pin!");
+      }
+    } catch (e) {
+      console.warn("Error auto-filling address:", e);
+    }
+  };
+
   useEffect(() => {
     if (!isLocationModalOpen) {
       if (mapInstanceRef.current) {
         try {
           mapInstanceRef.current.remove();
-        } catch {}
+        } catch { }
         mapInstanceRef.current = null;
+        markerRef.current = null;
       }
       return;
     }
 
     const timer = setTimeout(() => {
       if (!mapContainerRef.current) return;
+
       try {
         if ((mapContainerRef.current as any)._leaflet_id && !mapInstanceRef.current) {
           (mapContainerRef.current as any)._leaflet_id = null;
@@ -84,12 +104,14 @@ export const LocationModal: React.FC = () => {
         if (!mapInstanceRef.current) {
           const map = L.map(mapContainerRef.current, {
             center: coords,
-            zoom: 14,
+            zoom: 15,
             attributionControl: false,
           });
 
+          // Standard public OpenStreetMap tiles (Reliable, no API keys, works everywhere)
           L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
             maxZoom: 19,
+            subdomains: ["a", "b", "c"],
           }).addTo(map);
 
           const customIcon = L.divIcon({
@@ -106,74 +128,43 @@ export const LocationModal: React.FC = () => {
             icon: customIcon,
           }).addTo(map);
 
-          // Allow choosing location by clicking directly anywhere on the map
+          // Click anywhere on map -> Moves pin, updates coords, and auto-fills fields
           map.on("click", async (e: L.LeafletMouseEvent) => {
-            try {
-              const { lat, lng } = e.latlng;
-              if (Number.isFinite(lat) && Number.isFinite(lng)) {
-                setCoords([lat, lng]);
-                marker.setLatLng([lat, lng]);
-                showToast("Pin placed! Auto-filling address...");
-                await reverseGeocode(lat, lng);
-              }
-            } catch (err) {
-              console.warn("Map click notice:", err);
+            const { lat, lng } = e.latlng;
+            if (Number.isFinite(lat) && Number.isFinite(lng)) {
+              setCoords([lat, lng]);
+              marker.setLatLng([lat, lng]);
+              await reverseGeocode(lat, lng);
             }
           });
 
+          // Drag marker pin -> Updates coords and auto-fills fields
           marker.on("dragend", async () => {
-            try {
-              const latLng = marker.getLatLng();
-              setCoords([latLng.lat, latLng.lng]);
-              showToast("Pin moved! Auto-filling address...");
-              await reverseGeocode(latLng.lat, latLng.lng);
-            } catch (e) {
-              console.warn("Marker drag notice:", e);
-            }
+            const latLng = marker.getLatLng();
+            setCoords([latLng.lat, latLng.lng]);
+            await reverseGeocode(latLng.lat, latLng.lng);
           });
 
           mapInstanceRef.current = map;
           markerRef.current = marker;
-
-          // Recalculate dimensions so the map pans smoothly
-          setTimeout(() => {
-            map.invalidateSize();
-          }, 200);
         } else {
-          try {
-            mapInstanceRef.current.setView(coords, 14);
-            if (markerRef.current) {
-              markerRef.current.setLatLng(coords);
-            }
-            mapInstanceRef.current.invalidateSize();
-          } catch {}
+          mapInstanceRef.current.setView(coords, 15);
+          if (markerRef.current) {
+            markerRef.current.setLatLng(coords);
+          }
         }
+
+        mapInstanceRef.current?.invalidateSize();
+        setTimeout(() => mapInstanceRef.current?.invalidateSize(), 300);
       } catch (err) {
-        console.warn("Map setup notice:", err);
+        console.warn("Leaflet setup notice:", err);
       }
-    }, 180);
+    }, 150);
 
     return () => {
       clearTimeout(timer);
     };
   }, [isLocationModalOpen]);
-
-  const reverseGeocode = async (lat: number, lon: number) => {
-    try {
-      if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
-      const partial = await reverseGeocodeAndSaveAddress(lat, lon);
-      if (partial) {
-        if (partial.addressLine1) setAddressLine1(partial.addressLine1);
-        if (partial.pincode) setPincode(partial.pincode);
-        if (partial.state) setState(partial.state);
-        if (partial.district) setDistrict(partial.district);
-        if (partial.landmark) setLandmark(partial.landmark);
-        showToast("Address auto-populated from pin location!");
-      }
-    } catch {
-      // ignore network hiccups
-    }
-  };
 
   // Autocomplete / Search location on map
   const handleSearchQueryChange = (val: string) => {
@@ -225,7 +216,7 @@ export const LocationModal: React.FC = () => {
         mapInstanceRef.current.setView([lat, lon], 16);
         markerRef.current.setLatLng([lat, lon]);
         mapInstanceRef.current.invalidateSize();
-      } catch {}
+      } catch { }
     }
 
     showToast("Map focused on selected location!");
@@ -250,7 +241,7 @@ export const LocationModal: React.FC = () => {
                 mapInstanceRef.current.setView([lat, lng], 16);
                 markerRef.current.setLatLng([lat, lng]);
                 mapInstanceRef.current.invalidateSize();
-              } catch {}
+              } catch { }
             }
             showToast("GPS coordinates retrieved! Auto-filling address...");
             await reverseGeocode(lat, lng);
@@ -324,7 +315,7 @@ export const LocationModal: React.FC = () => {
     });
     try {
       localStorage.setItem("manopavana_address_saved", "true");
-    } catch {}
+    } catch { }
     setLocationModalOpen(false);
     showToast(
       isBLR
@@ -459,11 +450,10 @@ export const LocationModal: React.FC = () => {
 
           {/* Service Availability Badge */}
           <div
-            className={`p-3.5 rounded-2xl border flex items-start gap-3 ${
-              isBangalorePincode
+            className={`p-3.5 rounded-2xl border flex items-start gap-3 ${isBangalorePincode
                 ? "bg-emerald-950/40 border-emerald-800/40 text-emerald-200"
                 : "bg-amber-950/40 border-amber-800/40 text-amber-200"
-            }`}
+              }`}
           >
             {isBangalorePincode ? (
               <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />

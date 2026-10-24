@@ -84,3 +84,28 @@
 .timber-shadow-hover {
   box-shadow: 0 16px 36px rgba(0, 0, 0, 0.18);
 }
+
+/* Safe Leaflet Tile Reset (Does NOT override container dimensions) */
+.leaflet-tile-pane img.leaflet-tile {
+  max-width: none !important;
+  max-height: none !important;
+  display: block !important;
+}
+
+/* Ensure map controls remain above tiles */
+.leaflet-control-container {
+  position: relative;
+  z-index: 1000 !important;
+}
+
+/* Clean Dark Mode Map without API Keys */
+.dark .leaflet-tile-pane .dark-tiles {
+  filter: brightness(0.6) invert(1) contrast(3) hue-rotate(200deg) saturate(0.3) brightness(0.7);
+}
+
+/* Ensure map controls, markers, and popups remain unaffected */
+.leaflet-marker-pane,
+.leaflet-control-container,
+.leaflet-popup-pane {
+  filter: none !important;
+}

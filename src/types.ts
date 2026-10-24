@@ -52,7 +52,7 @@ export interface Product {
   id: "groundnut" | "coconut" | "sesame";
   name: string;
   kannadaName: string;
-  tamilName?: string;
+  subtitle?: string;
   searchKeywords: string;
   shortDescription: string;
   prices: {
