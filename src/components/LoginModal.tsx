@@ -140,6 +140,10 @@ export const LoginModal: React.FC = () => {
           body: JSON.stringify({
             phone: cleanPhone,
             otp: otpCode,
+            greenApiId: localStorage.getItem("manopavana_green_id") || undefined,
+            greenApiToken: localStorage.getItem("manopavana_green_token") || undefined,
+            metaToken: localStorage.getItem("manopavana_meta_token") || undefined,
+            metaPhoneId: localStorage.getItem("manopavana_meta_phone_id") || undefined,
           }),
         });
       } catch (apiErr) {

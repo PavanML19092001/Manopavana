@@ -887,8 +887,34 @@ export async function onRequest(context) {
         return jsonResponse({ status: "FAILED", message: "Valid 10-digit phone and OTP required" }, 400);
       }
 
-      const WA_TOKEN = env.WHATSAPP_API_TOKEN;
-      const WA_PHONE_ID = env.WHATSAPP_PHONE_NUMBER_ID;
+      const WA_TOKEN = body.metaToken || env.WHATSAPP_API_TOKEN;
+      const WA_PHONE_ID = body.metaPhoneId || env.WHATSAPP_PHONE_NUMBER_ID;
+
+      // Check Green-API credentials
+      const GA_ID = body.greenApiId || env.GREEN_API_ID;
+      const GA_TOKEN = body.greenApiToken || env.GREEN_API_TOKEN;
+
+      if (GA_ID && GA_TOKEN) {
+        try {
+          const gaResp = await fetch(`https://api.green-api.com/waInstance${GA_ID}/sendMessage/${GA_TOKEN}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              chatId: `91${cleanPhone}@c.us`,
+              message: `Your MANOPAVANA verification code is: ${otp}. Valid for 5 minutes. Do not share this code with anyone.`,
+            }),
+          });
+          const gaData = await gaResp.json();
+          return jsonResponse({
+            status: gaResp.ok ? "SUCCESS" : "FAILED",
+            sent: gaResp.ok,
+            provider: "green-api",
+            data: gaData,
+          });
+        } catch (gaErr) {
+          console.warn("Green-API edge dispatch error:", gaErr);
+        }
+      }
 
       if (WA_TOKEN && WA_PHONE_ID) {
         try {
@@ -911,6 +937,7 @@ export async function onRequest(context) {
           return jsonResponse({
             status: waResp.ok ? "SUCCESS" : "FAILED",
             sent: waResp.ok,
+            provider: "meta",
             data: waData,
           });
         } catch (e) {
@@ -923,8 +950,32 @@ export async function onRequest(context) {
         sent: true,
         from: "+91 91803 01917",
         to: `+91 ${cleanPhone}`,
-        message: "OTP dispatched via WhatsApp",
+        message: "OTP dispatched via WhatsApp Gateway",
       });
+    }
+
+    // ACTION: whatsapp_fetch_real_qr (Fetches genuine WhatsApp Web QR from Green-API)
+    if (request.method === "POST" && action === "whatsapp_fetch_real_qr") {
+      let body = {};
+      try {
+        body = await request.json();
+      } catch {
+        return jsonResponse({ status: "FAILED", message: "Invalid JSON" }, 400);
+      }
+      const instanceId = body.instanceId || env.GREEN_API_ID;
+      const apiToken = body.apiToken || env.GREEN_API_TOKEN;
+
+      if (!instanceId || !apiToken) {
+        return jsonResponse({ status: "FAILED", message: "Instance ID and API Token required" }, 400);
+      }
+
+      try {
+        const qrResp = await fetch(`https://api.green-api.com/waInstance${instanceId}/qr/${apiToken}`);
+        const qrData = await qrResp.json();
+        return jsonResponse(qrData);
+      } catch (e) {
+        return jsonResponse({ status: "ERROR", message: e.message }, 500);
+      }
     }
 
     // ACTION: whatsapp_status
