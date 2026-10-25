@@ -5,6 +5,7 @@ import {
   CartItem,
   ComboProduct,
   CustomerReview,
+  CustomerProfile,
   LoyaltyState,
   Order,
   Product,
@@ -84,6 +85,8 @@ interface StoreContextType {
   setLocationModalOpen: (open: boolean) => void;
 
   currentUser: FirebaseUser | null;
+  customerProfile: CustomerProfile | null;
+  saveProfile: (updates: Partial<CustomerProfile>) => Promise<void>;
   isLoginModalOpen: boolean;
   setLoginModalOpen: (open: boolean) => void;
   logoutUser: () => Promise<void>;
@@ -297,11 +300,13 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(null);
+  const [customerProfile, setCustomerProfile] = useState<CustomerProfile | null>(null);
   const [isLoginModalOpen, setLoginModalOpen] = useState(false);
 
   const isCartInitializedRef = useRef(false);
   const currentUidRef = useRef<string | null>(null);
   const customerDocUnsubRef = useRef<(() => void) | null>(null);
+  const primaryDocUnsubRef = useRef<(() => void) | null>(null);
   const cartDebounceTimerRef = useRef<NodeJS.Timeout | null>(null);
   const lastLocalCartMutationTimeRef = useRef<number>(0);
 
@@ -710,6 +715,10 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         customerDocUnsubRef.current();
         customerDocUnsubRef.current = null;
       }
+      if (primaryDocUnsubRef.current) {
+        primaryDocUnsubRef.current();
+        primaryDocUnsubRef.current = null;
+      }
 
       isCartInitializedRef.current = false;
       currentUidRef.current = user?.uid || null;
@@ -718,6 +727,10 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       if (user) {
         try {
           const profile = await syncCustomerDoc(user);
+          if (profile) {
+            setCustomerProfile(profile as CustomerProfile);
+          }
+
           if (profile && Array.isArray((profile as any).cart) && (profile as any).cart.length > 0) {
             setCart((profile as any).cart);
             try {
@@ -774,6 +787,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             }));
           }
 
+          // Real-time listener for current user's customer doc
           customerDocUnsubRef.current = onSnapshot(
             doc(db, "customers", user.uid),
             (snap) => {
@@ -782,6 +796,8 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
                 return;
               }
               const data = snap.data();
+              setCustomerProfile((prev) => ({ ...(prev || { uid: user.uid }), ...data } as CustomerProfile));
+
               // Prevent snapshot echo from stomping active local cart modifications
               const timeSinceLastLocalMutation = Date.now() - lastLocalCartMutationTimeRef.current;
               if (timeSinceLastLocalMutation > 3500 && Array.isArray(data?.cart)) {
@@ -821,12 +837,37 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
               console.warn("Real-time customer doc snapshot notice:", err);
             }
           );
+
+          // If linked to an existing primary account, also sync with master doc in real time
+          const masterTargetUid = (profile as any)?.primaryUid;
+          if (masterTargetUid && masterTargetUid !== user.uid) {
+            primaryDocUnsubRef.current = onSnapshot(
+              doc(db, "customers", masterTargetUid),
+              (masterSnap) => {
+                if (!masterSnap.exists()) return;
+                const masterData = masterSnap.data();
+                setCustomerProfile((prev) => ({ ...(prev || {}), ...masterData } as CustomerProfile));
+                if (masterData.name && (!userName || userName.startsWith("user_") || userName === "Customer")) {
+                  setAddress((prevAddr) => ({
+                    ...prevAddr,
+                    fullName: masterData.name || prevAddr.fullName,
+                    email: masterData.email || prevAddr.email,
+                    phone: masterData.phone || prevAddr.phone,
+                  }));
+                }
+              },
+              (masterErr) => {
+                console.warn("Master document snapshot notice:", masterErr);
+              }
+            );
+          }
         } catch (e) {
           console.warn("Error loading user-scoped Firestore state:", e);
         } finally {
           isCartInitializedRef.current = true;
         }
       } else {
+        setCustomerProfile(null);
         setOrders([]);
         isCartInitializedRef.current = true;
       }
@@ -837,6 +878,10 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       if (customerDocUnsubRef.current) {
         customerDocUnsubRef.current();
         customerDocUnsubRef.current = null;
+      }
+      if (primaryDocUnsubRef.current) {
+        primaryDocUnsubRef.current();
+        primaryDocUnsubRef.current = null;
       }
     };
   }, []);
@@ -852,6 +897,11 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     isCartInitializedRef.current = false;
     currentUidRef.current = null;
     setCurrentUser(null);
+    setCustomerProfile(null);
+    if (primaryDocUnsubRef.current) {
+      primaryDocUnsubRef.current();
+      primaryDocUnsubRef.current = null;
+    }
     setOrders([]);
     localStorage.removeItem("manopavana_active_user");
     sessionStorage.removeItem("manopavana_admin_auth");
@@ -867,6 +917,18 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     isCartInitializedRef.current = true;
 
     showToast("You have signed out. User session cleared.");
+  };
+
+  const saveProfile = async (updates: Partial<CustomerProfile>) => {
+    if (!currentUser?.uid) return;
+    await saveCustomerProfile(currentUser.uid, {
+      name: updates.name,
+      phone: updates.phone,
+      email: updates.email,
+      savedAddress: updates.savedAddress,
+      savedAddresses: updates.savedAddresses,
+    });
+    setCustomerProfile((prev) => ({ ...(prev || { uid: currentUser.uid }), ...updates } as CustomerProfile));
   };
 
   const [loyalty, setLoyalty] = useState<LoyaltyState>(() => {
@@ -1047,16 +1109,23 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
 
     const currentUid = currentUser.uid;
-    const userEmail = (currentUser.email || "").toLowerCase().trim();
+    const primaryUid = customerProfile?.primaryUid;
+    const allowedUids = Array.from(new Set([currentUid, primaryUid].filter(Boolean))) as string[];
     const userOrdersKey = `manopavana_orders_${currentUid}`;
 
-    // Load exclusively from this user's private local cache
+    // Load from private local cache
     try {
       const userCached = localStorage.getItem(userOrdersKey);
       if (userCached) {
         const parsed = JSON.parse(userCached);
         if (Array.isArray(parsed)) {
-          setOrders(parsed.filter((o: Order) => o.customerUid === currentUid || (o as any).firebaseUid === currentUid));
+          setOrders(
+            parsed.filter(
+              (o: Order) =>
+                allowedUids.includes(o.customerUid || "") ||
+                allowedUids.includes((o as any).firebaseUid || "")
+            )
+          );
         }
       }
     } catch {}
@@ -1067,24 +1136,32 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       undefined,
       (firestoreOrders) => {
         if (!firestoreOrders) return;
-        // Strictly filter to ensure zero leakage across different users
         const verifiedOrders = firestoreOrders.filter(
-          (o) => o.customerUid === currentUid || (o as any).firebaseUid === currentUid
+          (o) =>
+            allowedUids.includes(o.customerUid || "") ||
+            allowedUids.includes((o as any).firebaseUid || "")
         );
         setOrders(verifiedOrders);
         try {
           localStorage.setItem(userOrdersKey, JSON.stringify(verifiedOrders));
         } catch {}
-      }
+      },
+      primaryUid
     );
     return () => unsubscribe();
-  }, [currentUser?.uid]);
+  }, [currentUser?.uid, customerProfile?.primaryUid]);
 
   const saveOrder = async (newOrder: Order) => {
+    const finalUid = customerProfile?.primaryUid || currentUser?.uid || newOrder.customerUid || null;
     const finalOrder: Order = {
       ...newOrder,
-      customerUid: currentUser?.uid || newOrder.customerUid || null,
-      customerEmail: currentUser?.email || newOrder.customerEmail || newOrder.shippingAddress?.email || null,
+      customerUid: finalUid,
+      customerEmail:
+        (customerProfile?.email && !isSyntheticAccount(customerProfile.email) ? customerProfile.email : "") ||
+        (currentUser?.email && !isSyntheticAccount(currentUser.email) ? currentUser.email : "") ||
+        newOrder.customerEmail ||
+        newOrder.shippingAddress?.email ||
+        null,
     };
 
     // Update state immediately for zero lag
@@ -1938,6 +2015,8 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         isLocationModalOpen,
         setLocationModalOpen,
         currentUser,
+        customerProfile,
+        saveProfile,
         isLoginModalOpen,
         setLoginModalOpen,
         logoutUser,

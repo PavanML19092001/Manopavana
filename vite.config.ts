@@ -56,30 +56,34 @@ export default defineConfig(() => {
                   groundnut: {
                     title: "Wood-Pressed Groundnut Oil (ಕಡಲೆಕಾಯಿ ಎಣ್ಣೆ) - MANOPAVANA",
                     desc: "100% Traditional Marachekku Cold-Pressed Groundnut Oil from Bengaluru. High smoke point (230°C), unrefined, rich nutty aroma.",
-                    img: "https://pub-9e18bb265ecf4224ae1230cf913745ca.r2.dev/groundnut-1.png",
+                    img: "https://www.manopavana.com/images/products/groundnut-studio.jpg",
                   },
                   coconut: {
                     title: "Wood-Pressed Coconut Oil (ತೆಂಗಿನ ಎಣ್ಣೆ) - MANOPAVANA",
                     desc: "100% Traditional Marachekku Cold-Pressed Coconut Oil from sun-dried copra. Unrefined, natural aroma, ideal for coastal cooking & hair care.",
-                    img: "https://pub-9e18bb265ecf4224ae1230cf913745ca.r2.dev/coconut-1.png",
+                    img: "https://www.manopavana.com/images/products/coconut-studio.jpg",
                   },
                   sesame: {
                     title: "Wood-Pressed Sesame Oil (ಎಳ್ಳೆಣ್ಣೆ) - MANOPAVANA",
                     desc: "Traditional Marachekku gingelly oil cold-pressed with organic palm jaggery. Rich flavor, unrefined, ideal for tadka and Ayurvedic care.",
-                    img: "https://pub-9e18bb265ecf4224ae1230cf913745ca.r2.dev/sesame-1.png",
+                    img: "https://www.manopavana.com/images/products/sesame-studio.jpg",
                   },
                 };
                 const meta = PRODUCT_META[prodKey] || PRODUCT_META.groundnut;
                 const template = fs.readFileSync(path.resolve(__dirname, 'index.html'), 'utf-8');
+                const ogTags = `<meta property="og:image" content="${meta.img}" />\n    <meta property="og:image:secure_url" content="${meta.img}" />\n    <meta property="og:image:type" content="image/jpeg" />\n    <meta property="og:image:width" content="800" />\n    <meta property="og:image:height" content="800" />`;
                 let html = template
                   .replace(/<title>.*?<\/title>/, `<title>${meta.title}</title>`)
                   .replace(/<meta property="og:title" content=".*?" \/>/, `<meta property="og:title" content="${meta.title}" />`)
                   .replace(/<meta property="og:description" content=".*?" \/>/, `<meta property="og:description" content="${meta.desc}" />`)
-                  .replace(/<meta property="og:image" content=".*?" \/>/, `<meta property="og:image" content="${meta.img}" />`)
+                  .replace(/<meta property="og:image" content=".*?" \/>/, ogTags)
                   .replace(/<meta name="description" content=".*?" \/>/, `<meta name="description" content="${meta.desc}" />`);
 
-                if (!html.includes('twitter:image')) {
-                  html = html.replace('</head>', `  <meta name="twitter:image" content="${meta.img}" />\n  </head>`);
+                if (html.includes('<meta name="twitter:card"')) {
+                  html = html.replace(
+                    '<meta name="twitter:card" content="summary_large_image" />',
+                    `<meta name="twitter:card" content="summary_large_image" />\n    <meta name="twitter:image" content="${meta.img}" />\n    <meta name="twitter:title" content="${meta.title}" />\n    <meta name="twitter:description" content="${meta.desc}" />`
+                  );
                 }
 
                 const transformed = await server.transformIndexHtml(req.url, html);

@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { useStore } from "../context/StoreContext";
 import { BUSINESS_CONFIG } from "../constants";
+import { extractCleanPhone, isSyntheticAccount } from "../firebase";
 import { OrderStatus, Order } from "../types";
 import { LiveOrderTracker } from "../components/LiveOrderTracker";
 
@@ -39,6 +40,8 @@ export const AccountPage = () => {
     openLoyaltyQuiz,
     showToast,
     currentUser,
+    customerProfile,
+    saveProfile,
     setLoginModalOpen,
     logoutUser,
     themeMode,
@@ -50,15 +53,17 @@ export const AccountPage = () => {
     const seen = new Set<string>();
     const res: Order[] = [];
     const userUid = currentUser?.uid;
+    const primaryUid = customerProfile?.primaryUid;
+    const allowedUids = new Set([userUid, primaryUid].filter(Boolean) as string[]);
 
-    if (!userUid) return [];
+    if (allowedUids.size === 0) return [];
 
     for (const o of orders) {
       // Flipkart-level isolation: orders are strictly exclusive to the authenticated user account
       // that placed the order. Recipient phone number or email NEVER grants access to another user's order.
       const isMine =
-        (o.customerUid && o.customerUid === userUid) ||
-        ((o as any).firebaseUid && (o as any).firebaseUid === userUid);
+        (o.customerUid && allowedUids.has(o.customerUid)) ||
+        ((o as any).firebaseUid && allowedUids.has((o as any).firebaseUid));
 
       if (isMine) {
         const key = o.orderRef || o.id;
@@ -69,7 +74,7 @@ export const AccountPage = () => {
       }
     }
     return res;
-  }, [orders, currentUser]);
+  }, [orders, currentUser, customerProfile?.primaryUid]);
 
   const [searchQuery, setSearchQuery] = useState(targetRef || "");
   const [selectedOrderRef, setSelectedOrderRef] = useState<string>(
@@ -90,26 +95,51 @@ export const AccountPage = () => {
     setSearchParams({ order: orderRef });
   };
 
+  // Resolved human-friendly display name (zero machine ID leak)
+  const resolvedDisplayName =
+    (customerProfile?.name &&
+      !customerProfile.name.toLowerCase().startsWith("user_") &&
+      customerProfile.name !== "Customer" &&
+      customerProfile.name !== "Valued Customer" &&
+      customerProfile.name !== "Google Customer"
+      ? customerProfile.name
+      : "") ||
+    (currentUser?.displayName &&
+      !currentUser.displayName.toLowerCase().startsWith("user_") &&
+      currentUser.displayName !== "Customer" &&
+      currentUser.displayName !== "Google Customer"
+      ? currentUser.displayName
+      : "") ||
+    (address.fullName && !address.fullName.toLowerCase().startsWith("user_")
+      ? address.fullName
+      : "");
+
   // Profile fields for editing
-  const [name, setName] = useState(currentUser?.displayName || address.fullName);
-  const [phone, setPhone] = useState(address.phone);
+  const [name, setName] = useState(resolvedDisplayName);
+  const [phone, setPhone] = useState(customerProfile?.phone || address.phone || "");
   const [addressLine, setAddressLine] = useState(address.addressLine1);
   const [landmark, setLandmark] = useState(address.landmark);
 
   useEffect(() => {
-    if (address) {
-      if (address.fullName) setName(address.fullName);
-      if (address.phone) setPhone(address.phone);
-      if (address.addressLine1) setAddressLine(address.addressLine1);
-      if (address.landmark) setLandmark(address.landmark);
+    if (
+      customerProfile?.name &&
+      !customerProfile.name.toLowerCase().startsWith("user_") &&
+      customerProfile.name !== "Customer"
+    ) {
+      setName(customerProfile.name);
+    } else if (address?.fullName && !name) {
+      setName(address.fullName);
     }
-  }, [address]);
 
-  useEffect(() => {
-    if (currentUser?.displayName && !name) {
-      setName(currentUser.displayName);
+    if (customerProfile?.phone) {
+      setPhone(customerProfile.phone);
+    } else if (address?.phone && !phone) {
+      setPhone(address.phone);
     }
-  }, [currentUser]);
+
+    if (address?.addressLine1) setAddressLine(address.addressLine1);
+    if (address?.landmark) setLandmark(address.landmark);
+  }, [customerProfile, address]);
 
   useEffect(() => {
     if (tabParam === "profile" || tabParam === "addresses") {
@@ -126,7 +156,7 @@ export const AccountPage = () => {
     visibleOrders[0] ||
     null;
 
-  const handleUpdateProfile = (e: React.FormEvent) => {
+  const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     updateAddress({
       fullName: name,
@@ -134,6 +164,12 @@ export const AccountPage = () => {
       addressLine1: addressLine,
       landmark,
     });
+    if (saveProfile) {
+      await saveProfile({
+        name,
+        phone,
+      });
+    }
     showToast("Profile details updated & synced across the store!");
   };
 
@@ -200,7 +236,7 @@ export const AccountPage = () => {
             </h1>
             <p className={`text-xs ${isDark ? "text-[#D8C8B8]" : "text-[#5C4230]"}`}>
               Real-time Firestore sync • Peenya facility dispatch status
-              {currentUser && ` • Signed in as ${currentUser.displayName || currentUser.email}`}
+              {currentUser && ` • Signed in as ${resolvedDisplayName || "Valued Customer"}${phone ? ` (+91 ${phone})` : ""}`}
             </p>
           </div>
 

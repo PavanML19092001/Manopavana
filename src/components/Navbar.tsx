@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { useStore } from "../context/StoreContext";
 import { MEDIA_ASSETS, BUSINESS_CONFIG } from "../constants";
+import { extractCleanPhone, isSyntheticAccount } from "../firebase";
 
 export const Navbar: React.FC = () => {
   const {
@@ -32,6 +33,7 @@ export const Navbar: React.FC = () => {
     openLoyaltyQuiz,
     cmsConfig,
     currentUser,
+    customerProfile,
     setLoginModalOpen,
     addToCart,
     products,
@@ -59,6 +61,60 @@ export const Navbar: React.FC = () => {
   const [isUserDropdownOpen, setIsUserDropdownOpen] = useState(false);
   const mobileUserMenuRef = useRef<HTMLDivElement | null>(null);
   const desktopUserMenuRef = useRef<HTMLDivElement | null>(null);
+
+  // Flipkart-grade Name & Identity Resolution (Zero machine IDs like user_6361509415)
+  const effectiveName = React.useMemo(() => {
+    const profileName = customerProfile?.name?.trim();
+    if (
+      profileName &&
+      !profileName.toLowerCase().startsWith("user_") &&
+      profileName !== "Customer" &&
+      profileName !== "Valued Customer" &&
+      profileName !== "Google Customer"
+    ) {
+      return profileName;
+    }
+    const authName = currentUser?.displayName?.trim();
+    if (
+      authName &&
+      !authName.toLowerCase().startsWith("user_") &&
+      authName !== "Customer" &&
+      authName !== "Valued Customer" &&
+      authName !== "Google Customer"
+    ) {
+      return authName;
+    }
+    const addrName = address.fullName?.trim();
+    if (
+      addrName &&
+      !addrName.toLowerCase().startsWith("user_") &&
+      addrName !== "Customer" &&
+      addrName !== "Valued Customer"
+    ) {
+      return addrName;
+    }
+    return "Valued Customer";
+  }, [customerProfile?.name, currentUser?.displayName, address.fullName]);
+
+  const firstName = effectiveName !== "Valued Customer" ? effectiveName.split(" ")[0] : "Account";
+
+  const rawPhone =
+    customerProfile?.phone ||
+    extractCleanPhone(currentUser?.phoneNumber || "") ||
+    extractCleanPhone(currentUser?.email || "");
+  const formattedPhone = rawPhone && rawPhone.length === 10 ? `+91 ${rawPhone}` : "";
+
+  const cleanEmail =
+    customerProfile?.email && !isSyntheticAccount(customerProfile.email)
+      ? customerProfile.email
+      : currentUser?.email && !isSyntheticAccount(currentUser.email)
+      ? currentUser.email
+      : "";
+
+  const identitySubtitle =
+    formattedPhone && cleanEmail
+      ? `${formattedPhone} • ${cleanEmail}`
+      : formattedPhone || cleanEmail || "Verified Customer";
 
   // Close search & profile dropdowns on outside click
   useEffect(() => {
@@ -546,7 +602,7 @@ export const Navbar: React.FC = () => {
             >
               <User className="w-3.5 h-3.5 text-[#E08F35]" />
               <span>
-                {currentUser ? currentUser.displayName?.split(" ")[0] || "Account" : "Sign In"}
+                {currentUser ? firstName : "Sign In"}
               </span>
             </button>
 
@@ -560,14 +616,14 @@ export const Navbar: React.FC = () => {
                 <div className={`px-4 py-3 ${isLight ? "bg-[#F5EDE1]" : "bg-[#120904]"}`}>
                   <div className="flex items-center gap-2.5">
                     <div className="w-8 h-8 rounded-full bg-[#E08F35]/20 border border-[#E08F35]/40 flex items-center justify-center text-[#E08F35] font-black text-xs shrink-0">
-                      {(currentUser.displayName || currentUser.email || "C").charAt(0).toUpperCase()}
+                      {(effectiveName !== "Valued Customer" ? effectiveName : cleanEmail || "C").charAt(0).toUpperCase()}
                     </div>
                     <div className="min-w-0 flex-1">
                       <p className={`text-xs font-bold truncate ${isLight ? "text-[#1F120A]" : "text-[#FAF4EA]"}`}>
-                        Hello, {currentUser.displayName || currentUser.email?.split("@")[0] || "Customer"}
+                        Hello, {effectiveName}
                       </p>
                       <p className={`text-[10px] truncate ${isLight ? "text-[#7A5538]" : "text-[#D4A373]"}`}>
-                        {currentUser.email || "Active Session"}
+                        {identitySubtitle}
                       </p>
                     </div>
                   </div>
@@ -792,7 +848,7 @@ export const Navbar: React.FC = () => {
               )}
             </div>
             <span className="text-[10px] tracking-tight mt-0.5 truncate max-w-[62px]">
-              {currentUser ? (currentUser.displayName?.split(" ")[0] || "Account") : "Profile"}
+              {currentUser ? firstName : "Profile"}
             </span>
           </button>
 

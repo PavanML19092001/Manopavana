@@ -121,6 +121,22 @@ export interface Address {
   isBangalore: boolean;
 }
 
+export interface CustomerProfile {
+  uid: string;
+  primaryUid?: string;
+  name?: string;
+  email?: string;
+  phone?: string;
+  savedAddress?: Address;
+  savedAddresses?: any[];
+  cart?: CartItem[];
+  uids?: string[];
+  totalOrders?: number;
+  totalSpent?: number;
+  createdAt?: any;
+  updatedAt?: any;
+}
+
 export type OrderStatus =
   | "Placed"
   | "Payment Incomplete"

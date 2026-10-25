@@ -177,57 +177,54 @@ export const ProductPage = () => {
     }
   };
 
-  // FLIPKART STYLE SHARE HANDLER - SENDS EXACT PRODUCT IMAGE
+  // FLIPKART STYLE SHARE HANDLER - SENDS CLEAN LINK WITH RICH PREVIEW CARD
   const handleShare = async () => {
     const shareUrl = window.location.href;
     const shareTitle = `${product.name} (Pure Marachekku Wood-Pressed Oil)`;
-    const shareText = `Check out *${product.name}* (100% Marachekku Wood-Pressed Oil) from MANOPAVANA Bengaluru:\nPrice: ₹${price} (${selectedVolume})\nDirect Link: ${shareUrl}`;
+    const shareText = `Check out *${product.name}* (100% Marachekku Wood-Pressed Oil) from MANOPAVANA Bengaluru:\nPrice: ₹${price} (${selectedVolume})\n${shareUrl}`;
 
     // Try Web Share API with image file if supported
     if (navigator.share) {
       try {
         let fileShared = false;
-        if (activeImageUrl) {
-          try {
-            // Use same-origin proxy to ensure no CORS blocking and direct image byte transfer
-            const proxyEndpoint = `/api?action=proxy_image&url=${encodeURIComponent(activeImageUrl)}`;
-            const resp = await fetch(proxyEndpoint);
-            if (resp.ok) {
-              const blob = await resp.blob();
-              const ext = activeImageUrl.endsWith(".png") ? "png" : "jpg";
-              const file = new File([blob], `${product.id}-oil.${ext}`, {
-                type: blob.type || (ext === "png" ? "image/png" : "image/jpeg"),
-              });
+        try {
+          // Use optimized studio photo for direct image sharing (< 100KB)
+          const studioImgPath = `/images/products/${product.id}-studio.jpg`;
+          const resp = await fetch(studioImgPath);
+          if (resp.ok) {
+            const blob = await resp.blob();
+            const file = new File([blob], `${product.id}-wood-pressed-oil.jpg`, {
+              type: "image/jpeg",
+            });
 
-              // Level 2 Web Share API with both image file and clickable link
-              const fullPayload: any = {
+            // Level 2 Web Share API with both image file and clickable link
+            const fullPayload: any = {
+              title: shareTitle,
+              text: shareText,
+              url: shareUrl,
+              files: [file],
+            };
+
+            if (navigator.canShare && navigator.canShare(fullPayload)) {
+              await navigator.share(fullPayload);
+              fileShared = true;
+            } else if (navigator.canShare && navigator.canShare({ files: [file] })) {
+              await navigator.share({
                 title: shareTitle,
                 text: shareText,
-                url: shareUrl,
                 files: [file],
-              };
-
-              if (navigator.canShare && navigator.canShare(fullPayload)) {
-                await navigator.share(fullPayload);
-                fileShared = true;
-              } else if (navigator.canShare && navigator.canShare({ files: [file] })) {
-                await navigator.share({
-                  title: shareTitle,
-                  text: shareText,
-                  files: [file],
-                });
-                fileShared = true;
-              }
+              });
+              fileShared = true;
             }
-          } catch (e) {
-            console.warn("Notice: file share with image file fell back to standard share", e);
           }
+        } catch (e) {
+          console.warn("Notice: file share with image file fell back to standard link share", e);
         }
 
         if (!fileShared) {
           await navigator.share({
             title: shareTitle,
-            text: `${shareText}\n\nPhoto: ${activeImageUrl}`,
+            text: shareText,
             url: shareUrl,
           });
         }
@@ -244,9 +241,9 @@ export const ProductPage = () => {
     // Fallback: Open interactive Flipkart-style share sheet
     setIsShareModalOpen(true);
     try {
-      await navigator.clipboard.writeText(`${product.name} (₹${price})\n${shareUrl}\nPhoto: ${activeImageUrl}`);
+      await navigator.clipboard.writeText(`${product.name} (₹${price} - ${selectedVolume})\n${shareUrl}`);
       setCopiedLink(true);
-      showToast("Product link & photo preview copied to clipboard!");
+      showToast("Product link copied to clipboard!");
       setTimeout(() => setCopiedLink(false), 3000);
     } catch {
       // clipboard write failed
@@ -255,7 +252,7 @@ export const ProductPage = () => {
 
   const handleCopyLink = async () => {
     try {
-      await navigator.clipboard.writeText(`${product.name} (₹${price})\n${window.location.href}\nPhoto: ${activeImageUrl}`);
+      await navigator.clipboard.writeText(`${product.name} (₹${price} - ${selectedVolume})\n${window.location.href}`);
       setCopiedLink(true);
       showToast("Product link copied to clipboard!");
       setTimeout(() => setCopiedLink(false), 3000);
@@ -269,25 +266,30 @@ export const ProductPage = () => {
     `🌿 *${product.name}* (100% Traditional Marachekku Wood-Pressed Oil)\n` +
     `💰 Price: ₹${price} (${selectedVolume} Bottle)\n` +
     `📍 MANOPAVANA, Bengaluru\n\n` +
-    `📸 Product Photo: ${activeImageUrl}\n\n` +
-    `🔗 View & Order Online: ${window.location.href}`
+    `🔗 Order & View Details: ${window.location.href}`
   );
 
   React.useEffect(() => {
     document.title = `${product.name} - MANOPAVANA Artisanal Oils`;
+    // Update OpenGraph image to optimized lightweight studio photo for WhatsApp preview
+    const studioImgUrl = `${window.location.origin}/images/products/${product.id}-studio.jpg`;
     const ogImage = document.querySelector('meta[property="og:image"]');
-    if (ogImage && activeImageUrl) {
-      ogImage.setAttribute("content", activeImageUrl);
+    if (ogImage) {
+      ogImage.setAttribute("content", studioImgUrl);
+    }
+    const ogSecureImage = document.querySelector('meta[property="og:image:secure_url"]');
+    if (ogSecureImage) {
+      ogSecureImage.setAttribute("content", studioImgUrl);
     }
     const twitterImage = document.querySelector('meta[name="twitter:image"]');
-    if (twitterImage && activeImageUrl) {
-      twitterImage.setAttribute("content", activeImageUrl);
+    if (twitterImage) {
+      twitterImage.setAttribute("content", studioImgUrl);
     }
     const ogTitle = document.querySelector('meta[property="og:title"]');
     if (ogTitle) {
       ogTitle.setAttribute("content", `${product.name} - MANOPAVANA`);
     }
-  }, [product.name, activeImageUrl]);
+  }, [product.name, product.id]);
 
   return (
     <div
@@ -1087,7 +1089,7 @@ export const ProductPage = () => {
             </div>
 
             <p className="text-[10px] text-center text-stone-400">
-              Includes product name, link, and photo preview
+              WhatsApp preview card will automatically display the product photo
             </p>
           </div>
         </div>

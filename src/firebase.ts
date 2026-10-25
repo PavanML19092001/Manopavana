@@ -524,57 +524,100 @@ export async function syncCustomerDoc(
       if (!canonicalEmail && phoneLink?.email) {
         canonicalEmail = phoneLink.email;
       }
-
-      // If unified primaryUid is different from current, retrieve master profile data
-      if (primaryUid !== user.uid) {
-        try {
-          const masterSnap = await getDoc(doc(db, "customers", primaryUid));
-          if (masterSnap.exists()) {
-            existingData = { ...masterSnap.data(), ...existingData };
-          }
-        } catch {
-          // ignore
-        }
-      }
-
-      // Update mapping registry
-      const resolvedName =
-        (extra?.name && extra.name !== "Valued Customer" && extra.name !== "Google Customer" ? extra.name : "") ||
-        (user.displayName && user.displayName !== "Customer" ? user.displayName : "") ||
-        (existingData.name as string) ||
-        "";
-
-      if (cleanPhone) {
-        byPhone[cleanPhone] = {
-          primaryUid,
-          phone: cleanPhone,
-          email: canonicalEmail || phoneLink?.email || "",
-          name: resolvedName || phoneLink?.name || "",
-          updatedAt: Date.now(),
-        };
-      }
-      if (canonicalEmail) {
-        byEmail[canonicalEmail] = {
-          primaryUid,
-          email: canonicalEmail,
-          phone: cleanPhone || emailLink?.phone || "",
-          name: resolvedName || emailLink?.name || "",
-          updatedAt: Date.now(),
-        };
-      }
-
-      await setDoc(mappingRef, { byPhone, byEmail, updatedAt: serverTimestamp() }, { merge: true });
     } catch (mapErr) {
-      console.warn("Account mapping notice:", mapErr);
+      console.warn("Account mapping read notice:", mapErr);
     }
 
-    const resolvedName =
-      (extra?.name && extra.name !== "Valued Customer" && extra.name !== "Google Customer" ? extra.name : "") ||
-      (user.displayName && user.displayName !== "Customer" ? user.displayName : "") ||
-      (existingData.name as string) ||
+    // 2. Direct Firestore query fallback: check customers collection where phone == cleanPhone
+    if (cleanPhone && primaryUid === user.uid) {
+      try {
+        const phoneQ = query(collection(db, "customers"), where("phone", "==", cleanPhone));
+        const phoneDocs = await getDocs(phoneQ);
+        for (const d of phoneDocs.docs) {
+          if (d.id !== user.uid) {
+            const data = d.data();
+            const targetMasterUid = (data.primaryUid as string) || d.id;
+            primaryUid = targetMasterUid;
+            existingData = { ...data, ...existingData };
+            if (!canonicalEmail && data.email && !isSyntheticAccount(data.email)) {
+              canonicalEmail = data.email;
+            }
+            break;
+          }
+        }
+      } catch (phoneErr) {
+        console.warn("Direct phone lookup error:", phoneErr);
+      }
+    }
+
+    // 3. Direct Firestore query fallback: check customers collection where email == canonicalEmail
+    if (canonicalEmail && primaryUid === user.uid) {
+      try {
+        const emailQ = query(collection(db, "customers"), where("email", "==", canonicalEmail));
+        const emailDocs = await getDocs(emailQ);
+        for (const d of emailDocs.docs) {
+          if (d.id !== user.uid) {
+            const data = d.data();
+            const targetMasterUid = (data.primaryUid as string) || d.id;
+            primaryUid = targetMasterUid;
+            existingData = { ...data, ...existingData };
+            if (!cleanPhone && data.phone) {
+              cleanPhone = extractCleanPhone(data.phone);
+            }
+            break;
+          }
+        }
+      } catch (emailErr) {
+        console.warn("Direct email lookup error:", emailErr);
+      }
+    }
+
+    // 4. If primaryUid is different from user.uid, fetch master document to inherit full profile
+    if (primaryUid !== user.uid) {
+      try {
+        const masterSnap = await getDoc(doc(db, "customers", primaryUid));
+        if (masterSnap.exists()) {
+          const masterData = masterSnap.data();
+          existingData = { ...masterData, ...existingData };
+          if (!canonicalEmail && masterData.email && !isSyntheticAccount(masterData.email)) {
+            canonicalEmail = masterData.email;
+          }
+          if (!cleanPhone && masterData.phone) {
+            cleanPhone = extractCleanPhone(masterData.phone);
+          }
+        }
+      } catch (masterErr) {
+        console.warn("Master document load error:", masterErr);
+      }
+    }
+
+    // 5. Clean, human display name resolution (never use machine IDs like user_6361509415)
+    const rawNames = [
+      extra?.name,
+      user.displayName,
+      existingData.name,
+    ];
+    let resolvedName = "";
+    for (const n of rawNames) {
+      if (typeof n === "string" && n.trim()) {
+        const t = n.trim();
+        if (
+          !t.toLowerCase().startsWith("user_") &&
+          t !== "Customer" &&
+          t !== "Valued Customer" &&
+          t !== "Google Customer"
+        ) {
+          resolvedName = t;
+          break;
+        }
+      }
+    }
+
+    const resolvedEmail =
+      canonicalEmail ||
+      (existingData.email && !isSyntheticAccount(String(existingData.email)) ? String(existingData.email) : "") ||
       "";
 
-    const resolvedEmail = canonicalEmail || (existingData.email as string) || "";
     const resolvedPhone = cleanPhone || (existingData.phone as string) || "";
 
     const mergedPayload: Record<string, unknown> = {
@@ -619,11 +662,40 @@ export async function syncCustomerDoc(
       }
     }
 
-    // Flipkart-level isolation: orders belong EXCLUSIVELY to the user who placed them.
-    // An order placed by User X with recipient Y's phone/email must NEVER be reassigned to User Y.
-    // Therefore, no reassigning of past orders based on recipient phone or email.
+    // Update global account_mappings registry
+    try {
+      const mappingRef = doc(db, "settings", "account_mappings");
+      const mappingSnap = await getDoc(mappingRef);
+      const mappingData = mappingSnap.exists()
+        ? mappingSnap.data()
+        : { byPhone: {}, byEmail: {} };
 
-    return { ...existingData, ...cleanPayload };
+      const byPhone = (mappingData.byPhone || {}) as Record<string, any>;
+      const byEmail = (mappingData.byEmail || {}) as Record<string, any>;
+
+      const entry = {
+        primaryUid,
+        phone: resolvedPhone,
+        email: resolvedEmail,
+        name: resolvedName,
+        savedAddress: cleanPayload.savedAddress || null,
+        savedAddresses: cleanPayload.savedAddresses || [],
+        updatedAt: Date.now(),
+      };
+
+      if (resolvedPhone) {
+        byPhone[resolvedPhone] = entry;
+      }
+      if (resolvedEmail) {
+        byEmail[resolvedEmail] = entry;
+      }
+
+      await setDoc(mappingRef, { byPhone, byEmail, updatedAt: serverTimestamp() }, { merge: true });
+    } catch (mapUpdateErr) {
+      console.warn("Account mapping update notice:", mapUpdateErr);
+    }
+
+    return { ...existingData, ...cleanPayload, primaryUid };
   } catch (e) {
     handleFirestoreError(e, OperationType.WRITE, `customers/${user.uid}`);
     return null;
@@ -849,7 +921,8 @@ export function subscribeUserOrders(
   userUid: string | undefined,
   phone: string | undefined,
   email: string | undefined,
-  callback: (orders: Order[]) => void
+  callback: (orders: Order[]) => void,
+  primaryUid?: string
 ) {
   if (!userUid) {
     callback([]);
@@ -858,14 +931,23 @@ export function subscribeUserOrders(
 
   try {
     const ordersCol = collection(db, "orders");
-    const qUid = query(ordersCol, where("customerUid", "==", userUid));
+    const allowedUids = Array.from(new Set([userUid, primaryUid].filter(Boolean))) as string[];
+
+    const qOrders =
+      allowedUids.length === 1
+        ? query(ordersCol, where("customerUid", "==", allowedUids[0]))
+        : query(ordersCol, where("customerUid", "in", allowedUids.slice(0, 10)));
+
     return onSnapshot(
-      qUid,
+      qOrders,
       (snapshot) => {
         const list: Order[] = [];
         snapshot.forEach((d) => {
           const data = d.data() as Order;
-          if (data.customerUid === userUid || (data as any).firebaseUid === userUid) {
+          if (
+            (data.customerUid && allowedUids.includes(data.customerUid)) ||
+            ((data as any).firebaseUid && allowedUids.includes((data as any).firebaseUid))
+          ) {
             list.push(data);
           }
         });
