@@ -662,9 +662,6 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
           </div>
         </div>
 
-        {/* Option A: WhatsApp Web Gateway (Free, 1-Time QR Scan) */}
-        <WhatsAppGatewayPanel isDark={isDark} showToast={showToast} />
-
         {/* Delhivery Diagnostics */}
         <div
           className={`rounded-3xl border p-6 shadow-sm space-y-5 transition-colors ${
@@ -1394,6 +1391,9 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
             </div>
           </div>
         </div>
+
+        {/* WhatsApp Authentication & Gateway Hub (Placed at bottom for maintenance/reference) */}
+        <WhatsAppGatewayPanel isDark={isDark} showToast={showToast} />
       </div>
     </div>
   );

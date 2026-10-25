@@ -8,6 +8,8 @@ import {
   Building2,
   Search,
   Loader2,
+  Edit2,
+  Trash2,
 } from "lucide-react";
 import { useStore } from "../context/StoreContext";
 import { INDIAN_STATES_DISTRICTS } from "../constants";
@@ -16,6 +18,10 @@ import L from "leaflet";
 export const LocationModal: React.FC = () => {
   const {
     address,
+    savedAddresses,
+    selectSavedAddress,
+    updateSavedAddress,
+    deleteSavedAddress,
     updateAddress,
     reverseGeocodeAndSaveAddress,
     isLocationModalOpen,
@@ -31,6 +37,8 @@ export const LocationModal: React.FC = () => {
   const [state, setState] = useState(address.state || "Karnataka");
   const [district, setDistrict] = useState(address.district || "Bengaluru Urban");
   const [pincode, setPincode] = useState(address.pincode || "560058");
+  const [addressLabel, setAddressLabel] = useState<"Home" | "Work" | "Other">("Home");
+  const [editingAddressId, setEditingAddressId] = useState<string | null>(null);
   const [coords, setCoords] = useState<[number, number]>([
     address.lat || 12.9716,
     address.lng || 77.5946,
@@ -299,20 +307,40 @@ export const LocationModal: React.FC = () => {
     }
 
     const isBLR = cleanPin.startsWith("560");
-    updateAddress({
-      fullName: fullName.trim(),
-      phone: cleanPhone,
-      email: email.trim(),
-      addressLine1: addressLine1.trim(),
-      landmark: landmark.trim(),
-      state,
-      district,
-      pincode: cleanPin,
-      city: isBLR ? "Bengaluru" : district,
-      lat: coords[0],
-      lng: coords[1],
-      isBangalore: isBLR,
-    });
+    if (editingAddressId) {
+      updateSavedAddress(editingAddressId, {
+        fullName: fullName.trim(),
+        phone: cleanPhone,
+        email: email.trim(),
+        addressLine1: addressLine1.trim(),
+        landmark: landmark.trim(),
+        state,
+        district,
+        pincode: cleanPin,
+        city: isBLR ? "Bengaluru" : district,
+        lat: coords[0],
+        lng: coords[1],
+        isBangalore: isBLR,
+        label: addressLabel,
+      });
+      setEditingAddressId(null);
+    } else {
+      updateAddress({
+        fullName: fullName.trim(),
+        phone: cleanPhone,
+        email: email.trim(),
+        addressLine1: addressLine1.trim(),
+        landmark: landmark.trim(),
+        state,
+        district,
+        pincode: cleanPin,
+        city: isBLR ? "Bengaluru" : district,
+        lat: coords[0],
+        lng: coords[1],
+        isBangalore: isBLR,
+      });
+    }
+
     try {
       localStorage.setItem("manopavana_address_saved", "true");
     } catch { }
@@ -362,6 +390,140 @@ export const LocationModal: React.FC = () => {
 
         {/* Content Body */}
         <div className="overflow-y-auto p-5 sm:p-6 space-y-5">
+          {/* Saved Addresses Section */}
+          {savedAddresses && savedAddresses.length > 0 && (
+            <div className="space-y-2.5">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-[#FFD885] flex items-center gap-1.5">
+                  <MapPin className="w-3.5 h-3.5 text-[#F5BC51]" />
+                  <span>Saved Delivery Locations</span>
+                </span>
+                {editingAddressId && (
+                  <button
+                    type="button"
+                    onClick={() => setEditingAddressId(null)}
+                    className="text-[11px] text-[#A88D77] hover:underline cursor-pointer"
+                  >
+                    Cancel Editing
+                  </button>
+                )}
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                {savedAddresses.map((addr) => {
+                  const isCurrent = addressLine1 === addr.addressLine1 && pincode === addr.pincode;
+                  const isEditing = editingAddressId === addr.id;
+                  return (
+                    <div
+                      key={addr.id}
+                      className={`p-3 rounded-xl border text-xs transition-all relative ${
+                        isEditing
+                          ? "bg-amber-950/60 border-[#F5BC51] ring-1 ring-[#F5BC51]"
+                          : isCurrent
+                          ? "bg-[#1C110B] border-[#D49A37]/50"
+                          : "bg-[#120A06] border-[#3A2417] hover:border-[#5A3822]"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="flex items-center gap-1.5">
+                          <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-[#D49A37]/20 text-[#F5BC51]">
+                            {addr.label}
+                          </span>
+                          <span className="font-bold text-[#FDF6EC] truncate max-w-[110px]">
+                            {addr.fullName || "Customer"}
+                          </span>
+                        </span>
+                        <div className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            title="Edit this address"
+                            onClick={() => {
+                              setEditingAddressId(addr.id);
+                              setAddressLabel(addr.label);
+                              setFullName(addr.fullName || "");
+                              setPhone(addr.phone || "");
+                              setEmail(addr.email || "");
+                              setAddressLine1(addr.addressLine1 || "");
+                              setLandmark(addr.landmark || "");
+                              setState(addr.state || "Karnataka");
+                              setDistrict(addr.district || "Bengaluru Urban");
+                              setPincode(addr.pincode || "560058");
+                              if (Number.isFinite(addr.lat) && Number.isFinite(addr.lng)) {
+                                setCoords([addr.lat!, addr.lng!]);
+                                mapInstanceRef.current?.setView([addr.lat!, addr.lng!], 15);
+                                markerRef.current?.setLatLng([addr.lat!, addr.lng!]);
+                              }
+                            }}
+                            className="p-1 rounded-md text-[#F5BC51] hover:bg-[#D49A37]/20 cursor-pointer transition-colors"
+                          >
+                            <Edit2 className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            title="Delete this address"
+                            onClick={() => {
+                              if (window.confirm(`Delete "${addr.label}" address?`)) {
+                                deleteSavedAddress(addr.id);
+                                if (editingAddressId === addr.id) {
+                                  setEditingAddressId(null);
+                                }
+                              }
+                            }}
+                            className="p-1 rounded-md text-red-400 hover:bg-red-950/40 cursor-pointer transition-colors"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                      <p className="text-[11px] text-[#A88D77] line-clamp-1 mb-1.5">
+                        {addr.addressLine1}, {addr.district || addr.city} - {addr.pincode}
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          selectSavedAddress(addr.id);
+                          setFullName(addr.fullName || "");
+                          setPhone(addr.phone || "");
+                          setEmail(addr.email || "");
+                          setAddressLine1(addr.addressLine1 || "");
+                          setLandmark(addr.landmark || "");
+                          setState(addr.state || "Karnataka");
+                          setDistrict(addr.district || "Bengaluru Urban");
+                          setPincode(addr.pincode || "560058");
+                          if (Number.isFinite(addr.lat) && Number.isFinite(addr.lng)) {
+                            setCoords([addr.lat!, addr.lng!]);
+                            mapInstanceRef.current?.setView([addr.lat!, addr.lng!], 15);
+                            markerRef.current?.setLatLng([addr.lat!, addr.lng!]);
+                          }
+                          setLocationModalOpen(false);
+                        }}
+                        className="w-full py-1 rounded-lg bg-[#2C1D14] hover:bg-[#3D281C] text-[10px] font-bold text-[#F5BC51] transition-colors cursor-pointer"
+                      >
+                        {isCurrent ? "✓ Currently Active" : "Deliver to This Location"}
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* In-Place Editing Banner */}
+          {editingAddressId && (
+            <div className="flex items-center justify-between p-3 rounded-2xl bg-amber-950/40 border border-[#F5BC51]/50 text-xs text-amber-200">
+              <div className="flex items-center gap-2">
+                <Edit2 className="w-4 h-4 text-[#F5BC51]" />
+                <span className="font-bold">Editing "{addressLabel}" Address In-Place</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingAddressId(null)}
+                className="text-[11px] text-[#A88D77] hover:text-[#FDF6EC] underline cursor-pointer"
+              >
+                Cancel
+              </button>
+            </div>
+          )}
+
           {/* Geolocation Quick Trigger */}
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 p-3.5 bg-[#1C110B] border border-[#4A301E] rounded-2xl shadow-inner">
             <div className="flex items-center gap-2.5">

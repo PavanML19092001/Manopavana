@@ -77,7 +77,8 @@ interface StoreContextType {
   address: Address;
   savedAddresses: LabeledAddress[];
   selectSavedAddress: (id: string) => void;
-  saveNewAddress: (newAddr: Omit<LabeledAddress, "id">) => void;
+  saveNewAddress: (newAddr: Omit<LabeledAddress, "id"> | LabeledAddress) => void;
+  updateSavedAddress: (id: string, updatedAddr: Partial<LabeledAddress>) => void;
   deleteSavedAddress: (id: string) => void;
   updateAddress: (newAddr: Partial<Address>) => void;
   reverseGeocodeAndSaveAddress: (lat: number, lng: number) => Promise<Partial<Address> | null>;
@@ -453,10 +454,63 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   };
 
-  const saveNewAddress = (newAddr: Omit<LabeledAddress, "id">) => {
+  const updateSavedAddress = (id: string, updatedFields: Partial<LabeledAddress>) => {
+    setSavedAddresses((prev) => {
+      const idx = prev.findIndex((a) => a.id === id);
+      if (idx === -1) return prev;
+      const updatedList = [...prev];
+      const merged: LabeledAddress = {
+        ...updatedList[idx],
+        ...updatedFields,
+        id,
+      };
+      updatedList[idx] = merged;
+
+      setAddress((current) => {
+        if ((current as any).id === id || (current.addressLine1 === prev[idx].addressLine1 && current.pincode === prev[idx].pincode)) {
+          return merged;
+        }
+        return current;
+      });
+
+      try {
+        localStorage.setItem("manopavana_saved_addresses", JSON.stringify(updatedList));
+      } catch {}
+
+      if (currentUser?.uid) {
+        saveCustomerProfile(currentUser.uid, {
+          savedAddresses: updatedList,
+          savedAddress: merged,
+        });
+      }
+
+      showToast("Address updated successfully!");
+      return updatedList;
+    });
+  };
+
+  const saveNewAddress = (newAddr: Omit<LabeledAddress, "id"> | LabeledAddress) => {
+    const cleanPin = (newAddr.pincode || "").trim();
+    const cleanLine = (newAddr.addressLine1 || "").trim().toLowerCase();
+
+    // Check if an existing card in savedAddresses has the exact same address line and pincode
+    const existingIndex = savedAddresses.findIndex(
+      (a) =>
+        (a.id && (newAddr as any).id && a.id === (newAddr as any).id) ||
+        (a.addressLine1?.trim().toLowerCase() === cleanLine && (a.pincode || "").trim() === cleanPin)
+    );
+
+    if (existingIndex !== -1) {
+      // In-place update existing address card instead of stacking duplicates!
+      const targetId = savedAddresses[existingIndex].id;
+      updateSavedAddress(targetId, newAddr);
+      return;
+    }
+
+    const entryId = (newAddr as any).id || `addr-${Date.now()}`;
     const entry: LabeledAddress = {
       ...newAddr,
-      id: `addr-${Date.now()}`,
+      id: entryId,
     };
     const updated = [entry, ...savedAddresses];
     setSavedAddresses(updated);
@@ -478,17 +532,29 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const deleteSavedAddress = (id: string) => {
-    const filtered = savedAddresses.filter((a) => a.id !== id);
-    setSavedAddresses(filtered);
-    try {
-      localStorage.setItem("manopavana_saved_addresses", JSON.stringify(filtered));
-    } catch {}
-    if (currentUser?.uid) {
-      saveCustomerProfile(currentUser.uid, {
-        savedAddresses: filtered,
+    setSavedAddresses((prev) => {
+      const filtered = prev.filter((a) => a.id !== id);
+      try {
+        localStorage.setItem("manopavana_saved_addresses", JSON.stringify(filtered));
+      } catch {}
+
+      if (currentUser?.uid) {
+        saveCustomerProfile(currentUser.uid, {
+          savedAddresses: filtered,
+          savedAddress: filtered[0] || null,
+        });
+      }
+
+      setAddress((curr) => {
+        if ((curr as any).id === id) {
+          return filtered[0] || DEFAULT_ADDRESS;
+        }
+        return curr;
       });
-    }
-    showToast("Address deleted");
+
+      showToast("Address removed");
+      return filtered;
+    });
   };
 
   const updateAddress = (newFields: Partial<Address>) => {
@@ -2009,6 +2075,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         savedAddresses,
         selectSavedAddress,
         saveNewAddress,
+        updateSavedAddress,
         deleteSavedAddress,
         updateAddress,
         reverseGeocodeAndSaveAddress,

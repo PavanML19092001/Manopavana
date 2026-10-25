@@ -18,9 +18,12 @@ import {
   ShieldAlert,
   LogOut,
   Lock,
+  Edit2,
+  Trash2,
+  Plus,
 } from "lucide-react";
-import { useStore } from "../context/StoreContext";
-import { BUSINESS_CONFIG } from "../constants";
+import { useStore, LabeledAddress } from "../context/StoreContext";
+import { BUSINESS_CONFIG, INDIAN_STATES_DISTRICTS } from "../constants";
 import { extractCleanPhone, isSyntheticAccount } from "../firebase";
 import { OrderStatus, Order } from "../types";
 import { LiveOrderTracker } from "../components/LiveOrderTracker";
@@ -34,6 +37,11 @@ export const AccountPage = () => {
   const {
     orders,
     address,
+    savedAddresses,
+    selectSavedAddress,
+    saveNewAddress,
+    updateSavedAddress,
+    deleteSavedAddress,
     updateAddress,
     loyalty,
     loyaltyRemainingText,
@@ -54,16 +62,18 @@ export const AccountPage = () => {
     const res: Order[] = [];
     const userUid = currentUser?.uid;
     const primaryUid = customerProfile?.primaryUid;
-    const allowedUids = new Set([userUid, primaryUid].filter(Boolean) as string[]);
+    const userPhone = customerProfile?.phone || (currentUser?.phoneNumber ? extractCleanPhone(currentUser.phoneNumber) : "");
+    const phoneUid = userPhone ? `phone_${userPhone}` : undefined;
+    const allowedUids = new Set([userUid, primaryUid, phoneUid].filter(Boolean) as string[]);
 
-    if (allowedUids.size === 0) return [];
+    if (allowedUids.size === 0 && !userPhone) return [];
 
     for (const o of orders) {
-      // Flipkart-level isolation: orders are strictly exclusive to the authenticated user account
-      // that placed the order. Recipient phone number or email NEVER grants access to another user's order.
+      const orderPhone = extractCleanPhone(o.customerPhone || o.shippingAddress?.phone || "");
       const isMine =
         (o.customerUid && allowedUids.has(o.customerUid)) ||
-        ((o as any).firebaseUid && allowedUids.has((o as any).firebaseUid));
+        ((o as any).firebaseUid && allowedUids.has((o as any).firebaseUid)) ||
+        (userPhone && orderPhone && orderPhone === userPhone);
 
       if (isMine) {
         const key = o.orderRef || o.id;
@@ -74,7 +84,7 @@ export const AccountPage = () => {
       }
     }
     return res;
-  }, [orders, currentUser, customerProfile?.primaryUid]);
+  }, [orders, currentUser, customerProfile?.primaryUid, customerProfile?.phone]);
 
   const [searchQuery, setSearchQuery] = useState(targetRef || "");
   const [selectedOrderRef, setSelectedOrderRef] = useState<string>(
@@ -119,6 +129,12 @@ export const AccountPage = () => {
   const [phone, setPhone] = useState(customerProfile?.phone || address.phone || "");
   const [addressLine, setAddressLine] = useState(address.addressLine1);
   const [landmark, setLandmark] = useState(address.landmark);
+  const [stateName, setStateName] = useState(address.state || "Karnataka");
+  const [district, setDistrict] = useState(address.district || "Bengaluru Urban");
+  const [pincode, setPincode] = useState(address.pincode || "560058");
+  const [addressLabel, setAddressLabel] = useState<"Home" | "Work" | "Other">("Home");
+  const [editingAddressId, setEditingAddressId] = useState<string | null>(null);
+  const [isAddingNewAddress, setIsAddingNewAddress] = useState(false);
 
   useEffect(() => {
     if (
@@ -445,82 +461,324 @@ export const AccountPage = () => {
                 )}
               </div>
 
-              <form onSubmit={handleUpdateProfile} className="space-y-3 text-xs">
-                <div>
-                  <label className={`block font-semibold mb-1 ${isDark ? "text-[#FAF4EA]" : "text-[#4A3220]"}`}>
-                    Full Name
-                  </label>
-                  <input
-                    type="text"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder="Manoj Kumar"
-                    className={`w-full px-3 py-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#E08F35]/40 transition-colors ${
-                      isDark
-                        ? "bg-[#150D07] border border-[#362114] text-[#FAF4EA] placeholder-[#8A7665]"
-                        : "bg-white border border-[#DDD1BE] text-[#1F120A] placeholder-[#8A7665]"
-                    }`}
-                  />
-                </div>
+              <div className="space-y-4 text-xs">
+                {/* 1. Profile Information */}
+                <form onSubmit={handleUpdateProfile} className="space-y-3">
+                  <div>
+                    <label className={`block font-semibold mb-1 ${isDark ? "text-[#FAF4EA]" : "text-[#4A3220]"}`}>
+                      Full Name
+                    </label>
+                    <input
+                      type="text"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      placeholder="Manoj Kumar"
+                      className={`w-full px-3 py-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#E08F35]/40 transition-colors ${
+                        isDark
+                          ? "bg-[#150D07] border border-[#362114] text-[#FAF4EA] placeholder-[#8A7665]"
+                          : "bg-white border border-[#DDD1BE] text-[#1F120A] placeholder-[#8A7665]"
+                      }`}
+                    />
+                  </div>
 
-                <div>
-                  <label className={`block font-semibold mb-1 ${isDark ? "text-[#FAF4EA]" : "text-[#4A3220]"}`}>
-                    WhatsApp Contact
-                  </label>
-                  <input
-                    type="tel"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    placeholder="9180301917"
-                    className={`w-full px-3 py-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#E08F35]/40 transition-colors ${
-                      isDark
-                        ? "bg-[#150D07] border border-[#362114] text-[#FAF4EA] placeholder-[#8A7665]"
-                        : "bg-white border border-[#DDD1BE] text-[#1F120A] placeholder-[#8A7665]"
-                    }`}
-                  />
-                </div>
+                  <div>
+                    <label className={`block font-semibold mb-1 ${isDark ? "text-[#FAF4EA]" : "text-[#4A3220]"}`}>
+                      WhatsApp Contact
+                    </label>
+                    <input
+                      type="tel"
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                      placeholder="9180301917"
+                      className={`w-full px-3 py-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#E08F35]/40 transition-colors ${
+                        isDark
+                          ? "bg-[#150D07] border border-[#362114] text-[#FAF4EA] placeholder-[#8A7665]"
+                          : "bg-white border border-[#DDD1BE] text-[#1F120A] placeholder-[#8A7665]"
+                      }`}
+                    />
+                  </div>
 
-                <div>
-                  <label className={`block font-semibold mb-1 ${isDark ? "text-[#FAF4EA]" : "text-[#4A3220]"}`}>
-                    Primary Street Address
-                  </label>
-                  <input
-                    type="text"
-                    value={addressLine}
-                    onChange={(e) => setAddressLine(e.target.value)}
-                    placeholder="118, Raghavendra Layout, Thigalarapalya"
-                    className={`w-full px-3 py-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#E08F35]/40 transition-colors ${
-                      isDark
-                        ? "bg-[#150D07] border border-[#362114] text-[#FAF4EA] placeholder-[#8A7665]"
-                        : "bg-white border border-[#DDD1BE] text-[#1F120A] placeholder-[#8A7665]"
-                    }`}
-                  />
-                </div>
+                  <div className="pt-1">
+                    <button
+                      type="submit"
+                      className="w-full py-2 rounded-xl bg-[#5E3210] hover:bg-[#43230A] text-white font-bold transition-colors cursor-pointer shadow-sm text-xs"
+                    >
+                      Update Profile
+                    </button>
+                  </div>
+                </form>
 
-                <div>
-                  <label className={`block font-semibold mb-1 ${isDark ? "text-[#FAF4EA]" : "text-[#4A3220]"}`}>
-                    Landmark
-                  </label>
-                  <input
-                    type="text"
-                    value={landmark}
-                    onChange={(e) => setLandmark(e.target.value)}
-                    placeholder="Near Water Tank"
-                    className={`w-full px-3 py-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#E08F35]/40 transition-colors ${
-                      isDark
-                        ? "bg-[#150D07] border border-[#362114] text-[#FAF4EA] placeholder-[#8A7665]"
-                        : "bg-white border border-[#DDD1BE] text-[#1F120A] placeholder-[#8A7665]"
-                    }`}
-                  />
-                </div>
+                {/* 2. Saved Delivery Addresses */}
+                <div className={`pt-4 border-t ${isDark ? "border-[#2D1B10]" : "border-[#EFE8DC]"} space-y-3`}>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5">
+                      <MapPin className="w-3.5 h-3.5 text-[#E08F35]" />
+                      <h4 className={`font-bold font-serif ${isDark ? "text-[#FAF4EA]" : "text-[#1F120A]"}`}>
+                        Saved Delivery Addresses
+                      </h4>
+                    </div>
+                    {!isAddingNewAddress && !editingAddressId && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsAddingNewAddress(true);
+                          setEditingAddressId(null);
+                          setAddressLine("");
+                          setLandmark("");
+                        }}
+                        className="flex items-center gap-1 text-[11px] font-bold text-amber-500 hover:text-amber-600 transition-colors cursor-pointer"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>Add New</span>
+                      </button>
+                    )}
+                  </div>
 
-                <div className="pt-2">
-                  <button
-                    type="submit"
-                    className="w-full py-2.5 rounded-xl bg-[#5E3210] hover:bg-[#43230A] text-white font-bold transition-colors cursor-pointer shadow-sm"
-                  >
-                    Save & Sync Address
-                  </button>
+                  {/* List of Address Cards */}
+                  {savedAddresses && savedAddresses.length > 0 && !editingAddressId && !isAddingNewAddress && (
+                    <div className="space-y-2.5">
+                      {savedAddresses.map((addr) => (
+                        <div
+                          key={addr.id}
+                          className={`p-3 rounded-xl border transition-all ${
+                            isDark
+                              ? "bg-[#150D07] border-[#362114]"
+                              : "bg-[#FAF7F2] border-[#E8DEC8]"
+                          }`}
+                        >
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="flex items-center gap-1.5">
+                              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-[#E08F35]/20 text-[#E08F35]">
+                                {addr.label}
+                              </span>
+                              <span className="font-bold text-[#FAF4EA] truncate max-w-[120px]">
+                                {addr.fullName || name}
+                              </span>
+                            </span>
+                            <div className="flex items-center gap-1">
+                              <button
+                                type="button"
+                                title="Edit Address"
+                                onClick={() => {
+                                  setEditingAddressId(addr.id);
+                                  setIsAddingNewAddress(false);
+                                  setAddressLabel(addr.label);
+                                  setAddressLine(addr.addressLine1 || "");
+                                  setLandmark(addr.landmark || "");
+                                  setPincode(addr.pincode || "560058");
+                                  setDistrict(addr.district || "Bengaluru Urban");
+                                  setStateName(addr.state || "Karnataka");
+                                }}
+                                className="p-1 rounded-md text-amber-500 hover:text-amber-600 hover:bg-amber-500/10 cursor-pointer transition-colors"
+                              >
+                                <Edit2 className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                title="Delete Address"
+                                onClick={() => {
+                                  if (window.confirm(`Delete "${addr.label}" address?`)) {
+                                    deleteSavedAddress(addr.id);
+                                  }
+                                }}
+                                className="p-1 rounded-md text-red-400 hover:text-red-500 hover:bg-red-500/10 cursor-pointer transition-colors"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </div>
+                          <p className="font-mono text-[10px] text-[#A88D77] mb-0.5">{addr.phone || phone}</p>
+                          <p className="text-[11px] text-stone-400 line-clamp-2">
+                            {addr.addressLine1}, {addr.district || addr.city} - {addr.pincode}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Inline Address Edit / Add Form */}
+                  {(editingAddressId || isAddingNewAddress) && (
+                    <form
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        if (!addressLine.trim() || !pincode.trim()) {
+                          showToast("Please fill in address and pincode");
+                          return;
+                        }
+                        const isBLR =
+                          pincode.startsWith("560") ||
+                          district.toLowerCase().includes("bengaluru") ||
+                          district.toLowerCase().includes("bangalore");
+
+                        if (editingAddressId) {
+                          updateSavedAddress(editingAddressId, {
+                            fullName: name,
+                            phone,
+                            addressLine1: addressLine,
+                            landmark,
+                            state: stateName,
+                            district,
+                            pincode,
+                            city: isBLR ? "Bengaluru" : district,
+                            label: addressLabel,
+                            isBangalore: isBLR,
+                          });
+                          setEditingAddressId(null);
+                        } else {
+                          saveNewAddress({
+                            fullName: name,
+                            phone,
+                            addressLine1: addressLine,
+                            landmark,
+                            state: stateName,
+                            district,
+                            pincode,
+                            city: isBLR ? "Bengaluru" : district,
+                            label: addressLabel,
+                            isBangalore: isBLR,
+                          });
+                          setIsAddingNewAddress(false);
+                        }
+                      }}
+                      className={`p-3.5 rounded-2xl border space-y-3 ${
+                        isDark ? "bg-[#180E08] border-[#4A301E]" : "bg-white border-[#DDD1BE]"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between pb-1 border-b border-stone-200 dark:border-stone-800">
+                        <span className="font-bold text-xs text-amber-500">
+                          {editingAddressId ? `Editing "${addressLabel}" Address` : "Add New Delivery Address"}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingAddressId(null);
+                            setIsAddingNewAddress(false);
+                          }}
+                          className="text-[11px] text-stone-400 hover:underline cursor-pointer"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+
+                      {/* Label Selector */}
+                      <div>
+                        <label className={`block font-semibold mb-1 ${isDark ? "text-[#FAF4EA]" : "text-[#4A3220]"}`}>
+                          Label
+                        </label>
+                        <div className="flex gap-2">
+                          {(["Home", "Work", "Other"] as const).map((lbl) => (
+                            <button
+                              key={lbl}
+                              type="button"
+                              onClick={() => setAddressLabel(lbl)}
+                              className={`px-2.5 py-1 rounded-lg text-[11px] font-bold cursor-pointer transition-all ${
+                                addressLabel === lbl
+                                  ? "bg-[#5E3210] text-white"
+                                  : isDark
+                                  ? "bg-[#150D07] text-[#A88D77] border border-[#362114]"
+                                  : "bg-[#FAF7F2] text-[#5C402D] border border-[#DDD1BE]"
+                              }`}
+                            >
+                              {lbl}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className={`block font-semibold mb-1 ${isDark ? "text-[#FAF4EA]" : "text-[#4A3220]"}`}>
+                          Street Address *
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          value={addressLine}
+                          onChange={(e) => setAddressLine(e.target.value)}
+                          placeholder="House/Flat No, Street, Layout"
+                          className={`w-full px-3 py-1.5 rounded-xl text-xs ${
+                            isDark
+                              ? "bg-[#150D07] border border-[#362114] text-[#FAF4EA]"
+                              : "bg-white border border-[#DDD1BE] text-[#1F120A]"
+                          }`}
+                        />
+                      </div>
+
+                      <div>
+                        <label className={`block font-semibold mb-1 ${isDark ? "text-[#FAF4EA]" : "text-[#4A3220]"}`}>
+                          Landmark
+                        </label>
+                        <input
+                          type="text"
+                          value={landmark}
+                          onChange={(e) => setLandmark(e.target.value)}
+                          placeholder="Near Water Tank / Landmark"
+                          className={`w-full px-3 py-1.5 rounded-xl text-xs ${
+                            isDark
+                              ? "bg-[#150D07] border border-[#362114] text-[#FAF4EA]"
+                              : "bg-white border border-[#DDD1BE] text-[#1F120A]"
+                          }`}
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className={`block font-semibold mb-1 ${isDark ? "text-[#FAF4EA]" : "text-[#4A3220]"}`}>
+                            District
+                          </label>
+                          <input
+                            type="text"
+                            value={district}
+                            onChange={(e) => setDistrict(e.target.value)}
+                            placeholder="District"
+                            className={`w-full px-3 py-1.5 rounded-xl text-xs ${
+                              isDark
+                                ? "bg-[#150D07] border border-[#362114] text-[#FAF4EA]"
+                                : "bg-white border border-[#DDD1BE] text-[#1F120A]"
+                            }`}
+                          />
+                        </div>
+                        <div>
+                          <label className={`block font-semibold mb-1 ${isDark ? "text-[#FAF4EA]" : "text-[#4A3220]"}`}>
+                            Pincode *
+                          </label>
+                          <input
+                            type="text"
+                            maxLength={6}
+                            required
+                            value={pincode}
+                            onChange={(e) => setPincode(e.target.value)}
+                            placeholder="560058"
+                            className={`w-full px-3 py-1.5 rounded-xl text-xs ${
+                              isDark
+                                ? "bg-[#150D07] border border-[#362114] text-[#FAF4EA]"
+                                : "bg-white border border-[#DDD1BE] text-[#1F120A]"
+                            }`}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex gap-2 pt-1">
+                        <button
+                          type="submit"
+                          className="flex-1 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-700 text-white font-bold text-xs shadow-sm cursor-pointer"
+                        >
+                          {editingAddressId ? "Update Address In-Place" : "Save Address"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingAddressId(null);
+                            setIsAddingNewAddress(false);
+                          }}
+                          className={`px-3 py-2 rounded-xl border text-xs font-semibold cursor-pointer ${
+                            isDark ? "border-[#362114] text-[#A88D77]" : "border-[#DDD1BE] text-[#5C402D]"
+                          }`}
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </form>
+                  )}
                 </div>
 
                 {currentUser?.email === "manopavana@gmail.com" && (
@@ -534,7 +792,7 @@ export const AccountPage = () => {
                     </Link>
                   </div>
                 )}
-              </form>
+              </div>
             </div>
           </div>
         </div>

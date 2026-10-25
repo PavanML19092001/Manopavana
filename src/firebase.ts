@@ -136,17 +136,127 @@ export function formatLoginIdentifier(input: string): string {
 }
 
 /**
- * 1-Click Google Sign-In
+ * Flipkart-Exact Email Login Pre-Check Gate:
+ * Verifies if an email is already registered and linked to an existing customer account.
+ * First-time registration is strictly restricted to verified WhatsApp Mobile OTP.
+ */
+export async function checkEmailExistsInDatabase(rawEmail: string): Promise<{
+  exists: boolean;
+  phone?: string;
+  primaryUid?: string;
+  name?: string;
+  isStoreAdmin?: boolean;
+}> {
+  if (!rawEmail) return { exists: false };
+  const cleanEmail = rawEmail.toLowerCase().trim();
+
+  // 1. Allow store administrators
+  const ADMIN_EMAILS = ["manopavana@gmail.com", "pavanml19092001@gmail.com"];
+  if (ADMIN_EMAILS.includes(cleanEmail)) {
+    return { exists: true, isStoreAdmin: true };
+  }
+
+  // 2. Check settings/account_mappings
+  try {
+    const mapSnap = await getDoc(doc(db, "settings", "account_mappings"));
+    if (mapSnap.exists()) {
+      const mapData = mapSnap.data();
+      const byEmail = (mapData?.byEmail || {}) as Record<string, any>;
+      const match = byEmail[cleanEmail];
+      if (match && (match.phone || match.primaryUid)) {
+        return {
+          exists: true,
+          phone: match.phone || undefined,
+          primaryUid: match.primaryUid || undefined,
+          name: match.name || undefined,
+        };
+      }
+    }
+  } catch (e) {
+    console.warn("Notice checking account_mappings for email:", e);
+  }
+
+  // 3. Check customers collection where email == cleanEmail
+  try {
+    const qEmail = query(collection(db, "customers"), where("email", "==", cleanEmail));
+    const snap = await getDocs(qEmail);
+    if (!snap.empty) {
+      for (const d of snap.docs) {
+        const data = d.data();
+        if (data.phone || data.primaryUid) {
+          return {
+            exists: true,
+            phone: data.phone || undefined,
+            primaryUid: data.primaryUid || d.id,
+            name: data.name || undefined,
+          };
+        }
+      }
+      const firstData = snap.docs[0].data();
+      return {
+        exists: true,
+        primaryUid: snap.docs[0].id,
+        name: firstData.name || undefined,
+        phone: firstData.phone || undefined,
+      };
+    }
+  } catch (e) {
+    console.warn("Notice checking customers collection for email:", e);
+  }
+
+  // 4. Check past orders by customerEmail
+  try {
+    const qOrders = query(collection(db, "orders"), where("customerEmail", "==", cleanEmail));
+    const snap = await getDocs(qOrders);
+    if (!snap.empty) {
+      const firstOrd = snap.docs[0].data();
+      const cleanPhone = extractCleanPhone(firstOrd.customerPhone || firstOrd.shippingAddress?.phone || "");
+      return {
+        exists: true,
+        phone: cleanPhone || undefined,
+        primaryUid: firstOrd.customerUid || (cleanPhone ? `phone_${cleanPhone}` : undefined),
+        name: firstOrd.shippingAddress?.fullName || undefined,
+      };
+    }
+  } catch (e) {
+    console.warn("Notice checking orders for email:", e);
+  }
+
+  return { exists: false };
+}
+
+/**
+ * 1-Click Google Sign-In with Flipkart Pre-Check Gate:
+ * Only permitted if the Google email is already linked to a registered customer account.
+ * Unregistered accounts are blocked from first-time registration via email.
  */
 export async function signInWithGoogle() {
   const result = await signInWithPopup(auth, googleProvider);
-  if (result.user) {
-    await syncCustomerDoc(result.user, {
-      name: result.user.displayName || "Google Customer",
-      email: result.user.email || undefined,
-      phone: result.user.phoneNumber || undefined,
-    });
+  if (!result.user || !result.user.email) {
+    await signOut(auth);
+    throw new Error("Unable to retrieve email from Google account.");
   }
+
+  const cleanEmail = result.user.email.toLowerCase().trim();
+  const check = await checkEmailExistsInDatabase(cleanEmail);
+
+  if (!check.exists) {
+    // Immediately sign out to abort session
+    await signOut(auth);
+    const blockedErr = new Error(
+      "This Google account is not yet linked to any MANOPAVANA account. As per our security policy, first-time registration is strictly via your WhatsApp Mobile Number. Please sign in with your mobile number first, then link your email in your profile."
+    );
+    (blockedErr as any).code = "AUTH_BLOCKED_UNREGISTERED_EMAIL";
+    throw blockedErr;
+  }
+
+  // Synchronize Google user with their linked mobile account
+  await syncCustomerDoc(result.user, {
+    name: result.user.displayName || check.name || "Customer",
+    email: cleanEmail,
+    phone: check.phone || undefined,
+  });
+
   return result.user;
 }
 
@@ -853,8 +963,9 @@ export async function saveOrderToFirestore(order: Order, userUid?: string): Prom
     const orderDocRef = doc(db, "orders", order.orderRef);
     const cleanPhone = extractCleanPhone(order.shippingAddress?.phone || order.customerPhone || "");
     const cleanEmail = (order.shippingAddress?.email || order.customerEmail || "").toLowerCase().trim();
+    const phoneUid = cleanPhone ? `phone_${cleanPhone}` : null;
 
-    const uid = userUid || order.customerUid || (order as any).firebaseUid || null;
+    const uid = userUid || order.customerUid || (order as any).firebaseUid || phoneUid || null;
     const rawPayload = {
       ...order,
       customerUid: uid,
@@ -883,6 +994,21 @@ export async function saveOrderToFirestore(order: Order, userUid?: string): Prom
         { merge: true }
       ).catch(() => {});
     }
+
+    if (phoneUid && phoneUid !== uid) {
+      setDoc(
+        doc(db, "customers", phoneUid),
+        {
+          totalOrders: increment(1),
+          totalSpent: increment(order.total || 0),
+          lastOrderRef: order.orderRef,
+          lastOrderAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true }
+      ).catch(() => {});
+    }
+
     return true;
   } catch (err) {
     handleFirestoreError(err, OperationType.WRITE, `orders/${order.orderRef}`);
@@ -914,8 +1040,8 @@ export async function updateFirestoreOrderStatus(
 
 /**
  * Listen to orders for a specific user in real-time.
- * Strictly queries ONLY by customerUid so orders placed by one account
- * are never visible to another account, even if contact details match delivery recipients.
+ * Guarantees order parity across mobile number and linked email accounts
+ * by querying both customerUid and customerPhone.
  */
 export function subscribeUserOrders(
   userUid: string | undefined,
@@ -924,42 +1050,75 @@ export function subscribeUserOrders(
   callback: (orders: Order[]) => void,
   primaryUid?: string
 ) {
-  if (!userUid) {
+  const cleanPhone = extractCleanPhone(phone);
+  const phoneUid = cleanPhone ? `phone_${cleanPhone}` : undefined;
+  const allowedUids = Array.from(
+    new Set([userUid, primaryUid, phoneUid].filter(Boolean))
+  ) as string[];
+
+  if (allowedUids.length === 0 && !cleanPhone) {
     callback([]);
     return () => {};
   }
 
   try {
     const ordersCol = collection(db, "orders");
-    const allowedUids = Array.from(new Set([userUid, primaryUid].filter(Boolean))) as string[];
+    const unsubs: (() => void)[] = [];
+    const ordersMap = new Map<string, Order>();
 
-    const qOrders =
-      allowedUids.length === 1
-        ? query(ordersCol, where("customerUid", "==", allowedUids[0]))
-        : query(ordersCol, where("customerUid", "in", allowedUids.slice(0, 10)));
+    const emitOrders = () => {
+      const list = Array.from(ordersMap.values());
+      list.sort(
+        (a, b) => (b.timestamp || b.timestampMs || 0) - (a.timestamp || a.timestampMs || 0)
+      );
+      callback(list);
+    };
 
-    return onSnapshot(
-      qOrders,
-      (snapshot) => {
-        const list: Order[] = [];
-        snapshot.forEach((d) => {
-          const data = d.data() as Order;
-          if (
-            (data.customerUid && allowedUids.includes(data.customerUid)) ||
-            ((data as any).firebaseUid && allowedUids.includes((data as any).firebaseUid))
-          ) {
-            list.push(data);
-          }
-        });
-        list.sort(
-          (a, b) => (b.timestamp || b.timestampMs || 0) - (a.timestamp || a.timestampMs || 0)
-        );
-        callback(list);
-      },
-      (error) => {
-        handleFirestoreError(error, OperationType.GET, "orders");
-      }
-    );
+    if (allowedUids.length > 0) {
+      const qOrders =
+        allowedUids.length === 1
+          ? query(ordersCol, where("customerUid", "==", allowedUids[0]))
+          : query(ordersCol, where("customerUid", "in", allowedUids.slice(0, 10)));
+
+      const unsub1 = onSnapshot(
+        qOrders,
+        (snapshot) => {
+          snapshot.forEach((d) => {
+            const data = d.data() as Order;
+            const ref = data.orderRef || d.id;
+            ordersMap.set(ref, data);
+          });
+          emitOrders();
+        },
+        (error) => {
+          handleFirestoreError(error, OperationType.GET, "orders");
+        }
+      );
+      unsubs.push(unsub1);
+    }
+
+    if (cleanPhone) {
+      const qPhone = query(ordersCol, where("customerPhone", "==", cleanPhone));
+      const unsub2 = onSnapshot(
+        qPhone,
+        (snapshot) => {
+          snapshot.forEach((d) => {
+            const data = d.data() as Order;
+            const ref = data.orderRef || d.id;
+            ordersMap.set(ref, data);
+          });
+          emitOrders();
+        },
+        (error) => {
+          handleFirestoreError(error, OperationType.GET, "orders");
+        }
+      );
+      unsubs.push(unsub2);
+    }
+
+    return () => {
+      unsubs.forEach((u) => u());
+    };
   } catch (err) {
     handleFirestoreError(err, OperationType.LIST, "orders");
     return () => {};

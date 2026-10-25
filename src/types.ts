@@ -107,6 +107,7 @@ export interface CartItem {
 }
 
 export interface Address {
+  id?: string;
   fullName: string;
   phone: string;
   email?: string;

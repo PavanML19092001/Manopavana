@@ -18,6 +18,8 @@ import {
   Zap,
   Search,
   Loader2,
+  Edit2,
+  Trash2,
 } from "lucide-react";
 import L from "leaflet";
 import { useStore, LabeledAddress } from "../context/StoreContext";
@@ -46,6 +48,8 @@ export const CheckoutPage: React.FC = () => {
     savedAddresses,
     selectSavedAddress,
     saveNewAddress,
+    updateSavedAddress,
+    deleteSavedAddress,
     updateAddress,
     reverseGeocodeAndSaveAddress,
     saveOrder,
@@ -86,6 +90,7 @@ export const CheckoutPage: React.FC = () => {
   const [isAddingNewAddress, setIsAddingNewAddress] = useState<boolean>(
     !savedAddresses || savedAddresses.length === 0
   );
+  const [editingAddressId, setEditingAddressId] = useState<string | null>(null);
 
   // Address Form State
   const [fullName, setFullName] = useState(() => address.fullName || currentUser?.displayName || "");
@@ -835,12 +840,14 @@ export const CheckoutPage: React.FC = () => {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {savedAddresses.map((addr) => {
                       const isSelected = selectedAddressId === addr.id && !isAddingNewAddress;
+                      const isEditingThis = editingAddressId === addr.id;
                       return (
                         <div
                           key={addr.id}
                           onClick={() => {
                             setSelectedAddressId(addr.id);
                             setIsAddingNewAddress(false);
+                            setEditingAddressId(null);
                             selectSavedAddress(addr.id);
                             setFullName(addr.fullName || "");
                             setPhone(addr.phone || "");
@@ -854,7 +861,7 @@ export const CheckoutPage: React.FC = () => {
                               safeUpdateMapCenter(addr.lat!, addr.lng!, 15);
                             }
                           }}
-                          className={`p-3.5 rounded-xl border text-xs cursor-pointer transition-all ${isSelected
+                          className={`p-3.5 rounded-xl border text-xs cursor-pointer transition-all relative ${isSelected
                               ? isDark
                                 ? "bg-amber-950/40 border-[#E08F35] ring-2 ring-[#E08F35]/40"
                                 : "bg-amber-50/80 border-[#E08F35] ring-2 ring-[#E08F35]/40"
@@ -868,10 +875,54 @@ export const CheckoutPage: React.FC = () => {
                               <span className="px-2 py-0.5 rounded text-[10px] bg-[#E08F35]/20 text-[#E08F35]">
                                 {addr.label}
                               </span>
-                              <span className="truncate max-w-[120px]">{addr.fullName}</span>
+                              <span className="truncate max-w-[110px]">{addr.fullName}</span>
                             </span>
-                            <span className="font-mono text-[11px] text-[#A88D77]">{addr.phone}</span>
+                            <div className="flex items-center gap-1">
+                              <button
+                                type="button"
+                                title="Edit address"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setEditingAddressId(addr.id);
+                                  setSelectedAddressId(addr.id);
+                                  setIsAddingNewAddress(true);
+                                  setAddressLabel(addr.label);
+                                  setFullName(addr.fullName || "");
+                                  setPhone(addr.phone || "");
+                                  setAddressLine1(addr.addressLine1 || "");
+                                  setLandmark(addr.landmark || "");
+                                  setState(addr.state || "Karnataka");
+                                  setDistrict(addr.district || "Bengaluru Urban");
+                                  setPincode(addr.pincode || "560058");
+                                  if (Number.isFinite(addr.lat) && Number.isFinite(addr.lng)) {
+                                    setCoords([addr.lat!, addr.lng!]);
+                                    safeUpdateMapCenter(addr.lat!, addr.lng!, 15);
+                                  }
+                                }}
+                                className="p-1 rounded-md text-amber-500 hover:text-amber-600 hover:bg-amber-500/10 transition-colors"
+                              >
+                                <Edit2 className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                title="Delete address"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (window.confirm(`Delete "${addr.label}" address?`)) {
+                                    deleteSavedAddress(addr.id);
+                                    if (selectedAddressId === addr.id) {
+                                      setSelectedAddressId("new");
+                                      setIsAddingNewAddress(true);
+                                    }
+                                  }
+                                }}
+                                className="p-1 rounded-md text-red-400 hover:text-red-500 hover:bg-red-500/10 transition-colors"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
                           </div>
+                          <span className="font-mono text-[11px] text-[#A88D77] block mb-1">{addr.phone}</span>
                           <p className="text-[11px] text-stone-500 line-clamp-2">
                             {addr.addressLine1}, {addr.district || addr.city} - {addr.pincode}
                           </p>
@@ -882,9 +933,12 @@ export const CheckoutPage: React.FC = () => {
                     <div
                       onClick={() => {
                         setSelectedAddressId("new");
+                        setEditingAddressId(null);
                         setIsAddingNewAddress(true);
+                        setAddressLine1("");
+                        setLandmark("");
                       }}
-                      className={`p-3.5 rounded-xl border-2 border-dashed flex items-center justify-center gap-2 cursor-pointer text-xs font-bold transition-all ${isAddingNewAddress
+                      className={`p-3.5 rounded-xl border-2 border-dashed flex items-center justify-center gap-2 cursor-pointer text-xs font-bold transition-all ${isAddingNewAddress && !editingAddressId
                           ? "border-[#E08F35] bg-amber-500/10 text-[#E08F35]"
                           : isDark
                             ? "border-[#362114] text-[#A88D77] hover:border-[#E08F35]"
@@ -900,6 +954,28 @@ export const CheckoutPage: React.FC = () => {
               {/* Form Input Container */}
               {isAddingNewAddress && (
                 <div className="space-y-4 pt-2 border-t border-stone-200 dark:border-stone-800">
+                  {/* In-Place Editing Banner */}
+                  {editingAddressId && (
+                    <div className="flex items-center justify-between p-3 rounded-xl bg-amber-500/10 border border-amber-500/30">
+                      <div className="flex items-center gap-2">
+                        <Edit2 className="w-4 h-4 text-amber-500" />
+                        <span className="text-xs font-bold text-amber-600 dark:text-amber-300">
+                          Editing Address In-Place (Updates this card directly)
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingAddressId(null);
+                          setIsAddingNewAddress(false);
+                        }}
+                        className="text-xs text-stone-500 hover:text-stone-700 dark:hover:text-stone-300 underline font-medium cursor-pointer"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  )}
+
                   {/* Address Label Selector */}
                   <div>
                     <label className={`block text-xs font-semibold mb-1.5 ${isDark ? "text-[#FAF4EA]" : "text-[#3D2514]"}`}>
@@ -1076,6 +1152,104 @@ export const CheckoutPage: React.FC = () => {
                           : "bg-[#FAF7F2] border border-[#DDD1BE] text-[#23150C]"
                         }`}
                     />
+                  </div>
+
+                  {/* Form Action Buttons */}
+                  <div className="flex items-center gap-2 pt-2">
+                    {editingAddressId ? (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (!addressLine1.trim() || !pincode.trim() || !fullName.trim()) {
+                              showToast("Please fill in recipient name, address, and pincode");
+                              return;
+                            }
+                            updateSavedAddress(editingAddressId, {
+                              fullName,
+                              phone,
+                              addressLine1,
+                              landmark,
+                              state,
+                              district,
+                              pincode,
+                              label: addressLabel,
+                              lat: coords[0],
+                              lng: coords[1],
+                              isBangalore:
+                                pincode.startsWith("560") ||
+                                district.toLowerCase().includes("bengaluru") ||
+                                district.toLowerCase().includes("bangalore"),
+                            });
+                            setEditingAddressId(null);
+                            setIsAddingNewAddress(false);
+                          }}
+                          className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-700 hover:brightness-110 text-white font-bold text-xs shadow-md flex items-center justify-center gap-1.5 cursor-pointer"
+                        >
+                          <CheckCircle2 className="w-4 h-4" />
+                          <span>Update Address In-Place</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingAddressId(null);
+                            setIsAddingNewAddress(false);
+                          }}
+                          className={`px-4 py-2.5 rounded-xl border text-xs font-semibold cursor-pointer ${
+                            isDark ? "border-[#362114] text-[#A88D77]" : "border-[#DDD1BE] text-[#5C402D]"
+                          }`}
+                        >
+                          Cancel
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (!addressLine1.trim() || !pincode.trim() || !fullName.trim()) {
+                              showToast("Please fill in recipient name, address, and pincode");
+                              return;
+                            }
+                            saveNewAddress({
+                              fullName,
+                              phone,
+                              addressLine1,
+                              landmark,
+                              state,
+                              district,
+                              pincode,
+                              label: addressLabel,
+                              city: district,
+                              lat: coords[0],
+                              lng: coords[1],
+                              isBangalore:
+                                pincode.startsWith("560") ||
+                                district.toLowerCase().includes("bengaluru") ||
+                                district.toLowerCase().includes("bangalore"),
+                            });
+                            setIsAddingNewAddress(false);
+                          }}
+                          className="flex-1 py-2.5 rounded-xl bg-[#5E3210] hover:bg-[#43230A] text-white font-bold text-xs shadow-md flex items-center justify-center gap-1.5 cursor-pointer"
+                        >
+                          <CheckCircle2 className="w-4 h-4 text-amber-300" />
+                          <span>Save Address to Address Book</span>
+                        </button>
+                        {savedAddresses && savedAddresses.length > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setIsAddingNewAddress(false);
+                            }}
+                            className={`px-4 py-2.5 rounded-xl border text-xs font-semibold cursor-pointer ${
+                              isDark ? "border-[#362114] text-[#A88D77]" : "border-[#DDD1BE] text-[#5C402D]"
+                            }`}
+                          >
+                            Cancel
+                          </button>
+                        )}
+                      </>
+                    )}
                   </div>
                 </div>
               )}
