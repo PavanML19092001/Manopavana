@@ -678,7 +678,7 @@ export const Navbar: React.FC = () => {
     </header>
 
     {/* FIXED MOBILE BOTTOM NAVIGATION BAR (FLIPKART STYLE: HOME, OFFERS/QR, BEATS, PROFILE, CART) */}
-    {location.pathname !== "/checkout" && (
+    {location.pathname !== "/checkout" && !location.pathname.startsWith("/product") && (
       <nav
         aria-label="Mobile Navigation"
         className={`md:hidden fixed bottom-0 left-0 right-0 z-40 border-t backdrop-blur-xl transition-all shadow-[0_-4px_24px_rgba(0,0,0,0.2)] ${

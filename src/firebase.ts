@@ -7,6 +7,9 @@ import {
   createUserWithEmailAndPassword,
   signOut,
   User as FirebaseUser,
+  RecaptchaVerifier,
+  signInWithPhoneNumber,
+  ConfirmationResult,
 } from "firebase/auth";
 import {
   getFirestore,
@@ -132,6 +135,121 @@ export async function signInWithGoogle() {
   }
   return result.user;
 }
+
+declare global {
+  interface Window {
+    recaptchaVerifier?: RecaptchaVerifier;
+    confirmationResult?: ConfirmationResult;
+  }
+}
+
+/**
+ * Initialize or reset invisible reCAPTCHA verifier for Phone Auth
+ */
+export function setupRecaptcha(containerId = "recaptcha-container"): RecaptchaVerifier {
+  if (typeof window === "undefined") {
+    throw new Error("Window is not available");
+  }
+  if (window.recaptchaVerifier) {
+    try {
+      window.recaptchaVerifier.clear();
+    } catch {
+      // ignore clear error
+    }
+  }
+  const verifier = new RecaptchaVerifier(auth, containerId, {
+    size: "invisible",
+    callback: () => {},
+    "expired-callback": () => {},
+  });
+  window.recaptchaVerifier = verifier;
+  return verifier;
+}
+
+/**
+ * Send Firebase SMS OTP to Indian mobile number (+91)
+ */
+export async function sendPhoneOtp(
+  rawPhone: string,
+  containerId = "recaptcha-container"
+): Promise<ConfirmationResult> {
+  const digits = extractCleanPhone(rawPhone);
+  if (digits.length !== 10) {
+    throw new Error("Please enter a valid 10-digit Indian mobile number.");
+  }
+  const formattedPhone = `+91${digits}`;
+  const appVerifier = setupRecaptcha(containerId);
+  const confirmationResult = await signInWithPhoneNumber(auth, formattedPhone, appVerifier);
+  window.confirmationResult = confirmationResult;
+  return confirmationResult;
+}
+
+/**
+ * Confirm SMS OTP and sync customer profile to Firestore
+ */
+export async function confirmPhoneOtp(
+  confirmationResult: ConfirmationResult,
+  otp: string,
+  rawPhone?: string
+) {
+  const userCredential = await confirmationResult.confirm(otp.trim());
+  if (userCredential.user) {
+    const cleanPhone = extractCleanPhone(rawPhone || userCredential.user.phoneNumber || "");
+    await syncCustomerDoc(userCredential.user, {
+      phone: cleanPhone || undefined,
+      name: userCredential.user.displayName || "Customer",
+    });
+  }
+  return userCredential.user;
+}
+
+/**
+ * Get daily SMS count for Firebase Phone Auth (10 free SMS/day limit without billing)
+ */
+export async function getDailySmsCount(): Promise<number> {
+  const today = new Date().toISOString().slice(0, 10);
+  const localKey = `manopavana_sms_count_${today}`;
+  let count = parseInt(localStorage.getItem(localKey) || "0", 10);
+
+  try {
+    const quotaDoc = await getDoc(doc(db, "settings", `sms_quota_${today}`));
+    if (quotaDoc.exists()) {
+      const remoteCount = quotaDoc.data()?.count || 0;
+      count = Math.max(count, remoteCount);
+      localStorage.setItem(localKey, String(count));
+    }
+  } catch {
+    // ignore offline or permissions error
+  }
+  return count;
+}
+
+/**
+ * Increment daily SMS count when an SMS OTP is requested
+ */
+export async function incrementDailySmsCount(): Promise<number> {
+  const today = new Date().toISOString().slice(0, 10);
+  const localKey = `manopavana_sms_count_${today}`;
+  const nextCount = parseInt(localStorage.getItem(localKey) || "0", 10) + 1;
+  localStorage.setItem(localKey, String(nextCount));
+
+  try {
+    await setDoc(
+      doc(db, "settings", `sms_quota_${today}`),
+      {
+        count: increment(1),
+        date: today,
+        updatedAt: serverTimestamp(),
+      },
+      { merge: true }
+    );
+  } catch {
+    // ignore
+  }
+  return nextCount;
+}
+
+
 
 /**
  * Phone or Email Login with Automatic Registration fallback
@@ -507,13 +625,21 @@ export function subscribeUserOrders(
 export function subscribeReviews(callback: (reviews: CustomerReview[]) => void) {
   try {
     const reviewsCol = collection(db, "reviews");
-    const q = query(reviewsCol, orderBy("createdAt", "desc"));
     return onSnapshot(
-      q,
+      reviewsCol,
       (snapshot) => {
         const list: CustomerReview[] = [];
         snapshot.forEach((d) => {
           list.push({ id: d.id, ...(d.data() as Omit<CustomerReview, "id">) });
+        });
+        list.sort((a, b) => {
+          const tA = (a as any).createdAt?.toMillis
+            ? (a as any).createdAt.toMillis()
+            : (a as any).timestamp || 0;
+          const tB = (b as any).createdAt?.toMillis
+            ? (b as any).createdAt.toMillis()
+            : (b as any).timestamp || 0;
+          return tB - tA;
         });
         callback(list);
       },

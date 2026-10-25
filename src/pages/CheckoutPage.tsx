@@ -706,16 +706,36 @@ export const CheckoutPage: React.FC = () => {
 
         {/* Guest Sign-in Required Banner */}
         {!currentUser && (
-          <div className="p-4 sm:p-5 rounded-2xl bg-amber-500/15 border-2 border-[#E08F35]/70 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 text-xs shadow-md">
+          <div
+            className={`p-4 sm:p-5 rounded-2xl border-2 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 text-xs shadow-md transition-colors ${
+              isDark
+                ? "bg-[#25150C] border-[#E08F35] text-[#FAF4EA]"
+                : "bg-amber-50/95 border-[#D49A37] text-[#24140A]"
+            }`}
+          >
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-[#E08F35]/20 border border-[#E08F35]/40 flex items-center justify-center text-[#E08F35] shrink-0">
-                <Lock className="w-5 h-5 text-[#E08F35]" />
+              <div
+                className={`w-10 h-10 rounded-xl border flex items-center justify-center shrink-0 ${
+                  isDark
+                    ? "bg-[#E08F35]/20 border-[#E08F35]/40 text-[#E08F35]"
+                    : "bg-amber-100 border-amber-300 text-amber-900"
+                }`}
+              >
+                <Lock className="w-5 h-5" />
               </div>
               <div>
-                <p className="font-bold text-sm text-[#1F120A] dark:text-[#FAF4EA]">
+                <p
+                  className={`font-black text-sm sm:text-base ${
+                    isDark ? "text-[#FAF4EA]" : "text-[#24140A]"
+                  }`}
+                >
                   Sign In Required to Place Order
                 </p>
-                <p className="text-[#6A523E] dark:text-[#D6C4B0] mt-0.5">
+                <p
+                  className={`mt-0.5 text-xs font-semibold leading-relaxed ${
+                    isDark ? "text-[#D6C4B0]" : "text-[#5C381E]"
+                  }`}
+                >
                   Guests cannot place or track orders. Please sign in or create an account to complete your purchase and track delivery.
                 </p>
               </div>
@@ -723,7 +743,7 @@ export const CheckoutPage: React.FC = () => {
             <button
               type="button"
               onClick={() => setLoginModalOpen(true)}
-              className="px-5 py-2.5 rounded-xl bg-[#5E3210] hover:bg-[#43230A] text-white font-bold text-xs shrink-0 flex items-center gap-2 cursor-pointer shadow-sm transition-all hover:brightness-110"
+              className="px-5 py-2.5 rounded-xl bg-[#5E3210] hover:bg-[#43230A] text-white font-black text-xs shrink-0 flex items-center gap-2 cursor-pointer shadow-md transition-all hover:scale-105"
             >
               <LogIn className="w-4 h-4 text-amber-300" />
               <span>Sign In / Register</span>
@@ -1275,7 +1295,7 @@ export const CheckoutPage: React.FC = () => {
                         </label>
                         <input
                           type="number"
-                          placeholder={`Answer: ${codChallenge.a + codChallenge.b}`}
+                          placeholder="Type your answer here"
                           value={codAnswerInput}
                           onChange={(e) => {
                             setCodAnswerInput(e.target.value);

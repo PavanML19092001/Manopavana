@@ -53,11 +53,17 @@
       "description": "Customer feedback and ratings for oils",
       "type": "object",
       "properties": {
+        "id": { "type": "string" },
         "name": { "type": "string" },
         "rating": { "type": "number" },
         "comment": { "type": "string" },
-        "oil": { "type": "string" },
+        "product": { "type": "string" },
+        "productId": { "type": "string" },
+        "locality": { "type": "string" },
+        "city": { "type": "string" },
+        "date": { "type": "string" },
         "verified": { "type": "boolean" },
+        "customerUid": { "type": "string" },
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["name", "rating", "comment"]

@@ -198,3 +198,41 @@ export async function sendOrderConfirmationEmail(order: Order) {
     return false;
   }
 }
+
+/**
+ * Dispatch password-free login OTP via EmailJS directly to customer's email address
+ */
+export async function sendEmailLoginOtp(toEmail: string, otpCode: string): Promise<boolean> {
+  try {
+    const cleanEmail = toEmail.toLowerCase().trim();
+    const messageBody = `Hello,\n\nYour 6-digit one-time verification code to sign in to MANOPAVANA is:\n\n${otpCode}\n\nThis code is valid for 10 minutes. For your security, do not share this OTP with anyone.\n\nWarm regards,\nMANOPAVANA Artisanal Wood-Pressed Oils\nBengaluru, India`;
+
+    const templateParams: Record<string, string> = {
+      to_email: cleanEmail,
+      to_name: "Customer",
+      from_name: "MANOPAVANA Security",
+      from_email: "orders@manopavana.com",
+      reply_to: EMAILJS_CONFIG.TARGET_EMAIL,
+      subject: `Your MANOPAVANA Login OTP: ${otpCode}`,
+      title: `MANOPAVANA Login Verification: ${otpCode}`,
+      message: messageBody,
+      content: messageBody,
+      body: messageBody,
+      details: messageBody,
+      otp_code: otpCode,
+      code: otpCode,
+    };
+
+    await emailjs.send(
+      EMAILJS_CONFIG.SERVICE_ID,
+      EMAILJS_CONFIG.TEMPLATE_ID,
+      templateParams,
+      EMAILJS_CONFIG.PUBLIC_KEY
+    );
+    return true;
+  } catch (error) {
+    console.warn("Email OTP delivery notice:", error);
+    return false;
+  }
+}
+

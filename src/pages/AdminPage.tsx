@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { StorefrontCMSPanel } from "../components/admin/StoreFrontCmsPanel";
+import { WhatsAppGatewayPanel } from "../components/admin/WhatsAppGatewayPanel";
 import {
   Lock,
   ShieldAlert,
@@ -660,6 +661,9 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
             </button>
           </div>
         </div>
+
+        {/* Option A: WhatsApp Web Gateway (Free, 1-Time QR Scan) */}
+        <WhatsAppGatewayPanel isDark={isDark} showToast={showToast} />
 
         {/* Delhivery Diagnostics */}
         <div

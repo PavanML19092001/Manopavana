@@ -142,6 +142,7 @@ interface StoreContextType {
     productName: string;
     rating: number;
     comment: string;
+    reviewerName?: string;
   }) => Promise<boolean>;
 }
 
@@ -1828,6 +1829,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     productName: string;
     rating: number;
     comment: string;
+    reviewerName?: string;
   }) => {
     if (!currentUser) {
       showToast("Please sign in to submit a review.");
@@ -1836,12 +1838,19 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
 
     try {
+      const resolvedName =
+        reviewData.reviewerName?.trim() ||
+        currentUser.displayName ||
+        address.fullName ||
+        currentUser.email?.split("@")[0] ||
+        "Verified Customer";
+
       const newReview = {
         id: `rev_${Date.now()}`,
-        name: currentUser.displayName || address.fullName || "Verified Buyer",
+        name: resolvedName,
         locality: address.district || "Bengaluru",
         city: address.city || "Bengaluru",
-        rating: reviewData.rating,
+        rating: Number(reviewData.rating) || 5,
         comment: reviewData.comment.trim(),
         product: reviewData.productName,
         productId: reviewData.productId,
@@ -1852,10 +1861,11 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         }),
         verified: true,
         customerUid: currentUser.uid,
+        createdAt: serverTimestamp(),
       };
 
       await setDoc(doc(db, "reviews", newReview.id), newReview);
-      setReviews((prev) => [newReview, ...prev]);
+      setReviews((prev) => [newReview as any, ...prev]);
       showToast("Thank you! Your verified review has been published.");
       return true;
     } catch (err) {
