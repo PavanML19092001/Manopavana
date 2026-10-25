@@ -616,9 +616,10 @@ export default defineConfig(() => {
                     res.end(JSON.stringify({
                       status: 'SUCCESS',
                       sent: true,
+                      simulated: true,
                       from: '+91 91803 01917',
                       to: `+91 ${cleanPhone}`,
-                      message: 'OTP dispatched via WhatsApp Gateway',
+                      message: 'OTP dispatched via WhatsApp Gateway (Simulation / Setup mode)',
                     }));
                   } catch (e: any) {
                     res.statusCode = 500;

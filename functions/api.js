@@ -948,9 +948,10 @@ export async function onRequest(context) {
       return jsonResponse({
         status: "SUCCESS",
         sent: true,
+        simulated: true,
         from: "+91 91803 01917",
         to: `+91 ${cleanPhone}`,
-        message: "OTP dispatched via WhatsApp Gateway",
+        message: "OTP dispatched via WhatsApp Gateway (Simulation / Setup mode)",
       });
     }
 

@@ -212,7 +212,13 @@ export const WhatsAppGatewayPanel: React.FC<{
       setStatus((p) => ({ ...p, totalSent: nextCount }));
 
       if (data.status === "SUCCESS") {
-        showToast(`Test OTP (${testCode}) dispatched to +91 ${cleanNumber}!`);
+        if (data.simulated) {
+          showToast(
+            `Simulation Mode: Test Code is ${testCode}. Connect Green-API or Meta for real WhatsApp delivery.`
+          );
+        } else {
+          showToast(`Live WhatsApp OTP (${testCode}) dispatched to +91 ${cleanNumber}!`);
+        }
       } else {
         showToast(data.message || "OTP dispatched via gateway.");
       }

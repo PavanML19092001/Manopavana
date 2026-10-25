@@ -133,8 +133,9 @@ export const LoginModal: React.FC = () => {
       setOtpExpiryTime(Date.now() + 5 * 60 * 1000); // 5 min expiry
 
       // Call server endpoint to dispatch WhatsApp message from +91 91803 01917 to user's number
+      let isSimulated = false;
       try {
-        await fetch("/api?action=send_whatsapp_otp", {
+        const res = await fetch("/api?action=send_whatsapp_otp", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -146,15 +147,32 @@ export const LoginModal: React.FC = () => {
             metaPhoneId: localStorage.getItem("manopavana_meta_phone_id") || undefined,
           }),
         });
+        const data = await res.json();
+        if (
+          data.simulated ||
+          (!data.provider &&
+            !localStorage.getItem("manopavana_green_id") &&
+            !localStorage.getItem("manopavana_meta_token"))
+        ) {
+          isSimulated = true;
+        }
       } catch (apiErr) {
         console.warn("WhatsApp API route notice:", apiErr);
+        isSimulated = true;
       }
 
       setVerificationChannel("whatsapp");
       setResendCooldown(30);
-      setStatusNotice(
-        `We have sent a 6-digit verification code from MANOPAVANA (+91 91803 01917) to your WhatsApp (+91 ${cleanPhone}).`
-      );
+
+      if (isSimulated) {
+        setStatusNotice(
+          `WhatsApp gateway is in Preview / Setup Mode (No live WhatsApp API linked yet). For testing, your verification code is ${otpCode}. To deliver real WhatsApp messages to physical phones, connect Green-API or Meta in the Admin Panel.`
+        );
+      } else {
+        setStatusNotice(
+          `We have sent a 6-digit verification code from MANOPAVANA (+91 91803 01917) to your WhatsApp (+91 ${cleanPhone}).`
+        );
+      }
     } catch (err: unknown) {
       const e = err as { message?: string };
       setErrorMessage(e.message || "Failed to send WhatsApp OTP. Please try again.");
@@ -192,22 +210,26 @@ export const LoginModal: React.FC = () => {
 
       setStatusNotice(`SMS OTP sent to +91 ${cleanPhone}. (${10 - newCount} free SMS left today)`);
     } catch (err: unknown) {
-      console.warn("SMS OTP error:", err);
       const e = err as { code?: string; message?: string };
-
-      // If quota reached or carrier limit triggered, automatically switch to WhatsApp
+      console.warn("SMS OTP error:", err);
+      // If quota reached, carrier restriction, or region not enabled, automatically switch to WhatsApp OTP
       if (
         e.code === "auth/quota-exceeded" ||
         e.code === "auth/too-many-requests" ||
         e.code === "auth/billing-not-enabled" ||
-        (e.message && e.message.toLowerCase().includes("quota"))
+        e.code === "auth/operation-not-allowed" ||
+        (e.message && (
+          e.message.toLowerCase().includes("quota") ||
+          e.message.toLowerCase().includes("operation-not-allowed") ||
+          e.message.toLowerCase().includes("region enabled")
+        ))
       ) {
         setDailySmsCount(10);
-        showToast("Daily SMS quota (10/day) reached. Switched to WhatsApp OTP automatically.");
+        showToast("Firebase SMS not enabled for this region. Switched to WhatsApp OTP automatically.");
         await handleSendWhatsAppOtp();
       } else {
         setErrorMessage(
-          e.message || "SMS could not be delivered. Please use WhatsApp OTP for instant access."
+          "SMS delivery is not enabled for this region by Firebase. You can receive your verification code instantly via WhatsApp instead."
         );
       }
     } finally {
@@ -540,9 +562,20 @@ export const LoginModal: React.FC = () => {
                       )}
 
                       {errorMessage && (
-                        <p className="text-xs text-red-300 font-semibold bg-red-950/50 p-2.5 rounded-xl border border-red-800/40">
-                          {errorMessage}
-                        </p>
+                        <div className="space-y-2 p-3 bg-red-950/50 rounded-xl border border-red-800/40">
+                          <p className="text-xs text-red-300 font-semibold leading-relaxed">
+                            {errorMessage}
+                          </p>
+                          <button
+                            type="button"
+                            onClick={handleSendWhatsAppOtp}
+                            disabled={loading || !isPhoneValid}
+                            className="w-full py-2 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-sm transition-all"
+                          >
+                            <MessageSquare className="w-3.5 h-3.5" />
+                            <span>Send Verification Code via WhatsApp Instead</span>
+                          </button>
+                        </div>
                       )}
 
                       <div className="space-y-2 pt-1">
