@@ -27,7 +27,7 @@ import {
   PHONEPE_CONFIG,
 } from "../constants";
 import { Order } from "../types";
-import { updateFirestoreOrderStatus, getOrderFromFirestore, db } from "../firebase";
+import { updateFirestoreOrderStatus, getOrderFromFirestore, extractCleanPhone, db } from "../firebase";
 import { doc, getDoc } from "firebase/firestore";
 import { sendOrderConfirmationEmail } from "../services/emailService";
 
@@ -91,9 +91,10 @@ export const CheckoutPage: React.FC = () => {
   const [fullName, setFullName] = useState(() => address.fullName || currentUser?.displayName || "");
   const [phone, setPhone] = useState(() => {
     if (address.phone) return address.phone;
-    if (currentUser?.phoneNumber) return currentUser.phoneNumber.replace(/\D/g, "").slice(-10);
-    if (currentUser?.email && currentUser.email.endsWith("@phone.manopavana.com")) {
-      return currentUser.email.split("@")[0];
+    if (currentUser?.phoneNumber) return extractCleanPhone(currentUser.phoneNumber);
+    if (currentUser?.email) {
+      const clean = extractCleanPhone(currentUser.email);
+      if (clean.length === 10) return clean;
     }
     return "";
   });
@@ -156,11 +157,11 @@ export const CheckoutPage: React.FC = () => {
     if (currentUser) {
       if (!fullName && currentUser.displayName) setFullName(currentUser.displayName);
       const cleanPhone = currentUser.phoneNumber
-        ? currentUser.phoneNumber.replace(/\D/g, "").slice(-10)
-        : currentUser.email?.endsWith("@phone.manopavana.com")
-          ? currentUser.email.split("@")[0]
+        ? extractCleanPhone(currentUser.phoneNumber)
+        : currentUser.email
+          ? extractCleanPhone(currentUser.email)
           : "";
-      if (!phone && cleanPhone) setPhone(cleanPhone);
+      if (!phone && cleanPhone.length === 10) setPhone(cleanPhone);
     }
     if (address) {
       if (address.fullName && !fullName) setFullName(address.fullName);
@@ -186,16 +187,38 @@ export const CheckoutPage: React.FC = () => {
     async function loadCustomerFromFirestore() {
       try {
         const snap = await getDoc(doc(db, "customers", currentUser!.uid));
-        if (snap.exists() && isMounted) {
-          const data = snap.data();
-          if (data.name && !fullName) setFullName(data.name);
-          if (data.phone && !phone) setPhone(data.phone);
+        let data = snap.exists() ? snap.data() : {};
+
+        // If phone or savedAddress is missing, cross-fetch from account_mappings by email
+        if (!data.phone || !data.savedAddress) {
+          try {
+            const mapSnap = await getDoc(doc(db, "settings", "account_mappings"));
+            if (mapSnap.exists()) {
+              const mapData = mapSnap.data();
+              const userEmail = (currentUser?.email || "").toLowerCase().trim();
+              const userPhone = extractCleanPhone(currentUser?.phoneNumber || "");
+              const mapped = mapData.byEmail?.[userEmail] || (userPhone ? mapData.byPhone?.[userPhone] : null);
+              if (mapped) {
+                data = { ...mapped, ...data };
+              }
+            }
+          } catch {}
+        }
+
+        if (isMounted && data) {
+          const resolvedName = data.name || currentUser?.displayName;
+          if (resolvedName && (!fullName || fullName === "Google Customer" || fullName === "Valued Customer")) {
+            setFullName(resolvedName);
+          }
+          if (data.phone && (!phone || phone.length !== 10)) {
+            setPhone(data.phone);
+          }
           if (data.savedAddress && typeof data.savedAddress === "object") {
             const s = data.savedAddress;
-            if (s.fullName) setFullName(s.fullName);
-            if (s.phone) setPhone(s.phone);
-            if (s.addressLine1) setAddressLine1(s.addressLine1);
-            if (s.landmark) setLandmark(s.landmark);
+            if (s.fullName && (!fullName || fullName === "Google Customer")) setFullName(s.fullName);
+            if (s.phone && (!phone || phone.length !== 10)) setPhone(s.phone);
+            if (s.addressLine1 && !addressLine1) setAddressLine1(s.addressLine1);
+            if (s.landmark && !landmark) setLandmark(s.landmark);
             if (s.pincode) setPincode(s.pincode);
             if (s.district) setDistrict(s.district);
             if (s.state) setState(s.state);

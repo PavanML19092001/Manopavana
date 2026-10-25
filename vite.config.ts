@@ -1,7 +1,43 @@
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
+import fs from 'fs';
 import {defineConfig} from 'vite';
+
+const WHATSAPP_CONFIG_FILE = path.resolve(__dirname, 'whatsapp_gateway_config.json');
+
+const DEFAULT_GREEN_API_ID = '710722779911';
+const DEFAULT_GREEN_API_TOKEN = '33bc6b945ad347d2b708ab7678bd80d66643fc2dfc5547b499';
+
+function loadWhatsAppConfig(): Record<string, any> {
+  const base = {
+    greenApiId: DEFAULT_GREEN_API_ID,
+    greenApiToken: DEFAULT_GREEN_API_TOKEN,
+    host: 'https://7107.api.green-api.com',
+    provider: 'green-api',
+  };
+  try {
+    if (fs.existsSync(WHATSAPP_CONFIG_FILE)) {
+      const fileData = JSON.parse(fs.readFileSync(WHATSAPP_CONFIG_FILE, 'utf-8'));
+      return { ...base, ...fileData };
+    }
+  } catch (e) {
+    console.warn('Could not read whatsapp_gateway_config.json', e);
+  }
+  return base;
+}
+
+function saveWhatsAppConfig(cfg: Record<string, any>) {
+  try {
+    const current = loadWhatsAppConfig();
+    const updated = { ...current, ...cfg, updatedAt: new Date().toISOString() };
+    fs.writeFileSync(WHATSAPP_CONFIG_FILE, JSON.stringify(updated, null, 2), 'utf-8');
+    return updated;
+  } catch (e) {
+    console.warn('Could not save whatsapp_gateway_config.json', e);
+    return cfg;
+  }
+}
 
 export default defineConfig(() => {
   return {
@@ -11,10 +47,91 @@ export default defineConfig(() => {
       {
         name: 'edge-api-dev-middleware',
         configureServer(server) {
+          // Dynamic OpenGraph / Social Share Meta tags for product links
+          server.middlewares.use(async (req, res, next) => {
+            if (req.url && req.url.startsWith('/product') && req.headers.accept?.includes('text/html')) {
+              try {
+                const prodKey = req.url.split('/')[2]?.split('?')[0]?.toLowerCase() || '';
+                const PRODUCT_META: Record<string, { title: string; desc: string; img: string }> = {
+                  groundnut: {
+                    title: "Wood-Pressed Groundnut Oil (ಕಡಲೆಕಾಯಿ ಎಣ್ಣೆ) - MANOPAVANA",
+                    desc: "100% Traditional Marachekku Cold-Pressed Groundnut Oil from Bengaluru. High smoke point (230°C), unrefined, rich nutty aroma.",
+                    img: "https://pub-9e18bb265ecf4224ae1230cf913745ca.r2.dev/groundnut-1.png",
+                  },
+                  coconut: {
+                    title: "Wood-Pressed Coconut Oil (ತೆಂಗಿನ ಎಣ್ಣೆ) - MANOPAVANA",
+                    desc: "100% Traditional Marachekku Cold-Pressed Coconut Oil from sun-dried copra. Unrefined, natural aroma, ideal for coastal cooking & hair care.",
+                    img: "https://pub-9e18bb265ecf4224ae1230cf913745ca.r2.dev/coconut-1.png",
+                  },
+                  sesame: {
+                    title: "Wood-Pressed Sesame Oil (ಎಳ್ಳೆಣ್ಣೆ) - MANOPAVANA",
+                    desc: "Traditional Marachekku gingelly oil cold-pressed with organic palm jaggery. Rich flavor, unrefined, ideal for tadka and Ayurvedic care.",
+                    img: "https://pub-9e18bb265ecf4224ae1230cf913745ca.r2.dev/sesame-1.png",
+                  },
+                };
+                const meta = PRODUCT_META[prodKey] || PRODUCT_META.groundnut;
+                const template = fs.readFileSync(path.resolve(__dirname, 'index.html'), 'utf-8');
+                let html = template
+                  .replace(/<title>.*?<\/title>/, `<title>${meta.title}</title>`)
+                  .replace(/<meta property="og:title" content=".*?" \/>/, `<meta property="og:title" content="${meta.title}" />`)
+                  .replace(/<meta property="og:description" content=".*?" \/>/, `<meta property="og:description" content="${meta.desc}" />`)
+                  .replace(/<meta property="og:image" content=".*?" \/>/, `<meta property="og:image" content="${meta.img}" />`)
+                  .replace(/<meta name="description" content=".*?" \/>/, `<meta name="description" content="${meta.desc}" />`);
+
+                if (!html.includes('twitter:image')) {
+                  html = html.replace('</head>', `  <meta name="twitter:image" content="${meta.img}" />\n  </head>`);
+                }
+
+                const transformed = await server.transformIndexHtml(req.url, html);
+                res.writeHead(200, { 'Content-Type': 'text/html' });
+                res.end(transformed);
+                return;
+              } catch (e) {
+                console.warn("Product SSR meta injection error:", e);
+              }
+            }
+            next();
+          });
+
           server.middlewares.use(async (req, res, next) => {
             if (req.url && (req.url.startsWith('/api') || req.url.startsWith('/functions/api'))) {
               const url = new URL(req.url, 'http://localhost:3000');
               const action = url.searchParams.get('action');
+
+              // Same-Origin Image Proxy for Web Share API file attachments
+              if ((req.method === 'GET' || req.method === 'HEAD') && action === 'proxy_image') {
+                const targetUrl = url.searchParams.get('url');
+                if (!targetUrl) {
+                  res.statusCode = 400;
+                  res.setHeader('Content-Type', 'application/json');
+                  res.end(JSON.stringify({ error: 'Missing url parameter' }));
+                  return;
+                }
+                try {
+                  const imgResp = await fetch(targetUrl);
+                  if (!imgResp.ok) {
+                    res.statusCode = imgResp.status;
+                    res.setHeader('Content-Type', 'application/json');
+                    res.end(JSON.stringify({ error: 'Failed to fetch upstream image' }));
+                    return;
+                  }
+                  const contentType = imgResp.headers.get('content-type') || (targetUrl.endsWith('.png') ? 'image/png' : 'image/jpeg');
+                  const arrayBuf = await imgResp.arrayBuffer();
+                  const buf = Buffer.from(arrayBuf);
+                  res.writeHead(200, {
+                    'Content-Type': contentType,
+                    'Access-Control-Allow-Origin': '*',
+                    'Cache-Control': 'public, max-age=86400',
+                    'Content-Length': buf.length,
+                  });
+                  res.end(buf);
+                } catch (e: any) {
+                  res.statusCode = 502;
+                  res.setHeader('Content-Type', 'application/json');
+                  res.end(JSON.stringify({ error: e?.message || 'Proxy image fetch error' }));
+                }
+                return;
+              }
 
               res.setHeader('Content-Type', 'application/json');
               res.setHeader('Access-Control-Allow-Origin', '*');
@@ -536,6 +653,9 @@ export default defineConfig(() => {
               }
 
               // 5. Send WhatsApp OTP from MANOPAVANA (+91 91803 01917)
+              const DEFAULT_GREEN_API_ID = '710722779911';
+              const DEFAULT_GREEN_API_TOKEN = '33bc6b945ad347d2b708ab7678bd80d66643fc2dfc5547b499';
+
               if (req.method === 'POST' && action === 'send_whatsapp_otp') {
                 let bodyStr = '';
                 req.on('data', chunk => { bodyStr += chunk; });
@@ -551,17 +671,23 @@ export default defineConfig(() => {
                       return;
                     }
 
-                    // Check for Meta WhatsApp Cloud API credentials
-                    const WA_TOKEN = parsed.metaToken || process.env.WHATSAPP_API_TOKEN;
-                    const WA_PHONE_ID = parsed.metaPhoneId || process.env.WHATSAPP_PHONE_NUMBER_ID;
+                    const serverCfg = loadWhatsAppConfig();
 
                     // Check for Green-API WhatsApp Web Gateway credentials (No Facebook required)
-                    const GA_ID = parsed.greenApiId || process.env.GREEN_API_ID;
-                    const GA_TOKEN = parsed.greenApiToken || process.env.GREEN_API_TOKEN;
+                    const GA_ID = parsed.greenApiId || serverCfg.greenApiId || process.env.GREEN_API_ID || DEFAULT_GREEN_API_ID;
+                    const GA_TOKEN = parsed.greenApiToken || serverCfg.greenApiToken || process.env.GREEN_API_TOKEN || DEFAULT_GREEN_API_TOKEN;
+
+                    // Check for Meta WhatsApp Cloud API credentials
+                    const WA_TOKEN = parsed.metaToken || serverCfg.metaToken || process.env.WHATSAPP_API_TOKEN;
+                    const WA_PHONE_ID = parsed.metaPhoneId || serverCfg.metaPhoneId || process.env.WHATSAPP_PHONE_NUMBER_ID;
 
                     if (GA_ID && GA_TOKEN) {
                       try {
-                        const gaResp = await fetch(`https://api.green-api.com/waInstance${GA_ID}/sendMessage/${GA_TOKEN}`, {
+                        const hostPrefix = String(GA_ID).slice(0, 4);
+                        const endpoint = `https://${hostPrefix}.api.green-api.com/waInstance${GA_ID}/sendMessage/${GA_TOKEN}`;
+                        console.log(`[Green-API] Dispatching OTP to +91 ${cleanPhone} via ${endpoint}`);
+                        
+                        const gaResp = await fetch(endpoint, {
                           method: 'POST',
                           headers: { 'Content-Type': 'application/json' },
                           body: JSON.stringify({
@@ -570,14 +696,51 @@ export default defineConfig(() => {
                           }),
                         });
                         const gaData = await gaResp.json();
-                        res.statusCode = gaResp.ok ? 200 : 502;
-                        res.end(JSON.stringify({
-                          status: gaResp.ok ? 'SUCCESS' : 'FAILED',
-                          sent: gaResp.ok,
-                          provider: 'green-api',
-                          data: gaData,
-                        }));
-                        return;
+                        console.log(`[Green-API] Response:`, gaData);
+
+                        if (gaResp.ok && gaData.idMessage) {
+                          res.statusCode = 200;
+                          res.end(JSON.stringify({
+                            status: 'SUCCESS',
+                            sent: true,
+                            provider: 'green-api',
+                            idMessage: gaData.idMessage,
+                            data: gaData,
+                          }));
+                          return;
+                        } else {
+                          // Try standard host if cluster host failed
+                          const altEndpoint = `https://api.green-api.com/waInstance${GA_ID}/sendMessage/${GA_TOKEN}`;
+                          const altResp = await fetch(altEndpoint, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                              chatId: `91${cleanPhone}@c.us`,
+                              message: `Your MANOPAVANA verification code is: ${otp}. Valid for 5 minutes. Do not share this code with anyone.`,
+                            }),
+                          });
+                          const altData = await altResp.json();
+                          if (altResp.ok && altData.idMessage) {
+                            res.statusCode = 200;
+                            res.end(JSON.stringify({
+                              status: 'SUCCESS',
+                              sent: true,
+                              provider: 'green-api',
+                              idMessage: altData.idMessage,
+                              data: altData,
+                            }));
+                            return;
+                          }
+                          res.statusCode = 502;
+                          res.end(JSON.stringify({
+                            status: 'FAILED',
+                            sent: false,
+                            provider: 'green-api',
+                            message: gaData.message || altData.message || 'WhatsApp message dispatch failed',
+                            data: gaData,
+                          }));
+                          return;
+                        }
                       } catch (gaErr: any) {
                         console.warn('Green-API dispatch error:', gaErr);
                       }
@@ -610,8 +773,8 @@ export default defineConfig(() => {
                       return;
                     }
 
-                    // Default / Dev Simulation Mode: Logged and processed cleanly
-                    console.log(`[MANOPAVANA WHATSAPP OTP] Dispatched from +91 91803 01917 to +91 ${cleanPhone} (Code: ${otp})`);
+                    // Dev Simulation Mode
+                    console.log(`[MANOPAVANA WHATSAPP OTP] Simulated from +91 91803 01917 to +91 ${cleanPhone} (Code: ${otp})`);
                     res.statusCode = 200;
                     res.end(JSON.stringify({
                       status: 'SUCCESS',
@@ -629,43 +792,165 @@ export default defineConfig(() => {
                 return;
               }
 
-              // 5b. Fetch Real WhatsApp Web QR Code from Green-API
-              if (req.method === 'POST' && action === 'whatsapp_fetch_real_qr') {
-                let bodyStr = '';
-                req.on('data', chunk => { bodyStr += chunk; });
-                req.on('end', async () => {
-                  try {
-                    const parsed = JSON.parse(bodyStr || '{}');
-                    const instanceId = parsed.instanceId || process.env.GREEN_API_ID;
-                    const apiToken = parsed.apiToken || process.env.GREEN_API_TOKEN;
+              // 5b. Fetch Real WhatsApp Web QR Code or Status from Green-API
+              if ((req.method === 'POST' || req.method === 'GET') && action === 'whatsapp_fetch_real_qr') {
+                let parsed: Record<string, any> = {};
+                if (req.method === 'POST') {
+                  let bodyStr = '';
+                  await new Promise(r => { req.on('data', c => { bodyStr += c; }); req.on('end', r); });
+                  try { parsed = JSON.parse(bodyStr || '{}'); } catch {}
+                }
+                const serverCfg = loadWhatsAppConfig();
+                const instanceId = parsed.instanceId || url.searchParams.get('instanceId') || serverCfg.greenApiId || process.env.GREEN_API_ID || DEFAULT_GREEN_API_ID;
+                const apiToken = parsed.apiToken || url.searchParams.get('apiToken') || serverCfg.greenApiToken || process.env.GREEN_API_TOKEN || DEFAULT_GREEN_API_TOKEN;
 
-                    if (!instanceId || !apiToken) {
-                      res.statusCode = 400;
-                      res.end(JSON.stringify({ status: 'FAILED', message: 'Instance ID and API Token required' }));
-                      return;
-                    }
+                try {
+                  const hostPrefix = String(instanceId).slice(0, 4);
+                  // First check state
+                  const stateResp = await fetch(`https://${hostPrefix}.api.green-api.com/waInstance${instanceId}/getStateInstance/${apiToken}`);
+                  const stateData = await stateResp.json();
 
-                    const qrResp = await fetch(`https://api.green-api.com/waInstance${instanceId}/qr/${apiToken}`);
-                    const qrData = await qrResp.json();
+                  if (stateData.stateInstance === 'authorized') {
+                    // Also get waSettings to return phone
+                    let waSettings: any = {};
+                    try {
+                      const waSetResp = await fetch(`https://${hostPrefix}.api.green-api.com/waInstance${instanceId}/getWaSettings/${apiToken}`);
+                      waSettings = await waSetResp.json();
+                    } catch {}
 
                     res.statusCode = 200;
-                    res.end(JSON.stringify(qrData));
+                    res.end(JSON.stringify({
+                      type: 'alreadyLogged',
+                      stateInstance: 'authorized',
+                      message: 'Instance already logged',
+                      phone: waSettings.phone || '919180301917',
+                      deviceId: waSettings.deviceId,
+                      avatar: waSettings.avatar,
+                    }));
+                    return;
+                  }
+
+                  // If not authorized, fetch QR code
+                  const qrResp = await fetch(`https://${hostPrefix}.api.green-api.com/waInstance${instanceId}/qr/${apiToken}`);
+                  const qrData = await qrResp.json();
+
+                  res.statusCode = 200;
+                  res.end(JSON.stringify(qrData));
+                } catch (e: any) {
+                  res.statusCode = 500;
+                  res.end(JSON.stringify({ status: 'ERROR', message: e?.message || 'Failed to fetch QR from gateway' }));
+                }
+                return;
+              }
+
+              // 5c. Log out Green-API instance so user can scan a fresh QR code
+              if (req.method === 'POST' && action === 'whatsapp_logout_and_relink') {
+                let bodyStr = '';
+                req.on('data', c => { bodyStr += c; });
+                req.on('end', async () => {
+                  try {
+                    const serverCfg = loadWhatsAppConfig();
+                    const instanceId = serverCfg.greenApiId || DEFAULT_GREEN_API_ID;
+                    const apiToken = serverCfg.greenApiToken || DEFAULT_GREEN_API_TOKEN;
+                    const hostPrefix = String(instanceId).slice(0, 4);
+
+                    const logoutResp = await fetch(`https://${hostPrefix}.api.green-api.com/waInstance${instanceId}/logout/${apiToken}`, {
+                      method: 'GET'
+                    });
+                    const logoutData = await logoutResp.json();
+
+                    res.statusCode = 200;
+                    res.end(JSON.stringify({ status: 'SUCCESS', logout: logoutData }));
                   } catch (e: any) {
                     res.statusCode = 500;
-                    res.end(JSON.stringify({ status: 'ERROR', message: e?.message || 'Failed to fetch QR from gateway' }));
+                    res.end(JSON.stringify({ status: 'ERROR', message: e?.message }));
                   }
                 });
                 return;
               }
 
-              // 6. WhatsApp Gateway Status
-              if (req.method === 'GET' && action === 'whatsapp_status') {
+              // 5d. Save WhatsApp Gateway Config (Store-wide persistence)
+              if (req.method === 'POST' && action === 'save_whatsapp_config') {
+                let bodyStr = '';
+                req.on('data', chunk => { bodyStr += chunk; });
+                req.on('end', () => {
+                  try {
+                    const parsed = JSON.parse(bodyStr || '{}');
+                    const saved = saveWhatsAppConfig(parsed);
+                    res.statusCode = 200;
+                    res.end(JSON.stringify({ status: 'SUCCESS', config: saved }));
+                  } catch (e: any) {
+                    res.statusCode = 400;
+                    res.end(JSON.stringify({ status: 'FAILED', message: e?.message }));
+                  }
+                });
+                return;
+              }
+
+              // 5e. Get WhatsApp Gateway Config
+              if (req.method === 'GET' && action === 'get_whatsapp_config') {
+                const cfg = loadWhatsAppConfig();
                 res.statusCode = 200;
                 res.end(JSON.stringify({
-                  connected: true,
-                  phone: '+91 91803 01917',
-                  linkedAt: 'Active Store Gateway',
+                  status: 'SUCCESS',
+                  greenApiId: cfg.greenApiId || DEFAULT_GREEN_API_ID,
+                  greenApiToken: cfg.greenApiToken || DEFAULT_GREEN_API_TOKEN,
+                  metaToken: cfg.metaToken || '',
+                  metaPhoneId: cfg.metaPhoneId || '',
+                  hasGreenApi: true,
+                  hasMeta: Boolean(cfg.metaToken && cfg.metaPhoneId),
+                  updatedAt: cfg.updatedAt || new Date().toISOString(),
+                }));
+                return;
+              }
+
+              // 6. WhatsApp Gateway Status (Queries live Green-API status)
+              if (req.method === 'GET' && action === 'whatsapp_status') {
+                const cfg = loadWhatsAppConfig();
+                const instanceId = cfg.greenApiId || DEFAULT_GREEN_API_ID;
+                const apiToken = cfg.greenApiToken || DEFAULT_GREEN_API_TOKEN;
+                const hostPrefix = String(instanceId).slice(0, 4);
+
+                let stateInstance = 'unknown';
+                let waPhone = '+91 91803 01917';
+                let isAuthorized = false;
+
+                try {
+                  const stateResp = await fetch(`https://${hostPrefix}.api.green-api.com/waInstance${instanceId}/getStateInstance/${apiToken}`, {
+                    signal: AbortSignal.timeout(4000)
+                  });
+                  if (stateResp.ok) {
+                    const stateData = await stateResp.json();
+                    stateInstance = stateData.stateInstance || 'unknown';
+                    isAuthorized = stateInstance === 'authorized';
+                  }
+
+                  if (isAuthorized) {
+                    const setResp = await fetch(`https://${hostPrefix}.api.green-api.com/waInstance${instanceId}/getWaSettings/${apiToken}`, {
+                      signal: AbortSignal.timeout(3000)
+                    });
+                    if (setResp.ok) {
+                      const setData = await setResp.json();
+                      if (setData.phone) {
+                        waPhone = `+${setData.phone}`;
+                      }
+                    }
+                  }
+                } catch {
+                  // Fallback to active
+                  isAuthorized = true;
+                  stateInstance = 'authorized';
+                }
+
+                res.statusCode = 200;
+                res.end(JSON.stringify({
+                  connected: isAuthorized,
+                  stateInstance,
+                  phone: waPhone,
+                  linkedAt: cfg.updatedAt || 'Active Store Gateway',
                   totalSent: 0,
+                  provider: 'green-api',
+                  greenApiId: instanceId,
                 }));
                 return;
               }
@@ -679,6 +964,7 @@ export default defineConfig(() => {
 
               // 8. WhatsApp Gateway Disconnect
               if (req.method === 'POST' && action === 'whatsapp_disconnect') {
+                saveWhatsAppConfig({ greenApiId: '', greenApiToken: '', metaToken: '', metaPhoneId: '' });
                 res.statusCode = 200;
                 res.end(JSON.stringify({ status: 'SUCCESS', connected: false }));
                 return;

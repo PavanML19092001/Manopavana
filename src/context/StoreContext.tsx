@@ -38,6 +38,9 @@ import {
   subscribeStoreConfig,
   saveStoreConfigToFirestore,
   getOrderFromFirestore,
+  extractCleanPhone,
+  isSyntheticAccount,
+  saveCustomerProfile,
 } from "../firebase";
 import { doc, setDoc, onSnapshot, serverTimestamp } from "firebase/firestore";
 import { sendOrderConfirmationEmail } from "../services/emailService";
@@ -458,11 +461,13 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     } catch {}
 
     if (currentUser?.uid) {
-      setDoc(
-        doc(db, "customers", currentUser.uid),
-        { savedAddresses: updated, updatedAt: serverTimestamp() },
-        { merge: true }
-      ).catch(() => {});
+      saveCustomerProfile(currentUser.uid, {
+        name: entry.fullName,
+        phone: entry.phone,
+        email: entry.email,
+        savedAddress: entry,
+        savedAddresses: updated,
+      });
     }
     showToast(`Saved new address under "${entry.label}"`);
   };
@@ -474,11 +479,9 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       localStorage.setItem("manopavana_saved_addresses", JSON.stringify(filtered));
     } catch {}
     if (currentUser?.uid) {
-      setDoc(
-        doc(db, "customers", currentUser.uid),
-        { savedAddresses: filtered, updatedAt: serverTimestamp() },
-        { merge: true }
-      ).catch(() => {});
+      saveCustomerProfile(currentUser.uid, {
+        savedAddresses: filtered,
+      });
     }
     showToast("Address deleted");
   };
@@ -502,25 +505,12 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       } catch {}
 
       if (currentUser?.uid) {
-        try {
-          const profilePayload: Record<string, any> = {
-            savedAddress: full,
-            updatedAt: serverTimestamp(),
-          };
-          if (full.fullName?.trim()) profilePayload.name = full.fullName.trim();
-          if (full.phone?.trim()) profilePayload.phone = full.phone.trim();
-          if (full.email?.trim()) profilePayload.email = full.email.trim();
-
-          setDoc(
-            doc(db, "customers", currentUser.uid),
-            profilePayload,
-            { merge: true }
-          ).catch((e) => {
-            console.warn("Firestore customer profile sync notice:", e);
-          });
-        } catch (e) {
-          console.warn("Firestore updateAddress error caught:", e);
-        }
+        saveCustomerProfile(currentUser.uid, {
+          name: full.fullName?.trim() || undefined,
+          phone: full.phone?.trim() || undefined,
+          email: full.email?.trim() || undefined,
+          savedAddress: full,
+        });
       }
 
       return full;
@@ -751,10 +741,11 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           }
 
           let userPhone = (profile as any)?.phone || user.phoneNumber || "";
-          if (!userPhone && user.email && user.email.endsWith("@phone.manopavana.com")) {
-            userPhone = user.email.split("@")[0];
+          if (!userPhone && user.email) {
+            const digits = extractCleanPhone(user.email);
+            if (digits.length === 10) userPhone = digits;
           }
-          const userEmail = (profile as any)?.email || (user.email && !user.email.endsWith("@phone.manopavana.com") ? user.email : "");
+          const userEmail = (profile as any)?.email || (user.email && !isSyntheticAccount(user.email) ? user.email : "");
           const userName = (profile as any)?.name || user.displayName || "";
 
           if (profile && Array.isArray((profile as any).savedAddresses)) {
@@ -816,6 +807,13 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
                   fullName: data.savedAddress.fullName || data.name || prev.fullName,
                   phone: data.savedAddress.phone || data.phone || prev.phone,
                   email: data.savedAddress.email || data.email || prev.email,
+                }));
+              } else if (data?.name || data?.phone || data?.email) {
+                setAddress((prev) => ({
+                  ...prev,
+                  fullName: data.name || prev.fullName,
+                  phone: data.phone || prev.phone,
+                  email: data.email || prev.email,
                 }));
               }
             },
@@ -1058,7 +1056,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       if (userCached) {
         const parsed = JSON.parse(userCached);
         if (Array.isArray(parsed)) {
-          setOrders(parsed.filter((o: Order) => !o.customerUid || o.customerUid === currentUid));
+          setOrders(parsed.filter((o: Order) => o.customerUid === currentUid || (o as any).firebaseUid === currentUid));
         }
       }
     } catch {}
@@ -1066,12 +1064,12 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const unsubscribe = subscribeUserOrders(
       currentUid,
       undefined,
-      userEmail || undefined,
+      undefined,
       (firestoreOrders) => {
         if (!firestoreOrders) return;
         // Strictly filter to ensure zero leakage across different users
         const verifiedOrders = firestoreOrders.filter(
-          (o) => !o.customerUid || o.customerUid === currentUid
+          (o) => o.customerUid === currentUid || (o as any).firebaseUid === currentUid
         );
         setOrders(verifiedOrders);
         try {
@@ -1080,7 +1078,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }
     );
     return () => unsubscribe();
-  }, [currentUser?.uid, currentUser?.email]);
+  }, [currentUser?.uid]);
 
   const saveOrder = async (newOrder: Order) => {
     const finalOrder: Order = {

@@ -49,15 +49,17 @@ export const AccountPage = () => {
   const visibleOrders = React.useMemo(() => {
     const seen = new Set<string>();
     const res: Order[] = [];
-    const userEmail = (currentUser?.email || "").toLowerCase().trim();
     const userUid = currentUser?.uid;
 
+    if (!userUid) return [];
+
     for (const o of orders) {
+      // Flipkart-level isolation: orders are strictly exclusive to the authenticated user account
+      // that placed the order. Recipient phone number or email NEVER grants access to another user's order.
       const isMine =
-        !userUid ||
         (o.customerUid && o.customerUid === userUid) ||
-        (userEmail && o.customerEmail && o.customerEmail.toLowerCase() === userEmail) ||
-        (targetRef && (o.orderRef === targetRef || o.id === targetRef));
+        ((o as any).firebaseUid && (o as any).firebaseUid === userUid);
+
       if (isMine) {
         const key = o.orderRef || o.id;
         if (key && !seen.has(key)) {
@@ -67,7 +69,7 @@ export const AccountPage = () => {
       }
     }
     return res;
-  }, [orders, currentUser, targetRef]);
+  }, [orders, currentUser]);
 
   const [searchQuery, setSearchQuery] = useState(targetRef || "");
   const [selectedOrderRef, setSelectedOrderRef] = useState<string>(

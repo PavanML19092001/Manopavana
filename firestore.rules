@@ -30,8 +30,8 @@ service cloud.firestore {
 
     // Customer profile & persistent cart
     match /customers/{userId} {
-      allow read: if isOwner(userId) || isAdmin();
-      allow write: if isOwner(userId) || isAdmin();
+      allow read: if isSignedIn();
+      allow write: if isOwner(userId) || isAdmin() || isSignedIn();
     }
 
     // Orders collection

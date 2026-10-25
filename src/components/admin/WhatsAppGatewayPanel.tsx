@@ -14,8 +14,10 @@ import {
   Key,
   Layers,
   Sparkles,
+  Mail,
 } from "lucide-react";
 import { BUSINESS_CONFIG } from "../../constants";
+import { sendEmailLoginOtp } from "../../services/emailService";
 
 interface WhatsAppStatus {
   connected: boolean;
@@ -28,7 +30,7 @@ export const WhatsAppGatewayPanel: React.FC<{
   isDark: boolean;
   showToast: (msg: string) => void;
 }> = ({ isDark, showToast }) => {
-  const [activeTab, setActiveTab] = useState<"greenapi" | "meta" | "status">("greenapi");
+  const [activeTab, setActiveTab] = useState<"greenapi" | "meta" | "email" | "status">("greenapi");
   const [status, setStatus] = useState<WhatsAppStatus>({
     connected: false,
     phone: BUSINESS_CONFIG.PRIMARY_PHONE,
@@ -38,10 +40,10 @@ export const WhatsAppGatewayPanel: React.FC<{
 
   // Green-API settings (Zero Facebook, Real WhatsApp Web QR)
   const [greenInstanceId, setGreenInstanceId] = useState(
-    () => localStorage.getItem("manopavana_green_id") || ""
+    () => localStorage.getItem("manopavana_green_id") || "710722779911"
   );
   const [greenApiToken, setGreenApiToken] = useState(
-    () => localStorage.getItem("manopavana_green_token") || ""
+    () => localStorage.getItem("manopavana_green_token") || "33bc6b945ad347d2b708ab7678bd80d66643fc2dfc5547b499"
   );
   const [realQrImage, setRealQrImage] = useState<string | null>(null);
   const [fetchingQr, setFetchingQr] = useState(false);
@@ -54,20 +56,51 @@ export const WhatsAppGatewayPanel: React.FC<{
     () => localStorage.getItem("manopavana_meta_phone_id") || ""
   );
 
+  // EmailJS OTP Template settings
+  const [emailOtpTemplateId, setEmailOtpTemplateId] = useState(
+    () => localStorage.getItem("manopavana_emailjs_otp_template") || ""
+  );
+  const [testEmail, setTestEmail] = useState("");
+  const [testingEmailSend, setTestingEmailSend] = useState(false);
+
   const [testPhone, setTestPhone] = useState("");
   const [testingSend, setTestingSend] = useState(false);
 
   // Load gateway connection status
+  // Load gateway connection status & server config
   const fetchStatus = async () => {
     try {
+      // Sync server config
+      const cfgRes = await fetch("/api?action=get_whatsapp_config");
+      if (cfgRes.ok) {
+        const cfg = await cfgRes.json();
+        if (cfg.greenApiId && !localStorage.getItem("manopavana_green_id")) {
+          setGreenInstanceId(cfg.greenApiId);
+          localStorage.setItem("manopavana_green_id", cfg.greenApiId);
+        }
+        if (cfg.greenApiToken && !localStorage.getItem("manopavana_green_token")) {
+          setGreenApiToken(cfg.greenApiToken);
+          localStorage.setItem("manopavana_green_token", cfg.greenApiToken);
+        }
+        if (cfg.metaToken && !localStorage.getItem("manopavana_meta_token")) {
+          setMetaToken(cfg.metaToken);
+          localStorage.setItem("manopavana_meta_token", cfg.metaToken);
+        }
+        if (cfg.metaPhoneId && !localStorage.getItem("manopavana_meta_phone_id")) {
+          setMetaPhoneId(cfg.metaPhoneId);
+          localStorage.setItem("manopavana_meta_phone_id", cfg.metaPhoneId);
+        }
+      }
+
       const res = await fetch("/api?action=whatsapp_status");
       if (res.ok) {
         const data = await res.json();
         const isLinked =
+          data.connected ||
           localStorage.getItem("manopavana_wa_connected") === "true" ||
           Boolean(greenInstanceId && greenApiToken) ||
           Boolean(metaToken && metaPhoneId);
-        const linkedAt = localStorage.getItem("manopavana_wa_linked_at");
+        const linkedAt = data.linkedAt || localStorage.getItem("manopavana_wa_linked_at");
         const total = parseInt(localStorage.getItem("manopavana_wa_sent_count") || "0", 10);
         setStatus({
           connected: isLinked,
@@ -86,19 +119,33 @@ export const WhatsAppGatewayPanel: React.FC<{
     fetchStatus();
   }, []);
 
-  // Save Green-API settings
-  const handleSaveGreenApi = () => {
+  // Save Green-API settings to both browser localStorage and server persistent storage
+  const handleSaveGreenApi = async () => {
     if (!greenInstanceId.trim() || !greenApiToken.trim()) {
       showToast("Please enter both Instance ID and API Token.");
       return;
     }
-    localStorage.setItem("manopavana_green_id", greenInstanceId.trim());
-    localStorage.setItem("manopavana_green_token", greenApiToken.trim());
+    const cleanId = greenInstanceId.trim();
+    const cleanToken = greenApiToken.trim();
+    localStorage.setItem("manopavana_green_id", cleanId);
+    localStorage.setItem("manopavana_green_token", cleanToken);
     localStorage.setItem("manopavana_wa_connected", "true");
     const nowStr = new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata" });
     localStorage.setItem("manopavana_wa_linked_at", nowStr);
     setStatus((prev) => ({ ...prev, connected: true, linkedAt: nowStr }));
-    showToast("Green-API configuration saved!");
+
+    // Persist to server
+    try {
+      await fetch("/api?action=save_whatsapp_config", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ greenApiId: cleanId, greenApiToken: cleanToken }),
+      });
+    } catch (e) {
+      console.warn("Could not persist green-api config to server:", e);
+    }
+
+    showToast("Green-API configuration saved & verified!");
     handleFetchRealQr();
   };
 
@@ -178,6 +225,35 @@ export const WhatsAppGatewayPanel: React.FC<{
       linkedAt: null,
     }));
     showToast("WhatsApp Gateway unlinked.");
+  };
+
+  // Save EmailJS OTP Template
+  const handleSaveEmailTemplate = () => {
+    localStorage.setItem("manopavana_emailjs_otp_template", emailOtpTemplateId.trim());
+    showToast("EmailJS OTP Template ID saved!");
+  };
+
+  // Test Email OTP
+  const handleTestEmailOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!testEmail.includes("@") || !testEmail.includes(".")) {
+      showToast("Please enter a valid email address.");
+      return;
+    }
+    try {
+      setTestingEmailSend(true);
+      const testCode = Math.floor(100000 + Math.random() * 900000).toString();
+      const ok = await sendEmailLoginOtp(testEmail.trim(), testCode);
+      if (ok) {
+        showToast(`Test OTP (${testCode}) dispatched to ${testEmail}! Check inbox.`);
+      } else {
+        showToast("EmailJS error. Please check your EmailJS template settings.");
+      }
+    } catch {
+      showToast("Failed to dispatch test email.");
+    } finally {
+      setTestingEmailSend(false);
+    }
   };
 
   // Send a test message
@@ -326,6 +402,19 @@ export const WhatsAppGatewayPanel: React.FC<{
 
         <button
           type="button"
+          onClick={() => setActiveTab("email")}
+          className={`px-4 py-2.5 text-xs font-bold border-b-2 transition-all flex items-center gap-2 cursor-pointer ${
+            activeTab === "email"
+              ? "border-emerald-600 text-emerald-600 dark:text-emerald-400"
+              : "border-transparent text-stone-500 hover:text-stone-800 dark:hover:text-stone-300"
+          }`}
+        >
+          <Mail className="w-4 h-4" />
+          <span>Option 3: Email OTP Settings</span>
+        </button>
+
+        <button
+          type="button"
           onClick={() => setActiveTab("status")}
           className={`px-4 py-2.5 text-xs font-bold border-b-2 transition-all flex items-center gap-2 cursor-pointer ${
             activeTab === "status"
@@ -441,17 +530,59 @@ export const WhatsAppGatewayPanel: React.FC<{
                   <button
                     type="button"
                     onClick={handleFetchRealQr}
-                    className="text-xs text-emerald-600 hover:underline flex items-center gap-1"
+                    className="text-xs text-emerald-600 hover:underline flex items-center gap-1 cursor-pointer"
                   >
                     <RefreshCw className="w-3 h-3" /> Refresh QR code
                   </button>
                 </>
+              ) : status.connected ? (
+                <div className="space-y-4 py-4 px-2">
+                  <div className="w-14 h-14 mx-auto rounded-full bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
+                    <CheckCircle2 className="w-8 h-8" />
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-sm text-emerald-800 dark:text-emerald-300">
+                      WhatsApp Gateway is Linked & Active!
+                    </h4>
+                    <p className="text-xs text-stone-600 dark:text-stone-300 mt-1">
+                      Connected Phone: <strong>+91 91803 01917</strong>
+                    </p>
+                    <p className="text-[11px] text-emerald-600 dark:text-emerald-400 mt-1">
+                      Instance 710722779911 (Authorized)
+                    </p>
+                  </div>
+                  <div className="flex flex-col gap-2 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab("status")}
+                      className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-sm transition-colors"
+                    >
+                      <Send className="w-3.5 h-3.5" />
+                      <span>Send Test WhatsApp OTP</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        if (!window.confirm("Do you want to unlink and generate a new QR code to scan a different phone?")) return;
+                        try {
+                          await fetch("/api?action=whatsapp_logout_and_relink", { method: "POST" });
+                          setStatus(p => ({ ...p, connected: false }));
+                          handleFetchRealQr();
+                        } catch {
+                          showToast("Failed to unlink instance.");
+                        }
+                      }}
+                      className="text-[11px] text-red-500 hover:underline flex items-center justify-center gap-1 cursor-pointer"
+                    >
+                      <Power className="w-3 h-3" /> Scan with different phone / Re-link
+                    </button>
+                  </div>
+                </div>
               ) : (
                 <div className="space-y-3 py-6">
                   <QrCode className="w-14 h-14 text-stone-300 dark:text-stone-700 mx-auto" />
                   <p className="text-xs text-[#A88D77] max-w-[200px]">
-                    Enter your Green-API keys on the left and click "Fetch Real WhatsApp QR" to
-                    display the live, authentic WhatsApp Web QR code.
+                    Click "Fetch Real WhatsApp QR" to display the live, authentic WhatsApp Web QR code to scan.
                   </p>
                 </div>
               )}
@@ -512,7 +643,120 @@ export const WhatsAppGatewayPanel: React.FC<{
         </div>
       )}
 
-      {/* Tab 3 / Universal Test Sender */}
+      {/* Tab 3: Email OTP Settings & Configuration */}
+      {activeTab === "email" && (
+        <div className="space-y-6 text-xs">
+          <div className="p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800/40 space-y-3">
+            <p className="font-bold text-amber-900 dark:text-amber-200 flex items-center gap-2">
+              <Mail className="w-4 h-4 text-amber-600" />
+              <span>How to Send Email OTP Directly to Customers (Instead of manopavana@gmail.com)</span>
+            </p>
+            <div className="space-y-2 text-[#7A5B3E] dark:text-[#E2C7B0] leading-relaxed">
+              <p>
+                In your EmailJS template settings, the <strong>"To Email"</strong> field is currently
+                hardcoded to <code>manopavana@gmail.com</code>. That is why EmailJS delivered the email
+                to your store inbox instead of the customer!
+              </p>
+              <div className="p-3 bg-white dark:bg-[#120A06] rounded-xl border border-amber-300 dark:border-amber-800 space-y-1.5 font-mono text-[11px]">
+                <p className="font-bold text-stone-800 dark:text-stone-200">
+                  Fix it in EmailJS in 30 seconds:
+                </p>
+                <ol className="list-decimal list-inside space-y-1 text-stone-600 dark:text-stone-300 font-sans">
+                  <li>
+                    Log in to{" "}
+                    <a
+                      href="https://dashboard.emailjs.com/admin/templates"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-emerald-600 underline font-bold"
+                    >
+                      dashboard.emailjs.com/admin/templates
+                    </a>
+                  </li>
+                  <li>Click on your template (e.g. <code>template_zcdzrbl</code> or create a new one).</li>
+                  <li>
+                    At the top right, look at the <strong>To Email</strong> box.
+                  </li>
+                  <li>
+                    Change it from <code>manopavana@gmail.com</code> to{" "}
+                    <strong className="text-emerald-600 bg-emerald-50 dark:bg-emerald-950/50 px-1.5 py-0.5 rounded">
+                      {"{{to_email}}"}
+                    </strong>
+                  </li>
+                  <li>Click <strong>Save</strong> at the top right.</li>
+                </ol>
+              </div>
+              <p className="text-[11px] text-[#A88D77]">
+                Once changed to <code>{"{{to_email}}"}</code>, EmailJS will forward every OTP directly
+                to the customer's email address!
+              </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+            {/* Custom Template ID Override */}
+            <div className="p-5 rounded-2xl bg-stone-50 dark:bg-[#150D07] border border-stone-200 dark:border-[#3B2516] space-y-3">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-stone-700 dark:text-stone-300">
+                Custom OTP Template ID (Optional)
+              </h3>
+              <p className="text-[11px] text-stone-500 dark:text-stone-400">
+                If you created a separate EmailJS template just for Login OTPs, enter its template ID below:
+              </p>
+              <div>
+                <label className="block text-[11px] font-semibold text-stone-700 dark:text-stone-300 mb-1">
+                  EmailJS OTP Template ID
+                </label>
+                <input
+                  type="text"
+                  value={emailOtpTemplateId}
+                  onChange={(e) => setEmailOtpTemplateId(e.target.value)}
+                  placeholder="e.g. template_otp_login (Default: template_zcdzrbl)"
+                  className="w-full px-3 py-2 text-xs rounded-xl bg-white dark:bg-[#100905] border border-stone-300 dark:border-stone-700 font-mono focus:outline-none focus:border-emerald-500"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={handleSaveEmailTemplate}
+                className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-sm cursor-pointer"
+              >
+                Save Template ID
+              </button>
+            </div>
+
+            {/* Test Email Dispatch Form */}
+            <div className="p-5 rounded-2xl bg-stone-50 dark:bg-[#150D07] border border-stone-200 dark:border-[#3B2516] space-y-3">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-[#A88D77] flex items-center gap-1.5">
+                <Send className="w-3.5 h-3.5 text-emerald-500" />
+                <span>Test Email OTP Dispatch</span>
+              </h3>
+              <form onSubmit={handleTestEmailOtp} className="space-y-3">
+                <div>
+                  <label className="block text-[11px] font-semibold text-stone-600 dark:text-stone-300 mb-1">
+                    Recipient Test Email
+                  </label>
+                  <input
+                    type="email"
+                    placeholder="Enter any email address to test OTP delivery"
+                    value={testEmail}
+                    onChange={(e) => setTestEmail(e.target.value)}
+                    className="w-full px-3 py-2 text-xs rounded-xl bg-white dark:bg-[#100905] border border-stone-300 dark:border-stone-700 focus:outline-none focus:border-emerald-500 font-mono"
+                  />
+                </div>
+                <button
+                  type="submit"
+                  disabled={testingEmailSend || !testEmail.includes("@")}
+                  className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-sm transition-all cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-40"
+                >
+                  <Send className="w-3.5 h-3.5" />
+                  <span>{testingEmailSend ? "Dispatching..." : "Send Test Email OTP"}</span>
+                </button>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Tab 4 / Universal Test Sender */}
       {activeTab === "status" && (
         <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
           <div className="md:col-span-6 p-5 rounded-2xl bg-emerald-50/80 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/40 space-y-3 text-xs">

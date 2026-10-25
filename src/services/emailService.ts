@@ -207,25 +207,63 @@ export async function sendEmailLoginOtp(toEmail: string, otpCode: string): Promi
     const cleanEmail = toEmail.toLowerCase().trim();
     const messageBody = `Hello,\n\nYour 6-digit one-time verification code to sign in to MANOPAVANA is:\n\n${otpCode}\n\nThis code is valid for 10 minutes. For your security, do not share this OTP with anyone.\n\nWarm regards,\nMANOPAVANA Artisanal Wood-Pressed Oils\nBengaluru, India`;
 
+    // Populate every common variable so that EVEN IF an order template is used,
+    // the email is never blank and clearly displays the OTP code.
     const templateParams: Record<string, string> = {
+      // Recipient fields
       to_email: cleanEmail,
-      to_name: "Customer",
+      to_name: cleanEmail.split("@")[0] || "Customer",
+      recipient: cleanEmail,
+      user_email: cleanEmail,
+      customer_email: cleanEmail,
+      email: cleanEmail,
+      to: cleanEmail,
+      target_email: cleanEmail,
       from_name: "MANOPAVANA Security",
       from_email: "orders@manopavana.com",
-      reply_to: EMAILJS_CONFIG.TARGET_EMAIL,
+      reply_to: cleanEmail,
       subject: `Your MANOPAVANA Login OTP: ${otpCode}`,
       title: `MANOPAVANA Login Verification: ${otpCode}`,
+
+      // Primary message fields
       message: messageBody,
       content: messageBody,
       body: messageBody,
       details: messageBody,
+      text: messageBody,
       otp_code: otpCode,
       code: otpCode,
+      otp: otpCode,
+
+      // Order template variables fallback (prevents blank template)
+      order_ref: `LOGIN-OTP-${otpCode}`,
+      orderRef: `LOGIN-OTP-${otpCode}`,
+      order_id: `OTP-${otpCode}`,
+      orderId: `OTP-${otpCode}`,
+      customer_name: cleanEmail.split("@")[0] || "Customer",
+      customerName: cleanEmail.split("@")[0] || "Customer",
+      name: cleanEmail.split("@")[0] || "Customer",
+      total_amount: `OTP: ${otpCode}`,
+      total: `OTP: ${otpCode}`,
+      amount: `OTP: ${otpCode}`,
+      items_summary: `Your 6-digit MANOPAVANA login OTP is: ${otpCode}`,
+      itemsSummary: `Your 6-digit MANOPAVANA login OTP is: ${otpCode}`,
+      order_details: messageBody,
+      orderSummary: messageBody,
+      delivery_address: `Delivered to: ${cleanEmail}`,
+      deliveryAddress: `Delivered to: ${cleanEmail}`,
+      payment_method: `Login Verification (${otpCode})`,
+      paymentMethod: `Login Verification (${otpCode})`,
     };
+
+    const templateId =
+      (typeof localStorage !== "undefined" &&
+        localStorage.getItem("manopavana_emailjs_otp_template")) ||
+      EMAILJS_CONFIG.TEMPLATE_ID;
 
     await emailjs.send(
       EMAILJS_CONFIG.SERVICE_ID,
-      EMAILJS_CONFIG.TEMPLATE_ID,
+      templateId,
       templateParams,
       EMAILJS_CONFIG.PUBLIC_KEY
     );

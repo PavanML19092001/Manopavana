@@ -177,49 +177,61 @@ export const ProductPage = () => {
     }
   };
 
-  // FLIPKART STYLE SHARE HANDLER
+  // FLIPKART STYLE SHARE HANDLER - SENDS EXACT PRODUCT IMAGE
   const handleShare = async () => {
     const shareUrl = window.location.href;
-    const shareTitle = `${product.name} - MANOPAVANA Artisanal Oils`;
-    const shareText = `Check out ${product.name} (Pure Marachekku Wood-Pressed Oil) from MANOPAVANA Bengaluru:`;
-    const activeImageUrl = product.images[selectedImageIndex] || product.images[0];
+    const shareTitle = `${product.name} (Pure Marachekku Wood-Pressed Oil)`;
+    const shareText = `Check out *${product.name}* (100% Marachekku Wood-Pressed Oil) from MANOPAVANA Bengaluru:\nPrice: ₹${price} (${selectedVolume})\nDirect Link: ${shareUrl}`;
 
     // Try Web Share API with image file if supported
     if (navigator.share) {
       try {
         let fileShared = false;
-        if (navigator.canShare && activeImageUrl) {
+        if (activeImageUrl) {
           try {
-            const resp = await fetch(activeImageUrl);
+            // Use same-origin proxy to ensure no CORS blocking and direct image byte transfer
+            const proxyEndpoint = `/api?action=proxy_image&url=${encodeURIComponent(activeImageUrl)}`;
+            const resp = await fetch(proxyEndpoint);
             if (resp.ok) {
               const blob = await resp.blob();
               const ext = activeImageUrl.endsWith(".png") ? "png" : "jpg";
               const file = new File([blob], `${product.id}-oil.${ext}`, {
                 type: blob.type || (ext === "png" ? "image/png" : "image/jpeg"),
               });
-              if (navigator.canShare({ files: [file] })) {
+
+              // Level 2 Web Share API with both image file and clickable link
+              const fullPayload: any = {
+                title: shareTitle,
+                text: shareText,
+                url: shareUrl,
+                files: [file],
+              };
+
+              if (navigator.canShare && navigator.canShare(fullPayload)) {
+                await navigator.share(fullPayload);
+                fileShared = true;
+              } else if (navigator.canShare && navigator.canShare({ files: [file] })) {
                 await navigator.share({
                   title: shareTitle,
-                  text: `${shareText} ${shareUrl}`,
-                  url: shareUrl,
+                  text: shareText,
                   files: [file],
                 });
                 fileShared = true;
               }
             }
-          } catch {
-            // fallback to standard share without file
+          } catch (e) {
+            console.warn("Notice: file share with image file fell back to standard share", e);
           }
         }
 
         if (!fileShared) {
           await navigator.share({
             title: shareTitle,
-            text: shareText,
+            text: `${shareText}\n\nPhoto: ${activeImageUrl}`,
             url: shareUrl,
           });
         }
-        showToast("Shared successfully!");
+        showToast("Product shared successfully!");
         return;
       } catch (err: unknown) {
         const error = err as { name?: string };
@@ -232,9 +244,9 @@ export const ProductPage = () => {
     // Fallback: Open interactive Flipkart-style share sheet
     setIsShareModalOpen(true);
     try {
-      await navigator.clipboard.writeText(`${product.name}\n${shareUrl}`);
+      await navigator.clipboard.writeText(`${product.name} (₹${price})\n${shareUrl}\nPhoto: ${activeImageUrl}`);
       setCopiedLink(true);
-      showToast("Product link copied to clipboard!");
+      showToast("Product link & photo preview copied to clipboard!");
       setTimeout(() => setCopiedLink(false), 3000);
     } catch {
       // clipboard write failed
@@ -243,9 +255,9 @@ export const ProductPage = () => {
 
   const handleCopyLink = async () => {
     try {
-      await navigator.clipboard.writeText(`${product.name}\n${window.location.href}`);
+      await navigator.clipboard.writeText(`${product.name} (₹${price})\n${window.location.href}\nPhoto: ${activeImageUrl}`);
       setCopiedLink(true);
-      showToast("Link copied to clipboard!");
+      showToast("Product link copied to clipboard!");
       setTimeout(() => setCopiedLink(false), 3000);
     } catch {
       showToast("Unable to copy link automatically");
@@ -254,7 +266,11 @@ export const ProductPage = () => {
 
   const activeImageUrl = product.images[selectedImageIndex] || product.images[0];
   const shareMessage = encodeURIComponent(
-    `Take a look at ${product.name} (Pure Marachekku Wood-Pressed Oil) on MANOPAVANA:\n${window.location.href}\n\nPhoto: ${activeImageUrl}`
+    `🌿 *${product.name}* (100% Traditional Marachekku Wood-Pressed Oil)\n` +
+    `💰 Price: ₹${price} (${selectedVolume} Bottle)\n` +
+    `📍 MANOPAVANA, Bengaluru\n\n` +
+    `📸 Product Photo: ${activeImageUrl}\n\n` +
+    `🔗 View & Order Online: ${window.location.href}`
   );
 
   React.useEffect(() => {
@@ -262,6 +278,14 @@ export const ProductPage = () => {
     const ogImage = document.querySelector('meta[property="og:image"]');
     if (ogImage && activeImageUrl) {
       ogImage.setAttribute("content", activeImageUrl);
+    }
+    const twitterImage = document.querySelector('meta[name="twitter:image"]');
+    if (twitterImage && activeImageUrl) {
+      twitterImage.setAttribute("content", activeImageUrl);
+    }
+    const ogTitle = document.querySelector('meta[property="og:title"]');
+    if (ogTitle) {
+      ogTitle.setAttribute("content", `${product.name} - MANOPAVANA`);
     }
   }, [product.name, activeImageUrl]);
 
