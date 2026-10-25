@@ -181,7 +181,9 @@ export const ProductPage = () => {
   const handleShare = async () => {
     const shareUrl = window.location.href;
     const shareTitle = `${product.name} (Pure Marachekku Wood-Pressed Oil)`;
-    const shareText = `Check out *${product.name}* (100% Marachekku Wood-Pressed Oil) from MANOPAVANA Bengaluru:\nPrice: ₹${price} (${selectedVolume})\n${shareUrl}`;
+    // Clean text without trailing url: navigator.share with url appends the url automatically
+    const shareText = `Check out *${product.name}* (100% Marachekku Wood-Pressed Oil) from MANOPAVANA Bengaluru:\nPrice: ₹${price} (${selectedVolume})`;
+    const shareTextWithUrl = `${shareText}\n${shareUrl}`;
 
     // Try Web Share API with image file if supported
     if (navigator.share) {
@@ -211,7 +213,7 @@ export const ProductPage = () => {
             } else if (navigator.canShare && navigator.canShare({ files: [file] })) {
               await navigator.share({
                 title: shareTitle,
-                text: shareText,
+                text: shareTextWithUrl,
                 files: [file],
               });
               fileShared = true;

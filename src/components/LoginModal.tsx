@@ -71,7 +71,10 @@ export const LoginModal: React.FC = () => {
     } catch (err: unknown) {
       console.warn("Google Sign-In notice:", err);
       const e = err as { message?: string; code?: string };
-      if (e.code === "AUTH_BLOCKED_UNREGISTERED_EMAIL" || (e.message && e.message.includes("not yet linked"))) {
+      if (
+        e.code === "AUTH_BLOCKED_UNREGISTERED_EMAIL" ||
+        (e.message && (e.message.includes("not yet linked") || e.message.includes("Unlinked Google Account")))
+      ) {
         setErrorMessage(
           "Unlinked Google Account: First-time registration is strictly via your WhatsApp Mobile Number. Please enter your mobile number below to verify and create your account. You can link your Google account afterwards in your profile."
         );

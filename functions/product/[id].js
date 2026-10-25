@@ -33,8 +33,9 @@ export async function onRequest(context) {
   const urlObj = new URL(request.url);
   const absoluteImageUrl = `${urlObj.origin}${meta.image}`;
 
-  // Fetch the static asset (index.html) from the Pages deployment
-  const response = await env.ASSETS.fetch(request);
+  // Fetch the compiled root index.html from the Pages deployment
+  const indexUrl = new URL("/", request.url);
+  const response = await env.ASSETS.fetch(new Request(indexUrl.toString(), request));
   const contentType = response.headers.get("content-type") || "";
 
   if (contentType.includes("text/html")) {

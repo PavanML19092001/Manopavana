@@ -150,24 +150,25 @@ export async function checkEmailExistsInDatabase(rawEmail: string): Promise<{
   if (!rawEmail) return { exists: false };
   const cleanEmail = rawEmail.toLowerCase().trim();
 
-  // 1. Allow store administrators
-  const ADMIN_EMAILS = ["manopavana@gmail.com", "pavanml19092001@gmail.com"];
+  // 1. Store Master Administrator (explicit store account only)
+  const ADMIN_EMAILS = ["manopavana@gmail.com"];
   if (ADMIN_EMAILS.includes(cleanEmail)) {
     return { exists: true, isStoreAdmin: true };
   }
 
-  // 2. Check settings/account_mappings
+  // 2. Check settings/account_mappings - must have a valid 10-digit mobile number!
   try {
     const mapSnap = await getDoc(doc(db, "settings", "account_mappings"));
     if (mapSnap.exists()) {
       const mapData = mapSnap.data();
       const byEmail = (mapData?.byEmail || {}) as Record<string, any>;
       const match = byEmail[cleanEmail];
-      if (match && (match.phone || match.primaryUid)) {
+      const matchPhone = extractCleanPhone(match?.phone || "");
+      if (match && matchPhone.length === 10) {
         return {
           exists: true,
-          phone: match.phone || undefined,
-          primaryUid: match.primaryUid || undefined,
+          phone: matchPhone,
+          primaryUid: match.primaryUid || `phone_${matchPhone}`,
           name: match.name || undefined,
         };
       }
@@ -177,49 +178,26 @@ export async function checkEmailExistsInDatabase(rawEmail: string): Promise<{
   }
 
   // 3. Check customers collection where email == cleanEmail
+  // MUST have a verified 10-digit mobile phone number attached to the customer document
   try {
     const qEmail = query(collection(db, "customers"), where("email", "==", cleanEmail));
     const snap = await getDocs(qEmail);
     if (!snap.empty) {
       for (const d of snap.docs) {
         const data = d.data();
-        if (data.phone || data.primaryUid) {
+        const cleanPhone = extractCleanPhone(data.phone || data.customerPhone || "");
+        if (cleanPhone.length === 10) {
           return {
             exists: true,
-            phone: data.phone || undefined,
+            phone: cleanPhone,
             primaryUid: data.primaryUid || d.id,
             name: data.name || undefined,
           };
         }
       }
-      const firstData = snap.docs[0].data();
-      return {
-        exists: true,
-        primaryUid: snap.docs[0].id,
-        name: firstData.name || undefined,
-        phone: firstData.phone || undefined,
-      };
     }
   } catch (e) {
     console.warn("Notice checking customers collection for email:", e);
-  }
-
-  // 4. Check past orders by customerEmail
-  try {
-    const qOrders = query(collection(db, "orders"), where("customerEmail", "==", cleanEmail));
-    const snap = await getDocs(qOrders);
-    if (!snap.empty) {
-      const firstOrd = snap.docs[0].data();
-      const cleanPhone = extractCleanPhone(firstOrd.customerPhone || firstOrd.shippingAddress?.phone || "");
-      return {
-        exists: true,
-        phone: cleanPhone || undefined,
-        primaryUid: firstOrd.customerUid || (cleanPhone ? `phone_${cleanPhone}` : undefined),
-        name: firstOrd.shippingAddress?.fullName || undefined,
-      };
-    }
-  } catch (e) {
-    console.warn("Notice checking orders for email:", e);
   }
 
   return { exists: false };
@@ -244,7 +222,7 @@ export async function signInWithGoogle() {
     // Immediately sign out to abort session
     await signOut(auth);
     const blockedErr = new Error(
-      "This Google account is not yet linked to any MANOPAVANA account. As per our security policy, first-time registration is strictly via your WhatsApp Mobile Number. Please sign in with your mobile number first, then link your email in your profile."
+      "Unlinked Google Account: First-time registration is strictly via your WhatsApp Mobile Number. Please enter your mobile number below to verify and create your account. You can link your Google account afterwards in your profile."
     );
     (blockedErr as any).code = "AUTH_BLOCKED_UNREGISTERED_EMAIL";
     throw blockedErr;
