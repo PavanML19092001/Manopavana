@@ -555,7 +555,7 @@ export const COMBOS: ComboProduct[] = [
     image: MEDIA_ASSETS.comboBanner,
     bullets: [
       "Complete monthly cooking coverage for your family",
-      "Free Doorstep Delivery included across Bangalore (24–72 hrs)",
+      "Free Doorstep Delivery included across India (24–72 hrs)",
       "Raw artisanal extraction with zero chemical additives or solvents",
       "Includes verified 10% repeat order QR codes on all 3 bottles"
     ],
@@ -575,7 +575,7 @@ export const COMBOS: ComboProduct[] = [
     image: MEDIA_ASSETS.comboBanner,
     bullets: [
       "Complete monthly cooking coverage for your family",
-      "Free Doorstep Delivery included across Bangalore (24–72 hrs)",
+      "Free Doorstep Delivery included across India (24–72 hrs)",
       "Raw artisanal extraction with zero chemical additives or solvents",
       "Includes verified 10% repeat order QR codes on all 3 bottles"
     ],

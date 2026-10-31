@@ -74,7 +74,7 @@ export const StorefrontCMSPanel: React.FC<{ isDark: boolean }> = ({ isDark }) =>
     | "faqs"
     | "facility"
     | "policies"
-  >("orders");
+  >("brand");
 
   const [orderSearch, setOrderSearch] = useState("");
   const [orderStatusFilter, setOrderStatusFilter] = useState<string>("all");
@@ -292,7 +292,7 @@ export const StorefrontCMSPanel: React.FC<{ isDark: boolean }> = ({ isDark }) =>
         volumeLabel: "3 Litres (1L Groundnut + 1L Coconut + 1L Sesame)",
         description: "Equip your kitchen with South India's 3 core traditional wood-pressed oils. Sourced directly from traditional wood-press artisans, settled naturally, and packed hygienically at our Bangalore packaging and distribution facility.",
         image: MEDIA_ASSETS.comboBanner,
-        bullets: "Complete monthly cooking coverage for your family, Free Doorstep Delivery included across Bangalore (24–72 hrs), Raw artisanal extraction with zero chemical additives or solvents, Includes verified 10% repeat order QR codes on all 3 bottles",
+        bullets: "Complete monthly cooking coverage for your family, Free Doorstep Delivery included across India (24–72 hrs), Raw artisanal extraction with zero chemical additives or solvents, Includes verified 10% repeat order QR codes on all 3 bottles",
         regularPrice: 1299,
         loyaltyPrice: 1169,
         mrp: 1560,
@@ -304,7 +304,7 @@ export const StorefrontCMSPanel: React.FC<{ isDark: boolean }> = ({ isDark }) =>
         volumeLabel: "1.5 Litres (500ml Groundnut + 500ml Coconut + 500ml Sesame)",
         description: "Compact kitchen starter box containing 500ml Groundnut Oil, 500ml Coconut Oil, and 500ml Sesame Oil, packed fresh at our Bangalore packaging and distribution facility.",
         image: MEDIA_ASSETS.comboBanner,
-        bullets: "Complete monthly cooking coverage for your family, Free Doorstep Delivery included across Bangalore (24–72 hrs), Raw artisanal extraction with zero chemical additives or solvents, Includes verified 10% repeat order QR codes on all 3 bottles",
+        bullets: "Complete monthly cooking coverage for your family, Free Doorstep Delivery included across India (24–72 hrs), Raw artisanal extraction with zero chemical additives or solvents, Includes verified 10% repeat order QR codes on all 3 bottles",
         regularPrice: 699,
         loyaltyPrice: 629,
         mrp: 840,
@@ -1049,37 +1049,95 @@ export const StorefrontCMSPanel: React.FC<{ isDark: boolean }> = ({ isDark }) =>
               />
             </div>
 
-            {/* Delivery Thresholds & Subscription Discount */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2 border-t border-stone-200 dark:border-stone-800">
-              <div>
-                <label className="block font-semibold mb-1">Free Delivery Threshold (₹)</label>
-                <input
-                  type="number"
-                  value={threshold}
-                  onChange={(e) => setThreshold(Number(e.target.value))}
-                  className="w-full px-3 py-2 rounded-xl border border-stone-300 dark:border-stone-700 bg-transparent font-bold"
-                />
+            {/* Delivery Thresholds & Shipping Policy Engine */}
+            <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b pb-2.5 border-amber-500/20">
+                <div className="flex items-center gap-2">
+                  <Truck className="w-4 h-4 text-[#E08F35]" />
+                  <div>
+                    <h4 className="font-bold text-xs sm:text-sm text-stone-900 dark:text-stone-100">
+                      Shipping, Delivery Rules & Thresholds (Pan-India Policy)
+                    </h4>
+                    <p className="text-[10px] text-stone-500 dark:text-stone-400">
+                      Standardized across India — no regional restriction
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setThreshold(800);
+                    setStdFee(70);
+                    showToast("Reset shipping rules to defaults: ₹800 threshold / ₹70 standard fee!");
+                  }}
+                  className="px-3 py-1 rounded-xl text-[10px] font-bold bg-[#5E3210] hover:bg-[#43230A] text-white flex items-center gap-1.5 transition-colors cursor-pointer self-start sm:self-auto shadow-xs"
+                >
+                  <RefreshCw className="w-3 h-3 text-amber-300" />
+                  <span>Reset to Policy Defaults (₹800 / ₹70)</span>
+                </button>
               </div>
-              <div>
-                <label className="block font-semibold mb-1">Standard Shipping Fee (₹)</label>
-                <input
-                  type="number"
-                  value={stdFee}
-                  onChange={(e) => setStdFee(Number(e.target.value))}
-                  className="w-full px-3 py-2 rounded-xl border border-stone-300 dark:border-stone-700 bg-transparent font-bold"
-                />
+
+              {/* Active Rules Visual Cards */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px]">
+                <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-800 dark:text-emerald-300 flex items-start gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                  <div>
+                    <span className="font-bold">FREE Delivery Rule:</span>
+                    <p className="text-[10px] opacity-90">
+                      Automatically unlocked when order subtotal is ≥ ₹{threshold} <strong>OR</strong> cart count is ≥ 2 bottles across India.
+                    </p>
+                  </div>
+                </div>
+                <div className="p-2.5 rounded-xl bg-amber-500/15 border border-amber-500/20 text-[#5E3210] dark:text-amber-200 flex items-start gap-2">
+                  <ShieldCheck className="w-4 h-4 text-[#E08F35] shrink-0 mt-0.5" />
+                  <div>
+                    <span className="font-bold">Standard Delivery Fee:</span>
+                    <p className="text-[10px] opacity-90">
+                      Flat ₹{stdFee} applied only to single-bottle orders below ₹{threshold}.
+                    </p>
+                  </div>
+                </div>
               </div>
-              <div>
-                <label className="block font-semibold mb-1">Subscription Discount (%)</label>
-                <input
-                  type="number"
-                  min="0"
-                  max="50"
-                  value={subDiscountPercent}
-                  onChange={(e) => setSubDiscountPercent(Number(e.target.value))}
-                  className="w-full px-3 py-2 rounded-xl border border-stone-300 dark:border-stone-700 bg-transparent font-bold text-amber-700 dark:text-amber-400"
-                />
-                <span className="text-[10px] text-stone-500">Applied dynamically across all monthly subscriptions (Default: 10%)</span>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-1">
+                <div>
+                  <label className="block font-semibold mb-1">Free Delivery Threshold (₹)</label>
+                  <input
+                    type="number"
+                    value={threshold}
+                    onChange={(e) => setThreshold(Number(e.target.value))}
+                    className="w-full px-3 py-2 rounded-xl border border-stone-300 dark:border-stone-700 bg-white dark:bg-transparent font-bold text-xs"
+                  />
+                  <span className="text-[10px] text-stone-500 block mt-1">
+                    Free shipping unlocked at this amount or 2+ bottles
+                  </span>
+                </div>
+                <div>
+                  <label className="block font-semibold mb-1">Standard Shipping Fee (₹)</label>
+                  <input
+                    type="number"
+                    value={stdFee}
+                    onChange={(e) => setStdFee(Number(e.target.value))}
+                    className="w-full px-3 py-2 rounded-xl border border-stone-300 dark:border-stone-700 bg-white dark:bg-transparent font-bold text-xs"
+                  />
+                  <span className="text-[10px] text-stone-500 block mt-1">
+                    Flat fee for 1-bottle orders under ₹{threshold} (Default: ₹70)
+                  </span>
+                </div>
+                <div>
+                  <label className="block font-semibold mb-1">Subscription / Repeat Discount (%)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="50"
+                    value={subDiscountPercent}
+                    onChange={(e) => setSubDiscountPercent(Number(e.target.value))}
+                    className="w-full px-3 py-2 rounded-xl border border-stone-300 dark:border-stone-700 bg-white dark:bg-transparent font-bold text-amber-700 dark:text-amber-400 text-xs"
+                  />
+                  <span className="text-[10px] text-stone-500 block mt-1">
+                    Automatic 10% discount across orders
+                  </span>
+                </div>
               </div>
             </div>
           </div>
@@ -1391,11 +1449,54 @@ export const StorefrontCMSPanel: React.FC<{ isDark: boolean }> = ({ isDark }) =>
         {/* TAB 5: PRICING, MRPS & INVENTORY */}
         {activeTab === "pricing_stock" && (
           <div className="space-y-4 animate-fade-in">
+            {/* Current Base Rate Policy Bar */}
+            <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <span className="text-xs font-bold text-stone-900 dark:text-stone-100 flex items-center gap-1.5">
+                  <Tag className="w-3.5 h-3.5 text-[#E08F35]" />
+                  Base Retail Price Policy: Groundnut ₹399 • Coconut ₹489 • Sesame ₹499
+                </span>
+                <p className="text-[10px] text-stone-500 mt-0.5">
+                  Single bottle retail prices configured for healthy unit margins with ₹70 standard delivery fee / ₹800 free delivery
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setPrices({
+                    groundnut1L: 399,
+                    groundnut500ml: 189,
+                    coconut1L: 489,
+                    coconut500ml: 269,
+                    sesame1L: 499,
+                    sesame500ml: 269,
+                    combo3L: 1299,
+                    combo1_5L: 699,
+                  });
+                  setMrp({
+                    groundnut1L: 399,
+                    groundnut500ml: 189,
+                    coconut1L: 489,
+                    coconut500ml: 269,
+                    sesame1L: 499,
+                    sesame500ml: 269,
+                    combo3L: 1560,
+                    combo1_5L: 840,
+                  });
+                  showToast("Restored official base prices: Groundnut ₹399, Coconut ₹489, Sesame ₹499!");
+                }}
+                className="px-3 py-1.5 rounded-xl bg-[#5E3210] hover:bg-[#43230A] text-white text-[10px] font-bold flex items-center gap-1.5 transition-colors cursor-pointer self-start sm:self-auto shrink-0 shadow-xs"
+              >
+                <RefreshCw className="w-3 h-3 text-amber-300" />
+                <span>Reset to Standard Base Rates</span>
+              </button>
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {/* Groundnut Oil */}
               <div className="p-3.5 rounded-xl border border-stone-200 dark:border-stone-800 bg-stone-50/50 dark:bg-black/20 space-y-3">
                 <span className="font-bold text-amber-700 dark:text-amber-400 block border-b pb-1">
-                  Groundnut Oil Rates & Stock
+                  Groundnut Oil Rates & Stock (Base: ₹399 / 1L)
                 </span>
                 <div className="space-y-2">
                   <div className="flex items-center justify-between gap-2">
@@ -1463,7 +1564,7 @@ export const StorefrontCMSPanel: React.FC<{ isDark: boolean }> = ({ isDark }) =>
               {/* Coconut Oil */}
               <div className="p-3.5 rounded-xl border border-stone-200 dark:border-stone-800 bg-stone-50/50 dark:bg-black/20 space-y-3">
                 <span className="font-bold text-amber-700 dark:text-amber-400 block border-b pb-1">
-                  Coconut Oil Rates & Stock
+                  Coconut Oil Rates & Stock (Base: ₹489 / 1L)
                 </span>
                 <div className="space-y-2">
                   <div className="flex items-center justify-between gap-2">
@@ -1531,7 +1632,7 @@ export const StorefrontCMSPanel: React.FC<{ isDark: boolean }> = ({ isDark }) =>
               {/* Sesame Oil */}
               <div className="p-3.5 rounded-xl border border-stone-200 dark:border-stone-800 bg-stone-50/50 dark:bg-black/20 space-y-3">
                 <span className="font-bold text-amber-700 dark:text-amber-400 block border-b pb-1">
-                  Sesame Oil Rates & Stock
+                  Sesame Oil Rates & Stock (Base: ₹499 / 1L)
                 </span>
                 <div className="space-y-2">
                   <div className="flex items-center justify-between gap-2">
@@ -2011,6 +2112,34 @@ export const StorefrontCMSPanel: React.FC<{ isDark: boolean }> = ({ isDark }) =>
         {/* TAB 10: LEGAL POLICIES */}
         {activeTab === "policies" && (
           <div className="space-y-4 animate-fade-in">
+            <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <span className="text-xs font-bold text-stone-900 dark:text-stone-100 flex items-center gap-1.5">
+                  <FileText className="w-3.5 h-3.5 text-[#E08F35]" />
+                  Storefront Legal & Shipping Policies
+                </span>
+                <p className="text-[10px] text-stone-500 mt-0.5">
+                  Includes active Pan-India Free Delivery (₹800 or 2+ bottles) and ₹70 standard delivery fee clauses
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setPolicies({
+                    terms: { title: LEGAL_POLICIES.terms.title, content: LEGAL_POLICIES.terms.content },
+                    shipping: { title: LEGAL_POLICIES.shipping.title, content: LEGAL_POLICIES.shipping.content },
+                    returns: { title: LEGAL_POLICIES.returns.title, content: LEGAL_POLICIES.returns.content },
+                    privacy: { title: LEGAL_POLICIES.privacy.title, content: LEGAL_POLICIES.privacy.content },
+                  });
+                  showToast("Restored all policies to official defaults (including ₹800 / ₹70 shipping rules)!");
+                }}
+                className="px-3 py-1.5 rounded-xl bg-[#5E3210] hover:bg-[#43230A] text-white text-[10px] font-bold flex items-center gap-1.5 transition-colors cursor-pointer self-start sm:self-auto shrink-0 shadow-xs"
+              >
+                <RefreshCw className="w-3 h-3 text-amber-300" />
+                <span>Reset Policies to Defaults</span>
+              </button>
+            </div>
+
             {[
               { key: "terms", label: "Terms & Conditions" },
               { key: "shipping", label: "Shipping & Delivery Policy" },

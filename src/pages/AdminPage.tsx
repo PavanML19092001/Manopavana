@@ -930,27 +930,20 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
           </div>
         </div>
 
-        {/* Two-Column Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-          {/* Left Column: CMS Panel */}
-          <div className="lg:col-span-6 space-y-6">
-            <StorefrontCMSPanel isDark={isDark} />
-          </div>
-
-          {/* Right Column: Live Incoming Orders Queue */}
-          <div className="lg:col-span-6 space-y-4">
+        {/* Live Incoming Orders & Delhivery Queue (Top Priority) */}
+        <div className="space-y-4">
+          <div
+            className={`rounded-3xl border p-6 sm:p-8 shadow-sm space-y-5 transition-colors ${
+              isDark
+                ? "bg-[#1C120B] border-[#362114]"
+                : "bg-white border-[#E8DEC8]"
+            }`}
+          >
             <div
-              className={`rounded-2xl border p-6 shadow-2xs space-y-4 ${
-                isDark
-                  ? "bg-[#1C120B] border-[#362114]"
-                  : "bg-white border-[#E8DEC8]"
+              className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b pb-3 ${
+                isDark ? "border-[#2D1B10]" : "border-[#EFE8DC]"
               }`}
             >
-              <div
-                className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b pb-3 ${
-                  isDark ? "border-[#2D1B10]" : "border-[#EFE8DC]"
-                }`}
-              >
                 <div className="flex items-center gap-2">
                   <Truck className="w-4 h-4 text-[#E08F35]" />
                   <h2
@@ -1035,7 +1028,7 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                   </p>
                 </div>
               ) : (
-                <div className="space-y-4 max-h-[750px] overflow-y-auto pr-1">
+                <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 max-h-[850px] overflow-y-auto pr-1">
                   {displayOrders.map((ord) => {
                     const addr = (ord?.shippingAddress || {}) as any;
                     const rawItems = ord?.items;
@@ -1518,8 +1511,12 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                   })}
                 </div>
               )}
-            </div>
           </div>
+        </div>
+
+        {/* Master Storefront CMS Panel (Below Orders) */}
+        <div className="space-y-6">
+          <StorefrontCMSPanel isDark={isDark} />
         </div>
 
         {/* Monthly Cooking Oil Subscriptions Management Hub (Direct Firestore) */}

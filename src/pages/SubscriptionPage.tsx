@@ -102,8 +102,8 @@ export const getCustomBottleRates = (discountPercent: number = 5) => {
       name: "Wood-Pressed Coconut Oil",
       kannadaName: "ತೆಂಗಿನ ಎಣ್ಣೆ",
       volume: "1L",
-      mrp: 499,
-      subPrice: Math.round(499 * factor),
+      mrp: 489,
+      subPrice: Math.round(489 * factor),
       description: "Sulfur-free copra extract with natural healthy MCTs.",
     },
     sesame: {
@@ -125,7 +125,7 @@ export const getCustomBottleRates = (discountPercent: number = 5) => {
 export const getPresetSubscriptionCombos = (discountPercent: number = 5): SubscriptionCombo[] => {
   const factor = (100 - Math.max(0, Math.min(50, discountPercent))) / 100;
   const gnRate = Math.round(399 * factor);
-  const coRate = Math.round(499 * factor);
+  const coRate = Math.round(489 * factor);
   const seRate = Math.round(499 * factor);
 
   return [
@@ -139,9 +139,9 @@ export const getPresetSubscriptionCombos = (discountPercent: number = 5): Subscr
         { type: "groundnut", count: 2, label: "Groundnut (2L)", volume: "2x 1L" },
         { type: "coconut", count: 1, label: "Coconut (1L)", volume: "1x 1L" },
       ],
-      mrp: 1297, // 2*399 + 499
+      mrp: 1287, // 2*399 + 489
       monthlyPrice: 2 * gnRate + coRate,
-      savings: 1297 - (2 * gnRate + coRate),
+      savings: 1287 - (2 * gnRate + coRate),
       badge: "Most Popular",
     },
     {
@@ -155,9 +155,9 @@ export const getPresetSubscriptionCombos = (discountPercent: number = 5): Subscr
         { type: "coconut", count: 1, label: "Coconut", volume: "1L" },
         { type: "sesame", count: 1, label: "Sesame", volume: "1L" },
       ],
-      mrp: 1397, // 399 + 499 + 499
+      mrp: 1387, // 399 + 489 + 499
       monthlyPrice: gnRate + coRate + seRate,
-      savings: 1397 - (gnRate + coRate + seRate),
+      savings: 1387 - (gnRate + coRate + seRate),
       badge: "Best Value",
     },
     {
@@ -171,9 +171,9 @@ export const getPresetSubscriptionCombos = (discountPercent: number = 5): Subscr
         { type: "coconut", count: 1, label: "Coconut (1L)", volume: "1x 1L" },
         { type: "sesame", count: 1, label: "Sesame", volume: "1L" },
       ],
-      mrp: 1796, // 2*399 + 499 + 499
+      mrp: 1786, // 2*399 + 489 + 499
       monthlyPrice: 2 * gnRate + coRate + seRate,
-      savings: 1796 - (2 * gnRate + coRate + seRate),
+      savings: 1786 - (2 * gnRate + coRate + seRate),
       badge: "Maximum Savings",
     },
   ];
