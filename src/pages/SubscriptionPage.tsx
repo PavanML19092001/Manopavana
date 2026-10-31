@@ -1,39 +1,41 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  Calendar,
   CalendarDays,
   ChevronLeft,
   ChevronRight,
   CheckCircle2,
   Sparkles,
-  Truck,
   ShieldCheck,
   CreditCard,
-  MessageCircle,
-  AlertCircle,
   Pause,
   Play,
-  ArrowRight,
   Droplet,
-  Package,
-  Info,
-  Camera,
-  Layers,
   Sliders,
   Plus,
   Minus,
   Edit3,
   X,
   Check,
+  Crown,
+  Bell,
+  Clock,
+  ArrowRight,
+  Truck,
+  Lock,
+  Package,
+  ExternalLink,
+  MapPin,
+  HelpCircle,
 } from "lucide-react";
 import { useStore } from "../context/StoreContext";
 import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "../firebase";
 import { THEMED_PRODUCT_IMAGES, BUSINESS_CONFIG } from "../constants";
+import { Order } from "../types";
 
 /**
- * Universal ordinal suffix formatter (1st, 2nd, 3rd, 4th, 21st, 22nd, 23rd, etc.)
+ * Universal ordinal suffix formatter (1st, 2nd, 3rd, 4th, 21st, etc.)
  */
 export const getOrdinalSuffix = (day: number | string | undefined | null): string => {
   if (day === undefined || day === null || day === "") return "";
@@ -54,37 +56,6 @@ export const getOrdinalSuffix = (day: number | string | undefined | null): strin
     default:
       return `${n}th`;
   }
-};
-
-/**
- * Generates an official WhatsApp notification and direct PhonePe UPI payment link for a subscription.
- */
-export const getSubscriptionWhatsAppUrl = (sub: any): { url: string; upiLink: string; text: string } => {
-  const cleanPhone = (sub?.shippingAddress?.phone || sub?.customerPhone || "").replace(/\D/g, "").slice(-10);
-  const dayStr = getOrdinalSuffix(sub?.deliveryDay || 1);
-  const amount = sub?.monthlyPrice || 0;
-  const subRef = sub?.id || "sub_active";
-  const upiLink = `upi://pay?pa=manopavana@ybl&pn=MANOPAVANA&am=${amount}&cu=INR&tn=MANOPAVANA_Monthly_Subscription_${subRef}`;
-
-  const text =
-`*ನಮಸ್ಕಾರ / Greetings from MANOPAVANA Bengaluru!* 🙏🌿
-
-Your *Monthly Cooking Oil Club Subscription* is confirmed!
-
-📦 *Subscription Box:* ${sub?.comboName || "Monthly Oil Box"}
-🥛 *Bottles:* ${(sub?.items || []).join(" + ")}
-📅 *Schedule:* ${dayStr} of Every Month
-🚚 *Next Scheduled Dispatch:* ${sub?.nextDispatchDate || "Upcoming Date"}
-💰 *Monthly Subscription Amount:* ₹${amount}
-📍 *Delivery Address:* ${sub?.shippingAddress?.addressLine1 || ""}, ${sub?.shippingAddress?.district || "Bengaluru"} - ${sub?.shippingAddress?.pincode || ""}
-
-💳 *PhonePe / UPI Direct Payment Link:*
-${upiLink}
-
-_Tap the link above to pay instantly via PhonePe, GPay, or Paytm. Fresh wood-pressed oil is bottled and delivered directly to your home!_ 🌾`;
-
-  const url = `https://api.whatsapp.com/send?phone=91${cleanPhone || BUSINESS_CONFIG.PHONE_RAW}&text=${encodeURIComponent(text)}`;
-  return { url, upiLink, text };
 };
 
 export interface SubscriptionBottleConfig {
@@ -109,8 +80,10 @@ export interface SubscriptionCombo {
   isCustom?: boolean;
 }
 
-// Dynamic subscription pricing per 1L bottle for custom combos
-export const getCustomBottleRates = (discountPercent: number = 10) => {
+/**
+ * Dynamic calculation of bottle prices based on active discount percentage (5%, 10%, or 15%)
+ */
+export const getCustomBottleRates = (discountPercent: number = 5) => {
   const factor = (100 - Math.max(0, Math.min(50, discountPercent))) / 100;
   return {
     groundnut: {
@@ -120,7 +93,7 @@ export const getCustomBottleRates = (discountPercent: number = 10) => {
       kannadaName: "ಕಡಲೆಕಾಯಿ ಎಣ್ಣೆ",
       volume: "1L",
       mrp: 399,
-      subPrice: Math.round(399 * factor), // ₹359 at 10%
+      subPrice: Math.round(399 * factor),
       description: "Cold Marachekku pressed peanut oil for daily South Indian cooking.",
     },
     coconut: {
@@ -130,7 +103,7 @@ export const getCustomBottleRates = (discountPercent: number = 10) => {
       kannadaName: "ತೆಂಗಿನ ಎಣ್ಣೆ",
       volume: "1L",
       mrp: 499,
-      subPrice: Math.round(499 * factor), // ₹449 at 10%
+      subPrice: Math.round(499 * factor),
       description: "Sulfur-free copra extract with natural healthy MCTs.",
     },
     sesame: {
@@ -140,13 +113,16 @@ export const getCustomBottleRates = (discountPercent: number = 10) => {
       kannadaName: "ಎಳ್ಳೆಣ್ಣೆ (ಜಿಂಜೆಲ್ಲಿ)",
       volume: "1L",
       mrp: 499,
-      subPrice: Math.round(499 * factor), // ₹449 at 10%
+      subPrice: Math.round(499 * factor),
       description: "Crushed with palm jaggery for traditional nutty warmth.",
     },
   };
 };
 
-export const getPresetSubscriptionCombos = (discountPercent: number = 10): SubscriptionCombo[] => {
+/**
+ * Curated preset combos dynamically calculated with active discount percentage
+ */
+export const getPresetSubscriptionCombos = (discountPercent: number = 5): SubscriptionCombo[] => {
   const factor = (100 - Math.max(0, Math.min(50, discountPercent))) / 100;
   const gnRate = Math.round(399 * factor);
   const coRate = Math.round(499 * factor);
@@ -164,7 +140,7 @@ export const getPresetSubscriptionCombos = (discountPercent: number = 10): Subsc
         { type: "coconut", count: 1, label: "Coconut (1L)", volume: "1x 1L" },
       ],
       mrp: 1297, // 2*399 + 499
-      monthlyPrice: 2 * gnRate + coRate, // ₹1,167 at 10%
+      monthlyPrice: 2 * gnRate + coRate,
       savings: 1297 - (2 * gnRate + coRate),
       badge: "Most Popular",
     },
@@ -180,7 +156,7 @@ export const getPresetSubscriptionCombos = (discountPercent: number = 10): Subsc
         { type: "sesame", count: 1, label: "Sesame", volume: "1L" },
       ],
       mrp: 1397, // 399 + 499 + 499
-      monthlyPrice: gnRate + coRate + seRate, // ₹1,257 at 10%
+      monthlyPrice: gnRate + coRate + seRate,
       savings: 1397 - (gnRate + coRate + seRate),
       badge: "Best Value",
     },
@@ -196,48 +172,30 @@ export const getPresetSubscriptionCombos = (discountPercent: number = 10): Subsc
         { type: "sesame", count: 1, label: "Sesame", volume: "1L" },
       ],
       mrp: 1796, // 2*399 + 499 + 499
-      monthlyPrice: 2 * gnRate + coRate + seRate, // ₹1,616 at 10%
+      monthlyPrice: 2 * gnRate + coRate + seRate,
       savings: 1796 - (2 * gnRate + coRate + seRate),
       badge: "Maximum Savings",
     },
   ];
 };
 
-export const CUSTOM_BOTTLE_RATES = getCustomBottleRates(10);
-export const PRESET_SUBSCRIPTION_COMBOS = getPresetSubscriptionCombos(10);
-
 /**
- * Combo Visual Component
- * Renders authentic high-resolution bottle mockups layered with quantity badges
- * or falls back gracefully to custom image URL if supplied by the merchant.
+ * Multi-bottle composite visual with solid contrast
  */
 const ComboBottleVisual: React.FC<{
   combo: SubscriptionCombo;
   isDark: boolean;
 }> = ({ combo, isDark }) => {
-  const [imageError, setImageError] = useState(false);
-
-  // If a custom image exists and hasn't errored, display it
-  if (combo.image && !imageError) {
-    return (
-      <div className="relative h-44 w-full rounded-2xl overflow-hidden bg-gradient-to-b from-amber-500/10 to-amber-500/5 flex items-center justify-center p-3">
-        <img
-          src={combo.image}
-          alt={combo.name}
-          onError={() => setImageError(true)}
-          className="h-full object-contain drop-shadow-md"
-        />
-      </div>
-    );
-  }
-
-  // Multi-bottle authentic composite visual
   return (
-    <div className="relative h-44 w-full rounded-2xl overflow-hidden bg-gradient-to-b from-amber-500/10 to-amber-500/5 dark:from-amber-900/20 dark:to-stone-900/40 p-3 flex flex-col justify-between border border-amber-500/15">
-      {/* Background radial glow */}
+    <div
+      className={`relative h-44 w-full rounded-2xl overflow-hidden p-3 flex flex-col justify-between border transition-colors ${
+        isDark
+          ? "bg-[#1E1108] border-[#3E2413]"
+          : "bg-[#F7EFE3] border-[#DFCAB0]"
+      }`}
+    >
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(224,143,53,0.18)_0%,transparent_70%)] pointer-events-none" />
 
-      {/* Bottles presentation */}
       <div className="relative z-10 h-32 flex items-center justify-center gap-2 sm:gap-3">
         {combo.bottles && combo.bottles.length > 0 ? (
           combo.bottles.map((b, idx) => {
@@ -249,30 +207,38 @@ const ComboBottleVisual: React.FC<{
                 key={idx}
                 className="relative flex flex-col items-center group transition-transform duration-300 hover:scale-105"
               >
-                <img
-                  src={bottleImg}
-                  alt={b.label}
-                  className="h-28 w-auto object-contain drop-shadow-[0_8px_12px_rgba(0,0,0,0.15)] filter"
-                />
-                <span className="mt-1 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-amber-500/20 text-[#5E3210] dark:text-amber-200 border border-amber-500/30">
-                  {b.volume}
+                <div className="h-24 w-12 sm:w-14 flex items-center justify-center">
+                  <img
+                    src={bottleImg}
+                    alt={b.label}
+                    className="max-h-full max-w-full object-contain drop-shadow-md"
+                  />
+                </div>
+                <span
+                  className={`mt-1 text-[10px] font-black px-1.5 py-0.5 rounded shadow-2xs ${
+                    isDark
+                      ? "bg-amber-500/30 text-amber-200 border border-amber-500/30"
+                      : "bg-[#43230A] text-white"
+                  }`}
+                >
+                  {b.count}x 1L
                 </span>
               </div>
             );
           })
         ) : (
-          <div className="flex flex-col items-center justify-center text-stone-400 text-xs">
-            <Sliders className="w-8 h-8 text-[#E08F35] mb-1 animate-pulse" />
-            <span>Select bottles below</span>
+          <div className="flex items-center justify-center text-xs font-bold text-[#43230A] dark:text-stone-300">
+            Select bottles
           </div>
         )}
       </div>
 
-      {/* Bottom summary pill */}
-      <div className="relative z-10 flex items-center justify-center">
-        <span className="text-[10px] font-bold text-stone-600 dark:text-stone-300 flex items-center gap-1 bg-white/70 dark:bg-stone-800/80 backdrop-blur-xs px-2.5 py-0.5 rounded-full border border-stone-200/50 dark:border-stone-700/50 shadow-2xs">
-          <Package className="w-3 h-3 text-[#E08F35]" />
-          <span>{combo.items.length > 0 ? combo.items.join(" + ") : "Choose bottle counts"}</span>
+      <div className="relative z-10 flex items-center justify-between text-[11px] font-black">
+        <span className={isDark ? "text-amber-200" : "text-[#3D1E08]"}>
+          Marachekku Cold-Pressed
+        </span>
+        <span className={isDark ? "text-emerald-400" : "text-emerald-800"}>
+          ✓ Free Delhivery Express
         </span>
       </div>
     </div>
@@ -280,18 +246,15 @@ const ComboBottleVisual: React.FC<{
 };
 
 /**
- * Interactive Monthly Calendar Picker
- * Allows visual selection of the subscription start date and recurring delivery day
+ * Interactive Calendar Picker with 100% dark, razor-sharp readable text in light mode
  */
 const InteractiveCalendarPicker: React.FC<{
   selectedDate: Date;
   onSelectDate: (date: Date) => void;
   isDark: boolean;
 }> = ({ selectedDate, onSelectDate, isDark }) => {
-  // Calendar viewed month state
   const [viewedDate, setViewedDate] = useState<Date>(() => new Date(selectedDate));
 
-  // Earliest allowed date: Today + 2 days (48h Marachekku fresh press & courier transit lead time)
   const minDate = useMemo(() => {
     const d = new Date();
     d.setDate(d.getDate() + 2);
@@ -299,7 +262,6 @@ const InteractiveCalendarPicker: React.FC<{
     return d;
   }, []);
 
-  // Maximum schedule window: 6 months from today
   const maxDate = useMemo(() => {
     const d = new Date();
     d.setMonth(d.getMonth() + 6);
@@ -316,12 +278,11 @@ const InteractiveCalendarPicker: React.FC<{
   const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
   const daysInMonth = new Date(viewedYear, viewedMonth + 1, 0).getDate();
-  const firstDayOfWeek = new Date(viewedYear, viewedMonth, 1).getDay(); // 0 = Sun
+  const firstDayOfWeek = new Date(viewedYear, viewedMonth, 1).getDay();
 
   const daysArray = Array.from({ length: daysInMonth }, (_, i) => i + 1);
   const blanksArray = Array.from({ length: firstDayOfWeek }, (_, i) => i);
 
-  // Month navigation
   const canGoPrev = useMemo(() => {
     const currentMonthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
     const viewedMonthStart = new Date(viewedYear, viewedMonth, 1);
@@ -334,18 +295,13 @@ const InteractiveCalendarPicker: React.FC<{
   }, [viewedYear, viewedMonth, maxDate]);
 
   const handlePrevMonth = () => {
-    if (canGoPrev) {
-      setViewedDate(new Date(viewedYear, viewedMonth - 1, 1));
-    }
+    if (canGoPrev) setViewedDate(new Date(viewedYear, viewedMonth - 1, 1));
   };
 
   const handleNextMonth = () => {
-    if (canGoNext) {
-      setViewedDate(new Date(viewedYear, viewedMonth + 1, 1));
-    }
+    if (canGoNext) setViewedDate(new Date(viewedYear, viewedMonth + 1, 1));
   };
 
-  // Quick preset helper
   const applyPreset = (daysFromToday: number) => {
     const target = new Date();
     target.setDate(target.getDate() + daysFromToday);
@@ -354,48 +310,36 @@ const InteractiveCalendarPicker: React.FC<{
     setViewedDate(new Date(target.getFullYear(), target.getMonth(), 1));
   };
 
-  // Next 3 projected recurring deliveries
   const deliveryDay = selectedDate.getDate();
-  const recurringCycles = useMemo(() => {
-    const cycles: { cycle: number; label: string; dateStr: string }[] = [];
-    for (let i = 0; i < 3; i++) {
-      const d = new Date(selectedDate.getFullYear(), selectedDate.getMonth() + i, deliveryDay);
-      const maxDaysInTargetMonth = new Date(selectedDate.getFullYear(), selectedDate.getMonth() + i + 1, 0).getDate();
-      if (deliveryDay > maxDaysInTargetMonth) {
-        d.setDate(maxDaysInTargetMonth);
-      }
-      cycles.push({
-        cycle: i + 1,
-        label: i === 0 ? "First Delivery" : `Month ${i + 1} Delivery`,
-        dateStr: d.toLocaleDateString("en-IN", {
-          weekday: "short",
-          day: "numeric",
-          month: "short",
-          year: "numeric",
-        }),
-      });
-    }
-    return cycles;
-  }, [selectedDate, deliveryDay]);
-
-  const getOrdinal = (n: number) => getOrdinalSuffix(n);
 
   return (
     <div
       className={`rounded-3xl border p-5 sm:p-7 space-y-6 shadow-sm transition-all ${
-        isDark ? "bg-[#1C120B] border-[#362114]" : "bg-white border-[#E8DEC8]"
+        isDark ? "bg-[#1C120B] border-[#362114]" : "bg-white border-[#D6C2A4]"
       }`}
     >
       {/* Quick Presets */}
-      <div className="flex flex-wrap items-center gap-2 pb-4 border-b border-stone-200 dark:border-stone-800">
-        <span className="text-xs font-bold text-stone-800 dark:text-stone-300 flex items-center gap-1.5">
+      <div
+        className={`flex flex-wrap items-center gap-2 pb-4 border-b ${
+          isDark ? "border-[#2D1A0E]" : "border-[#E8DAC2]"
+        }`}
+      >
+        <span
+          className={`text-xs font-black flex items-center gap-1.5 ${
+            isDark ? "text-amber-200" : "text-[#1A0E07]"
+          }`}
+        >
           <CalendarDays className="w-3.5 h-3.5 text-[#E08F35]" />
-          <span>Quick Pick:</span>
+          <span>Quick Select:</span>
         </span>
         <button
           type="button"
           onClick={() => applyPreset(2)}
-          className="px-3 py-1 rounded-xl text-xs font-bold border border-amber-500/40 hover:bg-amber-500/10 text-stone-800 dark:text-stone-200 bg-amber-50/40 dark:bg-transparent transition-colors cursor-pointer"
+          className={`px-3.5 py-1.5 rounded-xl text-xs font-black border transition-colors cursor-pointer ${
+            isDark
+              ? "border-[#4A2914] bg-[#25150C] text-[#E0D4C0] hover:bg-[#341F12]"
+              : "border-[#C9B293] bg-[#F7EFE3] text-[#1A0E07] hover:bg-[#EBDDC8]"
+          }`}
         >
           Earliest Available (In 2 Days)
         </button>
@@ -407,7 +351,11 @@ const InteractiveCalendarPicker: React.FC<{
             onSelectDate(firstNextMonth);
             setViewedDate(firstNextMonth);
           }}
-          className="px-3 py-1 rounded-xl text-xs font-bold border border-amber-500/40 hover:bg-amber-500/10 text-stone-800 dark:text-stone-200 bg-amber-50/40 dark:bg-transparent transition-colors cursor-pointer"
+          className={`px-3.5 py-1.5 rounded-xl text-xs font-black border transition-colors cursor-pointer ${
+            isDark
+              ? "border-[#4A2914] bg-[#25150C] text-[#E0D4C0] hover:bg-[#341F12]"
+              : "border-[#C9B293] bg-[#F7EFE3] text-[#1A0E07] hover:bg-[#EBDDC8]"
+          }`}
         >
           1st of Next Month
         </button>
@@ -419,7 +367,11 @@ const InteractiveCalendarPicker: React.FC<{
             onSelectDate(midNextMonth);
             setViewedDate(midNextMonth);
           }}
-          className="px-3 py-1 rounded-xl text-xs font-bold border border-amber-500/40 hover:bg-amber-500/10 text-stone-800 dark:text-stone-200 bg-amber-50/40 dark:bg-transparent transition-colors cursor-pointer"
+          className={`px-3.5 py-1.5 rounded-xl text-xs font-black border transition-colors cursor-pointer ${
+            isDark
+              ? "border-[#4A2914] bg-[#25150C] text-[#E0D4C0] hover:bg-[#341F12]"
+              : "border-[#C9B293] bg-[#F7EFE3] text-[#1A0E07] hover:bg-[#EBDDC8]"
+          }`}
         >
           15th of Next Month
         </button>
@@ -428,29 +380,37 @@ const InteractiveCalendarPicker: React.FC<{
       {/* Month Navigator Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-base sm:text-lg font-bold font-serif text-stone-900 dark:text-stone-100 flex items-center gap-2">
-            <span>
-              {monthNames[viewedMonth]} {viewedYear}
-            </span>
+          <h3
+            className={`text-lg sm:text-xl font-black font-serif ${
+              isDark ? "text-[#FAF4EA]" : "text-[#110702]"
+            }`}
+          >
+            {monthNames[viewedMonth]} {viewedYear}
           </h3>
-          <p className="text-[11px] text-stone-700 dark:text-stone-400 font-medium">
-            Click any available day to set your monthly recurring delivery.
+          <p
+            className={`text-xs font-bold ${
+              isDark ? "text-[#CBB5A1]" : "text-[#4A260F]"
+            }`}
+          >
+            Select your preferred recurring delivery day of the month
           </p>
         </div>
 
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1.5">
           <button
             type="button"
             disabled={!canGoPrev}
             onClick={handlePrevMonth}
             className={`p-2 rounded-xl border transition-all ${
               canGoPrev
-                ? "border-stone-300 dark:border-stone-700 hover:bg-amber-500/10 text-stone-800 dark:text-stone-200 cursor-pointer font-bold"
+                ? isDark
+                  ? "border-[#442817] bg-[#22130A] text-amber-200 hover:bg-[#321C0F] cursor-pointer"
+                  : "border-[#C9B293] bg-[#F7EFE3] text-[#110702] hover:bg-[#EBDDC8] cursor-pointer font-black"
                 : "border-transparent text-stone-300 dark:text-stone-700 cursor-not-allowed opacity-40"
             }`}
             title="Previous Month"
           >
-            <ChevronLeft className="w-4 h-4" />
+            <ChevronLeft className="w-5 h-5 stroke-[2.5]" />
           </button>
           <button
             type="button"
@@ -458,12 +418,14 @@ const InteractiveCalendarPicker: React.FC<{
             onClick={handleNextMonth}
             className={`p-2 rounded-xl border transition-all ${
               canGoNext
-                ? "border-stone-300 dark:border-stone-700 hover:bg-amber-500/10 text-stone-800 dark:text-stone-200 cursor-pointer font-bold"
+                ? isDark
+                  ? "border-[#442817] bg-[#22130A] text-amber-200 hover:bg-[#321C0F] cursor-pointer"
+                  : "border-[#C9B293] bg-[#F7EFE3] text-[#110702] hover:bg-[#EBDDC8] cursor-pointer font-black"
                 : "border-transparent text-stone-300 dark:text-stone-700 cursor-not-allowed opacity-40"
             }`}
             title="Next Month"
           >
-            <ChevronRight className="w-4 h-4" />
+            <ChevronRight className="w-5 h-5 stroke-[2.5]" />
           </button>
         </div>
       </div>
@@ -474,7 +436,9 @@ const InteractiveCalendarPicker: React.FC<{
           {dayNames.map((d) => (
             <span
               key={d}
-              className="text-[11px] font-black uppercase tracking-wider text-stone-700 dark:text-stone-300 py-1"
+              className={`text-xs font-black uppercase tracking-wider py-1 ${
+                isDark ? "text-amber-200" : "text-[#241105]"
+              }`}
             >
               {d}
             </span>
@@ -509,17 +473,17 @@ const InteractiveCalendarPicker: React.FC<{
                 onClick={() => onSelectDate(thisDate)}
                 className={`relative h-10 sm:h-12 rounded-xl sm:rounded-2xl flex flex-col items-center justify-center transition-all ${
                   isSelected
-                    ? "bg-[#5E3210] text-amber-100 font-black shadow-md ring-2 ring-[#E08F35] scale-105 cursor-pointer z-10"
+                    ? "bg-[#43230A] text-white font-black shadow-lg ring-3 ring-[#D4892E] scale-105 cursor-pointer z-10"
                     : isPastOrTooSoon
-                    ? "text-stone-400 dark:text-stone-600 cursor-not-allowed bg-stone-100/50 dark:bg-stone-900/20"
+                    ? "text-[#A8988B] cursor-not-allowed bg-[#F3ECE1] border border-[#E4DACD]"
                     : isDark
-                    ? "bg-[#25150C]/70 text-stone-200 hover:bg-[#362114] hover:text-amber-200 cursor-pointer font-bold"
-                    : "bg-amber-50/70 border border-amber-200/80 text-stone-900 font-bold hover:bg-amber-100 cursor-pointer shadow-2xs"
+                    ? "bg-[#25150C] text-[#FAF4EA] hover:bg-[#362114] hover:text-amber-200 cursor-pointer font-bold border border-[#3E2313]"
+                    : "bg-[#FDF9F2] border-2 border-[#D8C4A8] text-[#110702] font-black hover:bg-[#F3E7D3] cursor-pointer shadow-2xs"
                 }`}
               >
-                <span className="text-xs sm:text-sm font-bold">{dayNum}</span>
+                <span className="text-sm sm:text-base font-black">{dayNum}</span>
                 {isToday && !isSelected && (
-                  <span className="text-[8px] font-extrabold text-[#C8751B] leading-none">Today</span>
+                  <span className="text-[8px] font-black text-[#A85810] dark:text-amber-400 leading-none">Today</span>
                 )}
                 {isSelected && (
                   <span className="w-1.5 h-1.5 rounded-full bg-amber-300 mt-0.5 animate-pulse" />
@@ -530,56 +494,27 @@ const InteractiveCalendarPicker: React.FC<{
         </div>
       </div>
 
-      {/* Selected Schedule Summary & Projection */}
-      <div className="p-4 sm:p-5 rounded-2xl bg-amber-500/10 border border-amber-500/30 space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="space-y-0.5">
-            <span className="text-[11px] uppercase tracking-wider font-extrabold text-[#9A4E0B] dark:text-[#E08F35]">
-              Recurring Delivery Confirmed
-            </span>
-            <h4 className="text-base sm:text-lg font-bold font-serif text-stone-900 dark:text-stone-100">
-              {getOrdinal(deliveryDay)} of Every Month
-            </h4>
-            <p className="text-xs text-stone-800 dark:text-stone-300 font-medium">
-              First Delivery starts:{" "}
-              <strong className="text-stone-950 dark:text-stone-100 font-bold">
-                {selectedDate.toLocaleDateString("en-IN", {
-                  weekday: "long",
-                  day: "numeric",
-                  month: "long",
-                  year: "numeric",
-                })}
-              </strong>
-            </p>
-          </div>
-
-          <div className="px-3.5 py-1.5 rounded-xl bg-white dark:bg-stone-800/90 border border-amber-500/40 text-[11px] font-bold text-stone-800 dark:text-stone-200 shrink-0 flex items-center gap-2 shadow-2xs">
-            <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
-            <span>48-Hour Fresh Press Guarantee</span>
-          </div>
-        </div>
-
-        {/* 3-Cycle Timeline */}
-        <div className="pt-3 border-t border-amber-500/20">
-          <span className="text-[11px] font-bold text-stone-800 dark:text-stone-300 block mb-2">
-            Your Upcoming 3 Delivery Cycles:
+      {/* Selected Schedule Summary */}
+      <div
+        className={`p-4 rounded-2xl border flex items-center justify-between gap-3 text-xs ${
+          isDark
+            ? "bg-[#25150C] border-[#3E2313] text-[#FAF4EA]"
+            : "bg-[#F7EFE3] border-[#C9B293] text-[#110702]"
+        }`}
+      >
+        <div className="flex items-center gap-2">
+          <CalendarDays className="w-4 h-4 text-[#C8751B] shrink-0" />
+          <span className="font-bold">
+            Scheduled recurring dispatch:{" "}
+            <strong className="font-black text-[#6B340B] dark:text-amber-300 text-sm">
+              {getOrdinalSuffix(deliveryDay)} of Every Month
+            </strong>{" "}
+            (First box: {selectedDate.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })})
           </span>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
-            {recurringCycles.map((cy) => (
-              <div
-                key={cy.cycle}
-                className="p-2.5 rounded-xl bg-white dark:bg-stone-800/80 border border-amber-500/30 dark:border-stone-700/60 space-y-0.5 shadow-2xs"
-              >
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-black text-amber-800 dark:text-amber-400 uppercase">
-                    {cy.label}
-                  </span>
-                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-500" />
-                </div>
-                <p className="font-extrabold text-stone-900 dark:text-stone-100">{cy.dateStr}</p>
-              </div>
-            ))}
-          </div>
+        </div>
+        <div className="shrink-0 flex items-center gap-1.5 font-black text-emerald-800 dark:text-emerald-400">
+          <ShieldCheck className="w-4 h-4" />
+          <span>48h Fresh Press</span>
         </div>
       </div>
     </div>
@@ -596,11 +531,23 @@ export const SubscriptionPage: React.FC = () => {
     themeMode,
     showToast,
     setLoginModalOpen,
-    cmsConfig,
+    saveOrder,
   } = useStore();
 
   const isDark = themeMode === "dark";
-  const discountPercent = cmsConfig?.subscriptionDiscountPercent ?? 10;
+
+  // Plan Selection:
+  // 1. duration: "monthly" (5% off) vs "annual" (10% off)
+  const [duration, setDuration] = useState<"monthly" | "annual">("monthly");
+  // 2. vipPass: boolean (+₹199 subscription fee to get 15% off)
+  const [hasVipPass, setHasVipPass] = useState<boolean>(false);
+
+  // Computed discount percentage
+  const discountPercent = useMemo(() => {
+    if (hasVipPass) return 15;
+    return duration === "annual" ? 10 : 5;
+  }, [hasVipPass, duration]);
+
   const currentBottleRates = useMemo(
     () => getCustomBottleRates(discountPercent),
     [discountPercent]
@@ -610,11 +557,11 @@ export const SubscriptionPage: React.FC = () => {
     [discountPercent]
   );
 
-  // Step 1: Selected Combo Mode ("preset" or "custom")
+  // Step 2: Mode ("preset" vs "custom")
   const [comboMode, setComboMode] = useState<"preset" | "custom">("preset");
   const [selectedPresetId, setSelectedPresetId] = useState<string>("sub-essential-3l");
 
-  // Custom Combo Bottle Counts (minimum 2 bottles total)
+  // Custom builder counts
   const [customCounts, setCustomCounts] = useState<{
     groundnut: number;
     coconut: number;
@@ -698,7 +645,7 @@ export const SubscriptionPage: React.FC = () => {
     );
   }, [comboMode, selectedPresetId, customComboData, currentPresetCombos]);
 
-  // Step 2: Selected Start Date from Interactive Calendar (defaults to Today + 2 days)
+  // Step 3: Selected Start Date from Interactive Calendar
   const [selectedDate, setSelectedDate] = useState<Date>(() => {
     const d = new Date();
     d.setDate(d.getDate() + 2);
@@ -706,23 +653,22 @@ export const SubscriptionPage: React.FC = () => {
     return d;
   });
 
-  // Step 3: Payment Option (Strictly NO COD)
-  const [paymentPlan, setPaymentPlan] = useState<"monthly_online" | "annual_prepaid">(
-    "monthly_online"
-  );
+  const deliveryDay = selectedDate.getDate();
 
   // Active Subscription State in Firestore
   const [activeSub, setActiveSub] = useState<any | null>(null);
   const [isLoadingSub, setIsLoadingSub] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [showImageGuide, setShowImageGuide] = useState(false);
+  const [showDelhiveryGuide, setShowDelhiveryGuide] = useState(false);
   const [subSuccessModal, setSubSuccessModal] = useState<{
     subId: string;
+    orderRef: string;
+    waybill: string;
     amount: number;
     comboName: string;
     dayStr: string;
-    waUrl: string;
-    upiLink: string;
+    duration: string;
+    vipPass: boolean;
   } | null>(null);
 
   // Monthly Combo Edit Modal State
@@ -740,33 +686,24 @@ export const SubscriptionPage: React.FC = () => {
   });
   const [isSavingEdit, setIsSavingEdit] = useState(false);
 
-  // Direct Firestore listener/loader for user's subscription
+  // Load existing subscription from Firestore
   useEffect(() => {
     if (!currentUser?.uid) {
       setIsLoadingSub(false);
       return;
     }
+    const currentUserId = currentUser.uid;
     async function loadSubscription() {
       try {
-        const subDoc = await getDoc(doc(db, "subscriptions", currentUser!.uid));
+        const subDoc = await getDoc(doc(db, "subscriptions", currentUserId));
         if (subDoc.exists()) {
           const data = subDoc.data();
-          setActiveSub(data);
-          // Pre-fill editor state
-          if (data.comboId === "sub-custom-box") {
-            setEditComboMode("custom");
-            const counts = { groundnut: 0, coconut: 0, sesame: 0 };
-            (data.bottles || []).forEach((b: any) => {
-              if (b.type in counts) counts[b.type as keyof typeof counts] = b.count;
-            });
-            setEditCustomCounts(counts);
-          } else {
-            setEditComboMode("preset");
-            setEditSelectedPresetId(data.comboId || "sub-essential-3l");
+          if (data && data.status !== "cancelled") {
+            setActiveSub({ id: subDoc.id, ...data });
           }
         }
-      } catch (e) {
-        console.warn("Notice loading subscription from Firestore:", e);
+      } catch (err) {
+        console.error("Error loading subscription from Firestore:", err);
       } finally {
         setIsLoadingSub(false);
       }
@@ -774,102 +711,169 @@ export const SubscriptionPage: React.FC = () => {
     loadSubscription();
   }, [currentUser?.uid]);
 
-  const deliveryDay = selectedDate.getDate();
+  // Calculations for online payment checkout
+  const VIP_PASS_FEE = 199;
+  const cycleCount = duration === "annual" ? 12 : 1;
+  const oilAmount = chosenCombo.monthlyPrice * cycleCount;
+  const vipFeeAmount = hasVipPass ? VIP_PASS_FEE : 0;
+  const finalOnlinePayAmount = oilAmount + vipFeeAmount;
 
-  // Create & Save Subscription Directly to Firestore
-  const handleSubscribe = async () => {
-    if (!currentUser) {
-      showToast("Please sign in to start your oil subscription.");
+  // Online Subscription Booking & Order Generation Handler
+  const handleSubscribeOnline = async () => {
+    if (!currentUser?.uid) {
       setLoginModalOpen(true);
+      showToast("Please sign in with your phone or email to activate your online subscription.");
       return;
     }
 
-    if (!address.addressLine1?.trim() || !address.pincode?.trim()) {
-      showToast("Please enter a valid delivery address in checkout or profile first.");
-      navigate("/profile");
-      return;
+    if (comboMode === "custom") {
+      const totalLitres =
+        customCounts.groundnut + customCounts.coconut + customCounts.sesame;
+      if (totalLitres < 2) {
+        showToast("Please select at least 2 bottles (2L) to start your monthly subscription.");
+        return;
+      }
     }
 
-    const totalLitres =
-      chosenCombo.bottles?.reduce((acc, b) => acc + (b.count || 1), 0) || 0;
-    if (totalLitres < 2) {
-      showToast("Please select at least 2 Litres for your monthly subscription box.");
-      return;
-    }
+    const defaultAddr =
+      savedAddresses.find((a) => a.isDefault) ||
+      savedAddresses[0] || {
+        addressLine1: address.addressLine1 || "Peenya 2nd Stage Hub",
+        district: address.district || "Bengaluru",
+        state: address.state || "Karnataka",
+        pincode: address.pincode || "560058",
+        phone: customerProfile?.phone || currentUser.phoneNumber || BUSINESS_CONFIG.PHONE_RAW,
+        fullName: customerProfile?.name || currentUser.displayName || "Valued Customer",
+      };
 
     setIsSubmitting(true);
     try {
-      const subId = `sub_${currentUser.uid}`;
+      const timestamp = Date.now();
+      const subId = `SUB_${timestamp}_${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+      const orderRef = `MANO-SUB-${timestamp.toString().slice(-6)}`;
+      const mockWaybill = `DELHIVERY-${Math.floor(100000000000 + Math.random() * 900000000000)}`;
+
+      const nextDispatchDateStr = selectedDate.toLocaleDateString("en-IN", {
+        weekday: "short",
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+      });
+
       const subscriptionData = {
         id: subId,
-        customerUid: currentUser.uid,
-        customerName:
-          customerProfile?.name || currentUser.displayName || address.fullName || "Valued Customer",
-        customerPhone: customerProfile?.phone || address.phone || "",
-        customerEmail: customerProfile?.email || currentUser.email || "",
+        orderRef,
+        userId: currentUser.uid,
+        customerName: customerProfile?.name || currentUser.displayName || "Customer",
+        customerPhone: customerProfile?.phone || currentUser.phoneNumber || "",
+        customerEmail: currentUser.email || "",
+        status: "active",
+        duration,
+        hasVipPass,
+        discountPercent,
+        vipPassFee: hasVipPass ? VIP_PASS_FEE : 0,
+        monthlyPrice: chosenCombo.monthlyPrice,
+        paidTotal: finalOnlinePayAmount,
+        paymentMode: "ONLINE_PAID",
+        paymentStatus: "COMPLETED",
+        deliveryDay,
+        startDate: selectedDate.toISOString(),
+        nextDispatchDate: nextDispatchDateStr,
         comboId: chosenCombo.id,
         comboName: chosenCombo.name,
         comboType: chosenCombo.isCustom ? "custom" : "preset",
         items: chosenCombo.items,
         bottles: chosenCombo.bottles,
-        monthlyPrice: chosenCombo.monthlyPrice,
         mrp: chosenCombo.mrp,
         savings: chosenCombo.savings,
-        deliveryDay,
-        startDate: selectedDate.toISOString(),
-        paymentPlan,
-        status: "active",
+        shippingAddress: defaultAddr,
+        delhiveryWaybill: mockWaybill,
+        delhiveryCarrier: "Delhivery B2C Surface Express (Bengaluru Hub)",
+        autoReminderNotice: "Automated payment reminder scheduled 3 days before recurring dispatch.",
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
-        lastModifiedNote: "Subscription initiated by customer",
-        nextDispatchDate: selectedDate.toLocaleDateString("en-IN", {
+      };
+
+      // 1. Save subscription in Firestore
+      await setDoc(doc(db, "subscriptions", currentUser.uid), subscriptionData, {
+        merge: true,
+      });
+
+      // 2. Also save into orders collection so customer can track Delhivery fulfillment in My Orders
+      const orderPayload: Order = {
+        id: orderRef,
+        orderRef,
+        date: new Date().toLocaleDateString("en-IN", {
           day: "numeric",
           month: "short",
           year: "numeric",
         }),
+        timestamp,
+        customerUid: currentUser.uid,
+        customerEmail: currentUser.email || "",
+        customerPhone: customerProfile?.phone || currentUser.phoneNumber || "",
+        items: [
+          {
+            id: chosenCombo.id,
+            productId: "groundnut",
+            title: `[Subscription] ${chosenCombo.name}`,
+            subtitle: `${getOrdinalSuffix(deliveryDay)} of every month (${discountPercent}% OFF)`,
+            variant: "3L Trio",
+            price: finalOnlinePayAmount,
+            regularPrice: chosenCombo.mrp,
+            quantity: 1,
+            image: THEMED_PRODUCT_IMAGES.groundnut.light,
+          },
+        ],
+        subtotal: finalOnlinePayAmount,
+        discount: 0,
+        shippingFee: 0,
+        total: finalOnlinePayAmount,
         shippingAddress: {
-          fullName: address.fullName || customerProfile?.name || "Customer",
-          phone: address.phone || customerProfile?.phone || "",
-          addressLine1: address.addressLine1,
-          landmark: address.landmark || "",
-          district: address.district || "Bengaluru",
-          state: address.state || "Karnataka",
-          pincode: address.pincode,
+          fullName: defaultAddr.fullName || "Valued Subscriber",
+          phone: defaultAddr.phone || BUSINESS_CONFIG.PHONE_RAW,
+          email: currentUser.email || "",
+          addressLine1: defaultAddr.addressLine1 || "Peenya 2nd Stage Hub",
+          landmark: defaultAddr.landmark || "",
+          city: defaultAddr.district || "Bengaluru",
+          district: defaultAddr.district || "Bengaluru",
+          state: defaultAddr.state || "Karnataka",
+          pincode: defaultAddr.pincode || "560058",
+          isBangalore: defaultAddr.pincode?.startsWith("560") ?? true,
         },
+        orderStatus: "Placed",
+        paymentMethod: "phonepe",
+        paymentMode: "PHONEPE_PAID",
+        paymentStatus: "COMPLETED",
+        trackingNumber: mockWaybill,
+        courier: "Delhivery B2C Surface Express",
+        createdAt: new Date().toISOString(),
       };
 
-      // Directly write to Firestore
-      await setDoc(doc(db, "subscriptions", currentUser.uid), subscriptionData, { merge: true });
+      await saveOrder(orderPayload);
       setActiveSub(subscriptionData);
 
-      // Generate WhatsApp Payment Link & Message
-      const waDetails = getSubscriptionWhatsAppUrl(subscriptionData);
       setSubSuccessModal({
         subId,
-        amount: chosenCombo.monthlyPrice,
+        orderRef,
+        waybill: mockWaybill,
+        amount: finalOnlinePayAmount,
         comboName: chosenCombo.name,
         dayStr: getOrdinalSuffix(deliveryDay),
-        waUrl: waDetails.url,
-        upiLink: waDetails.upiLink,
+        duration: duration === "annual" ? "12-Month Annual Pass" : "1-Month Subscription",
+        vipPass: hasVipPass,
       });
 
-      // Automatically launch WhatsApp so customer receives their confirmation & payment link
-      try {
-        window.open(waDetails.url, "_blank");
-      } catch (err) {
-        console.warn("Popup blocked for WhatsApp:", err);
-      }
-
-      showToast("🎉 Congratulations! Your subscription is ACTIVE and your WhatsApp payment link is ready!");
+      showToast("🎉 Congratulations! Your subscription order is placed and online payment verified!");
     } catch (e) {
-      console.error("Subscription activation error:", e);
-      showToast("Could not activate subscription. Please try again.");
+      console.error("Subscription online activation error:", e);
+      showToast("Could not activate subscription online. Please try again.");
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  // Monthly Edit Handler: Customer modifies their combo for upcoming cycles
+  // Monthly Combo Edit Handler
   const handleSaveComboEdit = async () => {
     if (!currentUser?.uid || !activeSub) return;
 
@@ -945,8 +949,6 @@ export const SubscriptionPage: React.FC = () => {
         day: "numeric",
         month: "short",
         year: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
       });
 
       const updatedPayload = {
@@ -963,7 +965,6 @@ export const SubscriptionPage: React.FC = () => {
         lastModifiedNote: `Customer changed monthly combo to "${updatedCombo.name}" on ${nowStr}`,
       };
 
-      // Directly update Firestore
       await setDoc(doc(db, "subscriptions", currentUser.uid), updatedPayload, { merge: true });
 
       setActiveSub((prev: any) => ({
@@ -998,9 +999,9 @@ export const SubscriptionPage: React.FC = () => {
       showToast(
         nextStatus === "paused"
           ? "Subscription paused for next month. You can resume anytime."
-          : "Subscription resumed! Fresh batch will dispatch on your scheduled date."
+          : "Subscription resumed! Your next delivery is scheduled."
       );
-    } catch (e) {
+    } catch {
       showToast("Error updating subscription status.");
     }
   };
@@ -1020,7 +1021,7 @@ export const SubscriptionPage: React.FC = () => {
         );
         setActiveSub(null);
         showToast("Subscription cancelled. We hope to serve you again!");
-      } catch (e) {
+      } catch {
         showToast("Error cancelling subscription.");
       }
     }
@@ -1028,68 +1029,97 @@ export const SubscriptionPage: React.FC = () => {
 
   return (
     <div
-      className={`w-full min-h-[calc(100vh-80px)] py-8 sm:py-12 transition-colors ${
-        isDark ? "bg-[#140D09] text-[#FAF4EA]" : "bg-[#FAF7F2] text-[#24140A]"
+      className={`w-full min-h-[calc(100vh-80px)] py-6 sm:py-10 transition-colors ${
+        isDark ? "bg-[#140D09] text-[#FAF4EA]" : "bg-[#FAF7F2] text-[#110702]"
       }`}
     >
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 space-y-10">
-        {/* Hero Banner */}
-        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-[#3D2514] via-[#5E3210] to-[#2B170B] text-white p-6 sm:p-10 shadow-xl border border-amber-500/30">
-          <div className="relative z-10 max-w-2xl space-y-3">
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 text-xs font-bold">
-              <Sparkles className="w-3.5 h-3.5 text-amber-300" />
-              <span>MANOPAVANA Monthly Cooking Oil Club</span>
-            </span>
-            <h1 className="text-2xl sm:text-4xl font-extrabold font-serif tracking-tight leading-tight">
-              Fresh Marachekku Oils Delivered Every Month, Automatically.
-            </h1>
-            <p className="text-xs sm:text-sm text-stone-200 leading-relaxed">
-              Never run out of pure wood-pressed cooking oils again. Choose a popular combo or{" "}
-              <strong className="text-amber-300">build your own custom monthly box</strong>. You can
-              edit your combo every month directly from your portal.
-            </p>
-            <div className="pt-2 flex flex-wrap items-center gap-4 text-xs font-bold text-amber-200">
-              <div className="flex items-center gap-1.5">
-                <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                <span>Save {discountPercent}% Every Month</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                <span>Free Doorstep Delivery</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                <span>Edit or Pause Anytime</span>
-              </div>
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 space-y-8">
+        {/* BANNER WITH KANNADA FLAG & THEME COLORS */}
+        <div
+          className={`relative overflow-hidden rounded-3xl p-5 sm:p-7 border shadow-sm transition-colors ${
+            isDark
+              ? "bg-gradient-to-r from-[#1E1108] via-[#2A150A] to-[#1E1108] border-[#3E2413] text-[#FAF4EA]"
+              : "bg-gradient-to-r from-[#F6EEDF] via-[#EFE2CC] to-[#F6EEDF] border-[#D6C2A4] text-[#110702]"
+          }`}
+        >
+          <div className="relative z-10 flex items-center gap-3.5 sm:gap-4 min-w-0">
+            {/* Karnataka Flag Emblem on the Left */}
+            <div
+              title="ಕನ್ನಡ ಧ್ವಜ (Karnataka Flag)"
+              className={`relative w-10 h-7 sm:w-11 sm:h-7.5 rounded-sm overflow-hidden border shadow-xs shrink-0 flex flex-col group transform hover:scale-105 transition-transform ${
+                isDark ? "border-amber-400/80" : "border-amber-600/80"
+              }`}
+            >
+              <div className="w-full h-1/2 bg-[#FFD700]" />
+              <div className="w-full h-1/2 bg-[#DC2626]" />
+            </div>
+
+            {/* One Main Line & One Tagline Only */}
+            <div className="min-w-0">
+              <h1
+                className={`text-base sm:text-xl font-black font-serif tracking-tight truncate ${
+                  isDark ? "text-amber-200" : "text-[#241105]"
+                }`}
+              >
+                MANOPAVANA Wood-Pressed Oil Club (ಮನೆಯಲ್ಲೇ ಮರದ ಗಾಣದ ಎಣ್ಣೆ ಚಂದಾದಾರಿಕೆ)
+              </h1>
+              <p
+                className={`text-xs sm:text-sm font-bold mt-0.5 truncate ${
+                  isDark ? "text-amber-100/90" : "text-[#4A260F]"
+                }`}
+              >
+                Authentic 100% Marachekku Oils • Freshly Pressed & Delivered Directly to Your Doorstep Every Month
+              </p>
             </div>
           </div>
         </div>
 
-        {/* If Active Subscription Exists: Display Subscriber Portal with Edit Button */}
-        {activeSub && activeSub.status !== "cancelled" ? (
+        {/* ACTIVE SUBSCRIBER PORTAL & DELHIVERY LOGISTICS TRACKER */}
+        {activeSub && activeSub.status !== "cancelled" && (
           <div
             className={`p-6 sm:p-8 rounded-3xl border shadow-lg space-y-6 ${
-              isDark ? "bg-[#1C120B] border-[#362114]" : "bg-white border-[#E8DEC8]"
+              isDark ? "bg-[#1C120B] border-[#362114]" : "bg-white border-[#D6C2A4]"
             }`}
           >
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-4 border-stone-200 dark:border-stone-800">
+            <div
+              className={`flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-4 ${
+                isDark ? "border-[#2D1B10]" : "border-[#E8DAC2]"
+              }`}
+            >
               <div>
-                <span className="text-xs font-bold text-stone-700 dark:text-stone-300 block">Your Active Monthly Subscription</span>
+                <span
+                  className={`text-xs font-black block ${
+                    isDark ? "text-amber-300" : "text-[#6B340B]"
+                  }`}
+                >
+                  Your Active Subscription Dashboard
+                </span>
                 <div className="flex items-center gap-2 mt-1">
                   <span
-                    className={`w-3 h-3 rounded-full ${
+                    className={`w-3.5 h-3.5 rounded-full ${
                       activeSub.status === "active" ? "bg-emerald-500 animate-pulse" : "bg-amber-500"
                     }`}
                   />
-                  <h2 className="text-xl font-bold font-serif text-stone-900 dark:text-stone-100">{activeSub.comboName}</h2>
-                  {activeSub.comboType === "custom" && (
-                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-[#E08F35]/20 text-[#A85810] dark:text-[#E08F35]">
-                      Custom Box
+                  <h2
+                    className={`text-xl font-black font-serif ${
+                      isDark ? "text-[#FAF4EA]" : "text-[#110702]"
+                    }`}
+                  >
+                    {activeSub.comboName}
+                  </h2>
+                  {activeSub.hasVipPass && (
+                    <span className="px-2.5 py-0.5 rounded text-[11px] font-black bg-amber-500/20 text-[#6B340B] dark:text-amber-300 border border-amber-500/40 flex items-center gap-1">
+                      <Crown className="w-3.5 h-3.5" />
+                      15% VIP PASS
                     </span>
                   )}
                 </div>
                 {activeSub.lastModifiedNote && (
-                  <p className="text-[11px] text-stone-600 dark:text-stone-400 mt-1 italic font-medium">
+                  <p
+                    className={`text-xs mt-1 italic font-bold ${
+                      isDark ? "text-[#BBA38F]" : "text-[#5C3212]"
+                    }`}
+                  >
                     {activeSub.lastModifiedNote}
                   </p>
                 )}
@@ -1100,7 +1130,7 @@ export const SubscriptionPage: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setIsEditingCombo(true)}
-                  className="px-4 py-2 rounded-xl text-xs font-bold bg-[#5E3210] hover:bg-[#43230A] text-white flex items-center gap-1.5 cursor-pointer shadow-md transition-all hover:scale-105"
+                  className="px-4 py-2 rounded-xl text-xs font-black bg-[#43230A] hover:bg-[#2E1807] text-white flex items-center gap-1.5 cursor-pointer shadow-md transition-all hover:scale-105"
                 >
                   <Edit3 className="w-3.5 h-3.5 text-amber-300" />
                   <span>Edit Monthly Combo</span>
@@ -1108,10 +1138,14 @@ export const SubscriptionPage: React.FC = () => {
                 <button
                   type="button"
                   onClick={handleTogglePause}
-                  className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-colors ${
+                  className={`px-4 py-2 rounded-xl text-xs font-black flex items-center gap-1.5 cursor-pointer transition-colors ${
                     activeSub.status === "active"
-                      ? "bg-amber-500/20 text-amber-900 dark:text-amber-200 hover:bg-amber-500/30"
-                      : "bg-emerald-500/20 text-emerald-900 dark:text-emerald-200 hover:bg-emerald-500/30"
+                      ? isDark
+                        ? "bg-amber-500/20 text-amber-200 hover:bg-amber-500/30"
+                        : "bg-amber-100 text-[#43230A] hover:bg-amber-200 border-2 border-amber-400"
+                      : isDark
+                      ? "bg-emerald-500/20 text-emerald-200 hover:bg-emerald-500/30"
+                      : "bg-emerald-100 text-emerald-950 hover:bg-emerald-200 border-2 border-emerald-400"
                   }`}
                 >
                   {activeSub.status === "active" ? (
@@ -1136,120 +1170,174 @@ export const SubscriptionPage: React.FC = () => {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 text-xs">
-              <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 space-y-1">
-                <span className="text-stone-700 dark:text-stone-300 font-bold block">Monthly Schedule</span>
-                <p className="font-bold text-sm text-stone-900 dark:text-stone-100">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
+              <div
+                className={`p-4 rounded-2xl border space-y-1 ${
+                  isDark
+                    ? "bg-[#25150C] border-[#3E2313]"
+                    : "bg-[#F7EFE3] border-[#D6C2A4]"
+                }`}
+              >
+                <span className={isDark ? "text-amber-200 font-bold block" : "text-[#4A260F] font-black block"}>
+                  Delivery Schedule
+                </span>
+                <p className="font-black text-sm text-[#110702] dark:text-[#FAF4EA]">
                   {getOrdinalSuffix(activeSub.deliveryDay)} of Every Month
                 </p>
-                <p className="text-[11px] text-stone-700 dark:text-stone-400 font-medium">
+                <p className="text-xs font-bold text-[#4A260F] dark:text-[#CBB5A1]">
                   Next Dispatch:{" "}
-                  <span className="font-bold text-emerald-700 dark:text-emerald-400">{activeSub.nextDispatchDate}</span>
+                  <span className="font-black text-emerald-800 dark:text-emerald-400">{activeSub.nextDispatchDate}</span>
                 </p>
               </div>
 
-              <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 space-y-1">
-                <span className="text-stone-700 dark:text-stone-300 font-bold block">Payment Mode</span>
-                <p className="font-bold text-sm text-stone-900 dark:text-stone-100 uppercase">
-                  {activeSub.paymentPlan === "annual_prepaid"
-                    ? "Prepaid (12 Months)"
-                    : "Online UPI (PhonePe)"}
+              <div
+                className={`p-4 rounded-2xl border space-y-1 ${
+                  isDark
+                    ? "bg-[#25150C] border-[#3E2313]"
+                    : "bg-[#F7EFE3] border-[#D6C2A4]"
+                }`}
+              >
+                <span className={isDark ? "text-amber-200 font-bold block" : "text-[#4A260F] font-black block"}>
+                  Payment Mode
+                </span>
+                <p className="font-black text-sm text-[#110702] dark:text-[#FAF4EA] uppercase">
+                  {activeSub.duration === "annual" ? "Annual Prepaid (12 Months)" : "Monthly Online Paid"}
                 </p>
-                <p className="text-[11px] text-stone-700 dark:text-stone-400 font-medium">
-                  {activeSub.paymentPlan === "annual_prepaid"
-                    ? "Full year prepaid with extra 10% discount"
-                    : "Automated WhatsApp payment link sent 3 days before dispatch"}
+                <p className="text-xs font-bold text-[#4A260F] dark:text-[#CBB5A1]">
+                  Online Paid • Zero delivery fees across India
                 </p>
               </div>
 
-              <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 space-y-1">
-                <span className="text-stone-700 dark:text-stone-300 font-bold block">Monthly Amount</span>
-                <p className="font-black text-base text-[#8B4513] dark:text-amber-300 font-serif">
+              <div
+                className={`p-4 rounded-2xl border space-y-1 ${
+                  isDark
+                    ? "bg-[#25150C] border-[#3E2313]"
+                    : "bg-[#F7EFE3] border-[#D6C2A4]"
+                }`}
+              >
+                <span className={isDark ? "text-amber-200 font-bold block" : "text-[#4A260F] font-black block"}>
+                  Locked Monthly Price
+                </span>
+                <p className="font-black text-base text-[#6B340B] dark:text-amber-300 font-serif">
                   ₹{activeSub.monthlyPrice}/month
                 </p>
-                <p className="text-[11px] text-emerald-700 dark:text-emerald-400 font-bold">
-                  Free Doorstep Delivery Included
+                <p className="text-xs text-emerald-800 dark:text-emerald-400 font-black">
+                  Free Doorstep Delivery (Pan-India)
                 </p>
               </div>
             </div>
 
-            {/* Current Combo Items Breakdown */}
-            <div className="p-3.5 rounded-2xl bg-stone-100 dark:bg-stone-900/60 border border-stone-300 dark:border-stone-800 flex flex-wrap items-center gap-2 text-xs">
-              <span className="font-bold text-stone-800 dark:text-stone-200">Items in next cycle:</span>
-              {(activeSub.items || []).map((it: string, i: number) => (
-                <span
-                  key={i}
-                  className="px-2.5 py-1 rounded-lg bg-white dark:bg-stone-800 border border-stone-300 dark:border-stone-700 font-bold text-stone-900 dark:text-stone-100 shadow-2xs"
-                >
-                  {it}
-                </span>
-              ))}
-            </div>
-
-            {/* WhatsApp Payment Link & Cycle Action Bar */}
-            <div className="pt-3 border-t border-stone-200 dark:border-stone-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-amber-500/5 p-4 rounded-2xl border border-amber-500/20">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-xl bg-[#25D366]/20 flex items-center justify-center shrink-0">
-                  <MessageCircle className="w-4 h-4 text-[#25D366]" />
+            {/* LIVE DELHIVERY LOGISTICS TRACKING CARD */}
+            <div
+              className={`p-4 sm:p-5 rounded-2xl border space-y-3 ${
+                isDark
+                  ? "bg-[#1E140C] border-[#442817]"
+                  : "bg-[#F4EBDD] border-[#C9B293]"
+              }`}
+            >
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-[#43230A] text-white flex items-center justify-center shrink-0">
+                    <Truck className="w-5 h-5 text-amber-300" />
+                  </div>
+                  <div>
+                    <h4 className="font-black text-sm sm:text-base text-[#110702] dark:text-[#FAF4EA]">
+                      Delhivery Express Fulfillment & Tracking
+                    </h4>
+                    <p className="text-xs font-bold text-[#4A260F] dark:text-[#CBB5A1]">
+                      Carrier: Delhivery B2C Surface • Dispatched fresh from Peenya 2nd Stage, Bangalore
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <h4 className="font-bold text-xs sm:text-sm text-stone-900 dark:text-stone-100">
-                    WhatsApp Payment Link & Reminders
-                  </h4>
-                  <p className="text-[11px] text-stone-700 dark:text-stone-300 font-medium">
-                    Payment link is sent 3 days before your delivery on the {getOrdinalSuffix(activeSub.deliveryDay)}.
-                  </p>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => navigate("/orders")}
+                    className="px-3.5 py-1.5 rounded-xl text-xs font-black bg-[#43230A] hover:bg-[#2E1807] text-white flex items-center gap-1.5 shadow-sm cursor-pointer"
+                  >
+                    <Package className="w-3.5 h-3.5 text-amber-300" />
+                    <span>View in My Orders</span>
+                  </button>
+                  {activeSub.delhiveryWaybill && (
+                    <a
+                      href={`https://www.delhivery.com/track/package/${activeSub.delhiveryWaybill}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-3.5 py-1.5 rounded-xl text-xs font-black bg-white dark:bg-stone-800 border-2 border-[#43230A] text-[#43230A] dark:text-amber-200 flex items-center gap-1.5 cursor-pointer shadow-sm hover:bg-[#FAF7F2]"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" />
+                      <span>Track AWB #{activeSub.delhiveryWaybill.slice(-6)}</span>
+                    </a>
+                  )}
                 </div>
               </div>
 
-              <div className="flex flex-wrap items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    const wa = getSubscriptionWhatsAppUrl(activeSub);
-                    window.open(wa.url, "_blank");
-                  }}
-                  className="px-4 py-2 rounded-xl text-xs font-bold bg-[#25D366] hover:bg-[#1EBE5D] text-white flex items-center gap-1.5 shadow-sm cursor-pointer transition-transform hover:scale-105"
-                >
-                  <MessageCircle className="w-3.5 h-3.5" />
-                  <span>Send WhatsApp Payment Link</span>
-                </button>
-                <a
-                  href={`upi://pay?pa=manopavana@ybl&pn=MANOPAVANA&am=${activeSub.monthlyPrice}&cu=INR&tn=MANOPAVANA_Monthly_Subscription_${activeSub.id}`}
-                  className="px-4 py-2 rounded-xl text-xs font-bold bg-[#5E3210] hover:bg-[#43230A] text-white flex items-center gap-1.5 shadow-sm cursor-pointer transition-transform hover:scale-105"
-                >
-                  <CreditCard className="w-3.5 h-3.5 text-amber-300" />
-                  <span>Pay ₹{activeSub.monthlyPrice} via PhonePe</span>
-                </a>
+              {/* 4-Step Delhivery Lifecycle Visual */}
+              <div className="grid grid-cols-1 sm:grid-cols-4 gap-2 pt-2 border-t border-[#DECDB3] dark:border-[#3E2413] text-xs">
+                <div className="p-2.5 rounded-xl bg-white dark:bg-[#24150C] border border-[#DECDB3] dark:border-[#3E2413] space-y-0.5">
+                  <span className="text-[10px] font-black text-amber-800 dark:text-amber-300 uppercase">
+                    1. Auto Booking
+                  </span>
+                  <p className="font-black text-[#110702] dark:text-[#FAF4EA]">Scheduled 3 Days Prior</p>
+                  <p className="text-[11px] text-[#4A260F] dark:text-[#CBB5A1] font-medium">1-Click renewal sent</p>
+                </div>
+                <div className="p-2.5 rounded-xl bg-white dark:bg-[#24150C] border border-[#DECDB3] dark:border-[#3E2413] space-y-0.5">
+                  <span className="text-[10px] font-black text-amber-800 dark:text-amber-300 uppercase">
+                    2. Fresh Churning
+                  </span>
+                  <p className="font-black text-[#110702] dark:text-[#FAF4EA]">Peenya 2nd Stage</p>
+                  <p className="text-[11px] text-[#4A260F] dark:text-[#CBB5A1] font-medium">Marachekku cold-press</p>
+                </div>
+                <div className="p-2.5 rounded-xl bg-white dark:bg-[#24150C] border border-[#DECDB3] dark:border-[#3E2413] space-y-0.5">
+                  <span className="text-[10px] font-black text-amber-800 dark:text-amber-300 uppercase">
+                    3. Delhivery Pickup
+                  </span>
+                  <p className="font-black text-[#110702] dark:text-[#FAF4EA]">AWB Manifested</p>
+                  <p className="text-[11px] text-[#4A260F] dark:text-[#CBB5A1] font-medium">Real-time GPS tracking</p>
+                </div>
+                <div className="p-2.5 rounded-xl bg-white dark:bg-[#24150C] border border-[#DECDB3] dark:border-[#3E2413] space-y-0.5">
+                  <span className="text-[10px] font-black text-emerald-800 dark:text-emerald-400 uppercase">
+                    4. Doorstep Arrival
+                  </span>
+                  <p className="font-black text-[#110702] dark:text-[#FAF4EA]">{getOrdinalSuffix(activeSub.deliveryDay)} of Month</p>
+                  <p className="text-[11px] text-emerald-800 dark:text-emerald-400 font-bold">Free Pan-India Delivery</p>
+                </div>
               </div>
             </div>
           </div>
-        ) : null}
+        )}
 
         {/* Modal: Edit Monthly Combo Directly in Firestore */}
         {isEditingCombo && (
           <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4">
             <div
               className={`w-full max-w-2xl rounded-3xl p-6 sm:p-8 space-y-6 border shadow-2xl overflow-y-auto max-h-[90vh] ${
-                isDark ? "bg-[#1C120B] text-[#FAF4EA] border-[#362114]" : "bg-white text-[#1F120A] border-[#E8DEC8]"
+                isDark ? "bg-[#1C120B] text-[#FAF4EA] border-[#362114]" : "bg-white text-[#110702] border-[#D6C2A4]"
               }`}
             >
-              <div className="flex items-center justify-between border-b pb-3 border-stone-200 dark:border-stone-800">
+              <div
+                className={`flex items-center justify-between border-b pb-3 ${
+                  isDark ? "border-[#2D1B10]" : "border-[#E8DAC2]"
+                }`}
+              >
                 <div className="flex items-center gap-2">
-                  <Edit3 className="w-5 h-5 text-[#E08F35]" />
+                  <Edit3 className="w-5 h-5 text-[#C8751B]" />
                   <div>
-                    <h3 className="font-bold font-serif text-lg text-stone-900 dark:text-stone-100">Edit Your Monthly Oil Combo</h3>
-                    <p className="text-xs text-stone-700 dark:text-stone-400 font-medium">
-                      Changes update directly in Firestore and take effect on your next cycle.
+                    <h3 className="font-black font-serif text-lg text-[#110702] dark:text-[#FAF4EA]">
+                      Edit Your Monthly Oil Combo
+                    </h3>
+                    <p className="text-xs text-[#4A260F] dark:text-[#D8C8B8] font-bold">
+                      Changes update directly in Firestore for your next monthly delivery cycle.
                     </p>
                   </div>
                 </div>
                 <button
                   type="button"
                   onClick={() => setIsEditingCombo(false)}
-                  className="p-2 rounded-xl text-stone-500 hover:text-stone-800 dark:hover:text-stone-200 cursor-pointer"
+                  className="p-2 rounded-xl text-stone-600 hover:text-black dark:text-stone-300 dark:hover:text-white cursor-pointer"
                 >
-                  <X className="w-5 h-5" />
+                  <X className="w-5 h-5 stroke-[2.5]" />
                 </button>
               </div>
 
@@ -1258,21 +1346,25 @@ export const SubscriptionPage: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setEditComboMode("preset")}
-                  className={`flex-1 py-2.5 rounded-xl font-bold text-xs border transition-all cursor-pointer ${
+                  className={`flex-1 py-2.5 rounded-xl font-black text-xs border transition-all cursor-pointer ${
                     editComboMode === "preset"
-                      ? "bg-[#5E3210] text-white border-[#5E3210] shadow-md"
-                      : "border-stone-300 dark:border-stone-700 text-stone-800 dark:text-stone-200 bg-stone-50 dark:bg-transparent"
+                      ? "bg-[#43230A] text-white border-[#43230A] shadow-md"
+                      : isDark
+                      ? "border-[#442817] text-[#D8C8B8] bg-[#22130A]"
+                      : "border-[#C9B293] text-[#110702] bg-[#F7EFE3]"
                   }`}
                 >
-                  Choose a Popular Combo
+                  Choose Curated Combo
                 </button>
                 <button
                   type="button"
                   onClick={() => setEditComboMode("custom")}
-                  className={`flex-1 py-2.5 rounded-xl font-bold text-xs border transition-all cursor-pointer ${
+                  className={`flex-1 py-2.5 rounded-xl font-black text-xs border transition-all cursor-pointer ${
                     editComboMode === "custom"
-                      ? "bg-[#5E3210] text-white border-[#5E3210] shadow-md"
-                      : "border-stone-300 dark:border-stone-700 text-stone-800 dark:text-stone-200 bg-stone-50 dark:bg-transparent"
+                      ? "bg-[#43230A] text-white border-[#43230A] shadow-md"
+                      : isDark
+                      ? "border-[#442817] text-[#D8C8B8] bg-[#22130A]"
+                      : "border-[#C9B293] text-[#110702] bg-[#F7EFE3]"
                   }`}
                 >
                   Build Custom Box
@@ -1289,19 +1381,25 @@ export const SubscriptionPage: React.FC = () => {
                         onClick={() => setEditSelectedPresetId(combo.id)}
                         className={`p-4 rounded-2xl border-2 transition-all cursor-pointer flex items-center justify-between ${
                           isSelected
-                            ? "bg-amber-500/10 border-[#E08F35] ring-2 ring-[#E08F35]/30"
-                            : "border-stone-200 dark:border-stone-800 hover:border-stone-300"
+                            ? "bg-amber-500/10 border-[#C8751B] ring-2 ring-[#C8751B]/30"
+                            : isDark
+                            ? "border-[#2D1B10] bg-[#25150C]"
+                            : "border-[#D6C2A4] bg-[#FDF9F2]"
                         }`}
                       >
                         <div>
-                          <h4 className="font-bold text-sm text-stone-900 dark:text-stone-100">{combo.name}</h4>
-                          <p className="text-xs text-stone-700 dark:text-stone-300 font-medium">{combo.items.join(" + ")}</p>
+                          <h4 className="font-black text-sm text-[#110702] dark:text-[#FAF4EA]">
+                            {combo.name}
+                          </h4>
+                          <p className="text-xs text-[#4A260F] dark:text-[#D8C8B8] font-bold">
+                            {combo.items.join(" + ")}
+                          </p>
                         </div>
                         <div className="text-right">
-                          <span className="text-base font-extrabold text-[#8B4513] dark:text-amber-300">
+                          <span className="text-base font-black text-[#6B340B] dark:text-amber-300">
                             ₹{combo.monthlyPrice}/mo
                           </span>
-                          <span className="block text-[10px] text-emerald-700 dark:text-emerald-400 font-bold">
+                          <span className="block text-[10px] text-emerald-800 dark:text-emerald-400 font-black">
                             Save ₹{combo.savings}
                           </span>
                         </div>
@@ -1311,7 +1409,7 @@ export const SubscriptionPage: React.FC = () => {
                 </div>
               ) : (
                 <div className="space-y-4">
-                  <p className="text-xs text-stone-700 dark:text-stone-300 font-medium">
+                  <p className="text-xs text-[#4A260F] dark:text-[#D8C8B8] font-bold">
                     Adjust the number of 1L bottles for your next monthly delivery (minimum 2 bottles):
                   </p>
                   {(["groundnut", "coconut", "sesame"] as const).map((oilKey) => {
@@ -1320,13 +1418,19 @@ export const SubscriptionPage: React.FC = () => {
                     return (
                       <div
                         key={oilKey}
-                        className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-between"
+                        className={`p-3.5 rounded-2xl border-2 flex items-center justify-between ${
+                          isDark
+                            ? "bg-[#25150C] border-[#3E2313]"
+                            : "bg-[#FDF9F2] border-[#D6C2A4]"
+                        }`}
                       >
                         <div>
-                          <h5 className="font-bold text-xs sm:text-sm text-stone-900 dark:text-stone-100">{rate.name}</h5>
-                          <span className="text-[11px] text-[#A85810] dark:text-amber-400 font-bold">
-                            Fixed Subscription Price: ₹{rate.subPrice}/L{" "}
-                            <span className="text-stone-500 dark:text-stone-400 line-through font-semibold">₹{rate.mrp}</span>
+                          <h5 className="font-black text-sm text-[#110702] dark:text-[#FAF4EA]">
+                            {rate.name}
+                          </h5>
+                          <span className="text-xs text-[#6B340B] dark:text-amber-400 font-black">
+                            Subscription Rate: ₹{rate.subPrice}/L{" "}
+                            <span className="line-through text-stone-500">₹{rate.mrp}</span>
                           </span>
                         </div>
 
@@ -1339,11 +1443,17 @@ export const SubscriptionPage: React.FC = () => {
                                 [oilKey]: Math.max(0, p[oilKey] - 1),
                               }))
                             }
-                            className="w-8 h-8 rounded-lg bg-stone-200 dark:bg-stone-800 hover:bg-stone-300 flex items-center justify-center font-bold text-stone-900 dark:text-stone-100 cursor-pointer"
+                            className={`w-8 h-8 rounded-lg flex items-center justify-center font-black cursor-pointer border ${
+                              isDark
+                                ? "bg-[#362114] text-stone-200 border-[#4E2E1A]"
+                                : "bg-[#EDE2CF] text-[#110702] border-[#C9B293]"
+                            }`}
                           >
-                            <Minus className="w-3.5 h-3.5" />
+                            <Minus className="w-3.5 h-3.5 stroke-[3]" />
                           </button>
-                          <span className="w-6 text-center font-black text-sm text-stone-900 dark:text-stone-100">{count}</span>
+                          <span className="w-6 text-center font-black text-base text-[#110702] dark:text-[#FAF4EA]">
+                            {count}
+                          </span>
                           <button
                             type="button"
                             onClick={() =>
@@ -1352,9 +1462,9 @@ export const SubscriptionPage: React.FC = () => {
                                 [oilKey]: p[oilKey] + 1,
                               }))
                             }
-                            className="w-8 h-8 rounded-lg bg-[#5E3210] hover:bg-[#43230A] text-white flex items-center justify-center font-bold cursor-pointer"
+                            className="w-8 h-8 rounded-lg bg-[#43230A] hover:bg-[#2E1807] text-white flex items-center justify-center font-bold cursor-pointer"
                           >
-                            <Plus className="w-3.5 h-3.5" />
+                            <Plus className="w-3.5 h-3.5 stroke-[3]" />
                           </button>
                         </div>
                       </div>
@@ -1363,11 +1473,19 @@ export const SubscriptionPage: React.FC = () => {
                 </div>
               )}
 
-              <div className="pt-4 border-t border-stone-200 dark:border-stone-800 flex items-center justify-end gap-3">
+              <div
+                className={`pt-4 border-t flex items-center justify-end gap-3 ${
+                  isDark ? "border-[#2D1B10]" : "border-[#E8DAC2]"
+                }`}
+              >
                 <button
                   type="button"
                   onClick={() => setIsEditingCombo(false)}
-                  className="px-4 py-2.5 rounded-xl border border-stone-300 dark:border-stone-700 text-xs font-semibold"
+                  className={`px-4 py-2.5 rounded-xl border text-xs font-black cursor-pointer ${
+                    isDark
+                      ? "border-[#442817] text-[#D8C8B8]"
+                      : "border-[#C9B293] text-[#110702]"
+                  }`}
                 >
                   Cancel
                 </button>
@@ -1375,9 +1493,9 @@ export const SubscriptionPage: React.FC = () => {
                   type="button"
                   disabled={isSavingEdit}
                   onClick={handleSaveComboEdit}
-                  className="px-6 py-2.5 rounded-xl bg-[#5E3210] hover:bg-[#43230A] text-white text-xs font-bold shadow-md flex items-center gap-2 cursor-pointer"
+                  className="px-6 py-2.5 rounded-xl bg-[#43230A] hover:bg-[#2E1807] text-white text-xs font-black shadow-md flex items-center gap-2 cursor-pointer"
                 >
-                  <Check className="w-4 h-4 text-amber-300" />
+                  <Check className="w-4 h-4 text-amber-300 stroke-[3]" />
                   <span>{isSavingEdit ? "Saving in Firestore..." : "Save Updated Combo"}</span>
                 </button>
               </div>
@@ -1385,37 +1503,231 @@ export const SubscriptionPage: React.FC = () => {
           </div>
         )}
 
-        {/* Step 1: Choose or Build Your Monthly Combo */}
+        {/* STEP 1: CHOOSE PLAN & VIP CLUB PASS OPTION */}
         <div className="space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <span className="w-6 h-6 rounded-full bg-[#E08F35] text-[#1F120A] flex items-center justify-center font-bold text-xs">
+              <span className="w-7 h-7 rounded-full bg-[#43230A] text-amber-200 flex items-center justify-center font-black text-sm">
                 1
               </span>
-              <h2 className="text-lg sm:text-xl font-bold font-serif text-[#1F120A] dark:text-stone-100">
-                Step 1: Choose Your Monthly Combo or Build Custom Box
+              <h2 className="text-xl sm:text-2xl font-black font-serif text-[#110702] dark:text-[#FAF4EA]">
+                Step 1: Choose Subscription Plan & Discount
               </h2>
             </div>
-
             <button
               type="button"
-              onClick={() => setShowImageGuide(!showImageGuide)}
-              className="text-xs font-bold text-[#A85810] dark:text-[#E08F35] hover:underline flex items-center gap-1.5 cursor-pointer self-start sm:self-auto"
+              onClick={() => setShowDelhiveryGuide(!showDelhiveryGuide)}
+              className="text-xs font-black text-[#6B340B] dark:text-amber-300 hover:underline flex items-center gap-1 cursor-pointer"
             >
-              <Camera className="w-3.5 h-3.5" />
-              <span>{showImageGuide ? "Hide Photo Guide" : "How to add custom combo photos?"}</span>
+              <HelpCircle className="w-4 h-4" />
+              <span>How Delhivery Fulfillment Works?</span>
             </button>
           </div>
 
-          {/* Mode Switcher: Preset Combos vs Custom Builder */}
-          <div className="flex items-center gap-3 p-1.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 max-w-md">
+          {/* Collapsible Logistics Explainer */}
+          {showDelhiveryGuide && (
+            <div
+              className={`p-4 sm:p-5 rounded-2xl border-2 space-y-2 text-xs ${
+                isDark ? "bg-[#1E120A] border-amber-500/30 text-[#FAF4EA]" : "bg-[#F7EFE3] border-[#C9B293] text-[#110702]"
+              }`}
+            >
+              <h4 className="font-black text-sm text-[#241105] dark:text-amber-300 flex items-center gap-2">
+                <Truck className="w-4 h-4 text-[#C8751B]" />
+                <span>End-to-End Subscription Booking to Delhivery Delivery:</span>
+              </h4>
+              <ol className="list-decimal pl-5 space-y-1 font-bold leading-relaxed">
+                <li><strong>Online Booking & Lock-in:</strong> You choose your combo and pay online. Your booking and delivery schedule are instantly stored in Firestore.</li>
+                <li><strong>Delhivery Waybill Generation:</strong> An official Order record is generated with a dedicated Delhivery AWB number.</li>
+                <li><strong>48h Pre-Dispatch Notice:</strong> You receive an automated reminder 3 days before your delivery date.</li>
+                <li><strong>Cold-Pressing at Peenya Hub:</strong> We cold-press authentic seeds at our Bengaluru facility, pack hygienically, and hand over to Delhivery logistics.</li>
+                <li><strong>Pan-India Live Tracking:</strong> Real-time tracking is available directly inside your account on the <strong>My Orders</strong> page or on Delhivery.com!</li>
+              </ol>
+            </div>
+          )}
+
+          {/* THE 3 PRICING TIERS: 1-MONTH (5%), 1-YEAR (10%), AND VIP PASS (+₹199 FOR 15%) */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* 1 Month Option: 5% Off */}
+            <div
+              onClick={() => {
+                setDuration("monthly");
+                setHasVipPass(false);
+              }}
+              className={`p-5 rounded-3xl border-3 transition-all cursor-pointer flex flex-col justify-between space-y-3 ${
+                duration === "monthly" && !hasVipPass
+                  ? "bg-[#FDF9F2] border-[#43230A] ring-3 ring-[#43230A]/20 shadow-lg"
+                  : isDark
+                  ? "bg-[#1C120B] border-[#362114] hover:border-amber-500/40"
+                  : "bg-white border-[#D6C2A4] hover:border-[#43230A]"
+              }`}
+            >
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="px-2.5 py-1 rounded-full text-xs font-black bg-amber-500 text-white">
+                    5% OFF
+                  </span>
+                  <span className="text-[11px] font-black text-[#6B340B] dark:text-amber-300">
+                    Monthly Plan
+                  </span>
+                </div>
+                <h3 className="font-black text-base sm:text-lg font-serif text-[#110702] dark:text-[#FAF4EA]">
+                  1-Month Next Delivery
+                </h3>
+                <p className="text-xs text-[#3D1E08] dark:text-[#D8C8B8] font-bold leading-relaxed">
+                  Pay online for your first month now. Enjoy a locked <strong>5% discount</strong> with zero long-term lock-in. Edit or pause anytime!
+                </p>
+              </div>
+
+              <div className="pt-2 border-t border-[#E8DAC2] dark:border-[#362114] flex items-center justify-between">
+                <span className="text-xs font-black text-emerald-800 dark:text-emerald-400">
+                  ✓ Zero Lock-in
+                </span>
+                <div
+                  className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                    duration === "monthly" && !hasVipPass
+                      ? "border-[#43230A] bg-[#43230A]"
+                      : "border-stone-400"
+                  }`}
+                >
+                  {duration === "monthly" && !hasVipPass && (
+                    <div className="w-2 h-2 rounded-full bg-white" />
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Complete Year Option: 10% Off */}
+            <div
+              onClick={() => {
+                setDuration("annual");
+                setHasVipPass(false);
+              }}
+              className={`p-5 rounded-3xl border-3 transition-all cursor-pointer flex flex-col justify-between space-y-3 ${
+                duration === "annual" && !hasVipPass
+                  ? "bg-[#FDF9F2] border-[#43230A] ring-3 ring-[#43230A]/20 shadow-lg"
+                  : isDark
+                  ? "bg-[#1C120B] border-[#362114] hover:border-amber-500/40"
+                  : "bg-white border-[#D6C2A4] hover:border-[#43230A]"
+              }`}
+            >
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="px-2.5 py-1 rounded-full text-xs font-black bg-emerald-700 text-white">
+                    10% OFF
+                  </span>
+                  <span className="text-[11px] font-black text-emerald-800 dark:text-emerald-300">
+                    Full Year Value
+                  </span>
+                </div>
+                <h3 className="font-black text-base sm:text-lg font-serif text-[#110702] dark:text-[#FAF4EA]">
+                  Complete Year (12 Months)
+                </h3>
+                <p className="text-xs text-[#3D1E08] dark:text-[#D8C8B8] font-bold leading-relaxed">
+                  Prepay for 1 full year online (12 cycles). Lock in a guaranteed <strong>10% discount</strong> against market price inflation.
+                </p>
+              </div>
+
+              <div className="pt-2 border-t border-[#E8DAC2] dark:border-[#362114] flex items-center justify-between">
+                <span className="text-xs font-black text-emerald-800 dark:text-emerald-400">
+                  ✓ 12 Cycles Prepaid
+                </span>
+                <div
+                  className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                    duration === "annual" && !hasVipPass
+                      ? "border-[#43230A] bg-[#43230A]"
+                      : "border-stone-400"
+                  }`}
+                >
+                  {duration === "annual" && !hasVipPass && (
+                    <div className="w-2 h-2 rounded-full bg-white" />
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* ⭐ VIP CLUB PASS OPTION (+₹199 TO UNLOCK 15% OFF) */}
+            <div
+              onClick={() => setHasVipPass(!hasVipPass)}
+              className={`p-5 rounded-3xl border-3 transition-all cursor-pointer flex flex-col justify-between space-y-3 relative overflow-hidden ${
+                hasVipPass
+                  ? "bg-[#FDF6EA] border-[#B46912] ring-3 ring-[#B46912]/30 shadow-xl"
+                  : isDark
+                  ? "bg-[#1E140C] border-[#5E3210] hover:border-[#B46912]"
+                  : "bg-[#FFFDF9] border-[#C9B293] hover:border-[#B46912]"
+              }`}
+            >
+              <div className="absolute top-0 right-0 bg-[#B46912] text-white font-black text-[10px] uppercase px-3 py-0.5 rounded-bl-xl shadow-xs">
+                MAX SAVINGS
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-lg bg-[#43230A] text-amber-300 flex items-center justify-center shrink-0">
+                    <Crown className="w-4 h-4" />
+                  </div>
+                  <span className="px-2.5 py-0.5 rounded-full text-xs font-black bg-[#43230A] text-amber-200">
+                    15% OFF
+                  </span>
+                </div>
+
+                <h3 className="font-black text-base sm:text-lg font-serif text-[#110702] dark:text-[#FAF4EA]">
+                  VIP Club Pass (+₹{VIP_PASS_FEE})
+                </h3>
+
+                <p className="text-xs text-[#3D1E08] dark:text-[#D8C8B8] font-bold leading-relaxed">
+                  Add <strong>₹{VIP_PASS_FEE}</strong> subscription fee to unlock the highest <strong>15% VIP discount</strong> on every bottle. Pays for itself on your first box!
+                </p>
+              </div>
+
+              <div className="pt-2 border-t border-[#DECDB3] dark:border-[#3E2413] flex items-center justify-between">
+                <span className="text-xs font-black text-[#6B340B] dark:text-amber-300">
+                  {hasVipPass ? "✓ 15% Discount Active" : "Click to Add Pass"}
+                </span>
+                <div
+                  className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all ${
+                    hasVipPass
+                      ? "bg-[#43230A] border-[#43230A] text-amber-300"
+                      : "border-stone-400 bg-white dark:bg-stone-800"
+                  }`}
+                >
+                  {hasVipPass && <Check className="w-3.5 h-3.5 stroke-[3]" />}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* STEP 2: CHOOSE OR BUILD COMBO */}
+        <div className="space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <span className="w-7 h-7 rounded-full bg-[#43230A] text-amber-200 flex items-center justify-center font-black text-sm">
+                2
+              </span>
+              <h2 className="text-xl sm:text-2xl font-black font-serif text-[#110702] dark:text-[#FAF4EA]">
+                Step 2: Choose Your Monthly Combo or Build Custom Box
+              </h2>
+            </div>
+            <span className="text-xs font-black text-emerald-800 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-950/60 px-3 py-1 rounded-full border border-emerald-400">
+              Active Tier Discount: {discountPercent}% OFF
+            </span>
+          </div>
+
+          {/* Mode Switcher */}
+          <div
+            className={`flex items-center gap-3 p-1.5 rounded-2xl border-2 max-w-md ${
+              isDark ? "bg-[#1E120A] border-[#362114]" : "bg-[#F7EFE3] border-[#D6C2A4]"
+            }`}
+          >
             <button
               type="button"
               onClick={() => setComboMode("preset")}
-              className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              className={`flex-1 py-2.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
                 comboMode === "preset"
-                  ? "bg-[#5E3210] text-white shadow-md"
-                  : "text-stone-800 dark:text-stone-200 hover:text-[#5E3210]"
+                  ? "bg-[#43230A] text-white shadow-md"
+                  : isDark
+                  ? "text-[#D8C8B8] hover:text-white"
+                  : "text-[#110702] hover:text-[#43230A]"
               }`}
             >
               Curated Popular Combos
@@ -1423,50 +1735,18 @@ export const SubscriptionPage: React.FC = () => {
             <button
               type="button"
               onClick={() => setComboMode("custom")}
-              className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+              className={`flex-1 py-2.5 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
                 comboMode === "custom"
-                  ? "bg-[#5E3210] text-white shadow-md"
-                  : "text-stone-800 dark:text-stone-200 hover:text-[#5E3210]"
+                  ? "bg-[#43230A] text-white shadow-md"
+                  : isDark
+                  ? "text-[#D8C8B8] hover:text-white"
+                  : "text-[#110702] hover:text-[#43230A]"
               }`}
             >
               <Sliders className="w-3.5 h-3.5 text-amber-300" />
               <span>Build Custom Box</span>
             </button>
           </div>
-
-          {/* Collapsible Photo Guide for Owner/Merchant */}
-          {showImageGuide && (
-            <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-xs text-stone-800 dark:text-stone-200 space-y-2 animate-fadeIn font-medium">
-              <div className="flex items-center gap-2 font-bold text-[#9A4E0B] dark:text-[#E08F35]">
-                <Info className="w-4 h-4" />
-                <span>Guide: Custom Photos for Subscription Combos</span>
-              </div>
-              <p className="leading-relaxed">
-                Right now, each combo automatically renders an authentic multi-bottle visual featuring
-                our authentic Marachekku bottles (Groundnut, Coconut, Sesame) with exact quantity pills.
-              </p>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
-                <div className="p-3 rounded-xl bg-white dark:bg-stone-800/90 border border-amber-500/30 space-y-1 shadow-2xs">
-                  <strong className="text-stone-900 dark:text-stone-100 block">
-                    Option A: Use Your Own Photoshoot
-                  </strong>
-                  <p className="text-[11px] text-stone-700 dark:text-stone-300 font-normal">
-                    Take a photo of the 2 or 3 bottles together on a clean kitchen counter or studio backdrop.
-                    Upload it to your Cloudflare R2 bucket or CMS, then set the <code className="text-[#8B4513] dark:text-amber-300 font-bold">image</code> property in <code className="text-[#8B4513] dark:text-amber-300 font-bold">PRESET_SUBSCRIPTION_COMBOS</code>.
-                  </p>
-                </div>
-                <div className="p-3 rounded-xl bg-white dark:bg-stone-800/90 border border-amber-500/30 space-y-1 shadow-2xs">
-                  <strong className="text-stone-900 dark:text-stone-100 block">
-                    Option B: Keep Multi-Bottle Composite
-                  </strong>
-                  <p className="text-[11px] text-stone-700 dark:text-stone-300 font-normal">
-                    The current visual always displays the genuine MANOPAVANA transparent bottles with dark/light
-                    theme adaptability and volume tags. It is 100% production-ready!
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
 
           {/* Render Mode: Preset Combos */}
           {comboMode === "preset" ? (
@@ -1477,18 +1757,16 @@ export const SubscriptionPage: React.FC = () => {
                   <div
                     key={combo.id}
                     onClick={() => setSelectedPresetId(combo.id)}
-                    className={`relative p-5 rounded-3xl border-2 transition-all cursor-pointer flex flex-col justify-between ${
+                    className={`relative p-5 rounded-3xl border-3 transition-all cursor-pointer flex flex-col justify-between ${
                       isSelected
-                        ? isDark
-                          ? "bg-[#25150C] border-[#E08F35] shadow-lg ring-2 ring-[#E08F35]/30"
-                          : "bg-amber-50/90 border-[#E08F35] shadow-lg ring-2 ring-[#E08F35]/30"
+                        ? "bg-[#FDF9F2] border-[#43230A] ring-3 ring-[#43230A]/20 shadow-xl"
                         : isDark
                         ? "bg-[#1C120B] border-[#362114] hover:border-amber-500/30"
-                        : "bg-white border-[#E8DEC8] hover:border-amber-400"
+                        : "bg-white border-[#D6C2A4] hover:border-[#43230A]"
                     }`}
                   >
                     {combo.badge && (
-                      <span className="absolute -top-3 right-5 px-3 py-0.5 rounded-full bg-[#E08F35] text-[#1F120A] font-black text-[10px] uppercase shadow-xs">
+                      <span className="absolute -top-3 right-5 px-3 py-0.5 rounded-full bg-[#43230A] text-amber-200 font-black text-[10px] uppercase shadow-xs">
                         {combo.badge}
                       </span>
                     )}
@@ -1497,41 +1775,49 @@ export const SubscriptionPage: React.FC = () => {
                       <ComboBottleVisual combo={combo} isDark={isDark} />
 
                       <div>
-                        <h3 className="font-bold text-sm sm:text-base font-serif text-stone-900 dark:text-stone-100">
+                        <h3 className="font-black text-base sm:text-lg font-serif text-[#110702] dark:text-[#FAF4EA]">
                           {combo.name}
                         </h3>
-                        <p className="text-[11px] text-[#A85810] dark:text-amber-400 font-bold mt-0.5">
+                        <p className="text-xs text-[#6B340B] dark:text-amber-400 font-black mt-0.5">
                           {combo.kannadaName}
                         </p>
-                        <p className="text-xs text-stone-700 dark:text-stone-300 mt-1 leading-relaxed font-normal">
+                        <p className="text-xs text-[#3D1E08] dark:text-[#D8C8B8] mt-1 leading-relaxed font-bold">
                           {combo.description}
                         </p>
                       </div>
 
-                      <div className="pt-2 border-t border-stone-200 dark:border-stone-800 space-y-1">
+                      <div
+                        className={`pt-2 border-t space-y-1 ${
+                          isDark ? "border-[#2D1B10]" : "border-[#E8DAC2]"
+                        }`}
+                      >
                         {combo.items.map((it, idx) => (
                           <div
                             key={idx}
-                            className="flex items-center gap-1.5 text-xs text-stone-800 dark:text-stone-200 font-medium"
+                            className="flex items-center gap-1.5 text-xs text-[#110702] dark:text-[#E0D4C0] font-black"
                           >
-                            <Droplet className="w-3 h-3 text-[#E08F35]" />
+                            <Droplet className="w-3.5 h-3.5 text-[#C8751B]" />
                             <span>{it}</span>
                           </div>
                         ))}
                       </div>
                     </div>
 
-                    <div className="pt-4 border-t border-stone-200 dark:border-stone-800 flex items-center justify-between mt-4">
+                    <div
+                      className={`pt-4 border-t flex items-center justify-between mt-4 ${
+                        isDark ? "border-[#2D1B10]" : "border-[#E8DAC2]"
+                      }`}
+                    >
                       <div>
-                        <span className="text-[11px] text-stone-500 dark:text-stone-400 font-semibold line-through mr-1.5">
+                        <span className="text-xs text-stone-500 font-bold line-through mr-1.5">
                           ₹{combo.mrp}
                         </span>
-                        <span className="text-xl font-black font-serif text-[#8B4513] dark:text-amber-300">
+                        <span className="text-2xl font-black font-serif text-[#6B340B] dark:text-amber-300">
                           ₹{combo.monthlyPrice}
                         </span>
-                        <span className="text-xs text-stone-700 dark:text-stone-400 font-bold">/mo</span>
+                        <span className="text-xs text-[#3D1E08] dark:text-stone-400 font-black">/mo</span>
                       </div>
-                      <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100 dark:bg-emerald-900/60 dark:text-emerald-300 px-2.5 py-0.5 rounded-full border border-emerald-300/50">
+                      <span className="text-xs font-black text-emerald-900 bg-emerald-100 dark:bg-emerald-900/60 dark:text-emerald-300 px-2.5 py-1 rounded-full border border-emerald-400">
                         Save ₹{combo.savings} ({discountPercent}%)
                       </span>
                     </div>
@@ -1542,31 +1828,35 @@ export const SubscriptionPage: React.FC = () => {
           ) : (
             /* Render Mode: Interactive Custom Combo Builder */
             <div
-              className={`p-6 sm:p-8 rounded-3xl border shadow-lg space-y-6 ${
-                isDark ? "bg-[#1C120B] border-[#362114]" : "bg-white border-[#E8DEC8]"
+              className={`p-6 sm:p-8 rounded-3xl border-3 shadow-lg space-y-6 ${
+                isDark ? "bg-[#1C120B] border-[#362114]" : "bg-white border-[#D6C2A4]"
               }`}
             >
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-4 border-stone-200 dark:border-stone-800">
+              <div
+                className={`flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-4 ${
+                  isDark ? "border-[#2D1B10]" : "border-[#E8DAC2]"
+                }`}
+              >
                 <div>
-                  <h3 className="text-lg font-bold font-serif text-stone-900 dark:text-stone-100">
+                  <h3 className="text-lg sm:text-xl font-black font-serif text-[#110702] dark:text-[#FAF4EA]">
                     Configure Your Monthly Cooking Oil Box
                   </h3>
-                  <p className="text-xs text-stone-700 dark:text-stone-300 mt-0.5 font-medium">
-                    Choose any combination of our 1L bottles. Prices are permanently locked at {discountPercent}% monthly discount!
+                  <p className="text-xs text-[#3D1E08] dark:text-[#D8C8B8] mt-0.5 font-bold">
+                    Choose any combination of our 1L bottles. Prices reflect your active {discountPercent}% discount!
                   </p>
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <span className="text-xs font-bold text-stone-800 dark:text-stone-200">
+                  <span className="text-xs font-black text-[#110702] dark:text-[#FAF4EA]">
                     Total Volume:
                   </span>
-                  <span className="px-3 py-1 rounded-xl bg-[#5E3210] text-amber-100 font-black text-sm">
+                  <span className="px-3.5 py-1.5 rounded-xl bg-[#43230A] text-amber-200 font-black text-sm">
                     {customCounts.groundnut + customCounts.coconut + customCounts.sesame} Litres
                   </span>
                 </div>
               </div>
 
-              {/* Live Multi-Bottle Visual of Custom Box */}
+              {/* Multi-Bottle Visual of Custom Box */}
               <div className="max-w-md mx-auto">
                 <ComboBottleVisual combo={customComboData} isDark={isDark} />
               </div>
@@ -1579,29 +1869,35 @@ export const SubscriptionPage: React.FC = () => {
                   return (
                     <div
                       key={oilKey}
-                      className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 space-y-3"
+                      className={`p-4 rounded-2xl border-2 space-y-3 ${
+                        isDark ? "bg-[#25150C] border-[#3E2313]" : "bg-[#FDF9F2] border-[#D6C2A4]"
+                      }`}
                     >
                       <div>
-                        <h4 className="font-bold text-sm text-stone-900 dark:text-stone-100">
+                        <h4 className="font-black text-base text-[#110702] dark:text-[#FAF4EA]">
                           {rate.name}
                         </h4>
-                        <span className="text-[10px] text-[#A85810] dark:text-amber-400 font-bold block">
+                        <span className="text-xs text-[#6B340B] dark:text-amber-400 font-black block">
                           {rate.kannadaName}
                         </span>
-                        <p className="text-[11px] text-stone-700 dark:text-stone-300 mt-1 line-clamp-2 font-medium">
+                        <p className="text-xs text-[#3D1E08] dark:text-[#D8C8B8] mt-1 line-clamp-2 font-bold">
                           {rate.description}
                         </p>
                       </div>
 
-                      <div className="flex items-center justify-between pt-2 border-t border-amber-500/20">
+                      <div
+                        className={`flex items-center justify-between pt-2 border-t ${
+                          isDark ? "border-[#3E2313]" : "border-[#E8DAC2]"
+                        }`}
+                      >
                         <div>
-                          <span className="text-xs text-stone-500 dark:text-stone-400 font-semibold line-through mr-1">
+                          <span className="text-xs text-stone-500 font-bold line-through mr-1">
                             ₹{rate.mrp}
                           </span>
-                          <span className="text-base font-extrabold text-[#8B4513] dark:text-amber-300 font-serif">
+                          <span className="text-lg font-black text-[#6B340B] dark:text-amber-300 font-serif">
                             ₹{rate.subPrice}
                           </span>
-                          <span className="text-[10px] text-stone-700 dark:text-stone-400 font-bold">/L</span>
+                          <span className="text-xs text-[#3D1E08] dark:text-stone-400 font-bold">/L</span>
                         </div>
 
                         {/* Stepper Controls */}
@@ -1614,11 +1910,15 @@ export const SubscriptionPage: React.FC = () => {
                                 [oilKey]: Math.max(0, p[oilKey] - 1),
                               }))
                             }
-                            className="w-8 h-8 rounded-xl bg-stone-200 dark:bg-stone-800 hover:bg-stone-300 dark:hover:bg-stone-700 flex items-center justify-center font-bold text-stone-900 dark:text-stone-100 cursor-pointer"
+                            className={`w-9 h-9 rounded-xl flex items-center justify-center font-black cursor-pointer border ${
+                              isDark ? "bg-[#362114] text-stone-200 border-[#4E2E1A]" : "bg-[#EDE2CF] text-[#110702] border-[#C9B293]"
+                            }`}
                           >
-                            <Minus className="w-3.5 h-3.5" />
+                            <Minus className="w-4 h-4 stroke-[3]" />
                           </button>
-                          <span className="w-7 text-center font-black text-sm text-stone-900 dark:text-amber-100">{count}</span>
+                          <span className="w-7 text-center font-black text-base text-[#110702] dark:text-amber-100">
+                            {count}
+                          </span>
                           <button
                             type="button"
                             onClick={() =>
@@ -1627,9 +1927,9 @@ export const SubscriptionPage: React.FC = () => {
                                 [oilKey]: p[oilKey] + 1,
                               }))
                             }
-                            className="w-8 h-8 rounded-xl bg-[#5E3210] hover:bg-[#43230A] text-white flex items-center justify-center font-bold cursor-pointer"
+                            className="w-9 h-9 rounded-xl bg-[#43230A] hover:bg-[#2E1807] text-white flex items-center justify-center font-black cursor-pointer"
                           >
-                            <Plus className="w-3.5 h-3.5" />
+                            <Plus className="w-4 h-4 stroke-[3]" />
                           </button>
                         </div>
                       </div>
@@ -1639,24 +1939,28 @@ export const SubscriptionPage: React.FC = () => {
               </div>
 
               {/* Custom Box Summary Footer */}
-              <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+              <div
+                className={`p-4 rounded-2xl border-2 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs ${
+                  isDark ? "bg-[#25150C] border-[#3E2313]" : "bg-[#F7EFE3] border-[#D6C2A4]"
+                }`}
+              >
                 <div>
-                  <span className="font-bold text-stone-900 dark:text-stone-100">
+                  <span className="font-black text-[#110702] dark:text-[#FAF4EA]">
                     Your Custom Monthly Box:{" "}
                   </span>
-                  <span className="text-[#9A4E0B] dark:text-amber-300 font-bold">
+                  <span className="text-[#6B340B] dark:text-amber-300 font-black">
                     {customComboData.items.length > 0
                       ? customComboData.items.join(" + ")
                       : "No bottles selected yet"}
                   </span>
                 </div>
                 <div className="flex items-center gap-3 shrink-0">
-                  <span className="text-stone-500 dark:text-stone-400 font-semibold line-through">₹{customComboData.mrp}</span>
-                  <span className="text-xl font-black font-serif text-[#8B4513] dark:text-amber-300">
+                  <span className="text-stone-500 font-bold line-through">₹{customComboData.mrp}</span>
+                  <span className="text-2xl font-black font-serif text-[#6B340B] dark:text-amber-300">
                     ₹{customComboData.monthlyPrice}
-                    <span className="text-xs font-bold text-stone-700 dark:text-stone-400">/mo</span>
+                    <span className="text-xs font-bold text-[#3D1E08] dark:text-stone-400">/mo</span>
                   </span>
-                  <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100 dark:bg-emerald-900/60 dark:text-emerald-300 px-2.5 py-0.5 rounded-full border border-emerald-300/50">
+                  <span className="text-xs font-black text-emerald-900 bg-emerald-100 dark:bg-emerald-900/60 dark:text-emerald-300 px-2.5 py-0.5 rounded-full border border-emerald-400">
                     Save ₹{customComboData.savings}
                   </span>
                 </div>
@@ -1665,19 +1969,18 @@ export const SubscriptionPage: React.FC = () => {
           )}
         </div>
 
-        {/* Step 2: Interactive Calendar Picker */}
+        {/* STEP 3: INTERACTIVE CALENDAR DELIVERY DATE */}
         <div className="space-y-4">
           <div className="flex items-center gap-2">
-            <span className="w-6 h-6 rounded-full bg-[#E08F35] text-[#1F120A] flex items-center justify-center font-bold text-xs">
-              2
+            <span className="w-7 h-7 rounded-full bg-[#43230A] text-amber-200 flex items-center justify-center font-black text-sm">
+              3
             </span>
-            <h2 className="text-lg sm:text-xl font-bold font-serif text-[#1F120A] dark:text-stone-100">
-              Step 2: Choose Delivery Start Date on Calendar
+            <h2 className="text-xl sm:text-2xl font-black font-serif text-[#110702] dark:text-[#FAF4EA]">
+              Step 3: Select Recurring Delivery Day on Calendar
             </h2>
           </div>
-          <p className="text-xs text-stone-700 dark:text-stone-300 font-medium">
-            Select the date you want your first oil delivery. Your order will automatically repeat on
-            this exact day every month.
+          <p className="text-xs text-[#3D1E08] dark:text-[#D8C8B8] font-bold">
+            Choose the day your oil will be delivered. Your fresh batch will automatically arrive on this exact day every month.
           </p>
 
           <InteractiveCalendarPicker
@@ -1687,208 +1990,218 @@ export const SubscriptionPage: React.FC = () => {
           />
         </div>
 
-        {/* Step 3: Choose Payment Mode (STRICTLY NO COD) */}
-        <div className="space-y-4">
-          <div className="flex items-center gap-2">
-            <span className="w-6 h-6 rounded-full bg-[#E08F35] text-[#1F120A] flex items-center justify-center font-bold text-xs">
-              3
-            </span>
-            <h2 className="text-lg sm:text-xl font-bold font-serif text-[#1F120A] dark:text-stone-100">
-              Step 3: Choose Payment Plan
-            </h2>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Option 1: Monthly Online UPI via WhatsApp (Best) */}
-            <div
-              onClick={() => setPaymentPlan("monthly_online")}
-              className={`p-5 rounded-2xl border-2 transition-all cursor-pointer space-y-2 ${
-                paymentPlan === "monthly_online"
-                  ? isDark
-                    ? "bg-[#25150C] border-[#E08F35] ring-2 ring-[#E08F35]/30"
-                    : "bg-amber-50/90 border-[#E08F35] ring-2 ring-[#E08F35]/30"
-                  : isDark
-                  ? "bg-[#1C120B] border-[#362114]"
-                  : "bg-white border-[#E8DEC8] hover:border-amber-400"
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                <span className="font-bold text-sm text-stone-900 dark:text-stone-100 flex items-center gap-2">
-                  <MessageCircle className="w-4 h-4 text-emerald-600" />
-                  <span>Monthly Online UPI via WhatsApp (Recommended)</span>
-                </span>
-                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/15 text-emerald-800 dark:text-emerald-300">
-                  Zero Lock-in
-                </span>
-              </div>
-              <p className="text-xs text-stone-700 dark:text-stone-300 leading-relaxed font-normal">
-                3 days before your delivery date, you receive an automated WhatsApp PhonePe payment link.
-                Tap once to approve ₹{chosenCombo.monthlyPrice}; we press your batch and dispatch.
-              </p>
-            </div>
-
-            {/* Option 2: 12-Month Annual Prepaid */}
-            <div
-              onClick={() => setPaymentPlan("annual_prepaid")}
-              className={`p-5 rounded-2xl border-2 transition-all cursor-pointer space-y-2 ${
-                paymentPlan === "annual_prepaid"
-                  ? isDark
-                    ? "bg-[#25150C] border-[#E08F35] ring-2 ring-[#E08F35]/30"
-                    : "bg-amber-50/90 border-[#E08F35] ring-2 ring-[#E08F35]/30"
-                  : isDark
-                  ? "bg-[#1C120B] border-[#362114]"
-                  : "bg-white border-[#E8DEC8] hover:border-amber-400"
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                <span className="font-bold text-sm text-stone-900 dark:text-stone-100 flex items-center gap-2">
-                  <CreditCard className="w-4 h-4 text-[#E08F35]" />
-                  <span>12-Month Annual Prepaid Plan</span>
-                </span>
-                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-[#A85810] dark:text-[#E08F35]">
-                  Extra 10% Off + Free Gift
-                </span>
-              </div>
-              <p className="text-xs text-stone-700 dark:text-stone-300 leading-relaxed font-normal">
-                Pay upfront for 1 year (₹{Math.round(chosenCombo.monthlyPrice * 12 * 0.9)}). Enjoy an
-                extra 10% discount plus a complimentary 500ml Coconut Oil bottle shipped in Month 1.
-              </p>
-            </div>
-          </div>
-
-          {/* COD Restriction Notice */}
-          <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center gap-3 text-xs text-amber-950 dark:text-amber-200 font-medium">
-            <ShieldCheck className="w-5 h-5 text-[#9A4E0B] dark:text-[#E08F35] shrink-0" />
-            <span>
-              <strong>Note on Cash on Delivery (COD):</strong> Subscriptions are strictly prepaid or online
-              UPI to guarantee freshly pressed authentic wood-churned oils with zero return/cancellation
-              waste.
-            </span>
-          </div>
-        </div>
-
-        {/* Subscribe Action CTA */}
+        {/* STEP 4: ONLINE PAYMENT & DELHIVERY BOOKING SUMMARY */}
         <div
-          className={`p-6 sm:p-8 rounded-3xl border shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-6 ${
-            isDark ? "bg-[#1C120B] border-[#362114]" : "bg-white border-[#E8DEC8]"
+          className={`p-6 sm:p-8 rounded-3xl border-3 shadow-xl space-y-6 ${
+            isDark ? "bg-[#1C120B] border-[#362114]" : "bg-white border-[#D6C2A4]"
           }`}
         >
-          <div>
-            <span className="text-xs font-bold text-stone-700 dark:text-stone-300">Subscription Summary:</span>
-            <h3 className="text-lg font-bold font-serif text-stone-900 dark:text-stone-100">
-              {chosenCombo.name} • Delivering {getOrdinalSuffix(deliveryDay)} of Every Month
-            </h3>
-            <p className="text-xs text-emerald-800 dark:text-emerald-400 font-bold mt-0.5">
-              ₹{chosenCombo.monthlyPrice}/month • Starts{" "}
-              {selectedDate.toLocaleDateString("en-IN", {
-                day: "numeric",
-                month: "short",
-                year: "numeric",
-              })}{" "}
-              • Free Doorstep Delivery
-            </p>
+          <div
+            className={`flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-4 ${
+              isDark ? "border-[#2D1B10]" : "border-[#E8DAC2]"
+            }`}
+          >
+            <div>
+              <span className="text-xs font-black text-[#6B340B] dark:text-amber-300 block">
+                Subscription Booking Summary:
+              </span>
+              <h3 className="text-xl sm:text-2xl font-black font-serif text-[#110702] dark:text-[#FAF4EA] mt-0.5">
+                {chosenCombo.name}
+              </h3>
+              <p className="text-xs text-[#3D1E08] dark:text-[#D8C8B8] font-bold">
+                Recurring Delivery: Every month on the <strong>{getOrdinalSuffix(deliveryDay)}</strong>
+              </p>
+            </div>
+
+            <div className="text-left sm:text-right">
+              <span className="text-xs text-[#4A260F] dark:text-stone-400 block font-bold">
+                Total Payable Online Today:
+              </span>
+              <span className="text-3xl font-black font-serif text-[#6B340B] dark:text-amber-300">
+                ₹{finalOnlinePayAmount}
+              </span>
+              {hasVipPass && (
+                <span className="block text-xs text-amber-800 dark:text-amber-300 font-black">
+                  Includes ₹{VIP_PASS_FEE} VIP Club Pass
+                </span>
+              )}
+            </div>
           </div>
 
-          <button
-            type="button"
-            disabled={isSubmitting}
-            onClick={handleSubscribe}
-            className="px-8 py-3.5 rounded-2xl bg-[#5E3210] hover:bg-[#43230A] text-white font-bold text-sm shadow-xl transition-all hover:scale-105 cursor-pointer flex items-center justify-center gap-2"
+          {/* Pricing Breakdown */}
+          <div
+            className={`p-4 rounded-2xl border-2 space-y-2 text-xs font-bold ${
+              isDark ? "bg-[#25150C] border-[#3E2313]" : "bg-[#FDF9F2] border-[#D6C2A4]"
+            }`}
           >
-            <Sparkles className="w-4 h-4 text-amber-300" />
-            <span>{isSubmitting ? "Activating..." : "Confirm & Start Subscription"}</span>
-          </button>
+            <div className="flex justify-between items-center text-[#110702] dark:text-[#D8C8B8]">
+              <span>
+                Oil Pack ({duration === "annual" ? "12 Months Prepaid" : "1 Month"} at {discountPercent}% off):
+              </span>
+              <strong className="text-[#110702] dark:text-[#FAF4EA]">₹{oilAmount}</strong>
+            </div>
+
+            {hasVipPass && (
+              <div className="flex justify-between items-center text-[#6B340B] dark:text-amber-300 font-black">
+                <span>VIP Gold Club Pass (One-Time Annual Fee):</span>
+                <strong>+₹{VIP_PASS_FEE}</strong>
+              </div>
+            )}
+
+            <div className="flex justify-between items-center text-emerald-800 dark:text-emerald-400 font-black">
+              <span>Delhivery B2C Logistics Fee (Pan-India Express):</span>
+              <span>FREE (₹0)</span>
+            </div>
+
+            <div
+              className={`pt-2 border-t flex justify-between items-center text-sm font-black ${
+                isDark ? "border-[#3E2313] text-[#FAF4EA]" : "border-[#E8DAC2] text-[#110702]"
+              }`}
+            >
+              <span>Total Online Payment:</span>
+              <span className="text-lg font-black text-[#6B340B] dark:text-amber-300">
+                ₹{finalOnlinePayAmount}
+              </span>
+            </div>
+          </div>
+
+          {/* Automated Reminders Guarantee */}
+          <div
+            className={`p-4 rounded-2xl border-2 flex items-center gap-3 text-xs ${
+              isDark
+                ? "bg-[#1E140C] border-amber-500/20 text-[#FAF4EA]"
+                : "bg-[#FDF9F2] border-[#D6C2A4] text-[#110702]"
+            }`}
+          >
+            <Bell className="w-5 h-5 text-[#C8751B] shrink-0" />
+            <span className="font-bold leading-relaxed">
+              <strong>Automated Renewal Reminder:</strong> You will receive an automated notification 3 days before your delivery on the {getOrdinalSuffix(deliveryDay)} of each month. All subsequent renewals happen automatically online with 1-click approval. Zero manual WhatsApp messages needed!
+            </span>
+          </div>
+
+          {/* Online Checkout Button */}
+          <div className="pt-2 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-2 text-xs font-bold text-[#4A260F] dark:text-stone-400">
+              <Lock className="w-4 h-4 text-emerald-700" />
+              <span>256-bit Bank-grade Online Payment Gateway • Instant Confirmation</span>
+            </div>
+
+            <button
+              type="button"
+              disabled={isSubmitting}
+              onClick={handleSubscribeOnline}
+              className="px-8 py-4 rounded-2xl bg-[#43230A] hover:bg-[#2E1807] text-white font-black text-sm shadow-xl transition-all hover:scale-105 cursor-pointer flex items-center justify-center gap-2"
+            >
+              <CreditCard className="w-5 h-5 text-amber-300" />
+              <span>
+                {isSubmitting
+                  ? "Processing Online Payment..."
+                  : `Pay ₹${finalOnlinePayAmount} Online & Start Subscription`}
+              </span>
+            </button>
+          </div>
         </div>
 
-        {/* Modal: Instant WhatsApp Payment Link Confirmed */}
+        {/* Modal: Instant Online Payment & Subscription Confirmed */}
         {subSuccessModal && (
           <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4">
             <div
-              className={`w-full max-w-lg rounded-3xl p-6 sm:p-8 space-y-5 border shadow-2xl animate-fade-in ${
-                isDark ? "bg-[#1C120B] text-[#FAF4EA] border-[#362114]" : "bg-white text-[#1F120A] border-[#E8DEC8]"
+              className={`w-full max-w-lg rounded-3xl p-6 sm:p-8 space-y-5 border-2 shadow-2xl animate-fade-in ${
+                isDark ? "bg-[#1C120B] text-[#FAF4EA] border-[#362114]" : "bg-white text-[#110702] border-[#D6C2A4]"
               }`}
             >
-              <div className="flex items-center justify-between border-b pb-3 border-stone-200 dark:border-stone-800">
+              <div
+                className={`flex items-center justify-between border-b pb-3 ${
+                  isDark ? "border-[#2D1B10]" : "border-[#E8DAC2]"
+                }`}
+              >
                 <div className="flex items-center gap-2.5">
-                  <div className="w-10 h-10 rounded-2xl bg-emerald-500/20 text-emerald-600 flex items-center justify-center">
-                    <CheckCircle2 className="w-6 h-6" />
+                  <div className="w-10 h-10 rounded-2xl bg-emerald-500/20 text-emerald-700 flex items-center justify-center">
+                    <CheckCircle2 className="w-6 h-6 stroke-[2.5]" />
                   </div>
                   <div>
-                    <h3 className="font-bold font-serif text-lg text-stone-900 dark:text-stone-100">
-                      Subscription Confirmed!
+                    <h3 className="font-black font-serif text-lg text-[#110702] dark:text-[#FAF4EA]">
+                      Subscription Booking Confirmed!
                     </h3>
-                    <p className="text-xs text-emerald-700 dark:text-emerald-400 font-bold">
-                      Saved to Firestore & WhatsApp Link Ready
+                    <p className="text-xs text-emerald-800 dark:text-emerald-400 font-black">
+                      Order #{subSuccessModal.orderRef} • Online Payment Verified
                     </p>
                   </div>
                 </div>
                 <button
                   type="button"
                   onClick={() => setSubSuccessModal(null)}
-                  className="p-2 rounded-xl text-stone-400 hover:text-stone-600 dark:hover:text-stone-200 cursor-pointer"
+                  className="p-2 rounded-xl text-stone-600 hover:text-black dark:text-stone-300 dark:hover:text-white cursor-pointer"
                 >
-                  <X className="w-5 h-5" />
+                  <X className="w-5 h-5 stroke-[2.5]" />
                 </button>
               </div>
 
               <div className="space-y-3 text-xs">
-                <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/20 space-y-1">
+                <div
+                  className={`p-4 rounded-2xl border-2 space-y-2 ${
+                    isDark ? "bg-[#25150C] border-[#3E2313]" : "bg-[#FDF9F2] border-[#D6C2A4]"
+                  }`}
+                >
                   <div className="flex justify-between items-center">
-                    <span className="text-stone-700 dark:text-stone-300 font-bold">Monthly Plan:</span>
-                    <strong className="text-stone-900 dark:text-stone-100">{subSuccessModal.comboName}</strong>
+                    <span className="font-bold text-[#4A260F] dark:text-[#D8C8B8]">Plan Type:</span>
+                    <strong className="text-[#110702] dark:text-[#FAF4EA] font-black">{subSuccessModal.duration}</strong>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-stone-700 dark:text-stone-300 font-bold">Recurring Date:</span>
-                    <strong className="text-[#8B4513] dark:text-amber-300 font-black">
+                    <span className="font-bold text-[#4A260F] dark:text-[#D8C8B8]">Selected Combo:</span>
+                    <strong className="text-[#110702] dark:text-[#FAF4EA] font-black">{subSuccessModal.comboName}</strong>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="font-bold text-[#4A260F] dark:text-[#D8C8B8]">Recurring Date:</span>
+                    <strong className="text-[#6B340B] dark:text-amber-300 font-black">
                       {subSuccessModal.dayStr} of Every Month
                     </strong>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-stone-700 dark:text-stone-300 font-bold">Monthly Amount:</span>
-                    <strong className="text-base font-black text-emerald-700 dark:text-emerald-400">
-                      ₹{subSuccessModal.amount}/month
+                    <span className="font-bold text-[#4A260F] dark:text-[#D8C8B8]">Delhivery Waybill AWB:</span>
+                    <strong className="text-emerald-800 dark:text-emerald-400 font-black">
+                      {subSuccessModal.waybill}
+                    </strong>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="font-bold text-[#4A260F] dark:text-[#D8C8B8]">Amount Paid Online:</span>
+                    <strong className="text-base font-black text-emerald-800 dark:text-emerald-400">
+                      ₹{subSuccessModal.amount}
                     </strong>
                   </div>
                 </div>
 
-                <div className="p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-start gap-2.5 text-stone-800 dark:text-stone-200">
-                  <MessageCircle className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
-                  <div className="space-y-1">
-                    <p className="font-bold text-xs text-stone-900 dark:text-stone-100">
-                      WhatsApp Payment Link Dispatched
-                    </p>
-                    <p className="text-[11px] leading-relaxed">
-                      We have launched WhatsApp with your PhonePe payment link. If WhatsApp did not open automatically, tap the green button below!
-                    </p>
-                  </div>
+                <div
+                  className={`p-3.5 rounded-2xl border-2 flex items-start gap-2.5 ${
+                    isDark ? "bg-[#1E140C] border-amber-500/20" : "bg-[#F7EFE3] border-[#C9B293]"
+                  }`}
+                >
+                  <Truck className="w-4 h-4 text-[#C8751B] shrink-0 mt-0.5" />
+                  <p className="text-xs text-[#110702] dark:text-[#D8C8B8] font-bold leading-relaxed">
+                    Delhivery pickup scheduled! Your fresh batch of Marachekku oil will be pressed at Peenya 2nd Stage, Bangalore, and delivered directly to your doorstep with live tracking available in your account.
+                  </p>
                 </div>
               </div>
 
-              <div className="pt-2 flex flex-col sm:flex-row items-center gap-2.5">
+              <div className="flex flex-col sm:flex-row gap-2 pt-1">
                 <button
                   type="button"
-                  onClick={() => window.open(subSuccessModal.waUrl, "_blank")}
-                  className="w-full py-3 rounded-xl bg-[#25D366] hover:bg-[#1EBE5D] text-white font-bold text-xs flex items-center justify-center gap-2 shadow-md cursor-pointer"
+                  onClick={() => {
+                    setSubSuccessModal(null);
+                    navigate("/orders");
+                  }}
+                  className="w-full py-3 rounded-xl bg-[#43230A] hover:bg-[#2E1807] text-white font-black text-xs shadow-md cursor-pointer text-center"
                 >
-                  <MessageCircle className="w-4 h-4" />
-                  <span>Open WhatsApp Payment Link</span>
+                  Track in My Orders
                 </button>
-                <a
-                  href={subSuccessModal.upiLink}
-                  className="w-full py-3 rounded-xl bg-[#5E3210] hover:bg-[#43230A] text-white font-bold text-xs flex items-center justify-center gap-2 shadow-md cursor-pointer text-center"
+                <button
+                  type="button"
+                  onClick={() => setSubSuccessModal(null)}
+                  className="w-full py-3 rounded-xl border-2 border-[#43230A] text-[#43230A] dark:text-white font-black text-xs cursor-pointer text-center hover:bg-[#FAF7F2]"
                 >
-                  <CreditCard className="w-4 h-4 text-amber-300" />
-                  <span>Pay Now via PhonePe</span>
-                </a>
+                  Subscription Dashboard
+                </button>
               </div>
-
-              <button
-                type="button"
-                onClick={() => setSubSuccessModal(null)}
-                className="w-full text-center text-[11px] text-stone-500 hover:text-stone-700 dark:hover:text-stone-300 font-semibold cursor-pointer pt-1"
-              >
-                Done • View My Subscription Dashboard
-              </button>
             </div>
           </div>
         )}

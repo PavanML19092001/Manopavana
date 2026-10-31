@@ -148,8 +148,8 @@ export const CartPage: React.FC = () => {
               <Truck className="w-4 h-4 text-[#E08F35]" />
               <span className={`font-bold ${isDark ? "text-[#FAF4EA]" : "text-[#23150C]"}`}>
                 {freeShippingProgress >= 100
-                  ? "🎉 Congratulations! You have unlocked FREE Doorstep Delivery across Bangalore!"
-                  : `Add ₹${freeShippingShortfall} more to unlock FREE Doorstep Delivery (Threshold: ₹${cmsConfig.freeShippingThreshold})`}
+                  ? "🎉 Congratulations! You have unlocked FREE Doorstep Delivery across India!"
+                  : `Add ₹${freeShippingShortfall} more (or add any 2+ bottles) to unlock FREE Doorstep Delivery across India!`}
               </span>
             </div>
             <span
@@ -313,53 +313,49 @@ export const CartPage: React.FC = () => {
               </div>
             ))}
 
-            {/* Bottle QR Loyalty Discount Card */}
+            {/* 10% Discount on Orders Above ₹1,000 Card */}
             <div
               className={`p-4 rounded-2xl border flex items-center justify-between gap-4 ${
-                isDark
+                subtotal >= 1000
+                  ? "bg-emerald-500/10 border-emerald-500/30"
+                  : isDark
                   ? "bg-[#1C120B] border-[#362114]"
-                  : "bg-amber-50 border border-amber-200/80"
+                  : "bg-amber-50/90 border border-amber-200"
               }`}
             >
               <div className="flex items-center gap-3">
-                <QrCode className="w-5 h-5 text-[#E08F35] shrink-0" />
+                <Sparkles className="w-5 h-5 text-[#E08F35] shrink-0" />
                 <div>
                   <p
-                    className={`text-xs font-bold ${
-                      isDark ? "text-amber-200" : "text-[#5A381E]"
+                    className={`text-xs font-black ${
+                      subtotal >= 1000
+                        ? "text-emerald-800 dark:text-emerald-400"
+                        : isDark
+                        ? "text-amber-200"
+                        : "text-[#5A381E]"
                     }`}
                   >
-                    {loyalty.isActive
-                      ? "10% Bottle QR Loyalty Program Active"
-                      : "Have an empty MANOPAVANA bottle at home?"}
+                    {subtotal >= 1000
+                      ? "🎉 10% Discount Unlocked!"
+                      : "Get 10% OFF on Orders Above ₹1,000"}
                   </p>
                   <p
-                    className={`text-[11px] ${
+                    className={`text-[11px] font-medium ${
                       isDark ? "text-[#D6C4B0]" : "text-[#5C402D]"
                     }`}
                   >
-                    {loyalty.isActive
-                      ? subtotal >= 1000
-                        ? `Enjoy 10% off repeat orders (${loyaltyRemainingText})`
-                        : `Add ₹${1000 - subtotal} more to activate 10% off (Applies to orders above ₹1,000)`
-                      : "Verify your bottle tagline to unlock 10% repeat order discount on orders above ₹1,000!"}
+                    {subtotal >= 1000
+                      ? `Flat 10% discount (-₹${discount}) automatically deducted from your total.`
+                      : `Add ₹${1000 - subtotal} more of wood-pressed oils to unlock 10% instant savings!`}
                   </p>
                 </div>
               </div>
-              {!loyalty.isActive ? (
-                <button
-                  type="button"
-                  onClick={() => openLoyaltyQuiz()}
-                  className="px-3.5 py-1.5 rounded-xl bg-[#5E3210] text-white font-bold text-xs hover:bg-[#43230A] transition-colors shrink-0 cursor-pointer"
-                >
-                  Scan & Save
-                </button>
-              ) : subtotal >= 1000 ? (
-                <span className="text-xs font-bold text-emerald-800 bg-emerald-100 px-2.5 py-1 rounded-lg">
-                  Applied (10%)
+              {subtotal >= 1000 ? (
+                <span className="text-xs font-black text-emerald-800 bg-emerald-100 dark:bg-emerald-950/60 dark:text-emerald-300 px-3 py-1 rounded-xl shrink-0 border border-emerald-400">
+                  10% APPLIED
                 </span>
               ) : (
-                <span className="text-[10px] font-bold text-amber-800 bg-amber-100 px-2 py-1 rounded-lg">
+                <span className="text-[11px] font-black text-amber-900 bg-amber-100 dark:bg-amber-950/60 dark:text-amber-300 px-3 py-1 rounded-xl shrink-0 border border-amber-400">
                   Min ₹1,000
                 </span>
               )}
@@ -399,20 +395,20 @@ export const CartPage: React.FC = () => {
                   </span>
                 </div>
 
-                {loyalty.isActive && subtotal >= 1000 && (
-                  <div className="flex items-center justify-between text-emerald-600 font-medium">
+                {subtotal >= 1000 && (
+                  <div className="flex items-center justify-between text-emerald-600 font-bold">
                     <span className="flex items-center gap-1">
                       <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-                      <span>Bottle Loyalty Discount (10%)</span>
+                      <span>10% Order Discount (Orders &gt; ₹1,000)</span>
                     </span>
                     <span className="font-bold">-₹{discount}</span>
                   </div>
                 )}
 
-                {loyalty.isActive && subtotal < 1000 && (
-                  <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-[11px] text-amber-800 dark:text-amber-200 flex items-center justify-between">
-                    <span>Add ₹{1000 - subtotal} more to unlock 10% discount</span>
-                    <span className="font-bold">Orders &gt; ₹1000</span>
+                {subtotal < 1000 && (
+                  <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-[11px] text-amber-900 dark:text-amber-200 flex items-center justify-between font-bold">
+                    <span>Add ₹{1000 - subtotal} more to get 10% OFF</span>
+                    <span className="font-black text-amber-700">Orders &gt; ₹1000</span>
                   </div>
                 )}
 
@@ -422,7 +418,7 @@ export const CartPage: React.FC = () => {
                   }`}
                 >
                   <div className="flex items-center gap-1">
-                    <span>Bangalore Delivery Fee</span>
+                    <span>Delivery Fee</span>
                     {shippingFee === 0 && (
                       <span className="text-[10px] text-emerald-700 font-bold bg-emerald-50 px-1.5 py-0.5 rounded">
                         FREE

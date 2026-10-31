@@ -363,7 +363,7 @@ export default function App() {
             <Route path="/orders" element={<OrdersPage />} />
             <Route path="/orders/:orderRef" element={<OrdersPage />} />
             <Route path="/profile" element={<ProfilePage />} />
-            <Route path="/subscriptions" element={<SubscriptionPage />} />
+            <Route path="/subscriptions" element={<Navigate to="/" replace />} />
             <Route path="/account" element={<Navigate to="/orders" replace />} />
             <Route
               path="/admin"

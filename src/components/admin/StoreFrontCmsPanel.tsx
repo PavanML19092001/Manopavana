@@ -96,8 +96,8 @@ export const StorefrontCMSPanel: React.FC<{ isDark: boolean }> = ({ isDark }) =>
   const [highlightsInput, setHighlightsInput] = useState(
     (cmsConfig?.heroHighlights || BUSINESS_CONFIG.HERO_HIGHLIGHTS).join(", ")
   );
-  const [threshold, setThreshold] = useState(cmsConfig?.freeShippingThreshold ?? 500);
-  const [stdFee, setStdFee] = useState(cmsConfig?.standardShippingFee ?? 49);
+  const [threshold, setThreshold] = useState(cmsConfig?.freeShippingThreshold ?? 800);
+  const [stdFee, setStdFee] = useState(cmsConfig?.standardShippingFee ?? 70);
 
   // Festive / Occasion Top Banner State
   const [festiveEnabled, setFestiveEnabled] = useState(
@@ -114,13 +114,13 @@ export const StorefrontCMSPanel: React.FC<{ isDark: boolean }> = ({ isDark }) =>
       "Authentic 100% Marachekku Wood-Pressed Cooking Oils • Direct from Karnataka Farmers to Your Home"
   );
   const [festiveBtnTextKannada, setFestiveBtnTextKannada] = useState(
-    cmsConfig?.festiveBanner?.btnTextKannada || "ಮಾಸಿಕ ಚಂದಾದಾರಿಕೆ"
+    cmsConfig?.festiveBanner?.btnTextKannada || "ಈಗಲೇ ಖರೀದಿಸಿ"
   );
   const [festiveBtnTextEnglish, setFestiveBtnTextEnglish] = useState(
-    cmsConfig?.festiveBanner?.btnTextEnglish || "Monthly Subscription (Save 15%)"
+    cmsConfig?.festiveBanner?.btnTextEnglish || "Flat 10% OFF Above ₹1,000"
   );
   const [festiveBtnLink, setFestiveBtnLink] = useState(
-    cmsConfig?.festiveBanner?.btnLink || "/subscriptions"
+    cmsConfig?.festiveBanner?.btnLink || "/#catalog"
   );
   const [subDiscountPercent, setSubDiscountPercent] = useState<number>(
     cmsConfig?.subscriptionDiscountPercent ?? 10
@@ -146,7 +146,7 @@ export const StorefrontCMSPanel: React.FC<{ isDark: boolean }> = ({ isDark }) =>
     cmsConfig?.prices || {
       groundnut1L: 399,
       groundnut500ml: 189,
-      coconut1L: 499,
+      coconut1L: 489,
       coconut500ml: 269,
       sesame1L: 499,
       sesame500ml: 269,
@@ -159,7 +159,7 @@ export const StorefrontCMSPanel: React.FC<{ isDark: boolean }> = ({ isDark }) =>
     cmsConfig?.mrp || {
       groundnut1L: 399,
       groundnut500ml: 189,
-      coconut1L: 499,
+      coconut1L: 489,
       coconut500ml: 269,
       sesame1L: 499,
       sesame500ml: 269,
@@ -806,8 +806,9 @@ export const StorefrontCMSPanel: React.FC<{ isDark: boolean }> = ({ isDark }) =>
                       setFestiveTitle("ಕನ್ನಡ ರಾಜ್ಯೋತ್ಸವದ ಶುಭಾಶಯಗಳು!");
                       setFestiveBadge("ನಮ್ಮ ನಾಡಿನ ಅಪ್ಪಟ ಗಾಣ");
                       setFestiveTagline("Authentic 100% Marachekku Wood-Pressed Cooking Oils • Direct from Karnataka Farmers to Your Home");
-                      setFestiveBtnTextKannada("ಮಾಸಿಕ ಚಂದಾದಾರಿಕೆ");
-                      setFestiveBtnTextEnglish("Monthly Subscription (Save 15%)");
+                      setFestiveBtnTextKannada("ಈಗಲೇ ಖರೀದಿಸಿ");
+                      setFestiveBtnTextEnglish("Flat 10% OFF Above ₹1,000");
+                      setFestiveBtnLink("/#catalog");
                     }}
                     className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-amber-500/20 text-[#5E3210] dark:text-amber-200 border border-amber-500/30 hover:bg-amber-500/30 transition-colors cursor-pointer"
                   >
@@ -819,8 +820,9 @@ export const StorefrontCMSPanel: React.FC<{ isDark: boolean }> = ({ isDark }) =>
                       setFestiveTitle("ದೀಪಾವಳಿ ಹಬ್ಬದ ಹಾರ್ದಿಕ ಶುಭಾಶಯಗಳು!");
                       setFestiveBadge("ಶುದ್ಧ ಎಣ್ಣೆಯೊಂದಿಗೆ ದೀಪದ ಬೆಳಗು");
                       setFestiveTagline("Celebrate Deepavali with pure unrefined cold-pressed oils. Free doorstep delivery across India!");
-                      setFestiveBtnTextKannada("ಮಾಸಿಕ ಚಂದಾದಾರಿಕೆ");
-                      setFestiveBtnTextEnglish("Monthly Subscription (Save 15%)");
+                      setFestiveBtnTextKannada("ಈಗಲೇ ಖರೀದಿಸಿ");
+                      setFestiveBtnTextEnglish("Flat 10% OFF Above ₹1,000");
+                      setFestiveBtnLink("/#catalog");
                     }}
                     className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-amber-500/20 text-[#5E3210] dark:text-amber-200 border border-amber-500/30 hover:bg-amber-500/30 transition-colors cursor-pointer"
                   >
@@ -832,8 +834,9 @@ export const StorefrontCMSPanel: React.FC<{ isDark: boolean }> = ({ isDark }) =>
                       setFestiveTitle("ಮಕರ ಸಂಕ್ರಾಂತಿ ಹಬ್ಬದ ಶುಭಾಶಯಗಳು!");
                       setFestiveBadge("ಎಳ್ಳು-ಬೆಲ್ಲದ ಸಿಹಿ, ಮರದ ಗಾಣದ ಎಣ್ಣೆ");
                       setFestiveTagline("Pure wood-pressed Sesame, Groundnut & Coconut oils for festive treats. Direct from Karnataka artisans.");
-                      setFestiveBtnTextKannada("ಮಾಸಿಕ ಚಂದಾದಾರಿಕೆ");
-                      setFestiveBtnTextEnglish("Monthly Subscription (Save 15%)");
+                      setFestiveBtnTextKannada("ಈಗಲೇ ಖರೀದಿಸಿ");
+                      setFestiveBtnTextEnglish("Flat 10% OFF Above ₹1,000");
+                      setFestiveBtnLink("/#catalog");
                     }}
                     className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-amber-500/20 text-[#5E3210] dark:text-amber-200 border border-amber-500/30 hover:bg-amber-500/30 transition-colors cursor-pointer"
                   >
@@ -845,8 +848,9 @@ export const StorefrontCMSPanel: React.FC<{ isDark: boolean }> = ({ isDark }) =>
                       setFestiveTitle("ಯುಗಾದಿ ಹಬ್ಬದ ಹಾರ್ದಿಕ ಶುಭಾಶಯಗಳು!");
                       setFestiveBadge("ಹೊಸ ವರ್ಷದ ಆರೋಗ್ಯಕರ ಆರಂಭ");
                       setFestiveTagline("Start the new year with pure, cold-pressed health for your entire family.");
-                      setFestiveBtnTextKannada("ಮಾಸಿಕ ಚಂದಾದಾರಿಕೆ");
-                      setFestiveBtnTextEnglish("Monthly Subscription (Save 15%)");
+                      setFestiveBtnTextKannada("ಈಗಲೇ ಖರೀದಿಸಿ");
+                      setFestiveBtnTextEnglish("Flat 10% OFF Above ₹1,000");
+                      setFestiveBtnLink("/#catalog");
                     }}
                     className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-amber-500/20 text-[#5E3210] dark:text-amber-200 border border-amber-500/30 hover:bg-amber-500/30 transition-colors cursor-pointer"
                   >

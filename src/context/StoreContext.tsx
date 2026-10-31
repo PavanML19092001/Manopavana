@@ -170,15 +170,15 @@ const DEFAULT_ADDRESS: Address = {
 };
 
 const DEFAULT_CMS_CONFIG: StoreCMSConfig = {
-  announcementTicker: "FREE Doorstep Delivery across India on orders above ₹500 | 100% Marachekku Cold-Pressed",
+  announcementTicker: "FREE Doorstep Delivery across India on orders above ₹800 (or 2+ bottles) | 100% Marachekku Cold-Pressed",
   festiveBanner: {
     enabled: true,
     title: "ಕನ್ನಡ ರಾಜ್ಯೋತ್ಸವದ ಶುಭಾಶಯಗಳು!",
     badge: "ನಮ್ಮ ನಾಡಿನ ಅಪ್ಪಟ ಗಾಣ",
     tagline: "Authentic 100% Marachekku Wood-Pressed Cooking Oils • Direct from Karnataka Farmers to Your Home",
-    btnTextKannada: "ಮಾಸಿಕ ಚಂದಾದಾರಿಕೆ",
-    btnTextEnglish: "Monthly Subscription (Save 15%)",
-    btnLink: "/subscriptions",
+    btnTextKannada: "ಈಗಲೇ ಖರೀದಿಸಿ",
+    btnTextEnglish: "Flat 10% OFF Above ₹1,000",
+    btnLink: "/#catalog",
   },
   brandName: BUSINESS_CONFIG.BRAND_NAME,
   heroHeadline: BUSINESS_CONFIG.HERO_HEADLINE,
@@ -215,7 +215,7 @@ const DEFAULT_CMS_CONFIG: StoreCMSConfig = {
   prices: {
     groundnut1L: 399,
     groundnut500ml: 189,
-    coconut1L: 499,
+    coconut1L: 489,
     coconut500ml: 269,
     sesame1L: 499,
     sesame500ml: 269,
@@ -225,7 +225,7 @@ const DEFAULT_CMS_CONFIG: StoreCMSConfig = {
   mrp: {
     groundnut1L: 399,
     groundnut500ml: 189,
-    coconut1L: 499,
+    coconut1L: 489,
     coconut500ml: 269,
     sesame1L: 499,
     sesame500ml: 269,
@@ -2055,18 +2055,26 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, [cart]);
 
   const discount = useMemo(() => {
-    if (!loyalty.isActive) return 0;
-    // 10% Bottle QR / Reorder discount strictly applies to orders of ₹1,000 or above
-    if (subtotal < 1000) return 0;
-    return Math.round((subtotal * loyalty.discountPercent) / 100);
-  }, [subtotal, loyalty]);
+    // 10% discount automatically applies to all orders of ₹1,000 or above
+    if (subtotal >= 1000) {
+      return Math.round((subtotal * 10) / 100);
+    }
+    return 0;
+  }, [subtotal]);
 
   const discountedSubtotal = subtotal - discount;
 
+  // Free delivery rule: Orders >= ₹800 OR 2+ bottles unlock Free Doorstep Delivery; single bottles under ₹800 incur ₹70 standard fee
+  const isFreeShippingQualified = useMemo(() => {
+    const threshold = cmsConfig.freeShippingThreshold || BUSINESS_CONFIG.FREE_SHIPPING_THRESHOLD;
+    return discountedSubtotal >= threshold || cartCount >= 2;
+  }, [discountedSubtotal, cartCount, cmsConfig.freeShippingThreshold]);
+
   const shippingFee = useMemo(() => {
     if (cart.length === 0) return 0;
-    return discountedSubtotal >= cmsConfig.freeShippingThreshold ? 0 : cmsConfig.standardShippingFee;
-  }, [cart.length, discountedSubtotal, cmsConfig]);
+    const fee = cmsConfig.standardShippingFee || BUSINESS_CONFIG.STANDARD_SHIPPING_FEE;
+    return isFreeShippingQualified ? 0 : fee;
+  }, [cart.length, isFreeShippingQualified, cmsConfig.standardShippingFee]);
 
   const total = useMemo(() => {
     if (cart.length === 0) return 0;
@@ -2074,13 +2082,16 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, [cart.length, discountedSubtotal, shippingFee]);
 
   const freeShippingProgress = useMemo(() => {
-    if (discountedSubtotal >= cmsConfig.freeShippingThreshold) return 100;
-    return Math.min(99, Math.floor((discountedSubtotal / cmsConfig.freeShippingThreshold) * 100));
-  }, [discountedSubtotal, cmsConfig.freeShippingThreshold]);
+    if (isFreeShippingQualified) return 100;
+    const threshold = cmsConfig.freeShippingThreshold || BUSINESS_CONFIG.FREE_SHIPPING_THRESHOLD;
+    return Math.min(99, Math.floor((discountedSubtotal / threshold) * 100));
+  }, [isFreeShippingQualified, discountedSubtotal, cmsConfig.freeShippingThreshold]);
 
   const freeShippingShortfall = useMemo(() => {
-    return Math.max(0, cmsConfig.freeShippingThreshold - discountedSubtotal);
-  }, [discountedSubtotal, cmsConfig.freeShippingThreshold]);
+    if (isFreeShippingQualified) return 0;
+    const threshold = cmsConfig.freeShippingThreshold || BUSINESS_CONFIG.FREE_SHIPPING_THRESHOLD;
+    return Math.max(0, threshold - discountedSubtotal);
+  }, [isFreeShippingQualified, discountedSubtotal, cmsConfig.freeShippingThreshold]);
 
   return (
     <StoreContext.Provider

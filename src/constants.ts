@@ -24,14 +24,14 @@ export const BUSINESS_CONFIG = {
   GSTIN: "29EYSPR5297E1ZE",
   ADMIN_PIN: "1917",
   DEFAULT_COORDINATES: [12.9716, 77.5946] as [number, number],
-  FREE_SHIPPING_THRESHOLD: 500,
-  STANDARD_SHIPPING_FEE: 49,
+  FREE_SHIPPING_THRESHOLD: 800,
+  STANDARD_SHIPPING_FEE: 70,
   LOYALTY_DISCOUNT_PERCENT: 10,
   LOYALTY_VALIDITY_MS: 7 * 24 * 60 * 60 * 1000, // 7 Days = 604,800,000 ms
   FACILITY_STATEMENT: "Sourced directly from traditional wood-press artisans, settled naturally, and packed hygienically at our Bangalore packaging and distribution facility.",
   HERO_HEADLINE: "Unrefined by Nature, Bottled Fresh",
   HERO_SUBHEAD: "Sourced directly from traditional wood-press artisans, settled naturally, and packed hygienically at our Bangalore facility. Free from chemical solvents, and sealed fresh into food-grade bottles to preserve natural aroma and wholesome nutrients.",
-  HERO_HIGHLIGHTS: ["Marachekku Pressing", "Natural Sedimentation", "Direct Bangalore Delivery"],
+  HERO_HIGHLIGHTS: ["Marachekku Pressing", "Natural Sedimentation", "All-India Delivery"],
 };
 
 export const PHONEPE_CONFIG = {
@@ -414,11 +414,11 @@ export const PRODUCTS: Product[] = [
     searchKeywords: "coconut copra nariyal coastal curry hair oil small 500ml",
     shortDescription: "Sourced directly from traditional wood-press artisans, settled naturally, and packed hygienically at our Bangalore packaging and distribution facility. Extracted from sulfur-free copra with wholesome MCTs.",
     prices: {
-      "1L": 499,
+      "1L": 489,
       "500ml": 269
     },
     mrp: {
-      "1L": 499,
+      "1L": 489,
       "500ml": 269
     },
     inStock: {
@@ -603,7 +603,7 @@ export const FAQS: FAQItem[] = [
   {
     category: "shipping",
     question: "Where do you deliver and what are the shipping charges?",
-    answer: "We deliver across all of India! For Bengaluru (560xxx), orders are fulfilled directly via our Peenya Facility Carrier within 24 to 48 hours. For all other locations across Karnataka and India, orders are fulfilled via our integrated Delhivery Express courier with live website tracking! Orders above ₹500 unlock Free Doorstep Delivery."
+    answer: "We deliver across all of India! For Bengaluru (560xxx), orders are fulfilled directly via our Peenya Facility Carrier within 24 to 48 hours. For all other locations across Karnataka and India, orders are fulfilled via our integrated Delhivery Express courier with live website tracking! Orders of ₹800 and above (or any 2+ bottles) unlock Free Doorstep Delivery across India. Single-bottle orders below ₹800 carry a standard ₹70 delivery fee."
   }
 ];
 
@@ -629,7 +629,7 @@ Packaging Facility Address: 118, Raghavendra Layout, Thigalarapalya, Peenya 2nd 
   },
   shipping: {
     title: "Shipping & Delivery Policy",
-    content: `1. Shipping Charges: Orders of ₹500 and above qualify for FREE Doorstep Delivery. Orders below ₹500 incur a flat ₹49 standard delivery fee.
+    content: `1. Shipping Charges: Orders of ₹800 and above (or any 2+ bottles) qualify for FREE Doorstep Delivery across India. Orders below ₹800 incur a standard flat ₹70 delivery fee.
 
 2. Bengaluru Delivery: Orders within Bengaluru (560xxx) are dispatched directly from our Peenya packaging facility and delivered within 24 to 48 business hours.
 

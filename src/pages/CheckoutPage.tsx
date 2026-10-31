@@ -70,16 +70,20 @@ export const CheckoutPage: React.FC = () => {
 
   const checkoutSubtotal = checkoutItems.reduce((acc, curr) => acc + curr.price * curr.quantity, 0);
   const checkoutDiscount =
-    loyalty.isActive && checkoutSubtotal >= 1000
-      ? Math.round((checkoutSubtotal * loyalty.discountPercent) / 100)
+    checkoutSubtotal >= 1000
+      ? Math.round((checkoutSubtotal * 10) / 100)
       : 0;
   const checkoutDiscountedSubtotal = checkoutSubtotal - checkoutDiscount;
+  const checkoutBottleCount = checkoutItems.reduce((acc, curr) => acc + curr.quantity, 0);
+  const freeThreshold = cmsConfig?.freeShippingThreshold || BUSINESS_CONFIG.FREE_SHIPPING_THRESHOLD;
+  const standardFee = cmsConfig?.standardShippingFee || BUSINESS_CONFIG.STANDARD_SHIPPING_FEE;
+  const isCheckoutFreeShipping = checkoutDiscountedSubtotal >= freeThreshold || checkoutBottleCount >= 2;
   const checkoutShippingFee =
     checkoutItems.length === 0
       ? 0
-      : checkoutDiscountedSubtotal >= (cmsConfig?.freeShippingThreshold || BUSINESS_CONFIG.FREE_SHIPPING_THRESHOLD)
+      : isCheckoutFreeShipping
         ? 0
-        : (cmsConfig?.standardShippingFee || BUSINESS_CONFIG.STANDARD_SHIPPING_FEE);
+        : standardFee;
   const checkoutTotal =
     checkoutItems.length === 0 ? 0 : checkoutDiscountedSubtotal + checkoutShippingFee;
 
@@ -1566,8 +1570,8 @@ export const CheckoutPage: React.FC = () => {
                   <span>₹{checkoutSubtotal}</span>
                 </div>
                 {checkoutDiscount > 0 && (
-                  <div className="flex justify-between text-emerald-600 font-medium">
-                    <span>Loyalty Discount:</span>
+                  <div className="flex justify-between text-emerald-600 font-bold">
+                    <span>10% Discount (Orders &gt; ₹1,000):</span>
                     <span>-₹{checkoutDiscount}</span>
                   </div>
                 )}

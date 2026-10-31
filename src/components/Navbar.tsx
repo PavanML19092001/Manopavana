@@ -653,16 +653,6 @@ export const Navbar: React.FC = () => {
                   </Link>
 
                   <Link
-                    to="/subscriptions"
-                    onClick={() => setIsUserDropdownOpen(false)}
-                    className={`flex items-center gap-2.5 px-4 py-2.5 ${isLight ? "text-[#24140A] hover:bg-[#F3EDE2] hover:text-[#C8751B]" : "text-[#FAF4EA] hover:bg-[#25150C] hover:text-[#E08F35]"
-                      } transition-colors font-medium`}
-                  >
-                    <Calendar className={`w-4 h-4 text-emerald-500`} />
-                    <span>📅 Monthly Subscriptions</span>
-                  </Link>
-
-                  <Link
                     to="/profile"
                     onClick={() => setIsUserDropdownOpen(false)}
                     className={`flex items-center gap-2.5 px-4 py-2.5 ${isLight ? "text-[#24140A] hover:bg-[#F3EDE2] hover:text-[#C8751B]" : "text-[#FAF4EA] hover:bg-[#25150C] hover:text-[#E08F35]"

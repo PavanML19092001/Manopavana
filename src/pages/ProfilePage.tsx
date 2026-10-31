@@ -314,16 +314,7 @@ export const ProfilePage = () => {
                   <ChevronRight className="w-4 h-4 opacity-70" />
                 </Link>
 
-                <Link
-                  to="/subscriptions"
-                  className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-bold text-stone-700 dark:text-stone-300 hover:bg-stone-50 dark:hover:bg-stone-800 transition-all"
-                >
-                  <div className="flex items-center gap-2.5">
-                    <Calendar className="w-4 h-4 text-emerald-500" />
-                    <span>Monthly Oil Subscriptions</span>
-                  </div>
-                  <ChevronRight className="w-4 h-4 opacity-70" />
-                </Link>
+
 
                 <button
                   type="button"

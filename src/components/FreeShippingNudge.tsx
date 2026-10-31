@@ -60,7 +60,7 @@ export const FreeShippingNudge: React.FC = () => {
                 </span>
               ) : (
                 <span>
-                  Add <strong className="text-[#E08F35]">₹{freeShippingShortfall}</strong> more for{" "}
+                  Add <strong className="text-[#E08F35]">₹{freeShippingShortfall}</strong> more (or 2nd bottle) for{" "}
                   <strong>FREE Delivery</strong>
                 </span>
               )}

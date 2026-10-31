@@ -347,7 +347,7 @@ export const LocationModal: React.FC = () => {
     setLocationModalOpen(false);
     showToast(
       isBLR
-        ? "Bengaluru delivery location updated!"
+        ? "Delivery location updated!"
         : "Pan-India delivery location updated via Delhivery Express!"
     );
   };

@@ -495,7 +495,7 @@ export const ProductPage = () => {
               </span>
             </div>
             <p className={`text-xs ${isDark ? "text-[#A8907E]" : "text-[#7A5E48]"}`}>
-              Direct artisan price. Free delivery across Bengaluru unlocked on orders above ₹500.
+              Direct artisan price. Free delivery across India unlocked on orders above ₹500.
             </p>
           </div>
 
