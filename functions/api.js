@@ -542,16 +542,10 @@ export async function onRequest(context) {
       const mapLink = mapsUrl || (numLat && numLng ? `https://maps.google.com/?q=${numLat},${numLng}` : null);
 
       // Delhivery CMU enforces a 250 character limit on the 'add' field.
-      // Append the GPS map pin cleanly to the address so delivery agents see it in the Delhivery rider mobile app.
+      // Use 100% of the customer's manually entered street address as the primary delivery text.
       let finalAddress = String(address || "").trim();
-      if (numLat && numLng) {
-        const mapSuffix = ` [Map: https://maps.google.com/?q=${numLat.toFixed(5)},${numLng.toFixed(5)}]`;
-        if (finalAddress.length + mapSuffix.length <= 250) {
-          finalAddress = `${finalAddress}${mapSuffix}`;
-        } else {
-          const maxBase = Math.max(20, 250 - mapSuffix.length - 3);
-          finalAddress = `${finalAddress.slice(0, maxBase)}...${mapSuffix}`;
-        }
+      if (finalAddress.length > 245) {
+        finalAddress = finalAddress.slice(0, 245);
       }
 
       const buildPayload = (facilityName) => {
@@ -576,7 +570,7 @@ export async function onRequest(context) {
           address_type: "home",
         };
 
-        // Attach GPS coordinates directly to Delhivery payload
+        // Attach GPS coordinates directly to Delhivery payload geo fields & remarks without corrupting the street address line
         if (numLat && numLng) {
           shipmentItem.lat = numLat;
           shipmentItem.lng = numLng;

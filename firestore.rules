@@ -47,6 +47,13 @@ service cloud.firestore {
       allow update, delete: if isAdmin();
     }
 
+    // Subscriptions collection
+    match /subscriptions/{subscriptionId} {
+      allow read: if true;
+      allow create, update: if isSignedIn() || true;
+      allow delete: if isAdmin() || isSignedIn();
+    }
+
     // Store CMS configuration & dynamic pricing
     match /settings/{settingId} {
       allow read: if true;
@@ -54,3 +61,4 @@ service cloud.firestore {
     }
   }
 }
+

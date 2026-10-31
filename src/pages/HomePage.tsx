@@ -23,6 +23,7 @@ import {
   Lock,
   Plus,
   Minus,
+  Calendar,
 } from "lucide-react";
 import { useStore } from "../context/StoreContext";
 import {
@@ -199,6 +200,35 @@ export const HomePage: React.FC = () => {
 
   return (
     <div className="w-full max-w-full overflow-x-hidden flex flex-col box-border">
+      {/* KANNADA PRIDE / FESTIVE OCCASION CELEBRATION BRAND BANNER */}
+      {cmsConfig?.festiveBanner?.enabled !== false && (
+        <section className="w-full relative shadow-xs border-b border-amber-900/40 bg-gradient-to-r from-[#1A0E08] via-[#2A160A] to-[#1A0E08] text-[#FAF4EA] overflow-hidden">
+          <div className="max-w-7xl mx-auto py-2 sm:py-2.5 px-4 sm:px-6 relative z-10 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3 min-w-0">
+              {/* Karnataka Flag Emblem on the Left */}
+              <div
+                title="ಕನ್ನಡ ಧ್ವಜ (Karnataka Flag)"
+                className="relative w-9 h-6 sm:w-10 sm:h-6.5 rounded-sm overflow-hidden border border-amber-400/80 shadow-xs shrink-0 flex flex-col group transform hover:scale-105 transition-transform"
+              >
+                <div className="w-full h-1/2 bg-[#FFD700]" />
+                <div className="w-full h-1/2 bg-[#DC2626]" />
+              </div>
+
+              {/* One Main Line & One Tagline Only */}
+              <div className="min-w-0">
+                <h3 className="font-black text-xs sm:text-sm font-serif tracking-wide text-amber-300 truncate">
+                  {cmsConfig?.festiveBanner?.title || "ಕನ್ನಡ ರಾಜ್ಯೋತ್ಸವದ ಶುಭಾಶಯಗಳು!"}
+                </h3>
+                <p className="text-[11px] sm:text-xs text-amber-100/90 font-medium leading-tight truncate">
+                  {cmsConfig?.festiveBanner?.tagline ||
+                    "Authentic 100% Marachekku Wood-Pressed Cooking Oils • Direct from Karnataka Farmers to Your Home"}
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
+
       {/* 1. HERO SECTION (SPLIT-SCREEN 2-COLUMN LAYOUT) */}
       <section
         className={`relative w-full max-w-full overflow-hidden py-12 sm:py-16 lg:py-20 border-b transition-colors box-border ${
@@ -932,6 +962,261 @@ export const HomePage: React.FC = () => {
                 );
               })}
               </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* 4B. DEDICATED MONTHLY SUBSCRIPTION SECTION (AUTOMATED HOME DELIVERY) */}
+      <section
+        id="monthly-subscription"
+        className={`w-full max-w-full py-16 sm:py-20 border-b transition-colors box-border relative overflow-hidden ${
+          isDark
+            ? "bg-gradient-to-b from-[#180E08] via-[#1F120A] to-[#140D09] border-[#2D1B10] text-[#FAF4EA]"
+            : "bg-gradient-to-b from-[#FFFDF9] via-[#FAF4EA] to-[#F5ECE0] border-[#E8DEC8] text-[#23150C]"
+        }`}
+      >
+        {/* Ambient Decorative Lighting */}
+        <div className="absolute top-0 right-1/4 w-96 h-96 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute bottom-0 left-1/4 w-96 h-96 bg-[#C8751B]/10 rounded-full blur-3xl pointer-events-none" />
+
+        <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-12 relative z-10 box-border">
+          {/* Header */}
+          <div className="text-center max-w-3xl mx-auto space-y-3">
+            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider bg-amber-500/15 text-[#C8751B] border border-[#C8751B]/30 shadow-xs">
+              <Calendar className="w-3.5 h-3.5" />
+              <span>MANOPAVANA COOKING OIL CLUB • ಮಾಸಿಕ ಚಂದಾದಾರಿಕೆ</span>
+            </div>
+            <h2
+              className={`text-3xl sm:text-4xl lg:text-5xl font-black font-serif tracking-tight ${
+                isDark ? "text-[#FAF4EA]" : "text-[#23150C]"
+              }`}
+            >
+              Never Remember to Order Cooking Oil Again
+            </h2>
+            <p
+              className={`text-sm sm:text-base leading-relaxed ${
+                isDark ? "text-[#D6C4B0]" : "text-[#5C402D]"
+              }`}
+            >
+              Choose your favorite combo or customize your own bottles. We press freshly within 48 hours and deliver directly to your doorstep on your chosen date every single month — with guaranteed 10% discount and free shipping.
+            </p>
+          </div>
+
+          {/* 4 Feature Value Pillars */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-5">
+            <div
+              className={`p-4 sm:p-5 rounded-2xl border transition-all ${
+                isDark
+                  ? "bg-[#1C120B]/90 border-[#362114]"
+                  : "bg-white/95 border-[#E8DEC8] shadow-xs"
+              }`}
+            >
+              <div className="w-10 h-10 rounded-xl bg-amber-500/15 text-[#C8751B] flex items-center justify-center mb-3">
+                <Calendar className="w-5 h-5" />
+              </div>
+              <h3 className="text-sm sm:text-base font-bold mb-1">Pick Your Delivery Date</h3>
+              <p className={`text-xs ${isDark ? "text-[#A89886]" : "text-[#755946]"}`}>
+                Choose any date (1st, 2nd, 3rd... of every month) matching your monthly kitchen replenishment cycle.
+              </p>
+            </div>
+
+            <div
+              className={`p-4 sm:p-5 rounded-2xl border transition-all ${
+                isDark
+                  ? "bg-[#1C120B]/90 border-[#362114]"
+                  : "bg-white/95 border-[#E8DEC8] shadow-xs"
+              }`}
+            >
+              <div className="w-10 h-10 rounded-xl bg-emerald-500/15 text-emerald-600 flex items-center justify-center mb-3">
+                <ShieldCheck className="w-5 h-5" />
+              </div>
+              <h3 className="text-sm sm:text-base font-bold mb-1">Guaranteed 10% Off</h3>
+              <p className={`text-xs ${isDark ? "text-[#A89886]" : "text-[#755946]"}`}>
+                Enjoy an automatic 10% discount locked into every monthly box, plus zero delivery fees on all cycles.
+              </p>
+            </div>
+
+            <div
+              className={`p-4 sm:p-5 rounded-2xl border transition-all ${
+                isDark
+                  ? "bg-[#1C120B]/90 border-[#362114]"
+                  : "bg-white/95 border-[#E8DEC8] shadow-xs"
+              }`}
+            >
+              <div className="w-10 h-10 rounded-xl bg-blue-500/15 text-blue-600 flex items-center justify-center mb-3">
+                <Truck className="w-5 h-5" />
+              </div>
+              <h3 className="text-sm sm:text-base font-bold mb-1">Doorstep Auto-Delivery</h3>
+              <p className={`text-xs ${isDark ? "text-[#A89886]" : "text-[#755946]"}`}>
+                Direct dispatch from our wooden cold-press mill via priority courier with live Delhivery tracking.
+              </p>
+            </div>
+
+            <div
+              className={`p-4 sm:p-5 rounded-2xl border transition-all ${
+                isDark
+                  ? "bg-[#1C120B]/90 border-[#362114]"
+                  : "bg-white/95 border-[#E8DEC8] shadow-xs"
+              }`}
+            >
+              <div className="w-10 h-10 rounded-xl bg-amber-500/15 text-[#C8751B] flex items-center justify-center mb-3">
+                <CheckCircle2 className="w-5 h-5" />
+              </div>
+              <h3 className="text-sm sm:text-base font-bold mb-1">Zero Lock-in & Flexibility</h3>
+              <p className={`text-xs ${isDark ? "text-[#A89886]" : "text-[#755946]"}`}>
+                Swap oils, change delivery day, pause for vacation, or cancel anytime in 1 tap from your dashboard.
+              </p>
+            </div>
+          </div>
+
+          {/* Curated Combo Cards Preview */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* Box 1 */}
+            <div
+              className={`rounded-2xl border p-5 flex flex-col justify-between transition-all hover:scale-[1.01] ${
+                isDark
+                  ? "bg-[#1C120B] border-[#362114] hover:border-amber-500/50"
+                  : "bg-white border-[#E8DEC8] shadow-sm hover:border-[#C8751B]"
+              }`}
+            >
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-amber-500/15 text-[#C8751B] border border-[#C8751B]/30">
+                    Most Popular
+                  </span>
+                  <span className="text-xs font-semibold text-emerald-600">Save 10% Every Month</span>
+                </div>
+                <h4 className="text-lg font-bold font-serif">Essential Kitchen Duo (3L)</h4>
+                <p className={`text-xs ${isDark ? "text-[#A89886]" : "text-[#755946]"}`}>
+                  2L Wood-Pressed Groundnut + 1L Wood-Pressed Sunflower. Perfect for standard family daily cooking & frying.
+                </p>
+                <div className="flex items-baseline gap-2 pt-2 border-t border-[#E8DEC8]/40">
+                  <span className="text-2xl font-black text-[#C8751B]">₹1,167</span>
+                  <span className="text-sm line-through text-stone-400">₹1,297</span>
+                  <span className="text-xs text-stone-500">/ month</span>
+                </div>
+              </div>
+              <button
+                onClick={() => navigate("/subscriptions")}
+                className="mt-5 w-full py-2.5 px-4 rounded-xl bg-[#C8751B] hover:bg-[#a65f14] text-white text-xs font-bold transition-all shadow-md flex items-center justify-center gap-1.5"
+              >
+                <span>Subscribe This Combo</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+
+            {/* Box 2 */}
+            <div
+              className={`rounded-2xl border-2 p-5 flex flex-col justify-between transition-all relative hover:scale-[1.01] ${
+                isDark
+                  ? "bg-[#23150C] border-amber-500/80 shadow-lg shadow-amber-900/20"
+                  : "bg-[#FFFDF9] border-[#C8751B] shadow-md shadow-amber-900/10"
+              }`}
+            >
+              <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 rounded-full bg-[#C8751B] text-white text-[10px] font-black uppercase tracking-wider shadow-sm">
+                Recommended by Nutritionists
+              </div>
+              <div className="space-y-3 pt-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 border border-emerald-500/30">
+                    Complete Nutrition
+                  </span>
+                  <span className="text-xs font-semibold text-emerald-600">Save 10% Every Month</span>
+                </div>
+                <h4 className="text-lg font-bold font-serif">Traditional Wellness Trio (3L)</h4>
+                <p className={`text-xs ${isDark ? "text-[#A89886]" : "text-[#755946]"}`}>
+                  1L Groundnut + 1L Coconut + 1L Sesame Oil. Authentic cold-pressed variety for tadkas, curries, and rasam.
+                </p>
+                <div className="flex items-baseline gap-2 pt-2 border-t border-[#E8DEC8]/40">
+                  <span className="text-2xl font-black text-[#C8751B]">₹1,257</span>
+                  <span className="text-sm line-through text-stone-400">₹1,397</span>
+                  <span className="text-xs text-stone-500">/ month</span>
+                </div>
+              </div>
+              <button
+                onClick={() => navigate("/subscriptions")}
+                className="mt-5 w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-[#C8751B] to-[#991B1B] hover:opacity-95 text-white text-xs font-bold transition-all shadow-md flex items-center justify-center gap-1.5"
+              >
+                <span>Subscribe This Combo</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+
+            {/* Box 3 */}
+            <div
+              className={`rounded-2xl border p-5 flex flex-col justify-between transition-all hover:scale-[1.01] ${
+                isDark
+                  ? "bg-[#1C120B] border-[#362114] hover:border-amber-500/50"
+                  : "bg-white border-[#E8DEC8] shadow-sm hover:border-[#C8751B]"
+              }`}
+            >
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-purple-500/15 text-purple-600 border border-purple-500/30">
+                    Large Family Pack
+                  </span>
+                  <span className="text-xs font-semibold text-emerald-600">Save 10% Every Month</span>
+                </div>
+                <h4 className="text-lg font-bold font-serif">Family Feast Master Pack (4L)</h4>
+                <p className={`text-xs ${isDark ? "text-[#A89886]" : "text-[#755946]"}`}>
+                  2L Groundnut + 1L Mustard + 1L Coconut. Ample supply for multi-generational homes and authentic regional cuisines.
+                </p>
+                <div className="flex items-baseline gap-2 pt-2 border-t border-[#E8DEC8]/40">
+                  <span className="text-2xl font-black text-[#C8751B]">₹1,616</span>
+                  <span className="text-sm line-through text-stone-400">₹1,796</span>
+                  <span className="text-xs text-stone-500">/ month</span>
+                </div>
+              </div>
+              <button
+                onClick={() => navigate("/subscriptions")}
+                className="mt-5 w-full py-2.5 px-4 rounded-xl bg-[#C8751B] hover:bg-[#a65f14] text-white text-xs font-bold transition-all shadow-md flex items-center justify-center gap-1.5"
+              >
+                <span>Subscribe This Combo</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+
+          {/* Action CTA Box */}
+          <div
+            className={`p-6 sm:p-8 rounded-3xl border flex flex-col md:flex-row items-center justify-between gap-6 text-center md:text-left ${
+              isDark
+                ? "bg-[#20140D] border-[#3A2417]"
+                : "bg-gradient-to-r from-amber-50 via-orange-50 to-amber-100/50 border-amber-200"
+            }`}
+          >
+            <div className="space-y-1.5 max-w-xl">
+              <div className="flex items-center justify-center md:justify-start gap-2 text-xs font-bold text-amber-700">
+                <Sparkles className="w-4 h-4 text-[#C8751B]" />
+                <span>Want to build your own custom combination of oils?</span>
+              </div>
+              <h3 className="text-xl sm:text-2xl font-black font-serif">
+                Customize Your Own Monthly Oil Box
+              </h3>
+              <p className={`text-xs sm:text-sm ${isDark ? "text-[#D6C4B0]" : "text-[#5C402D]"}`}>
+                Pick any quantity of Groundnut, Coconut, Sesame, Mustard, or Safflower bottles. Lock in 10% off and update or edit your items dynamically anytime before your monthly cycle.
+              </p>
+            </div>
+
+            <div className="flex flex-col sm:flex-row items-center gap-3 shrink-0">
+              <button
+                onClick={() => navigate("/subscriptions")}
+                className="w-full sm:w-auto px-6 py-3.5 rounded-xl bg-[#C8751B] hover:bg-[#b06514] text-white text-sm font-black transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-2"
+              >
+                <Calendar className="w-4 h-4" />
+                <span>Explore Monthly Subscriptions</span>
+              </button>
+              <button
+                onClick={() => navigate("/subscriptions")}
+                className={`w-full sm:w-auto px-5 py-3.5 rounded-xl border text-sm font-bold transition-all ${
+                  isDark
+                    ? "border-[#4A2E1D] hover:bg-[#2C1A10] text-[#FAF4EA]"
+                    : "border-[#D6C4B0] hover:bg-white text-[#23150C]"
+                }`}
+              >
+                <span>Build Custom Box</span>
+              </button>
             </div>
           </div>
         </div>

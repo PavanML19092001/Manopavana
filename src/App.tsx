@@ -14,6 +14,9 @@ import { ProductPage } from "./pages/ProductPage";
 import { CartPage } from "./pages/CartPage";
 import { CheckoutPage } from "./pages/CheckoutPage";
 import { AccountPage } from "./pages/AccountPage";
+import { OrdersPage } from "./pages/OrdersPage";
+import { ProfilePage } from "./pages/ProfilePage";
+import { SubscriptionPage } from "./pages/SubscriptionPage";
 import { AdminPage } from "./pages/AdminPage";
 import { useStore } from "./context/StoreContext";
 import { Order } from "./types";
@@ -357,7 +360,11 @@ export default function App() {
             <Route path="/product/:id" element={<ProductPage />} />
             <Route path="/cart" element={<CartPage />} />
             <Route path="/checkout" element={<CheckoutPage />} />
-            <Route path="/account" element={<AccountPage />} />
+            <Route path="/orders" element={<OrdersPage />} />
+            <Route path="/orders/:orderRef" element={<OrdersPage />} />
+            <Route path="/profile" element={<ProfilePage />} />
+            <Route path="/subscriptions" element={<SubscriptionPage />} />
+            <Route path="/account" element={<Navigate to="/orders" replace />} />
             <Route
               path="/admin"
               element={

@@ -61,9 +61,9 @@ export const LiveOrderTracker = ({
   const isCod = order.paymentMethod === "cod" || order.paymentMode === "COD";
   const isCancelled = (order.orderStatus as string) === "Cancelled";
 
-  // Allowed to edit or cancel until order leaves dispatch hub
+  // Allowed to edit or cancel ONLY while order is in initial "Placed" status and before carrier pickup/AWB manifestation
   const canModifyOrCancel =
-    order.orderStatus === "Placed" || order.orderStatus === "Packed";
+    order.orderStatus === "Placed" && (!order.trackingNumber || order.trackingNumber.length === 0);
 
   // Universal: Poll Delhivery tracking for any order with a waybill regardless of pincode
   useEffect(() => {

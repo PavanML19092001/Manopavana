@@ -171,6 +171,15 @@ const DEFAULT_ADDRESS: Address = {
 
 const DEFAULT_CMS_CONFIG: StoreCMSConfig = {
   announcementTicker: "FREE Doorstep Delivery across India on orders above ₹500 | 100% Marachekku Cold-Pressed",
+  festiveBanner: {
+    enabled: true,
+    title: "ಕನ್ನಡ ರಾಜ್ಯೋತ್ಸವದ ಶುಭಾಶಯಗಳು!",
+    badge: "ನಮ್ಮ ನಾಡಿನ ಅಪ್ಪಟ ಗಾಣ",
+    tagline: "Authentic 100% Marachekku Wood-Pressed Cooking Oils • Direct from Karnataka Farmers to Your Home",
+    btnTextKannada: "ಮಾಸಿಕ ಚಂದಾದಾರಿಕೆ",
+    btnTextEnglish: "Monthly Subscription (Save 15%)",
+    btnLink: "/subscriptions",
+  },
   brandName: BUSINESS_CONFIG.BRAND_NAME,
   heroHeadline: BUSINESS_CONFIG.HERO_HEADLINE,
   heroSubhead: BUSINESS_CONFIG.HERO_SUBHEAD,
@@ -178,6 +187,7 @@ const DEFAULT_CMS_CONFIG: StoreCMSConfig = {
   heroCtaPrimaryText: "Explore The Collection →",
   brandTagline: "Pure by nature, trusted for life",
   brandLogoUrl: MEDIA_ASSETS.logo,
+
   chekkuVideoUrl: MEDIA_ASSETS.heroVideo,
   heroFallbackImage: MEDIA_ASSETS.heroFallbackImage,
   ambientAudioTrack: MEDIA_ASSETS.ambientAudioTrack,
@@ -199,6 +209,7 @@ const DEFAULT_CMS_CONFIG: StoreCMSConfig = {
   delhiveryTokenMasked: "6d43e0...fc9a",
   loyaltyDiscountPercent: BUSINESS_CONFIG.LOYALTY_DISCOUNT_PERCENT,
   loyaltyValidityDays: 7,
+  subscriptionDiscountPercent: 10,
   freeShippingThreshold: BUSINESS_CONFIG.FREE_SHIPPING_THRESHOLD,
   standardShippingFee: BUSINESS_CONFIG.STANDARD_SHIPPING_FEE,
   prices: {
@@ -1098,42 +1109,33 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
+    // Audio element setup (defaults to strictly paused/silent until user requests it)
     const audio = new Audio("https://pub-9e18bb265ecf4224ae1230cf913745ca.r2.dev/marada_gaana_beat.mp3");
     audio.loop = true;
-    audio.volume = 0.4;
-    audio.preload = "auto";
+    audio.volume = 0.35;
+    audio.preload = "none";
     audio.setAttribute("playsinline", "true");
     audio.setAttribute("webkit-playsinline", "true");
     audioRef.current = audio;
 
-    const events = ["pointerdown", "touchstart", "touchend", "click", "keydown"];
-
-    const triggerPlay = () => {
-      if (!audioRef.current) return;
-      audioRef.current
-        .play()
-        .then(() => {
-          setIsPlayingAudio(true);
-          events.forEach((evt) => {
-            document.removeEventListener(evt, triggerPlay, true);
-            window.removeEventListener(evt, triggerPlay, true);
-          });
-        })
-        .catch(() => {});
+    // Immediately stop audio when user switches tabs, minimizes Chrome, locks phone screen, or leaves the app
+    const handleVisibilityOrBackground = () => {
+      if (document.hidden || document.visibilityState === "hidden") {
+        if (audioRef.current) {
+          audioRef.current.pause();
+          setIsPlayingAudio(false);
+        }
+      }
     };
 
-    triggerPlay();
-
-    events.forEach((evt) => {
-      document.addEventListener(evt, triggerPlay, { capture: true, passive: true });
-      window.addEventListener(evt, triggerPlay, { capture: true, passive: true });
-    });
+    document.addEventListener("visibilitychange", handleVisibilityOrBackground);
+    window.addEventListener("pagehide", handleVisibilityOrBackground);
+    window.addEventListener("blur", handleVisibilityOrBackground);
 
     return () => {
-      events.forEach((evt) => {
-        document.removeEventListener(evt, triggerPlay, true);
-        window.removeEventListener(evt, triggerPlay, true);
-      });
+      document.removeEventListener("visibilitychange", handleVisibilityOrBackground);
+      window.removeEventListener("pagehide", handleVisibilityOrBackground);
+      window.removeEventListener("blur", handleVisibilityOrBackground);
       if (audioRef.current) {
         audioRef.current.pause();
       }
@@ -1285,8 +1287,14 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     if (!target) return false;
 
-    if (target.orderStatus === "Dispatched" || target.orderStatus === "Delivered") {
-      showToast("This order is already out for delivery and cannot be cancelled.");
+    // Immediately remove cancel option if order is packed, picked up, dispatched, or has an AWB
+    if (
+      target.orderStatus === "Packed" ||
+      target.orderStatus === "Dispatched" ||
+      target.orderStatus === "Delivered" ||
+      Boolean(target.trackingNumber)
+    ) {
+      showToast("This order has already been packed/picked up by Delhivery and cannot be cancelled.");
       return false;
     }
 
@@ -1537,7 +1545,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         : itemsToUse.reduce((acc, c) => acc + c.price * c.quantity, 0);
     const finalDiscount =
       target?.discount ??
-      (loyalty.isActive ? Math.round((finalSubtotal * loyalty.discountPercent) / 100) : 0);
+      (loyalty.isActive && finalSubtotal >= 1000 ? Math.round((finalSubtotal * loyalty.discountPercent) / 100) : 0);
     const finalShipping =
       target?.shippingFee ??
       (finalSubtotal - finalDiscount >= cmsConfig.freeShippingThreshold ? 0 : cmsConfig.standardShippingFee);
@@ -1728,6 +1736,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           const merged: StoreCMSConfig = {
             ...prev,
             ...remoteConfig,
+            festiveBanner: { ...prev.festiveBanner, ...(remoteConfig.festiveBanner || {}) },
             prices: { ...prev.prices, ...(remoteConfig.prices || {}) },
             mrp: { ...prev.mrp, ...(remoteConfig.mrp || {}) },
             stock: { ...prev.stock, ...(remoteConfig.stock || {}) },
@@ -2047,6 +2056,8 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const discount = useMemo(() => {
     if (!loyalty.isActive) return 0;
+    // 10% Bottle QR / Reorder discount strictly applies to orders of ₹1,000 or above
+    if (subtotal < 1000) return 0;
     return Math.round((subtotal * loyalty.discountPercent) / 100);
   }, [subtotal, loyalty]);
 

@@ -339,8 +339,10 @@ export const CartPage: React.FC = () => {
                     }`}
                   >
                     {loyalty.isActive
-                      ? `Enjoy 10% off repeat orders (${loyaltyRemainingText})`
-                      : "Verify your bottle tagline to unlock 10% repeat order discount!"}
+                      ? subtotal >= 1000
+                        ? `Enjoy 10% off repeat orders (${loyaltyRemainingText})`
+                        : `Add ₹${1000 - subtotal} more to activate 10% off (Applies to orders above ₹1,000)`
+                      : "Verify your bottle tagline to unlock 10% repeat order discount on orders above ₹1,000!"}
                   </p>
                 </div>
               </div>
@@ -352,9 +354,13 @@ export const CartPage: React.FC = () => {
                 >
                   Scan & Save
                 </button>
-              ) : (
+              ) : subtotal >= 1000 ? (
                 <span className="text-xs font-bold text-emerald-800 bg-emerald-100 px-2.5 py-1 rounded-lg">
-                  Applied
+                  Applied (10%)
+                </span>
+              ) : (
+                <span className="text-[10px] font-bold text-amber-800 bg-amber-100 px-2 py-1 rounded-lg">
+                  Min ₹1,000
                 </span>
               )}
             </div>
@@ -393,13 +399,20 @@ export const CartPage: React.FC = () => {
                   </span>
                 </div>
 
-                {loyalty.isActive && (
+                {loyalty.isActive && subtotal >= 1000 && (
                   <div className="flex items-center justify-between text-emerald-600 font-medium">
                     <span className="flex items-center gap-1">
                       <Sparkles className="w-3.5 h-3.5 text-amber-500" />
                       <span>Bottle Loyalty Discount (10%)</span>
                     </span>
                     <span className="font-bold">-₹{discount}</span>
+                  </div>
+                )}
+
+                {loyalty.isActive && subtotal < 1000 && (
+                  <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-[11px] text-amber-800 dark:text-amber-200 flex items-center justify-between">
+                    <span>Add ₹{1000 - subtotal} more to unlock 10% discount</span>
+                    <span className="font-bold">Orders &gt; ₹1000</span>
                   </div>
                 )}
 

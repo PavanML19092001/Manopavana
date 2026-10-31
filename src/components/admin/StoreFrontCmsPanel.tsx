@@ -99,6 +99,35 @@ export const StorefrontCMSPanel: React.FC<{ isDark: boolean }> = ({ isDark }) =>
   const [threshold, setThreshold] = useState(cmsConfig?.freeShippingThreshold ?? 500);
   const [stdFee, setStdFee] = useState(cmsConfig?.standardShippingFee ?? 49);
 
+  // Festive / Occasion Top Banner State
+  const [festiveEnabled, setFestiveEnabled] = useState(
+    cmsConfig?.festiveBanner?.enabled !== false
+  );
+  const [festiveTitle, setFestiveTitle] = useState(
+    cmsConfig?.festiveBanner?.title || "ಕನ್ನಡ ರಾಜ್ಯೋತ್ಸವದ ಶುಭಾಶಯಗಳು!"
+  );
+  const [festiveBadge, setFestiveBadge] = useState(
+    cmsConfig?.festiveBanner?.badge || "ನಮ್ಮ ನಾಡಿನ ಅಪ್ಪಟ ಗಾಣ"
+  );
+  const [festiveTagline, setFestiveTagline] = useState(
+    cmsConfig?.festiveBanner?.tagline ||
+      "Authentic 100% Marachekku Wood-Pressed Cooking Oils • Direct from Karnataka Farmers to Your Home"
+  );
+  const [festiveBtnTextKannada, setFestiveBtnTextKannada] = useState(
+    cmsConfig?.festiveBanner?.btnTextKannada || "ಮಾಸಿಕ ಚಂದಾದಾರಿಕೆ"
+  );
+  const [festiveBtnTextEnglish, setFestiveBtnTextEnglish] = useState(
+    cmsConfig?.festiveBanner?.btnTextEnglish || "Monthly Subscription (Save 15%)"
+  );
+  const [festiveBtnLink, setFestiveBtnLink] = useState(
+    cmsConfig?.festiveBanner?.btnLink || "/subscriptions"
+  );
+  const [subDiscountPercent, setSubDiscountPercent] = useState<number>(
+    cmsConfig?.subscriptionDiscountPercent ?? 10
+  );
+
+
+
   // Tab 2: Facility & Legal Credentials
   const [founderName, setFounderName] = useState(cmsConfig?.founderName || BUSINESS_CONFIG.FOUNDER_NAME);
   const [primaryPhone, setPrimaryPhone] = useState(cmsConfig?.primaryPhone || BUSINESS_CONFIG.PRIMARY_PHONE);
@@ -326,6 +355,15 @@ export const StorefrontCMSPanel: React.FC<{ isDark: boolean }> = ({ isDark }) =>
     updateCMSConfig((prev) => ({
       ...prev,
       brandName,
+      festiveBanner: {
+        enabled: festiveEnabled,
+        title: festiveTitle,
+        badge: festiveBadge,
+        tagline: festiveTagline,
+        btnTextKannada: festiveBtnTextKannada,
+        btnTextEnglish: festiveBtnTextEnglish,
+        btnLink: festiveBtnLink,
+      },
       announcementTicker: ticker,
       brandTagline: tagline,
       heroEyebrow: eyebrow,
@@ -340,6 +378,7 @@ export const StorefrontCMSPanel: React.FC<{ isDark: boolean }> = ({ isDark }) =>
       heroHighlights: parsedHighlights.length > 0 ? parsedHighlights : prev.heroHighlights,
       freeShippingThreshold: Number(threshold),
       standardShippingFee: Number(stdFee),
+      subscriptionDiscountPercent: Number(subDiscountPercent),
       founderName,
       primaryPhone,
       altPhone,
@@ -735,6 +774,166 @@ export const StorefrontCMSPanel: React.FC<{ isDark: boolean }> = ({ isDark }) =>
               />
             </div>
 
+            {/* Occasion / Festive Celebratory Banner Management */}
+            <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 space-y-3.5">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b pb-2 border-amber-500/20">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-[#E08F35]" />
+                  <h4 className="font-bold text-xs sm:text-sm text-stone-900 dark:text-stone-100">
+                    Occasion & Festive Celebratory Banner (ರಾಜ್ಯೋತ್ಸವ / ಹಬ್ಬದ ಬ್ಯಾನರ್)
+                  </h4>
+                </div>
+                <label className="flex items-center gap-2 cursor-pointer font-bold text-xs self-start sm:self-auto">
+                  <input
+                    type="checkbox"
+                    checked={festiveEnabled}
+                    onChange={(e) => setFestiveEnabled(e.target.checked)}
+                    className="w-4 h-4 rounded text-[#E08F35] focus:ring-0 cursor-pointer"
+                  />
+                  <span>Show Celebratory Banner on Website</span>
+                </label>
+              </div>
+
+              {/* Quick Preset Buttons */}
+              <div className="space-y-1.5">
+                <span className="text-[10px] font-bold text-stone-500 uppercase block">
+                  Quick Occasion Presets (Click to instant-fill):
+                </span>
+                <div className="flex flex-wrap gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFestiveTitle("ಕನ್ನಡ ರಾಜ್ಯೋತ್ಸವದ ಶುಭಾಶಯಗಳು!");
+                      setFestiveBadge("ನಮ್ಮ ನಾಡಿನ ಅಪ್ಪಟ ಗಾಣ");
+                      setFestiveTagline("Authentic 100% Marachekku Wood-Pressed Cooking Oils • Direct from Karnataka Farmers to Your Home");
+                      setFestiveBtnTextKannada("ಮಾಸಿಕ ಚಂದಾದಾರಿಕೆ");
+                      setFestiveBtnTextEnglish("Monthly Subscription (Save 15%)");
+                    }}
+                    className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-amber-500/20 text-[#5E3210] dark:text-amber-200 border border-amber-500/30 hover:bg-amber-500/30 transition-colors cursor-pointer"
+                  >
+                    ಕನ್ನಡ ರಾಜ್ಯೋತ್ಸವ (Rajyotsava)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFestiveTitle("ದೀಪಾವಳಿ ಹಬ್ಬದ ಹಾರ್ದಿಕ ಶುಭಾಶಯಗಳು!");
+                      setFestiveBadge("ಶುದ್ಧ ಎಣ್ಣೆಯೊಂದಿಗೆ ದೀಪದ ಬೆಳಗು");
+                      setFestiveTagline("Celebrate Deepavali with pure unrefined cold-pressed oils. Free doorstep delivery across India!");
+                      setFestiveBtnTextKannada("ಮಾಸಿಕ ಚಂದಾದಾರಿಕೆ");
+                      setFestiveBtnTextEnglish("Monthly Subscription (Save 15%)");
+                    }}
+                    className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-amber-500/20 text-[#5E3210] dark:text-amber-200 border border-amber-500/30 hover:bg-amber-500/30 transition-colors cursor-pointer"
+                  >
+                    ದೀಪಾವಳಿ (Deepavali)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFestiveTitle("ಮಕರ ಸಂಕ್ರಾಂತಿ ಹಬ್ಬದ ಶುಭಾಶಯಗಳು!");
+                      setFestiveBadge("ಎಳ್ಳು-ಬೆಲ್ಲದ ಸಿಹಿ, ಮರದ ಗಾಣದ ಎಣ್ಣೆ");
+                      setFestiveTagline("Pure wood-pressed Sesame, Groundnut & Coconut oils for festive treats. Direct from Karnataka artisans.");
+                      setFestiveBtnTextKannada("ಮಾಸಿಕ ಚಂದಾದಾರಿಕೆ");
+                      setFestiveBtnTextEnglish("Monthly Subscription (Save 15%)");
+                    }}
+                    className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-amber-500/20 text-[#5E3210] dark:text-amber-200 border border-amber-500/30 hover:bg-amber-500/30 transition-colors cursor-pointer"
+                  >
+                    ಮಕರ ಸಂಕ್ರಾಂತಿ (Sankranti)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFestiveTitle("ಯುಗಾದಿ ಹಬ್ಬದ ಹಾರ್ದಿಕ ಶುಭಾಶಯಗಳು!");
+                      setFestiveBadge("ಹೊಸ ವರ್ಷದ ಆರೋಗ್ಯಕರ ಆರಂಭ");
+                      setFestiveTagline("Start the new year with pure, cold-pressed health for your entire family.");
+                      setFestiveBtnTextKannada("ಮಾಸಿಕ ಚಂದಾದಾರಿಕೆ");
+                      setFestiveBtnTextEnglish("Monthly Subscription (Save 15%)");
+                    }}
+                    className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-amber-500/20 text-[#5E3210] dark:text-amber-200 border border-amber-500/30 hover:bg-amber-500/30 transition-colors cursor-pointer"
+                  >
+                    ಯುಗಾದಿ (Ugadi)
+                  </button>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                <div>
+                  <label className="block font-semibold mb-1">Banner Headline (Title)</label>
+                  <input
+                    type="text"
+                    value={festiveTitle}
+                    onChange={(e) => setFestiveTitle(e.target.value)}
+                    className="w-full px-3 py-1.5 rounded-xl border border-stone-300 dark:border-stone-700 bg-transparent text-xs"
+                    placeholder="e.g. ಕನ್ನಡ ರಾಜ್ಯೋತ್ಸವದ ಶುಭಾಶಯಗಳು!"
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold mb-1">Badge Text (Short Pill)</label>
+                  <input
+                    type="text"
+                    value={festiveBadge}
+                    onChange={(e) => setFestiveBadge(e.target.value)}
+                    className="w-full px-3 py-1.5 rounded-xl border border-stone-300 dark:border-stone-700 bg-transparent text-xs"
+                    placeholder="e.g. ನಮ್ಮ ನಾಡಿನ ಅಪ್ಪಟ ಗಾಣ"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-semibold mb-1">Sub-tagline (Description)</label>
+                <input
+                  type="text"
+                  value={festiveTagline}
+                  onChange={(e) => setFestiveTagline(e.target.value)}
+                  className="w-full px-3 py-1.5 rounded-xl border border-stone-300 dark:border-stone-700 bg-transparent text-xs"
+                  placeholder="e.g. Authentic 100% Marachekku Wood-Pressed Cooking Oils..."
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-semibold mb-1">Button Kannada Label</label>
+                  <input
+                    type="text"
+                    value={festiveBtnTextKannada}
+                    onChange={(e) => setFestiveBtnTextKannada(e.target.value)}
+                    className="w-full px-3 py-1.5 rounded-xl border border-stone-300 dark:border-stone-700 bg-transparent text-xs"
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold mb-1">Button English Label</label>
+                  <input
+                    type="text"
+                    value={festiveBtnTextEnglish}
+                    onChange={(e) => setFestiveBtnTextEnglish(e.target.value)}
+                    className="w-full px-3 py-1.5 rounded-xl border border-stone-300 dark:border-stone-700 bg-transparent text-xs"
+                  />
+                </div>
+              </div>
+
+              <div className="pt-2 border-t border-amber-500/20 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <label className="block font-semibold text-xs text-stone-800 dark:text-stone-200">
+                    Monthly Subscription Discount (%)
+                  </label>
+                  <p className="text-[10px] text-stone-500">
+                    Discount automatically applied on all recurring monthly subscriptions
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    min="1"
+                    max="50"
+                    value={subDiscountPercent}
+                    onChange={(e) => setSubDiscountPercent(Number(e.target.value))}
+                    className="w-20 px-2.5 py-1 text-center font-bold text-xs rounded-lg border border-amber-500/40 bg-transparent"
+                  />
+                  <span className="text-xs font-bold text-stone-500">% Off</span>
+                </div>
+              </div>
+            </div>
+
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block font-semibold mb-1">Hero Eyebrow / Tag</label>
@@ -846,8 +1045,8 @@ export const StorefrontCMSPanel: React.FC<{ isDark: boolean }> = ({ isDark }) =>
               />
             </div>
 
-            {/* Delivery Thresholds */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-stone-200 dark:border-stone-800">
+            {/* Delivery Thresholds & Subscription Discount */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2 border-t border-stone-200 dark:border-stone-800">
               <div>
                 <label className="block font-semibold mb-1">Free Delivery Threshold (₹)</label>
                 <input
@@ -865,6 +1064,18 @@ export const StorefrontCMSPanel: React.FC<{ isDark: boolean }> = ({ isDark }) =>
                   onChange={(e) => setStdFee(Number(e.target.value))}
                   className="w-full px-3 py-2 rounded-xl border border-stone-300 dark:border-stone-700 bg-transparent font-bold"
                 />
+              </div>
+              <div>
+                <label className="block font-semibold mb-1">Subscription Discount (%)</label>
+                <input
+                  type="number"
+                  min="0"
+                  max="50"
+                  value={subDiscountPercent}
+                  onChange={(e) => setSubDiscountPercent(Number(e.target.value))}
+                  className="w-full px-3 py-2 rounded-xl border border-stone-300 dark:border-stone-700 bg-transparent font-bold text-amber-700 dark:text-amber-400"
+                />
+                <span className="text-[10px] text-stone-500">Applied dynamically across all monthly subscriptions (Default: 10%)</span>
               </div>
             </div>
           </div>

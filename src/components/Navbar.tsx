@@ -18,6 +18,7 @@ import {
   Home,
   Volume2,
   VolumeX,
+  Calendar,
 } from "lucide-react";
 import { useStore } from "../context/StoreContext";
 import { MEDIA_ASSETS, BUSINESS_CONFIG } from "../constants";
@@ -632,33 +633,43 @@ export const Navbar: React.FC = () => {
                 {/* Navigation Links */}
                 <div className="py-1 text-xs">
                   <Link
-                    to="/account?tab=profile"
+                    to="/profile"
                     onClick={() => setIsUserDropdownOpen(false)}
                     className={`flex items-center gap-2.5 px-4 py-2.5 ${isLight ? "text-[#24140A] hover:bg-[#F3EDE2] hover:text-[#C8751B]" : "text-[#FAF4EA] hover:bg-[#25150C] hover:text-[#E08F35]"
-                      } transition-colors`}
+                      } transition-colors font-medium`}
                   >
                     <User className={`w-4 h-4 ${isLight ? "text-[#7A5538]" : "text-[#D4A373]"}`} />
                     <span>👤 My Profile</span>
                   </Link>
 
                   <Link
-                    to="/account?tab=orders"
+                    to="/orders"
                     onClick={() => setIsUserDropdownOpen(false)}
                     className={`flex items-center gap-2.5 px-4 py-2.5 ${isLight ? "text-[#24140A] hover:bg-[#F3EDE2] hover:text-[#C8751B]" : "text-[#FAF4EA] hover:bg-[#25150C] hover:text-[#E08F35]"
-                      } transition-colors`}
+                      } transition-colors font-medium`}
                   >
                     <Package className={`w-4 h-4 ${isLight ? "text-[#7A5538]" : "text-[#D4A373]"}`} />
                     <span>📦 My Orders</span>
                   </Link>
 
                   <Link
-                    to="/account?tab=addresses"
+                    to="/subscriptions"
                     onClick={() => setIsUserDropdownOpen(false)}
                     className={`flex items-center gap-2.5 px-4 py-2.5 ${isLight ? "text-[#24140A] hover:bg-[#F3EDE2] hover:text-[#C8751B]" : "text-[#FAF4EA] hover:bg-[#25150C] hover:text-[#E08F35]"
-                      } transition-colors`}
+                      } transition-colors font-medium`}
+                  >
+                    <Calendar className={`w-4 h-4 text-emerald-500`} />
+                    <span>📅 Monthly Subscriptions</span>
+                  </Link>
+
+                  <Link
+                    to="/profile"
+                    onClick={() => setIsUserDropdownOpen(false)}
+                    className={`flex items-center gap-2.5 px-4 py-2.5 ${isLight ? "text-[#24140A] hover:bg-[#F3EDE2] hover:text-[#C8751B]" : "text-[#FAF4EA] hover:bg-[#25150C] hover:text-[#E08F35]"
+                      } transition-colors font-medium`}
                   >
                     <MapPin className={`w-4 h-4 ${isLight ? "text-[#7A5538]" : "text-[#D4A373]"}`} />
-                    <span>📍 Delivery Address</span>
+                    <span>📍 Manage Addresses</span>
                   </Link>
 
                   <button
@@ -791,48 +802,37 @@ export const Navbar: React.FC = () => {
             </span>
           </button>
 
-          {/* 3. Marada Gaana Beats */}
-          <button
-            type="button"
-            onClick={toggleAudio}
-            className={`flex-1 flex flex-col items-center justify-center py-1 transition-colors cursor-pointer ${
-              isPlayingAudio
-                ? "text-[#E08F35] font-bold"
+          {/* 3. Orders */}
+          <Link
+            to="/orders"
+            className={`flex-1 flex flex-col items-center justify-center py-1 transition-colors ${
+              location.pathname.startsWith("/orders")
+                ? isLight
+                  ? "text-[#B86B14] font-bold"
+                  : "text-[#F5BC51] font-bold"
                 : isLight
                   ? "text-[#7A5538] hover:text-[#1F120A]"
                   : "text-[#A8907E] hover:text-[#FAF4EA]"
             }`}
           >
-            <div className="relative flex items-center justify-center">
-              {isPlayingAudio ? (
-                <Volume2 className="w-5 h-5 text-[#E08F35] animate-pulse" />
-              ) : (
-                <VolumeX className="w-5 h-5 opacity-70" />
-              )}
-              {isPlayingAudio && (
-                <span className="absolute -top-1 -right-2 flex items-end gap-0.5 h-2.5">
-                  <span className="w-0.5 h-full bg-[#E08F35] animate-[bounce_0.8s_infinite]" />
-                  <span className="w-0.5 h-1.5 bg-[#E08F35] animate-[bounce_0.6s_infinite_0.2s]" />
-                </span>
-              )}
+            <div className="relative">
+              <Package className="w-5 h-5" />
             </div>
-            <span className="text-[10px] tracking-tight mt-0.5">
-              {isPlayingAudio ? "Beats ON" : "Beats OFF"}
-            </span>
-          </button>
+            <span className="text-[10px] tracking-tight mt-0.5">Orders</span>
+          </Link>
 
-          {/* 4. Profile / Account */}
+          {/* 4. Profile */}
           <button
             type="button"
             onClick={() => {
               if (currentUser) {
-                navigate("/account?tab=profile");
+                navigate("/profile");
               } else {
                 setLoginModalOpen(true);
               }
             }}
             className={`flex-1 flex flex-col items-center justify-center py-1 transition-colors cursor-pointer ${
-              location.pathname === "/account"
+              location.pathname === "/profile"
                 ? isLight
                   ? "text-[#B86B14] font-bold"
                   : "text-[#F5BC51] font-bold"

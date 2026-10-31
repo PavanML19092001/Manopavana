@@ -69,9 +69,10 @@ export const CheckoutPage: React.FC = () => {
   const checkoutItems = isBuyNowMode && buyNowItem ? [buyNowItem] : cart;
 
   const checkoutSubtotal = checkoutItems.reduce((acc, curr) => acc + curr.price * curr.quantity, 0);
-  const checkoutDiscount = loyalty.isActive
-    ? Math.round((checkoutSubtotal * loyalty.discountPercent) / 100)
-    : 0;
+  const checkoutDiscount =
+    loyalty.isActive && checkoutSubtotal >= 1000
+      ? Math.round((checkoutSubtotal * loyalty.discountPercent) / 100)
+      : 0;
   const checkoutDiscountedSubtotal = checkoutSubtotal - checkoutDiscount;
   const checkoutShippingFee =
     checkoutItems.length === 0

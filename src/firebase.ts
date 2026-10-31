@@ -801,6 +801,7 @@ export async function saveCustomerProfile(
     name?: string;
     phone?: string;
     email?: string;
+    gender?: string;
     savedAddress?: any;
     savedAddresses?: any[];
   }
@@ -822,6 +823,9 @@ export async function saveCustomerProfile(
 
     if (profileUpdates.name && profileUpdates.name.trim()) {
       payload.name = profileUpdates.name.trim();
+    }
+    if (profileUpdates.gender) {
+      payload.gender = profileUpdates.gender;
     }
     if (cleanPhone) {
       payload.phone = cleanPhone;

@@ -128,6 +128,7 @@ export interface CustomerProfile {
   name?: string;
   email?: string;
   phone?: string;
+  gender?: "male" | "female" | "other" | string;
   savedAddress?: Address;
   savedAddresses?: any[];
   cart?: CartItem[];
@@ -283,10 +284,22 @@ export interface ComboDetailOverride {
   inStock?: boolean;
 }
 
+export interface FestiveBannerConfig {
+  enabled?: boolean;
+  title?: string;
+  badge?: string;
+  tagline?: string;
+  btnTextKannada?: string;
+  btnTextEnglish?: string;
+  btnLink?: string;
+}
+
 export interface StoreCMSConfig {
   announcementTicker: string;
+  festiveBanner?: FestiveBannerConfig;
   brandName?: string;
   brandTagline: string;
+
   brandLogoUrl: string;
   heroEyebrow?: string;
   heroHeadline: string;
@@ -314,6 +327,7 @@ export interface StoreCMSConfig {
   delhiveryTokenMasked?: string;
   loyaltyDiscountPercent?: number;
   loyaltyValidityDays?: number;
+  subscriptionDiscountPercent?: number;
   freeShippingThreshold: number;
   standardShippingFee: number;
   prices: {

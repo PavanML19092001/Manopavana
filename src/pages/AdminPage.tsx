@@ -19,10 +19,27 @@ import {
   Trash2,
   Eye,
   Key,
+  Calendar,
+  Sliders,
+  Pause,
+  Play,
 } from "lucide-react";
 import { useStore } from "../context/StoreContext";
 import { BUSINESS_CONFIG } from "../constants";
 import { OrderStatus, Order } from "../types";
+import { collection, onSnapshot, doc, setDoc, serverTimestamp } from "firebase/firestore";
+import { db } from "../firebase";
+
+const getOrdinalSuffix = (n: number | string | undefined): string => {
+  const num = Number(n);
+  if (!num || isNaN(num)) return `${n || ""}`;
+  const j = num % 10;
+  const k = num % 100;
+  if (j === 1 && k !== 11) return `${num}st`;
+  if (j === 2 && k !== 12) return `${num}nd`;
+  if (j === 3 && k !== 13) return `${num}rd`;
+  return `${num}th`;
+};
 
 export const AdminPage: React.FC = () => {
   const {
@@ -77,6 +94,50 @@ export const AdminPage: React.FC = () => {
     latencyMs?: number;
     message?: string;
   } | null>(null);
+
+  // Subscriptions Management State (Direct Firestore Real-time)
+  const [adminSubscriptions, setAdminSubscriptions] = useState<any[]>([]);
+  const [subSearch, setSubSearch] = useState("");
+  const [subStatusFilter, setSubStatusFilter] = useState<string>("all");
+  const [isUpdatingSub, setIsUpdatingSub] = useState<Record<string, boolean>>({});
+
+  // Direct Firestore real-time listener for subscriptions collection
+  useEffect(() => {
+    if (!isAdminAuthenticated) return;
+    try {
+      const unsub = onSnapshot(collection(db, "subscriptions"), (snap) => {
+        const subs = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+        setAdminSubscriptions(subs);
+      }, (err) => {
+        console.warn("Notice loading subscriptions in admin:", err);
+      });
+      return () => unsub();
+    } catch (err) {
+      console.warn("Subscriptions listener setup notice:", err);
+    }
+  }, [isAdminAuthenticated]);
+
+  const handleToggleSubStatus = async (subId: string, currentStatus: string) => {
+    const nextStatus = currentStatus === "paused" ? "active" : "paused";
+    setIsUpdatingSub((p) => ({ ...p, [subId]: true }));
+    try {
+      await setDoc(
+        doc(db, "subscriptions", subId),
+        {
+          status: nextStatus,
+          updatedAt: serverTimestamp(),
+          lastModifiedNote: `Status changed to ${nextStatus} by Administrator`,
+        },
+        { merge: true }
+      );
+      showToast(`Subscription ${nextStatus === "paused" ? "paused" : "resumed"} successfully!`);
+    } catch (e) {
+      showToast("Error updating subscription status in Firestore.");
+    } finally {
+      setIsUpdatingSub((p) => ({ ...p, [subId]: false }));
+    }
+  };
+
 
   // Helper to map live Delhivery carrier status strings to website order stages
   const mapDelhiveryToWebStatus = (
@@ -349,6 +410,65 @@ export const AdminPage: React.FC = () => {
     }
 
     await updateOrderStatus(ord.id || ord.orderRef, newStatus);
+  };
+
+  const [isSyncingDelhivery, setIsSyncingDelhivery] = useState(false);
+
+  const handleSyncAllDelhiveryTracking = async () => {
+    const trackableOrders = adminOrders.filter(
+      (o) => o.trackingNumber && o.trackingNumber.length > 5 && o.orderStatus !== "Cancelled"
+    );
+    if (trackableOrders.length === 0) {
+      showToast("No active shipments with AWB to track.");
+      return;
+    }
+    setIsSyncingDelhivery(true);
+    let updatedCount = 0;
+    try {
+      showToast(`Checking live Delhivery status for ${trackableOrders.length} shipments...`);
+      for (const ord of trackableOrders) {
+        try {
+          const res = await fetch(`/api?action=delhivery_track&waybill=${encodeURIComponent(ord.trackingNumber!)}`);
+          if (!res.ok) continue;
+          const data = await res.json();
+          const pkg = data.data?.ShipmentData?.[0]?.Shipment;
+          if (pkg) {
+            const rawStatus = String(pkg.Status?.Status || "").toLowerCase();
+            const instructions = String(pkg.Status?.Instructions || "").toLowerCase();
+            let newStatus: OrderStatus | null = null;
+            if (rawStatus.includes("delivered")) {
+              newStatus = "Delivered";
+            } else if (
+              rawStatus.includes("out for delivery") ||
+              rawStatus.includes("dispatched") ||
+              rawStatus.includes("transit") ||
+              instructions.includes("in transit")
+            ) {
+              newStatus = "Dispatched";
+            } else if (
+              rawStatus.includes("picked up") ||
+              rawStatus.includes("manifest") ||
+              instructions.includes("picked up")
+            ) {
+              newStatus = "Packed";
+            }
+            if (newStatus && newStatus !== ord.orderStatus) {
+              await updateOrderDetails(ord.orderRef, { orderStatus: newStatus });
+              updatedCount++;
+            }
+          }
+        } catch (e) {
+          console.warn("Notice syncing waybill:", ord.trackingNumber, e);
+        }
+      }
+      if (updatedCount > 0) {
+        showToast(`Updated ${updatedCount} orders from live Delhivery tracking!`);
+      } else {
+        showToast("Delhivery statuses are already up to date.");
+      }
+    } finally {
+      setIsSyncingDelhivery(false);
+    }
   };
 
   const handleCopyCustomerAddress = (order: Order) => {
@@ -841,7 +961,17 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                     Live Orders & Delhivery Queue ({displayOrders.length})
                   </h2>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    disabled={isSyncingDelhivery}
+                    onClick={handleSyncAllDelhiveryTracking}
+                    className="px-2.5 py-1 rounded-lg text-xs font-bold bg-blue-500/15 hover:bg-blue-500/25 text-blue-700 dark:text-blue-300 border border-blue-500/30 flex items-center gap-1 cursor-pointer transition-colors"
+                    title="Poll Delhivery carrier API for all active AWB shipments and update delivery status directly in Firestore"
+                  >
+                    <Truck className={`w-3 h-3 text-blue-600 ${isSyncingDelhivery ? "animate-bounce" : ""}`} />
+                    <span>{isSyncingDelhivery ? "Syncing Delhivery..." : "Sync Delhivery"}</span>
+                  </button>
                   <button
                     type="button"
                     disabled={isSyncingOrders}
@@ -1390,6 +1520,278 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
               )}
             </div>
           </div>
+        </div>
+
+        {/* Monthly Cooking Oil Subscriptions Management Hub (Direct Firestore) */}
+        <div
+          className={`rounded-3xl border p-6 sm:p-8 shadow-sm space-y-6 transition-colors ${
+            isDark ? "bg-[#1C120B] border-[#362114]" : "bg-white border-[#E8DEC8]"
+          }`}
+        >
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-4 border-stone-200 dark:border-stone-800">
+            <div className="flex items-center gap-3">
+              <div className="p-3 rounded-2xl bg-[#E08F35]/15 text-[#E08F35]">
+                <Calendar className="w-6 h-6 text-[#E08F35]" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h2 className="text-lg sm:text-xl font-bold font-serif">
+                    Monthly Oil Subscriptions Hub ({adminSubscriptions.length})
+                  </h2>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    Direct Firestore
+                  </span>
+                </div>
+                <p className="text-xs text-stone-500 mt-0.5">
+                  Live real-time feed of subscribers. When customers customize or edit their combo, it updates here immediately.
+                </p>
+              </div>
+            </div>
+
+            {/* Quick Metrics */}
+            <div className="flex items-center gap-3">
+              <div className="p-3 rounded-2xl bg-amber-500/5 border border-amber-500/20 text-right">
+                <span className="text-[10px] uppercase font-bold text-stone-500 block">
+                  Active Subscribers
+                </span>
+                <span className="text-lg font-black text-[#E08F35] font-serif">
+                  {adminSubscriptions.filter((s) => s.status === "active").length}
+                </span>
+              </div>
+              <div className="p-3 rounded-2xl bg-emerald-500/5 border border-emerald-500/20 text-right">
+                <span className="text-[10px] uppercase font-bold text-stone-500 block">
+                  Monthly Run Rate (MRR)
+                </span>
+                <span className="text-lg font-black text-emerald-600 font-serif">
+                  ₹
+                  {adminSubscriptions
+                    .filter((s) => s.status === "active")
+                    .reduce((acc, s) => acc + (Number(s.monthlyPrice) || 0), 0)
+                    .toLocaleString("en-IN")}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Search & Filters */}
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
+            <input
+              type="text"
+              placeholder="Search by customer name, phone, combo, or city..."
+              value={subSearch}
+              onChange={(e) => setSubSearch(e.target.value)}
+              className="w-full sm:max-w-md px-3.5 py-2 rounded-xl text-xs border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-900/50"
+            />
+            <div className="flex items-center gap-1 self-start sm:self-auto">
+              {["all", "active", "paused", "cancelled"].map((st) => (
+                <button
+                  key={st}
+                  type="button"
+                  onClick={() => setSubStatusFilter(st)}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold capitalize transition-all cursor-pointer ${
+                    subStatusFilter === st
+                      ? "bg-[#5E3210] text-white shadow-xs"
+                      : "bg-stone-100 dark:bg-stone-800 text-stone-600 dark:text-stone-300"
+                  }`}
+                >
+                  {st}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Subscriptions Grid */}
+          {(() => {
+            const query = subSearch.toLowerCase().trim();
+            const filteredSubs = adminSubscriptions.filter((sub) => {
+              const matchesFilter =
+                subStatusFilter === "all" ||
+                (sub.status || "active").toLowerCase() === subStatusFilter.toLowerCase();
+              const matchesQuery =
+                !query ||
+                (sub.customerName || "").toLowerCase().includes(query) ||
+                (sub.customerPhone || "").includes(query) ||
+                (sub.comboName || "").toLowerCase().includes(query) ||
+                (sub.shippingAddress?.district || "").toLowerCase().includes(query) ||
+                (sub.shippingAddress?.pincode || "").includes(query);
+              return matchesFilter && matchesQuery;
+            });
+
+            if (filteredSubs.length === 0) {
+              return (
+                <div className="p-8 text-center text-stone-400 space-y-2">
+                  <Calendar className="w-8 h-8 mx-auto text-stone-300" />
+                  <p className="text-xs font-semibold">No subscriptions found matching filter</p>
+                  <p className="text-[11px]">
+                    Subscribers will appear here automatically when they join the Monthly Oil Club.
+                  </p>
+                </div>
+              );
+            }
+
+            return (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {filteredSubs.map((sub) => {
+                  const cleanPhone = (sub.customerPhone || "").replace(/\D/g, "").slice(-10);
+                  const upiIntent = `upi://pay?pa=manopavana@ybl&pn=MANOPAVANA&am=${sub.monthlyPrice}&cu=INR&tn=${encodeURIComponent(
+                    `MANOPAVANA Sub ${sub.id}`
+                  )}`;
+                  const waMsg = encodeURIComponent(
+                    `🌿 *MANOPAVANA Wood-Pressed Cooking Oils*\n*Monthly Subscription Renewal & Dispatch*\n\n` +
+                      `Namaskara ${sub.customerName || "Customer"}! 🙏\n` +
+                      `Your monthly cold-pressed oil box is scheduled for fresh wooden-press batching and dispatch on *${
+                        sub.nextDispatchDate || `${getOrdinalSuffix(sub.deliveryDay)} of this month`
+                      }*.\n\n` +
+                      `📦 *Your Monthly Box:* ${sub.comboName}\n` +
+                      `🛢️ *Bottles:* ${(sub.items || []).join(", ")}\n` +
+                      `💰 *Monthly Subscription Total (10% Off Applied):* ₹${sub.monthlyPrice}\n` +
+                      `📍 *Delivery Address:* ${sub.shippingAddress?.addressLine1 || ""}, ${
+                        sub.shippingAddress?.district || "Bengaluru"
+                      } - ${sub.shippingAddress?.pincode || ""}\n\n` +
+                      `💳 *Click to Pay directly via PhonePe / UPI:* \n${upiIntent}\n\n` +
+                      `_Or reply here to update your bottle choices or pause your cycle._\n\n` +
+                      `Thank you for trusting pure, authentic Marachekku health!`
+                  );
+                  const waUrl = `https://wa.me/91${cleanPhone}?text=${waMsg}`;
+
+                  return (
+                    <div
+                      key={sub.id}
+                      className={`p-5 rounded-2xl border space-y-4 transition-all ${
+                        isDark ? "bg-[#25150C]/60 border-[#3B2516]" : "bg-amber-50/40 border-[#E8DFC8]"
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <h3 className="font-bold text-sm text-stone-900 dark:text-stone-100">
+                              {sub.customerName || "Valued Customer"}
+                            </h3>
+                            <span
+                              className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                                sub.status === "active"
+                                  ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
+                                  : sub.status === "paused"
+                                  ? "bg-amber-500/15 text-amber-700 dark:text-amber-300"
+                                  : "bg-red-500/15 text-red-600"
+                              }`}
+                            >
+                              {sub.status || "active"}
+                            </span>
+                          </div>
+                          <p className="text-xs text-stone-500 mt-0.5 font-mono">
+                            +91 {cleanPhone || "No Phone"} • {sub.customerEmail || "No Email"}
+                          </p>
+                        </div>
+
+                        <div className="text-right shrink-0">
+                          <span className="text-base font-black font-serif text-[#C8751B] dark:text-amber-300 block">
+                            ₹{sub.monthlyPrice}/mo
+                          </span>
+                          <span className="text-[10px] text-stone-500 uppercase tracking-wider block">
+                            {sub.paymentPlan === "annual_prepaid" ? "Prepaid 1-Yr" : "Monthly Online"}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Combo Details & Itemized Bottles */}
+                      <div className="p-3 rounded-xl bg-white/70 dark:bg-stone-800/70 border border-amber-500/20 space-y-2 text-xs">
+                        <div className="flex items-center justify-between">
+                          <span className="font-bold text-stone-800 dark:text-stone-200">
+                            {sub.comboName}
+                          </span>
+                          {sub.comboType === "custom" && (
+                            <span className="px-2 py-0.5 rounded text-[9px] font-bold bg-[#E08F35]/20 text-[#E08F35] uppercase">
+                              Custom Box
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Bottles Pills */}
+                        <div className="flex flex-wrap gap-1.5 pt-1">
+                          {(sub.items || []).map((it: string, i: number) => (
+                            <span
+                              key={i}
+                              className="px-2 py-0.5 rounded-lg bg-amber-500/10 text-stone-700 dark:text-stone-300 text-[11px] font-medium border border-amber-500/20"
+                            >
+                              {it}
+                            </span>
+                          ))}
+                        </div>
+
+                        {/* Customer modification highlight note */}
+                        {sub.lastModifiedNote && (
+                          <div className="p-2 rounded-lg bg-amber-500/15 border border-amber-500/30 text-[11px] text-[#5E3210] dark:text-amber-200 flex items-start gap-1.5">
+                            <AlertCircle className="w-3.5 h-3.5 text-[#E08F35] shrink-0 mt-0.5" />
+                            <span>{sub.lastModifiedNote}</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Schedule & Delivery Address */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] text-stone-600 dark:text-stone-400">
+                        <div className="space-y-0.5">
+                          <span className="text-[10px] uppercase font-bold text-stone-400 block">
+                            Delivery Cycle
+                          </span>
+                          <p className="font-bold text-stone-800 dark:text-stone-200">
+                            {getOrdinalSuffix(sub.deliveryDay)} of Every Month
+                          </p>
+                          <p className="text-[10px] text-emerald-600 font-semibold">
+                            Next Dispatch: {sub.nextDispatchDate}
+                          </p>
+                        </div>
+
+                        <div className="space-y-0.5">
+                          <span className="text-[10px] uppercase font-bold text-stone-400 block">
+                            Delivery Address
+                          </span>
+                          <p className="line-clamp-2">
+                            {sub.shippingAddress?.addressLine1 || "No street address"},{" "}
+                            {sub.shippingAddress?.district || "Bengaluru"} -{" "}
+                            {sub.shippingAddress?.pincode || ""}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Action Buttons */}
+                      <div className="pt-2 border-t border-amber-500/20 flex items-center justify-between gap-2">
+                        <button
+                          type="button"
+                          disabled={isUpdatingSub[sub.id]}
+                          onClick={() => handleToggleSubStatus(sub.id, sub.status || "active")}
+                          className="px-3 py-1.5 rounded-xl border border-stone-300 dark:border-stone-700 text-xs font-semibold hover:bg-stone-100 dark:hover:bg-stone-800 transition-colors cursor-pointer flex items-center gap-1.5"
+                        >
+                          {sub.status === "active" ? (
+                            <>
+                              <Pause className="w-3.5 h-3.5 text-amber-500" />
+                              <span>Pause</span>
+                            </>
+                          ) : (
+                            <>
+                              <Play className="w-3.5 h-3.5 text-emerald-500" />
+                              <span>Resume</span>
+                            </>
+                          )}
+                        </button>
+
+                        <a
+                          href={waUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer"
+                        >
+                          <MessageCircle className="w-3.5 h-3.5" />
+                          <span>WhatsApp Reminder</span>
+                        </a>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })()}
         </div>
 
         {/* WhatsApp Authentication & Gateway Hub (Placed at bottom for maintenance/reference) */}
