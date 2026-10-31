@@ -1173,21 +1173,56 @@ export async function deleteReviewFromFirestore(reviewId: string) {
 }
 
 /**
+ * Clean object of any undefined values before writing to Firestore
+ */
+function cleanObjectForFirestore(obj: any): any {
+  if (obj === null || obj === undefined) return null;
+  return JSON.parse(JSON.stringify(obj, (_, v) => (v === undefined ? null : v)));
+}
+
+/**
  * Save store CMS configuration to Firestore document 'settings/store_config'
  */
-export async function saveStoreConfigToFirestore(config: StoreCMSConfig) {
+export async function saveStoreConfigToFirestore(config: StoreCMSConfig): Promise<boolean> {
+  try {
+    const configDocRef = doc(db, "settings", "store_config");
+    const sanitized = cleanObjectForFirestore(config);
+    await setDoc(
+      configDocRef,
+      {
+        ...sanitized,
+        updatedAt: serverTimestamp(),
+      },
+      { merge: true }
+    );
+    return true;
+  } catch (err) {
+    console.error("Error saving store_config to Firestore:", err);
+    handleFirestoreError(err, OperationType.WRITE, "settings/store_config");
+    return false;
+  }
+}
+
+/**
+ * Direct atomic update for shipping thresholds & delivery fees in Firestore
+ */
+export async function saveShippingRulesToFirestore(threshold: number, standardFee: number): Promise<boolean> {
   try {
     const configDocRef = doc(db, "settings", "store_config");
     await setDoc(
       configDocRef,
       {
-        ...config,
+        freeShippingThreshold: Number(threshold),
+        standardShippingFee: Number(standardFee),
         updatedAt: serverTimestamp(),
       },
       { merge: true }
     );
+    return true;
   } catch (err) {
+    console.error("Error saving shipping rules to Firestore:", err);
     handleFirestoreError(err, OperationType.WRITE, "settings/store_config");
+    return false;
   }
 }
 

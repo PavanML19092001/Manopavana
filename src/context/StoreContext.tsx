@@ -1721,6 +1721,12 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         ) {
           parsed.brandLogoUrl = MEDIA_ASSETS.logo;
         }
+        if (parsed.freeShippingThreshold === 500) {
+          parsed.freeShippingThreshold = BUSINESS_CONFIG.FREE_SHIPPING_THRESHOLD;
+        }
+        if (parsed.standardShippingFee === 49) {
+          parsed.standardShippingFee = BUSINESS_CONFIG.STANDARD_SHIPPING_FEE;
+        }
         return parsed;
       }
       return DEFAULT_CMS_CONFIG;
@@ -1733,9 +1739,21 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const unsubscribe = subscribeStoreConfig((remoteConfig) => {
       if (remoteConfig) {
         setCmsConfig((prev) => {
+          const cleanThreshold =
+            remoteConfig.freeShippingThreshold === 500
+              ? (prev.freeShippingThreshold && prev.freeShippingThreshold !== 500 ? prev.freeShippingThreshold : BUSINESS_CONFIG.FREE_SHIPPING_THRESHOLD)
+              : (remoteConfig.freeShippingThreshold ?? prev.freeShippingThreshold ?? BUSINESS_CONFIG.FREE_SHIPPING_THRESHOLD);
+
+          const cleanStdFee =
+            remoteConfig.standardShippingFee === 49
+              ? (prev.standardShippingFee && prev.standardShippingFee !== 49 ? prev.standardShippingFee : BUSINESS_CONFIG.STANDARD_SHIPPING_FEE)
+              : (remoteConfig.standardShippingFee ?? prev.standardShippingFee ?? BUSINESS_CONFIG.STANDARD_SHIPPING_FEE);
+
           const merged: StoreCMSConfig = {
             ...prev,
             ...remoteConfig,
+            freeShippingThreshold: cleanThreshold,
+            standardShippingFee: cleanStdFee,
             festiveBanner: { ...prev.festiveBanner, ...(remoteConfig.festiveBanner || {}) },
             prices: { ...prev.prices, ...(remoteConfig.prices || {}) },
             mrp: { ...prev.mrp, ...(remoteConfig.mrp || {}) },
@@ -1771,7 +1789,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       try {
         localStorage.setItem("manopavana_cms", JSON.stringify(next));
       } catch {}
-      saveStoreConfigToFirestore(next);
+      saveStoreConfigToFirestore(next).catch((e) => console.error("Notice saving CMS to Firestore:", e));
       return next;
     });
   };

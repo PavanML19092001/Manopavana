@@ -52,6 +52,7 @@ import {
   ProductDetailOverride,
   ComboDetailOverride,
 } from "../../types";
+import { saveShippingRulesToFirestore } from "../../firebase";
 
 export const StorefrontCMSPanel: React.FC<{ isDark: boolean }> = ({ isDark }) => {
   const {
@@ -96,8 +97,28 @@ export const StorefrontCMSPanel: React.FC<{ isDark: boolean }> = ({ isDark }) =>
   const [highlightsInput, setHighlightsInput] = useState(
     (cmsConfig?.heroHighlights || BUSINESS_CONFIG.HERO_HIGHLIGHTS).join(", ")
   );
-  const [threshold, setThreshold] = useState(cmsConfig?.freeShippingThreshold ?? 800);
-  const [stdFee, setStdFee] = useState(cmsConfig?.standardShippingFee ?? 70);
+  const [threshold, setThreshold] = useState<number>(() => {
+    const val = cmsConfig?.freeShippingThreshold;
+    return val && val !== 500 ? val : 800;
+  });
+  const [stdFee, setStdFee] = useState<number>(() => {
+    const val = cmsConfig?.standardShippingFee;
+    return val && val !== 49 ? val : 70;
+  });
+  const [isSavingShipping, setIsSavingShipping] = useState(false);
+
+  // Synchronize threshold & stdFee whenever cmsConfig updates from Firestore
+  React.useEffect(() => {
+    if (cmsConfig?.freeShippingThreshold !== undefined && cmsConfig.freeShippingThreshold !== 500) {
+      setThreshold(cmsConfig.freeShippingThreshold);
+    }
+  }, [cmsConfig?.freeShippingThreshold]);
+
+  React.useEffect(() => {
+    if (cmsConfig?.standardShippingFee !== undefined && cmsConfig.standardShippingFee !== 49) {
+      setStdFee(cmsConfig.standardShippingFee);
+    }
+  }, [cmsConfig?.standardShippingFee]);
 
   // Festive / Occasion Top Banner State
   const [festiveEnabled, setFestiveEnabled] = useState(
@@ -1063,18 +1084,51 @@ export const StorefrontCMSPanel: React.FC<{ isDark: boolean }> = ({ isDark }) =>
                     </p>
                   </div>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setThreshold(800);
-                    setStdFee(70);
-                    showToast("Reset shipping rules to defaults: ₹800 threshold / ₹70 standard fee!");
-                  }}
-                  className="px-3 py-1 rounded-xl text-[10px] font-bold bg-[#5E3210] hover:bg-[#43230A] text-white flex items-center gap-1.5 transition-colors cursor-pointer self-start sm:self-auto shadow-xs"
-                >
-                  <RefreshCw className="w-3 h-3 text-amber-300" />
-                  <span>Reset to Policy Defaults (₹800 / ₹70)</span>
-                </button>
+                <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      const newThreshold = Number(threshold);
+                      const newStdFee = Number(stdFee);
+                      setIsSavingShipping(true);
+                      updateCMSConfig((prev) => ({
+                        ...prev,
+                        freeShippingThreshold: newThreshold,
+                        standardShippingFee: newStdFee,
+                      }));
+                      const ok = await saveShippingRulesToFirestore(newThreshold, newStdFee);
+                      setIsSavingShipping(false);
+                      if (ok) {
+                        showToast(`✅ Saved & Synced to Cloud: Free above ₹${newThreshold} • Standard Fee ₹${newStdFee}`);
+                      } else {
+                        showToast("Saved locally and scheduled cloud sync.");
+                      }
+                    }}
+                    disabled={isSavingShipping}
+                    className="px-3.5 py-1.5 rounded-xl text-[10px] font-bold bg-[#E08F35] hover:bg-amber-400 text-[#140D09] flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs disabled:opacity-50"
+                  >
+                    <Save className={`w-3 h-3 text-[#140D09] ${isSavingShipping ? "animate-spin" : ""}`} />
+                    <span>{isSavingShipping ? "Saving to Cloud..." : "Save Shipping Rules"}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      setThreshold(800);
+                      setStdFee(70);
+                      updateCMSConfig((prev) => ({
+                        ...prev,
+                        freeShippingThreshold: 800,
+                        standardShippingFee: 70,
+                      }));
+                      await saveShippingRulesToFirestore(800, 70);
+                      showToast("Reset shipping rules to defaults: ₹800 threshold / ₹70 standard fee!");
+                    }}
+                    className="px-3 py-1.5 rounded-xl text-[10px] font-bold bg-[#5E3210] hover:bg-[#43230A] text-white flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
+                  >
+                    <RefreshCw className="w-3 h-3 text-amber-300" />
+                    <span>Reset to Defaults (₹800 / ₹70)</span>
+                  </button>
+                </div>
               </div>
 
               {/* Active Rules Visual Cards */}
