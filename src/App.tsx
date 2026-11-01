@@ -205,10 +205,12 @@ export default function App() {
           setOrderSuccessRef(ref);
           showToast("Payment verified online! Order placed.");
         } else {
+          setOrderSuccessRef(null);
           await updateFirestoreOrderStatus(ref, {
             orderStatus: "Payment Incomplete",
             paymentStatus: "FAILED",
           });
+          showToast("Online payment cancelled or incomplete.");
 
           if (matched && matched.items && matched.items.length > 0) {
             setPaymentFailedOrder(matched);
@@ -241,6 +243,7 @@ export default function App() {
         }
       } catch (err) {
         console.warn("Payment verification error:", err);
+        setOrderSuccessRef(null);
         let matched: Order | null | undefined = await getOrderFromFirestore(ref);
         if (!matched) matched = getOrder(ref) || null;
         if (matched && matched.items && matched.items.length > 0) {

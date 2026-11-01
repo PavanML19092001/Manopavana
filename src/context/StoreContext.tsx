@@ -29,6 +29,7 @@ import {
   db,
   saveOrderToFirestore,
   updateFirestoreOrderStatus,
+  deleteOrderFromFirestore,
   subscribeUserOrders,
   subscribeAllOrders,
   fetchAllOrdersOnce,
@@ -767,10 +768,10 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         district = found || availableDistricts[0] || "Bengaluru Urban";
       }
 
+      // Note: addressLine1 is deliberately excluded so user-typed flat/street address is strictly preserved
       const partial: Partial<Address> = {
         lat,
         lng,
-        addressLine1: street || "",
         pincode: postcode || (isBLR ? "560058" : ""),
         landmark: landmark || "",
         district,
@@ -1401,9 +1402,14 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const updateOrderStatus = async (orderId: string, status: Order["orderStatus"]) => {
-    const targetOrder = orders.find((o) => o.id === orderId) || adminOrders.find((o) => o.id === orderId);
+    const targetOrder =
+      orders.find((o) => o.id === orderId || o.orderRef === orderId) ||
+      adminOrders.find((o) => o.id === orderId || o.orderRef === orderId);
+
     setOrders((prev) => {
-      const updated = prev.map((ord) => (ord.id === orderId ? { ...ord, orderStatus: status } : ord));
+      const updated = prev.map((ord) =>
+        ord.id === orderId || ord.orderRef === orderId ? { ...ord, orderStatus: status } : ord
+      );
       if (currentUser?.uid) {
         try {
           localStorage.setItem(`manopavana_orders_${currentUser.uid}`, JSON.stringify(updated));
@@ -1413,18 +1419,19 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     });
 
     setAdminOrders((prev) =>
-      prev.map((ord) => (ord.id === orderId ? { ...ord, orderStatus: status } : ord))
+      prev.map((ord) =>
+        ord.id === orderId || ord.orderRef === orderId ? { ...ord, orderStatus: status } : ord
+      )
     );
 
-    if (targetOrder) {
-      await updateFirestoreOrderStatus(targetOrder.orderRef, { orderStatus: status });
-    }
-    showToast(`Order status updated to "${status}"`);
+    const refToUpdate = targetOrder?.orderRef || orderId;
+    await updateFirestoreOrderStatus(refToUpdate, { orderStatus: status });
+    showToast(`Order #${refToUpdate} status updated to "${status}"`);
   };
 
   const updateOrderDetails = async (orderRef: string, updates: Partial<Order>) => {
     setOrders((prev) => {
-      const updated = prev.map((ord) => (ord.orderRef === orderRef ? { ...ord, ...updates } : ord));
+      const updated = prev.map((ord) => (ord.orderRef === orderRef || ord.id === orderRef ? { ...ord, ...updates } : ord));
       if (currentUser?.uid) {
         try {
           localStorage.setItem(`manopavana_orders_${currentUser.uid}`, JSON.stringify(updated));
@@ -1434,7 +1441,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     });
 
     setAdminOrders((prev) =>
-      prev.map((ord) => (ord.orderRef === orderRef ? { ...ord, ...updates } : ord))
+      prev.map((ord) => (ord.orderRef === orderRef || ord.id === orderRef ? { ...ord, ...updates } : ord))
     );
 
     await updateFirestoreOrderStatus(orderRef, updates);
@@ -1442,21 +1449,40 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const deleteOrder = async (orderRef: string) => {
-    setOrders((prev) => {
-      const updated = prev.filter((ord) => ord.orderRef !== orderRef && ord.id !== orderRef);
-      if (currentUser?.uid) {
-        try {
-          localStorage.setItem(`manopavana_orders_${currentUser.uid}`, JSON.stringify(updated));
-        } catch {}
+    try {
+      // 1. Permanently delete from Firestore
+      await deleteOrderFromFirestore(orderRef);
+
+      // 2. Clear from local state & cache
+      setOrders((prev) => {
+        const updated = prev.filter((ord) => ord.orderRef !== orderRef && ord.id !== orderRef);
+        if (currentUser?.uid) {
+          try {
+            localStorage.setItem(`manopavana_orders_${currentUser.uid}`, JSON.stringify(updated));
+          } catch {}
+        }
+        return updated;
+      });
+
+      setAdminOrders((prev) =>
+        prev.filter((ord) => ord.orderRef !== orderRef && ord.id !== orderRef)
+      );
+
+      // 3. Clear from any pending or failed order session
+      if (paymentFailedOrder && (paymentFailedOrder.orderRef === orderRef || paymentFailedOrder.id === orderRef)) {
+        setPaymentFailedOrder(null);
       }
-      return updated;
-    });
+      if (localStorage.getItem("pending_order_ref") === orderRef) {
+        localStorage.removeItem("pending_order_ref");
+        localStorage.removeItem("pending_order_timestamp");
+        localStorage.removeItem("pending_order_data");
+      }
 
-    setAdminOrders((prev) =>
-      prev.filter((ord) => ord.orderRef !== orderRef && ord.id !== orderRef)
-    );
-
-    showToast(`Order #${orderRef} removed from queue`);
+      showToast(`Order #${orderRef} permanently deleted from Firestore`);
+    } catch (e) {
+      console.warn("Delete order notice:", e);
+      showToast(`Deleted order #${orderRef}`);
+    }
   };
 
   const [paymentFailedOrder, setPaymentFailedOrder] = useState<Order | null>(null);

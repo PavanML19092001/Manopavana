@@ -36,8 +36,7 @@ service cloud.firestore {
 
     // Orders collection
     match /orders/{orderId} {
-      allow read, create, update: if true;
-      allow delete: if isAdmin();
+      allow read, create, update, delete: if true;
     }
 
     // Customer reviews

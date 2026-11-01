@@ -1021,6 +1021,21 @@ export async function updateFirestoreOrderStatus(
 }
 
 /**
+ * Delete order permanently from Firestore 'orders' collection
+ */
+export async function deleteOrderFromFirestore(orderRef: string): Promise<boolean> {
+  if (!orderRef) return false;
+  try {
+    const orderDocRef = doc(db, "orders", orderRef);
+    await deleteDoc(orderDocRef);
+    return true;
+  } catch (err) {
+    handleFirestoreError(err, OperationType.DELETE, `orders/${orderRef}`);
+    return false;
+  }
+}
+
+/**
  * Listen to orders for a specific user in real-time.
  * Guarantees order parity across mobile number and linked email accounts
  * by querying both customerUid and customerPhone.
@@ -1046,10 +1061,14 @@ export function subscribeUserOrders(
   try {
     const ordersCol = collection(db, "orders");
     const unsubs: (() => void)[] = [];
-    const ordersMap = new Map<string, Order>();
+    const uidOrdersMap = new Map<string, Order>();
+    const phoneOrdersMap = new Map<string, Order>();
 
     const emitOrders = () => {
-      const list = Array.from(ordersMap.values());
+      const mergedMap = new Map<string, Order>();
+      uidOrdersMap.forEach((ord, key) => mergedMap.set(key, ord));
+      phoneOrdersMap.forEach((ord, key) => mergedMap.set(key, ord));
+      const list = Array.from(mergedMap.values());
       list.sort(
         (a, b) => (b.timestamp || b.timestampMs || 0) - (a.timestamp || a.timestampMs || 0)
       );
@@ -1065,10 +1084,11 @@ export function subscribeUserOrders(
       const unsub1 = onSnapshot(
         qOrders,
         (snapshot) => {
+          uidOrdersMap.clear();
           snapshot.forEach((d) => {
             const data = d.data() as Order;
             const ref = data.orderRef || d.id;
-            ordersMap.set(ref, data);
+            uidOrdersMap.set(ref, data);
           });
           emitOrders();
         },
@@ -1084,10 +1104,11 @@ export function subscribeUserOrders(
       const unsub2 = onSnapshot(
         qPhone,
         (snapshot) => {
+          phoneOrdersMap.clear();
           snapshot.forEach((d) => {
             const data = d.data() as Order;
             const ref = data.orderRef || d.id;
-            ordersMap.set(ref, data);
+            phoneOrdersMap.set(ref, data);
           });
           emitOrders();
         },

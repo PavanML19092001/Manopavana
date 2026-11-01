@@ -36,6 +36,8 @@ export const OrdersPage = () => {
     cancelOrderWithinWindow,
     showToast,
     setLoginModalOpen,
+    loadOrderToCartAndRetry,
+    switchOrderToCOD,
   } = useStore();
 
   const isDark = themeMode === "dark";
@@ -243,9 +245,11 @@ export const OrdersPage = () => {
                     className={`w-2.5 h-2.5 rounded-full ${
                       activeOrder.orderStatus === "Delivered"
                         ? "bg-emerald-500"
-                        : activeOrder.orderStatus === "Cancelled"
+                        : activeOrder.orderStatus === "Cancelled" || activeOrder.orderStatus === "Failed (Expired)"
                         ? "bg-red-500"
-                        : "bg-amber-500 animate-pulse"
+                        : activeOrder.orderStatus === "Payment Incomplete"
+                        ? "bg-amber-500 animate-pulse"
+                        : "bg-emerald-500"
                     }`}
                   />
                   <h2 className="text-base font-bold font-serif">
@@ -253,11 +257,15 @@ export const OrdersPage = () => {
                       ? "Delivered to Doorstep"
                       : activeOrder.orderStatus === "Cancelled"
                       ? "Order Cancelled"
+                      : activeOrder.orderStatus === "Payment Incomplete"
+                      ? "Online Payment Incomplete"
+                      : activeOrder.orderStatus === "Failed (Expired)"
+                      ? "Payment Window Expired"
                       : activeOrder.orderStatus === "Dispatched"
                       ? "Dispatched with Delhivery Carrier"
                       : activeOrder.orderStatus === "Packed"
                       ? "Packed & Ready at Facility"
-                      : "Order Confirmed"}
+                      : "Order Confirmed & Placed"}
                   </h2>
                 </div>
               </div>
@@ -280,8 +288,65 @@ export const OrdersPage = () => {
               )}
             </div>
 
-            {/* Stepper Timeline (Flipkart style) */}
-            {activeOrder.orderStatus !== "Cancelled" ? (
+            {/* Status-specific Action Panel or Flipkart Stepper */}
+            {activeOrder.orderStatus === "Payment Incomplete" ? (
+              <div className="p-5 rounded-2xl bg-amber-950/30 border-2 border-amber-500/40 space-y-3">
+                <div className="flex items-center gap-2.5 text-amber-300">
+                  <AlertCircle className="w-5 h-5 shrink-0" />
+                  <span className="font-bold text-sm font-serif">
+                    Online Payment Incomplete / Cancelled
+                  </span>
+                </div>
+                <p className="text-xs text-stone-300 leading-relaxed">
+                  The online transaction was cancelled or did not complete. Your cold-pressed oil bottles remain reserved for 10 minutes. You can retry paying online or switch this order directly to Cash on Delivery.
+                </p>
+                <div className="flex flex-wrap gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      loadOrderToCartAndRetry(activeOrder);
+                      navigate("/checkout");
+                    }}
+                    className="px-4 py-2.5 rounded-xl bg-[#E08F35] hover:bg-[#c97a26] text-[#1F120A] font-bold text-xs shadow-md transition-all cursor-pointer flex items-center gap-1.5"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" />
+                    <span>Retry Online Payment</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      await switchOrderToCOD(activeOrder.orderRef);
+                      showToast("Order switched to Cash on Delivery!");
+                    }}
+                    className="px-4 py-2.5 rounded-xl bg-stone-800 hover:bg-stone-700 text-stone-100 font-bold text-xs border border-stone-600 transition-all cursor-pointer flex items-center gap-1.5"
+                  >
+                    <span>Switch to Cash on Delivery (COD)</span>
+                  </button>
+                </div>
+              </div>
+            ) : activeOrder.orderStatus === "Failed (Expired)" ? (
+              <div className="p-5 rounded-2xl bg-red-950/30 border-2 border-red-500/40 space-y-3">
+                <div className="flex items-center gap-2.5 text-red-300">
+                  <XCircle className="w-5 h-5 shrink-0" />
+                  <span className="font-bold text-sm font-serif">
+                    Payment Window Expired (Failed)
+                  </span>
+                </div>
+                <p className="text-xs text-stone-300 leading-relaxed">
+                  The 10-minute payment window for this order has expired. Reserved inventory has been returned to stock. You can re-order fresh bottles anytime.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    loadOrderToCartAndRetry(activeOrder);
+                    navigate("/checkout");
+                  }}
+                  className="px-4 py-2.5 rounded-xl bg-[#E08F35] hover:bg-[#c97a26] text-[#1F120A] font-bold text-xs shadow-md transition-all cursor-pointer"
+                >
+                  Re-order These Items
+                </button>
+              </div>
+            ) : activeOrder.orderStatus !== "Cancelled" ? (
               <div className="relative pl-6 sm:pl-8 space-y-6 before:absolute before:left-3 sm:before:left-4 before:top-2 before:bottom-2 before:w-0.5 before:bg-stone-200 dark:before:bg-stone-800">
                 {/* Step 1: Placed */}
                 <div className="relative flex items-start gap-4">
@@ -621,6 +686,8 @@ export const OrdersPage = () => {
               const remainingCount = ord.items.length - 1;
               const isDelivered = ord.orderStatus === "Delivered";
               const isCancelled = ord.orderStatus === "Cancelled";
+              const isIncomplete = ord.orderStatus === "Payment Incomplete";
+              const isExpired = ord.orderStatus === "Failed (Expired)";
 
               return (
                 <div
@@ -685,24 +752,32 @@ export const OrdersPage = () => {
                           className={`w-2 h-2 rounded-full ${
                             isDelivered
                               ? "bg-emerald-500"
-                              : isCancelled
+                              : isCancelled || isExpired
                               ? "bg-red-500"
-                              : "bg-amber-500 animate-pulse"
+                              : isIncomplete
+                              ? "bg-amber-500 animate-pulse"
+                              : "bg-emerald-500"
                           }`}
                         />
                         <span
                           className={`text-xs font-bold ${
                             isDelivered
                               ? "text-emerald-700 dark:text-emerald-400"
-                              : isCancelled
+                              : isCancelled || isExpired
                               ? "text-red-600"
-                              : "text-amber-700 dark:text-amber-400"
+                              : isIncomplete
+                              ? "text-amber-700 dark:text-amber-400"
+                              : "text-emerald-700 dark:text-emerald-400"
                           }`}
                         >
                           {isDelivered
                             ? "Delivered"
                             : isCancelled
                             ? "Cancelled"
+                            : isIncomplete
+                            ? "Payment Incomplete"
+                            : isExpired
+                            ? "Payment Expired"
                             : ord.orderStatus === "Dispatched"
                             ? "In Transit"
                             : ord.orderStatus === "Packed"
@@ -715,6 +790,10 @@ export const OrdersPage = () => {
                           ? "Delivered to your address"
                           : isCancelled
                           ? "Refund processed"
+                          : isIncomplete
+                          ? "Payment incomplete • Tap to retry or switch to COD"
+                          : isExpired
+                          ? "Payment window expired after 10 mins"
                           : ord.trackingNumber
                           ? `Delhivery AWB #${ord.trackingNumber}`
                           : "Preparing your shipment"}

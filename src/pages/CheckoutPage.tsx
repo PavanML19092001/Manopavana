@@ -175,7 +175,7 @@ export const CheckoutPage: React.FC = () => {
     }
     if (address) {
       if (address.fullName && !fullName) setFullName(address.fullName);
-      if (address.phone && !phone) setPhone(address.phone);
+      if (address.phone && (!phone || phone.length !== 10)) setPhone(address.phone);
       if (address.addressLine1 && !addressLine1) setAddressLine1(address.addressLine1);
       if (address.landmark && !landmark) setLandmark(address.landmark);
       if (address.state) setState(address.state);
@@ -189,6 +189,33 @@ export const CheckoutPage: React.FC = () => {
       }
     }
   }, [address, currentUser]);
+
+  // Auto-sync form with active saved address on mount or when savedAddresses load
+  useEffect(() => {
+    if (savedAddresses && savedAddresses.length > 0 && !isAddingNewAddress) {
+      const active = savedAddresses.find((a) => a.id === selectedAddressId) || savedAddresses[0];
+      if (active) {
+        if (active.phone && (!phone || phone.length !== 10)) {
+          setPhone(active.phone);
+        }
+        if (active.fullName && !fullName) {
+          setFullName(active.fullName);
+        }
+        if (active.addressLine1 && !addressLine1) {
+          setAddressLine1(active.addressLine1);
+        }
+        if (active.pincode && (!pincode || pincode === "560058")) {
+          setPincode(active.pincode);
+        }
+        if (active.state && !state) {
+          setState(active.state);
+        }
+        if (active.district && !district) {
+          setDistrict(active.district);
+        }
+      }
+    }
+  }, [savedAddresses, selectedAddressId, isAddingNewAddress]);
 
   // 2. Direct Firestore Customer Profile Sync on mount
   useEffect(() => {
@@ -322,15 +349,15 @@ export const CheckoutPage: React.FC = () => {
                 setCoords([lat, lng]);
                 marker.setLatLng([lat, lng]);
                 updateAddress({ lat, lng });
-                showToast("Pin placed on map! Updating address...");
+                showToast("Pin placed on map! Syncing pincode & district...");
                 const partial = await reverseGeocodeAndSaveAddress(lat, lng);
                 if (partial) {
-                  if (partial.addressLine1) setAddressLine1(partial.addressLine1);
+                  // addressLine1 is preserved strictly from user manual input
                   if (partial.pincode) setPincode(partial.pincode);
                   if (partial.state) setState(partial.state);
                   if (partial.district) setDistrict(partial.district);
                   if (partial.landmark) setLandmark(partial.landmark);
-                  showToast("Address & district auto-populated from pin!");
+                  showToast("Pincode, district & state auto-populated from pin!");
                 }
               }
             } catch (err) {
@@ -345,12 +372,12 @@ export const CheckoutPage: React.FC = () => {
               updateAddress({ lat: latLng.lat, lng: latLng.lng });
               const partial = await reverseGeocodeAndSaveAddress(latLng.lat, latLng.lng);
               if (partial) {
-                if (partial.addressLine1) setAddressLine1(partial.addressLine1);
+                // addressLine1 is preserved strictly from user manual input
                 if (partial.pincode) setPincode(partial.pincode);
                 if (partial.state) setState(partial.state);
                 if (partial.district) setDistrict(partial.district);
                 if (partial.landmark) setLandmark(partial.landmark);
-                showToast("Pin dragged! Street address & district updated.");
+                showToast("Pin updated! Pincode & district synced.");
               }
             } catch (e) {
               console.warn("Marker drag notice:", e);
@@ -438,7 +465,7 @@ export const CheckoutPage: React.FC = () => {
     showToast("Map focused on selected location!");
     const partial = await reverseGeocodeAndSaveAddress(lat, lon);
     if (partial) {
-      if (partial.addressLine1) setAddressLine1(partial.addressLine1);
+      // addressLine1 is preserved strictly from user manual input
       if (partial.pincode) setPincode(partial.pincode);
       if (partial.state) setState(partial.state);
       if (partial.district) setDistrict(partial.district);
@@ -469,15 +496,15 @@ export const CheckoutPage: React.FC = () => {
             const c: [number, number] = [lat, lng];
             setCoords(c);
             safeUpdateMapCenter(lat, lng, 16);
-            showToast("GPS coordinates retrieved! Auto-filling address...");
+            showToast("GPS coordinates retrieved! Updating pincode & district...");
             const partial = await reverseGeocodeAndSaveAddress(lat, lng);
             if (partial) {
-              if (partial.addressLine1) setAddressLine1(partial.addressLine1);
+              // addressLine1 is preserved strictly from user manual input
               if (partial.pincode) setPincode(partial.pincode);
               if (partial.state) setState(partial.state);
               if (partial.district) setDistrict(partial.district);
               if (partial.landmark) setLandmark(partial.landmark);
-              showToast("Address & district auto-populated from GPS!");
+              showToast("Pincode, district & state auto-populated from GPS!");
             }
           }
         } catch (e) {
@@ -517,7 +544,19 @@ export const CheckoutPage: React.FC = () => {
       return;
     }
 
-    const cleanPhone = phone.trim().replace(/\D/g, "").slice(-10);
+    let cleanPhone = phone.trim().replace(/\D/g, "").slice(-10);
+    if (cleanPhone.length !== 10) {
+      const fallback =
+        (address.phone || "").replace(/\D/g, "").slice(-10) ||
+        (savedAddresses && savedAddresses.length > 0 ? (savedAddresses[0].phone || "").replace(/\D/g, "").slice(-10) : "") ||
+        (currentUser?.phoneNumber ? extractCleanPhone(currentUser.phoneNumber) : "") ||
+        (currentUser?.email ? extractCleanPhone(currentUser.email) : "");
+      if (fallback.length === 10) {
+        cleanPhone = fallback;
+        setPhone(fallback);
+      }
+    }
+
     if (cleanPhone.length !== 10) {
       showToast("Please enter a valid 10-digit WhatsApp phone number.");
       return;
