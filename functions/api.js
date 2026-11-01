@@ -537,9 +537,26 @@ export async function onRequest(context) {
       const codAmount = isCod ? Math.round(Number(totalAmount)) : 0;
 
       // Extract coordinates and construct direct Google Maps pin link
-      const numLat = Number.isFinite(Number(lat)) && Number(lat) !== 0 ? Number(lat) : null;
-      const numLng = Number.isFinite(Number(lng)) && Number(lng) !== 0 ? Number(lng) : null;
-      const mapLink = mapsUrl || (numLat && numLng ? `https://maps.google.com/?q=${numLat},${numLng}` : null);
+      const rawLat = Number.isFinite(Number(lat)) && Number(lat) !== 0 ? Number(lat) : null;
+      const rawLng = Number.isFinite(Number(lng)) && Number(lng) !== 0 ? Number(lng) : null;
+
+      // Coordinate sanity check: verify coordinates don't falsely map to Bangalore default if destination pincode is outside Bangalore
+      const pinStr = String(pincode || "").replace(/\D/g, "");
+      const isBangalorePin = pinStr.startsWith("560") || pinStr.startsWith("562");
+      const isDefaultBangalorePin =
+        rawLat &&
+        rawLng &&
+        Math.abs(rawLat - 12.9716) < 0.05 &&
+        Math.abs(rawLng - 77.5946) < 0.05;
+
+      const numLat = isDefaultBangalorePin && !isBangalorePin ? null : rawLat;
+      const numLng = isDefaultBangalorePin && !isBangalorePin ? null : rawLng;
+      const mapLink =
+        numLat && numLng
+          ? `https://maps.google.com/?q=${numLat},${numLng}`
+          : mapsUrl && !mapsUrl.includes("12.9716,77.5946")
+          ? mapsUrl
+          : null;
 
       // Delhivery CMU enforces a 250 character limit on the 'add' field.
       // Use 100% of the customer's manually entered street address as the primary delivery text.

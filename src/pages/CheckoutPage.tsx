@@ -117,6 +117,19 @@ export const CheckoutPage: React.FC = () => {
     Number.isFinite(address.lat) ? (address.lat as number) : 12.9716,
     Number.isFinite(address.lng) ? (address.lng as number) : 77.5946,
   ]);
+  const [isPinConfirmed, setIsPinConfirmed] = useState<boolean>(() => {
+    // If user has a valid saved address with custom coordinates already selected
+    if (
+      Number.isFinite(address.lat) &&
+      Number.isFinite(address.lng) &&
+      (address.lat !== 12.9716 || address.lng !== 77.5946)
+    ) {
+      return true;
+    }
+    return false;
+  });
+  const [mapErrorHighlight, setMapErrorHighlight] = useState(false);
+  const mapSectionRef = useRef<HTMLDivElement | null>(null);
   const [isLocating, setIsLocating] = useState(false);
   const [iframePaymentUrl, setIframePaymentUrl] = useState<string | null>(null);
   const [pendingPhonePeRef, setPendingPhonePeRef] = useState<string | null>(null);
@@ -349,7 +362,9 @@ export const CheckoutPage: React.FC = () => {
                 setCoords([lat, lng]);
                 marker.setLatLng([lat, lng]);
                 updateAddress({ lat, lng });
-                showToast("Pin placed on map! Syncing pincode & district...");
+                setIsPinConfirmed(true);
+                setMapErrorHighlight(false);
+                showToast("Doorstep pin set on map! Coordinates verified.");
                 const partial = await reverseGeocodeAndSaveAddress(lat, lng);
                 if (partial) {
                   // addressLine1 is preserved strictly from user manual input
@@ -370,6 +385,9 @@ export const CheckoutPage: React.FC = () => {
               const latLng = marker.getLatLng();
               setCoords([latLng.lat, latLng.lng]);
               updateAddress({ lat: latLng.lat, lng: latLng.lng });
+              setIsPinConfirmed(true);
+              setMapErrorHighlight(false);
+              showToast("Doorstep pin updated! Coordinates verified.");
               const partial = await reverseGeocodeAndSaveAddress(latLng.lat, latLng.lng);
               if (partial) {
                 // addressLine1 is preserved strictly from user manual input
@@ -451,6 +469,8 @@ export const CheckoutPage: React.FC = () => {
     if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
 
     setCoords([lat, lon]);
+    setIsPinConfirmed(true);
+    setMapErrorHighlight(false);
     setSearchResults([]);
     setSearchQuery(item.display_name);
 
@@ -462,7 +482,7 @@ export const CheckoutPage: React.FC = () => {
       } catch { }
     }
 
-    showToast("Map focused on selected location!");
+    showToast("Map focused on selected location! Pin confirmed.");
     const partial = await reverseGeocodeAndSaveAddress(lat, lon);
     if (partial) {
       // addressLine1 is preserved strictly from user manual input
@@ -472,6 +492,32 @@ export const CheckoutPage: React.FC = () => {
       if (partial.landmark) setLandmark(partial.landmark);
     }
   };
+
+  // Auto-geocode pincode to center map on the customer's actual district/city
+  useEffect(() => {
+    const clean = pincode.replace(/\D/g, "").slice(0, 6);
+    if (clean.length === 6) {
+      const timer = setTimeout(async () => {
+        try {
+          const res = await fetch(
+            `https://nominatim.openstreetmap.org/search?format=json&postalcode=${clean}&country=india&limit=1`
+          );
+          const data = await res.json();
+          if (data && data[0]) {
+            const lat = parseFloat(data[0].lat);
+            const lon = parseFloat(data[0].lon);
+            if (Number.isFinite(lat) && Number.isFinite(lon)) {
+              setCoords([lat, lon]);
+              safeUpdateMapCenter(lat, lon, 14);
+            }
+          }
+        } catch (e) {
+          console.warn("Pincode geocode notice:", e);
+        }
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [pincode]);
 
   const handleStateChange = (newState: string) => {
     setState(newState);
@@ -495,8 +541,10 @@ export const CheckoutPage: React.FC = () => {
           if (Number.isFinite(lat) && Number.isFinite(lng)) {
             const c: [number, number] = [lat, lng];
             setCoords(c);
+            setIsPinConfirmed(true);
+            setMapErrorHighlight(false);
             safeUpdateMapCenter(lat, lng, 16);
-            showToast("GPS coordinates retrieved! Updating pincode & district...");
+            showToast("GPS coordinates locked & verified!");
             const partial = await reverseGeocodeAndSaveAddress(lat, lng);
             if (partial) {
               // addressLine1 is preserved strictly from user manual input
@@ -570,6 +618,15 @@ export const CheckoutPage: React.FC = () => {
     const cleanPin = pincode.trim().replace(/\D/g, "").slice(0, 6);
     if (cleanPin.length !== 6) {
       showToast("Please enter a valid 6-digit Indian postal pincode.");
+      return;
+    }
+
+    if (!isPinConfirmed) {
+      setMapErrorHighlight(true);
+      showToast("📍 Mandatory: Please confirm your doorstep location pin on the map below.");
+      if (mapSectionRef.current) {
+        mapSectionRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
       return;
     }
 
@@ -902,6 +959,8 @@ export const CheckoutPage: React.FC = () => {
                             setPincode(addr.pincode || "560058");
                             if (Number.isFinite(addr.lat) && Number.isFinite(addr.lng)) {
                               setCoords([addr.lat!, addr.lng!]);
+                              setIsPinConfirmed(true);
+                              setMapErrorHighlight(false);
                               safeUpdateMapCenter(addr.lat!, addr.lng!, 15);
                             }
                           }}
@@ -1336,6 +1395,95 @@ export const CheckoutPage: React.FC = () => {
                       </li>
                     ))}
                   </ul>
+                )}
+              </div>
+
+              {/* Mandatory Location Pin Confirmation Banner */}
+              <div
+                ref={mapSectionRef}
+                className={`p-4 rounded-2xl border transition-all ${
+                  !isPinConfirmed
+                    ? mapErrorHighlight
+                      ? "bg-red-500/15 border-red-500 ring-2 ring-red-500/50"
+                      : isDark
+                      ? "bg-amber-950/40 border-[#E08F35]/60 text-amber-100"
+                      : "bg-amber-50/90 border-amber-300 text-[#5E3210]"
+                    : "bg-emerald-500/10 border-emerald-500/30 text-emerald-800 dark:text-emerald-200"
+                }`}
+              >
+                {!isPinConfirmed ? (
+                  <div className="space-y-3">
+                    <div className="flex items-start gap-2.5">
+                      <div className="p-2 rounded-xl bg-[#E08F35]/20 text-[#E08F35] shrink-0 mt-0.5">
+                        <Navigation className="w-4 h-4 animate-pulse text-[#E08F35]" />
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h4 className="text-xs font-bold font-serif">
+                            Step 2: Confirm Your Doorstep Location Pin
+                          </h4>
+                          <span className="px-2 py-0.5 rounded text-[10px] bg-red-600 text-white font-extrabold uppercase tracking-wide">
+                            Mandatory
+                          </span>
+                        </div>
+                        <p className="text-[11px] opacity-90 mt-1 leading-relaxed">
+                          Delivery partners (Delhivery & Ekart) use this exact Google Maps pin to deliver directly to your gate without calling. Detect your GPS or position the pin on your house below.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-2 pt-1">
+                      <button
+                        type="button"
+                        onClick={handleGPSDetect}
+                        disabled={isLocating}
+                        className="px-3.5 py-2 rounded-xl bg-[#5E3210] hover:bg-[#43230A] text-white text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs disabled:opacity-50"
+                      >
+                        <Navigation className="w-3.5 h-3.5 text-amber-300" />
+                        <span>{isLocating ? "Detecting GPS..." : "Auto-Detect My GPS"}</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsPinConfirmed(true);
+                          setMapErrorHighlight(false);
+                          showToast("Doorstep pin confirmed! Exact coordinates attached to order.");
+                        }}
+                        className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
+                      >
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-200" />
+                        <span>Confirm Pin Position ({coords[0].toFixed(3)}, {coords[1].toFixed(3)})</span>
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center gap-2.5">
+                      <div className="p-1.5 rounded-xl bg-emerald-500/20 text-emerald-600 shrink-0">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-bold text-emerald-700 dark:text-emerald-300">
+                            Doorstep Location Pin Confirmed
+                          </span>
+                          <span className="px-1.5 py-0.5 rounded text-[10px] bg-emerald-600/20 text-emerald-700 dark:text-emerald-300 font-bold">
+                            Ready for Navigation
+                          </span>
+                        </div>
+                        <span className="block text-[11px] font-mono opacity-80 mt-0.5">
+                          GPS: {coords[0].toFixed(5)}, {coords[1].toFixed(5)} • Attached to order
+                        </span>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setIsPinConfirmed(false)}
+                      className="px-2.5 py-1 rounded-lg border border-emerald-600/30 text-emerald-700 dark:text-emerald-300 text-xs font-bold hover:bg-emerald-500/10 transition-colors cursor-pointer"
+                    >
+                      Move / Re-adjust Pin
+                    </button>
+                  </div>
                 )}
               </div>
 

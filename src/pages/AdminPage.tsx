@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
+import L from "leaflet";
 import { StorefrontCMSPanel } from "../components/admin/StoreFrontCmsPanel";
 import { WhatsAppGatewayPanel } from "../components/admin/WhatsAppGatewayPanel";
 import {
@@ -23,9 +24,14 @@ import {
   Sliders,
   Pause,
   Play,
+  Edit2,
+  Search,
+  Navigation,
+  Loader2,
+  X,
 } from "lucide-react";
 import { useStore } from "../context/StoreContext";
-import { BUSINESS_CONFIG } from "../constants";
+import { BUSINESS_CONFIG, INDIAN_STATES_DISTRICTS } from "../constants";
 import { OrderStatus, Order } from "../types";
 import { collection, onSnapshot, doc, setDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "../firebase";
@@ -102,6 +108,27 @@ export const AdminPage: React.FC = () => {
     walletBalance?: string;
     message?: string;
   } | null>(null);
+
+  // Editable Address & GPS Pin State for CMS Orders
+  const [editingOrderAddress, setEditingOrderAddress] = useState<Order | null>(null);
+  const [editAddressForm, setEditAddressForm] = useState({
+    fullName: "",
+    phone: "",
+    addressLine1: "",
+    landmark: "",
+    district: "",
+    state: "Karnataka",
+    pincode: "",
+    lat: 12.9716,
+    lng: 77.5946,
+  });
+  const [isLocatingEditPincode, setIsLocatingEditPincode] = useState(false);
+  const [isSavingEditAddress, setIsSavingEditAddress] = useState(false);
+  const [editMapSearchQuery, setEditMapSearchQuery] = useState("");
+  const [editMapSearchResults, setEditMapSearchResults] = useState<any[]>([]);
+  const [isSearchingEditMap, setIsSearchingEditMap] = useState(false);
+  const adminMapInstanceRef = useRef<L.Map | null>(null);
+  const adminMarkerRef = useRef<L.Marker | null>(null);
 
   // Delhivery Diagnostic State
   const [pingingApi, setPingingApi] = useState(false);
@@ -562,6 +589,227 @@ export const AdminPage: React.FC = () => {
     });
     setCustomEkartAwb((p) => ({ ...p, [orderRef]: "" }));
     showToast(`Saved Ekart AWB #${awb}`);
+  };
+
+  // Open address edit modal for an order
+  const handleOpenEditAddress = (ord: Order) => {
+    const addr = ord.shippingAddress || ({} as any);
+    const numLat = Number.isFinite(Number(addr.lat)) && Number(addr.lat) !== 0 ? Number(addr.lat) : 12.9716;
+    const numLng = Number.isFinite(Number(addr.lng)) && Number(addr.lng) !== 0 ? Number(addr.lng) : 77.5946;
+    setEditAddressForm({
+      fullName: addr.fullName || "Customer",
+      phone: (addr.phone || ord.customerPhone || "").replace(/\D/g, "").slice(-10),
+      addressLine1: addr.addressLine1 || "",
+      landmark: addr.landmark || "",
+      district: addr.district || addr.city || "Bengaluru Urban",
+      state: addr.state || "Karnataka",
+      pincode: (addr.pincode || "560058").replace(/\D/g, "").slice(0, 6),
+      lat: numLat,
+      lng: numLng,
+    });
+    setEditMapSearchQuery("");
+    setEditMapSearchResults([]);
+    setEditingOrderAddress(ord);
+  };
+
+  // Setup Leaflet map inside admin modal
+  useEffect(() => {
+    if (!editingOrderAddress) {
+      if (adminMapInstanceRef.current) {
+        try {
+          adminMapInstanceRef.current.remove();
+        } catch {}
+        adminMapInstanceRef.current = null;
+      }
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      const container = document.getElementById("admin-order-edit-map");
+      if (!container) return;
+
+      if (adminMapInstanceRef.current) {
+        try {
+          adminMapInstanceRef.current.remove();
+        } catch {}
+        adminMapInstanceRef.current = null;
+      }
+
+      const initialCoords: [number, number] = [
+        Number.isFinite(editAddressForm.lat) && editAddressForm.lat !== 0 ? editAddressForm.lat : 12.9716,
+        Number.isFinite(editAddressForm.lng) && editAddressForm.lng !== 0 ? editAddressForm.lng : 77.5946,
+      ];
+
+      try {
+        const map = L.map(container, {
+          center: initialCoords,
+          zoom: 15,
+          zoomControl: true,
+          attributionControl: false,
+        });
+
+        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+          maxZoom: 19,
+        }).addTo(map);
+
+        const customIcon = L.divIcon({
+          className: "admin-leaflet-marker",
+          html: `<div style="background-color:#5E3210; width:34px; height:34px; border-radius:50%; border:3px solid #FFF; box-shadow:0 4px 14px rgba(0,0,0,0.5); display:flex; align-items:center; justify-content:center;">
+                  <div style="background:#E08F35; width:14px; height:14px; border-radius:50%;"></div>
+                </div>`,
+          iconSize: [34, 34],
+          iconAnchor: [17, 17],
+        });
+
+        const marker = L.marker(initialCoords, {
+          draggable: true,
+          icon: customIcon,
+        }).addTo(map);
+
+        marker.on("dragend", () => {
+          const pos = marker.getLatLng();
+          setEditAddressForm((prev) => ({ ...prev, lat: pos.lat, lng: pos.lng }));
+        });
+
+        map.on("click", (e: L.LeafletMouseEvent) => {
+          marker.setLatLng(e.latlng);
+          setEditAddressForm((prev) => ({ ...prev, lat: e.latlng.lat, lng: e.latlng.lng }));
+        });
+
+        adminMapInstanceRef.current = map;
+        adminMarkerRef.current = marker;
+
+        setTimeout(() => {
+          map.invalidateSize();
+        }, 200);
+      } catch (err) {
+        console.warn("Admin Leaflet map error:", err);
+      }
+    }, 150);
+
+    return () => {
+      clearTimeout(timer);
+      if (adminMapInstanceRef.current) {
+        try {
+          adminMapInstanceRef.current.remove();
+        } catch {}
+        adminMapInstanceRef.current = null;
+      }
+    };
+  }, [editingOrderAddress]);
+
+  const handleLocatePincodeInEditModal = async () => {
+    const pin = editAddressForm.pincode.replace(/\D/g, "").slice(0, 6);
+    if (pin.length !== 6) {
+      showToast("Please enter a valid 6-digit postal pincode");
+      return;
+    }
+    setIsLocatingEditPincode(true);
+    try {
+      const q = `${pin}, ${editAddressForm.district || ""}, India`;
+      const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&limit=1`);
+      const data = await res.json();
+      if (data && data[0]) {
+        const lat = parseFloat(data[0].lat);
+        const lon = parseFloat(data[0].lon);
+        setEditAddressForm((prev) => ({ ...prev, lat, lng: lon }));
+        if (adminMapInstanceRef.current && adminMarkerRef.current) {
+          adminMapInstanceRef.current.setView([lat, lon], 15);
+          adminMarkerRef.current.setLatLng([lat, lon]);
+          adminMapInstanceRef.current.invalidateSize();
+        }
+        showToast(`Map centered on pincode ${pin}!`);
+      } else {
+        showToast("Could not geocode this pincode. Search area on map below.");
+      }
+    } catch {
+      showToast("Error locating pincode");
+    } finally {
+      setIsLocatingEditPincode(false);
+    }
+  };
+
+  const handleEditMapSearch = async (val: string) => {
+    setEditMapSearchQuery(val);
+    if (!val.trim() || val.length < 3) {
+      setEditMapSearchResults([]);
+      return;
+    }
+    setIsSearchingEditMap(true);
+    try {
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(val)}&countrycodes=in&limit=5`
+      );
+      const data = await res.json();
+      setEditMapSearchResults(data || []);
+    } catch {
+      setEditMapSearchResults([]);
+    } finally {
+      setIsSearchingEditMap(false);
+    }
+  };
+
+  const handleSelectEditSearchResult = (item: any) => {
+    const lat = parseFloat(item.lat);
+    const lon = parseFloat(item.lon);
+    setEditAddressForm((prev) => ({ ...prev, lat, lng: lon }));
+    setEditMapSearchResults([]);
+    setEditMapSearchQuery(item.display_name);
+    if (adminMapInstanceRef.current && adminMarkerRef.current) {
+      adminMapInstanceRef.current.setView([lat, lon], 16);
+      adminMarkerRef.current.setLatLng([lat, lon]);
+      adminMapInstanceRef.current.invalidateSize();
+    }
+    showToast("Pin placed at selected location!");
+  };
+
+  const handleSaveEditedAddress = async () => {
+    if (!editingOrderAddress) return;
+    if (!editAddressForm.addressLine1.trim()) {
+      showToast("Please enter street address");
+      return;
+    }
+    const cleanPin = editAddressForm.pincode.replace(/\D/g, "").slice(0, 6);
+    if (cleanPin.length !== 6) {
+      showToast("Please enter a valid 6-digit pincode");
+      return;
+    }
+    const cleanPhone = editAddressForm.phone.replace(/\D/g, "").slice(-10);
+    if (cleanPhone.length !== 10) {
+      showToast("Please enter a valid 10-digit phone number");
+      return;
+    }
+
+    setIsSavingEditAddress(true);
+    try {
+      const updatedShippingAddress = {
+        ...(editingOrderAddress.shippingAddress || {}),
+        fullName: editAddressForm.fullName.trim(),
+        phone: cleanPhone,
+        addressLine1: editAddressForm.addressLine1.trim(),
+        landmark: editAddressForm.landmark.trim(),
+        state: editAddressForm.state,
+        district: editAddressForm.district,
+        city: editAddressForm.district,
+        pincode: cleanPin,
+        lat: editAddressForm.lat,
+        lng: editAddressForm.lng,
+        isBangalore: cleanPin.startsWith("560") || editAddressForm.district.toLowerCase().includes("bengaluru"),
+      };
+
+      await updateOrderDetails(editingOrderAddress.orderRef, {
+        shippingAddress: updatedShippingAddress,
+        customerPhone: cleanPhone,
+      });
+
+      showToast(`Address & GPS pin updated for order #${editingOrderAddress.orderRef}!`);
+      setEditingOrderAddress(null);
+    } catch (err) {
+      console.warn("Save address error:", err);
+      showToast("Failed to update address in Firestore");
+    } finally {
+      setIsSavingEditAddress(false);
+    }
   };
 
   const handleStatusChange = async (ord: Order, newStatus: OrderStatus) => {
@@ -1586,15 +1834,25 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                                   : "Address location pin linked with shipment"}
                               </span>
                             </div>
-                            <a
-                              href={mapsUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-[10px] font-bold text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-0.5 shrink-0 ml-auto"
-                            >
-                              <span>View Pin</span>
-                              <ExternalLink className="w-2.5 h-2.5" />
-                            </a>
+                            <div className="flex items-center gap-2.5 shrink-0 ml-auto">
+                              <button
+                                type="button"
+                                onClick={() => handleOpenEditAddress(ord)}
+                                className="text-[11px] font-bold text-[#E08F35] hover:underline flex items-center gap-1 cursor-pointer"
+                              >
+                                <Edit2 className="w-3 h-3 text-[#E08F35]" />
+                                <span>Edit Address / Pin</span>
+                              </button>
+                              <a
+                                href={mapsUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-[10px] font-bold text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-0.5"
+                              >
+                                <span>View Pin</span>
+                                <ExternalLink className="w-2.5 h-2.5" />
+                              </a>
+                            </div>
                           </div>
 
                           {ord.trackingNumber ? (
@@ -1821,6 +2079,20 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                               <span>Google Maps Pin</span>
                               <ExternalLink className="w-3 h-3 text-[#A69788]" />
                             </a>
+
+                            <button
+                              type="button"
+                              onClick={() => handleOpenEditAddress(ord)}
+                              className={`px-3 py-1.5 rounded-lg border text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer ${
+                                isDark
+                                  ? "bg-[#1C120B] border-[#362114] text-amber-300 hover:border-[#E08F35] hover:bg-[#28180E]"
+                                  : "bg-white border-[#DDD1BE] hover:border-[#E08F35] text-[#5E3210] hover:bg-amber-50"
+                              }`}
+                              title="Edit address, phone, or adjust doorstep GPS pin before courier dispatch"
+                            >
+                              <Edit2 className="w-3.5 h-3.5 text-[#E08F35]" />
+                              <span>Edit Address & Pin</span>
+                            </button>
 
                             <button
                               type="button"
@@ -2166,6 +2438,326 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
 
         {/* WhatsApp Authentication & Gateway Hub (Placed at bottom for maintenance/reference) */}
         <WhatsAppGatewayPanel isDark={isDark} showToast={showToast} />
+
+        {/* Order Delivery Address & GPS Coordinates Editor Modal */}
+        {editingOrderAddress && (
+          <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-xs flex items-center justify-center p-3 sm:p-5 overflow-y-auto">
+            <div
+              className={`w-full max-w-4xl rounded-3xl p-5 sm:p-7 space-y-5 text-left border shadow-2xl max-h-[92vh] overflow-y-auto ${
+                isDark
+                  ? "bg-[#180E08] text-[#FAF4EA] border-[#362114]"
+                  : "bg-white text-[#1F120A] border-[#DDD1BE]"
+              }`}
+            >
+              {/* Modal Header */}
+              <div className="flex items-center justify-between border-b pb-3 border-stone-200 dark:border-stone-800">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 rounded-xl bg-[#E08F35]/20 text-[#E08F35]">
+                    <MapPin className="w-5 h-5 text-[#E08F35]" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold font-serif text-base flex items-center gap-2">
+                      <span>Edit Delivery Address & GPS Pin</span>
+                      <span className="text-xs font-mono font-bold px-2 py-0.5 rounded-full bg-amber-500/15 text-[#E08F35]">
+                        #{editingOrderAddress.orderRef}
+                      </span>
+                    </h3>
+                    <p className="text-xs text-stone-500 dark:text-stone-400 mt-0.5">
+                      Updates are saved in Firestore and automatically used for Delhivery & Ekart manifests.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setEditingOrderAddress(null)}
+                  className="p-1.5 rounded-xl border border-stone-300 dark:border-stone-700 hover:bg-stone-100 dark:hover:bg-stone-800 transition-colors cursor-pointer text-stone-500 hover:text-stone-700 dark:hover:text-stone-300"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* 2-Column Responsive Body */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                {/* Column 1: Address Fields */}
+                <div className="space-y-3.5">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-[#E08F35] flex items-center gap-1.5">
+                    <span>1. Customer & Delivery Address</span>
+                  </h4>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-semibold mb-1 opacity-80">
+                        Recipient Name *
+                      </label>
+                      <input
+                        type="text"
+                        value={editAddressForm.fullName}
+                        onChange={(e) =>
+                          setEditAddressForm((p) => ({ ...p, fullName: e.target.value }))
+                        }
+                        className={`w-full px-3 py-2 text-xs rounded-xl focus:outline-none focus:ring-1 focus:ring-[#E08F35] ${
+                          isDark
+                            ? "bg-[#100905] border border-[#362114] text-[#FAF4EA]"
+                            : "bg-[#FAF7F2] border border-[#DDD1BE] text-[#1F120A]"
+                        }`}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold mb-1 opacity-80">
+                        WhatsApp Phone *
+                      </label>
+                      <input
+                        type="tel"
+                        maxLength={10}
+                        value={editAddressForm.phone}
+                        onChange={(e) =>
+                          setEditAddressForm((p) => ({
+                            ...p,
+                            phone: e.target.value.replace(/\D/g, "").slice(0, 10),
+                          }))
+                        }
+                        className={`w-full px-3 py-2 text-xs font-mono rounded-xl focus:outline-none focus:ring-1 focus:ring-[#E08F35] ${
+                          isDark
+                            ? "bg-[#100905] border border-[#362114] text-[#FAF4EA]"
+                            : "bg-[#FAF7F2] border border-[#DDD1BE] text-[#1F120A]"
+                        }`}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold mb-1 opacity-80">
+                      House / Flat / Street Address *
+                    </label>
+                    <textarea
+                      rows={2}
+                      value={editAddressForm.addressLine1}
+                      onChange={(e) =>
+                        setEditAddressForm((p) => ({ ...p, addressLine1: e.target.value }))
+                      }
+                      className={`w-full px-3 py-2 text-xs rounded-xl focus:outline-none focus:ring-1 focus:ring-[#E08F35] resize-none ${
+                        isDark
+                          ? "bg-[#100905] border border-[#362114] text-[#FAF4EA]"
+                          : "bg-[#FAF7F2] border border-[#DDD1BE] text-[#1F120A]"
+                      }`}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold mb-1 opacity-80">
+                      Landmark (Optional)
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Near Water Tank, Opposite SBI..."
+                      value={editAddressForm.landmark}
+                      onChange={(e) =>
+                        setEditAddressForm((p) => ({ ...p, landmark: e.target.value }))
+                      }
+                      className={`w-full px-3 py-2 text-xs rounded-xl focus:outline-none focus:ring-1 focus:ring-[#E08F35] ${
+                        isDark
+                          ? "bg-[#100905] border border-[#362114] text-[#FAF4EA]"
+                          : "bg-[#FAF7F2] border border-[#DDD1BE] text-[#1F120A]"
+                      }`}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div>
+                      <label className="block text-xs font-semibold mb-1 opacity-80">
+                        State *
+                      </label>
+                      <select
+                        value={editAddressForm.state}
+                        onChange={(e) => {
+                          const newState = e.target.value;
+                          const districts = INDIAN_STATES_DISTRICTS[newState] || [];
+                          setEditAddressForm((p) => ({
+                            ...p,
+                            state: newState,
+                            district: districts[0] || p.district,
+                          }));
+                        }}
+                        className={`w-full px-3 py-2 text-xs rounded-xl focus:outline-none focus:ring-1 focus:ring-[#E08F35] ${
+                          isDark
+                            ? "bg-[#100905] border border-[#362114] text-[#FAF4EA]"
+                            : "bg-[#FAF7F2] border border-[#DDD1BE] text-[#1F120A]"
+                        }`}
+                      >
+                        {Object.keys(INDIAN_STATES_DISTRICTS).map((st) => (
+                          <option key={st} value={st}>
+                            {st}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold mb-1 opacity-80">
+                        District / City *
+                      </label>
+                      <select
+                        value={editAddressForm.district}
+                        onChange={(e) =>
+                          setEditAddressForm((p) => ({ ...p, district: e.target.value }))
+                        }
+                        className={`w-full px-3 py-2 text-xs rounded-xl focus:outline-none focus:ring-1 focus:ring-[#E08F35] ${
+                          isDark
+                            ? "bg-[#100905] border border-[#362114] text-[#FAF4EA]"
+                            : "bg-[#FAF7F2] border border-[#DDD1BE] text-[#1F120A]"
+                        }`}
+                      >
+                        {!((INDIAN_STATES_DISTRICTS[editAddressForm.state] || []).includes(editAddressForm.district)) && editAddressForm.district && (
+                          <option value={editAddressForm.district}>{editAddressForm.district}</option>
+                        )}
+                        {(INDIAN_STATES_DISTRICTS[editAddressForm.state] || []).map((dst) => (
+                          <option key={dst} value={dst}>
+                            {dst}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold mb-1 opacity-80">
+                        Pincode *
+                      </label>
+                      <input
+                        type="text"
+                        maxLength={6}
+                        value={editAddressForm.pincode}
+                        onChange={(e) =>
+                          setEditAddressForm((p) => ({
+                            ...p,
+                            pincode: e.target.value.replace(/\D/g, "").slice(0, 6),
+                          }))
+                        }
+                        className={`w-full px-3 py-2 text-xs font-mono rounded-xl focus:outline-none focus:ring-1 focus:ring-[#E08F35] ${
+                          isDark
+                            ? "bg-[#100905] border border-[#362114] text-[#FAF4EA]"
+                            : "bg-[#FAF7F2] border border-[#DDD1BE] text-[#1F120A]"
+                        }`}
+                      />
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleLocatePincodeInEditModal}
+                    disabled={isLocatingEditPincode}
+                    className="w-full py-2 rounded-xl bg-amber-500/15 border border-amber-500/30 text-[#E08F35] text-xs font-bold flex items-center justify-center gap-1.5 hover:bg-amber-500/25 transition-colors cursor-pointer disabled:opacity-50"
+                  >
+                    <Navigation className="w-3.5 h-3.5" />
+                    <span>
+                      {isLocatingEditPincode
+                        ? "Locating..."
+                        : `📍 Auto-Center Pin on Pincode (${editAddressForm.pincode || "..."})`}
+                    </span>
+                  </button>
+                </div>
+
+                {/* Column 2: Interactive Leaflet Map & GPS Verification */}
+                <div className="space-y-3.5">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-[#E08F35] flex items-center gap-1.5">
+                      <span>2. Doorstep GPS Pinpoint</span>
+                    </h4>
+                    <span className="text-[11px] font-mono text-stone-500">
+                      {editAddressForm.lat.toFixed(5)}, {editAddressForm.lng.toFixed(5)}
+                    </span>
+                  </div>
+
+                  {/* Search Map Bar */}
+                  <div className="relative">
+                    <Search className="absolute left-3 top-2.5 w-3.5 h-3.5 text-stone-400" />
+                    <input
+                      type="text"
+                      placeholder="Search locality, street, or building name..."
+                      value={editMapSearchQuery}
+                      onChange={(e) => handleEditMapSearch(e.target.value)}
+                      className={`w-full pl-9 pr-9 py-2 text-xs rounded-xl focus:outline-none focus:ring-1 focus:ring-[#E08F35] ${
+                        isDark
+                          ? "bg-[#100905] border border-[#362114] text-[#FAF4EA]"
+                          : "bg-[#FAF7F2] border border-[#DDD1BE] text-[#1F120A]"
+                      }`}
+                    />
+                    {isSearchingEditMap && (
+                      <Loader2 className="absolute right-3 top-2.5 w-3.5 h-3.5 text-[#E08F35] animate-spin" />
+                    )}
+
+                    {editMapSearchResults.length > 0 && (
+                      <ul className="absolute left-0 right-0 top-full mt-1.5 bg-white dark:bg-[#1C110B] border border-stone-200 dark:border-[#4A301E] rounded-xl shadow-xl max-h-48 overflow-y-auto divide-y divide-stone-100 dark:divide-[#2C1D14] z-50">
+                        {editMapSearchResults.map((res, i) => (
+                          <li
+                            key={i}
+                            onClick={() => handleSelectEditSearchResult(res)}
+                            className="p-2.5 text-xs hover:bg-amber-50 dark:hover:bg-[#2C1D14] cursor-pointer flex items-start gap-2"
+                          >
+                            <MapPin className="w-3.5 h-3.5 text-[#E08F35] shrink-0 mt-0.5" />
+                            <span className="line-clamp-2">{res.display_name}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+
+                  {/* Leaflet Map Box */}
+                  <div
+                    id="admin-order-edit-map"
+                    className="w-full h-56 sm:h-64 rounded-2xl border border-stone-300 dark:border-stone-700 overflow-hidden shadow-inner touch-manipulation relative z-10"
+                  />
+
+                  <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-stone-500">
+                    <span className="text-[11px]">
+                      💡 Drag the marker or tap anywhere on the map to set the exact delivery pin.
+                    </span>
+                    <a
+                      href={`https://maps.google.com/?q=${editAddressForm.lat},${editAddressForm.lng}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-2 py-1 rounded-lg border border-stone-300 dark:border-stone-700 text-blue-600 dark:text-blue-400 font-bold text-[11px] flex items-center gap-1 hover:underline"
+                    >
+                      <span>Test in Google Maps</span>
+                      <ExternalLink className="w-2.5 h-2.5" />
+                    </a>
+                  </div>
+                </div>
+              </div>
+
+              {/* Modal Footer */}
+              <div className="flex items-center justify-end gap-3 pt-4 border-t border-stone-200 dark:border-stone-800">
+                <button
+                  type="button"
+                  onClick={() => setEditingOrderAddress(null)}
+                  disabled={isSavingEditAddress}
+                  className="px-4 py-2 rounded-xl border border-stone-300 dark:border-stone-700 text-xs font-semibold cursor-pointer hover:bg-stone-100 dark:hover:bg-stone-800 transition-colors"
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleSaveEditedAddress}
+                  disabled={isSavingEditAddress}
+                  className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-700 hover:brightness-110 text-white font-bold text-xs shadow-md flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
+                >
+                  {isSavingEditAddress ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin text-white" />
+                      <span>Saving in Firestore...</span>
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 className="w-4 h-4 text-emerald-200" />
+                      <span>Save & Update Order in Firestore</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
