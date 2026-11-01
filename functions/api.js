@@ -882,6 +882,55 @@ export async function onRequest(context) {
       }
     }
 
+    // ACTION: delhivery_edit_address (Updates live address and Google Maps location on an existing waybill)
+    if (request.method === "POST" && action === "delhivery_edit_address") {
+      let body = {};
+      try {
+        body = await request.json();
+      } catch {
+        return jsonResponse({ status: "FAILED", message: "Invalid JSON body" }, 400);
+      }
+
+      const { waybill, address, phone, name, lat, lng } = body;
+      if (!waybill) {
+        return jsonResponse({ status: "FAILED", message: "Missing waybill number" }, 400);
+      }
+
+      const numLat = Number.isFinite(Number(lat)) && Number(lat) !== 0 ? Number(lat) : null;
+      const numLng = Number.isFinite(Number(lng)) && Number(lng) !== 0 ? Number(lng) : null;
+      const mapLink = numLat && numLng ? `https://maps.google.com/?q=${numLat},${numLng}` : null;
+
+      const editPayload = {
+        waybill: String(waybill).trim(),
+      };
+      if (address) editPayload.add = String(address).slice(0, 245);
+      if (phone) editPayload.phone = String(phone).replace(/\D/g, "").slice(-10);
+      if (name) editPayload.name = String(name).trim();
+      if (mapLink) editPayload.remarks = `Location: ${mapLink}`;
+
+      try {
+        const editResp = await fetch("https://track.delhivery.com/api/p/edit", {
+          method: "POST",
+          headers: {
+            Authorization: `Token ${DELHIVERY_TOKEN}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(editPayload),
+        });
+
+        const editData = await editResp.json();
+        return jsonResponse({
+          status: editResp.ok ? "SUCCESS" : "FAILED",
+          data: editData,
+          message: editResp.ok
+            ? "Shipment address and Google Maps pin updated live on Delhivery!"
+            : "Delhivery address update notice",
+        });
+      } catch (err) {
+        return jsonResponse({ status: "ERROR", message: err.message }, 500);
+      }
+    }
+
     /* -------------------------------------------------------------
      * EKART LOGISTICS (FLIPKART B2C) INTEGRATION
      * ------------------------------------------------------------- */

@@ -802,6 +802,38 @@ export const AdminPage: React.FC = () => {
         customerPhone: cleanPhone,
       });
 
+      // If the order was already manifested with Delhivery, sync update directly to Delhivery's live package
+      if (editingOrderAddress.trackingNumber && !editingOrderAddress.trackingNumber.startsWith("FMP")) {
+        try {
+          const fullStreetAdd = [
+            editAddressForm.addressLine1.trim(),
+            editAddressForm.landmark?.trim() ? `Near ${editAddressForm.landmark.trim()}` : "",
+            editAddressForm.district,
+          ]
+            .filter(Boolean)
+            .join(", ");
+
+          const editRes = await fetch("/api?action=delhivery_edit_address", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              waybill: editingOrderAddress.trackingNumber,
+              address: fullStreetAdd,
+              phone: cleanPhone,
+              name: editAddressForm.fullName.trim(),
+              lat: editAddressForm.lat,
+              lng: editAddressForm.lng,
+            }),
+          });
+          const editData = await editRes.json();
+          if (editData.status === "SUCCESS") {
+            showToast("Carrier sync: Location updated live on Delhivery rider app!");
+          }
+        } catch (apiErr) {
+          console.warn("Live courier address sync notice:", apiErr);
+        }
+      }
+
       showToast(`Address & GPS pin updated for order #${editingOrderAddress.orderRef}!`);
       setEditingOrderAddress(null);
     } catch (err) {
