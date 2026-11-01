@@ -276,12 +276,26 @@ export const OrdersPage = () => {
                     AWB: #{activeOrder.trackingNumber}
                   </span>
                   <a
-                    href={`https://www.delhivery.com/track/package/${activeOrder.trackingNumber}`}
+                    href={
+                      activeOrder.courier?.toLowerCase().includes("ekart") ||
+                      activeOrder.trackingNumber.startsWith("FMP")
+                        ? `https://ekartlogistics.com/shipmenttrack/${encodeURIComponent(
+                            activeOrder.trackingNumber
+                          )}`
+                        : `https://www.delhivery.com/track/package/${encodeURIComponent(
+                            activeOrder.trackingNumber
+                          )}`
+                    }
                     target="_blank"
                     rel="noopener noreferrer"
                     className="px-3 py-1.5 rounded-lg text-xs font-bold bg-[#E08F35]/15 text-[#5E3210] dark:text-amber-200 hover:bg-[#E08F35]/25 flex items-center gap-1 transition-colors"
                   >
-                    <span>Track on Delhivery</span>
+                    <span>
+                      {activeOrder.courier?.toLowerCase().includes("ekart") ||
+                      activeOrder.trackingNumber.startsWith("FMP")
+                        ? "Track on Ekart Logistics"
+                        : "Track on Delhivery"}
+                    </span>
                     <ExternalLink className="w-3 h-3" />
                   </a>
                 </div>
@@ -795,7 +809,10 @@ export const OrdersPage = () => {
                           : isExpired
                           ? "Payment window expired after 10 mins"
                           : ord.trackingNumber
-                          ? `Delhivery AWB #${ord.trackingNumber}`
+                          ? ord.courier?.toLowerCase().includes("ekart") ||
+                            ord.trackingNumber.startsWith("FMP")
+                            ? `Ekart Logistics AWB #${ord.trackingNumber}`
+                            : `Delhivery AWB #${ord.trackingNumber}`
                           : "Preparing your shipment"}
                       </p>
                     </div>

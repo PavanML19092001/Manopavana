@@ -82,6 +82,27 @@ export const AdminPage: React.FC = () => {
   const [customAwb, setCustomAwb] = useState<Record<string, string>>({});
   const [copiedAddress, setCopiedAddress] = useState<Record<string, boolean>>({});
 
+  // Ekart Logistics State
+  const [carrierChoice, setCarrierChoice] = useState<Record<string, "delhivery" | "ekart">>({});
+  const [manifestingEkart, setManifestingEkart] = useState<Record<string, boolean>>({});
+  const [ekartManifestError, setEkartManifestError] = useState<Record<string, string>>({});
+  const [customEkartAwb, setCustomEkartAwb] = useState<Record<string, string>>({});
+  const [checkingEkartPincode, setCheckingEkartPincode] = useState<Record<string, boolean>>({});
+  const [ekartPincodeStatus, setEkartPincodeStatus] = useState<Record<string, any>>({});
+  const [pingingEkart, setPingingEkart] = useState(false);
+  const [ekartPingResult, setEkartPingResult] = useState<{
+    status: string;
+    authenticated: boolean;
+    clientIdMasked: string;
+    clientName: string;
+    warehouse: string;
+    originPincode: string;
+    latencyMs?: number;
+    accountStatus?: string;
+    walletBalance?: string;
+    message?: string;
+  } | null>(null);
+
   // Delhivery Diagnostic State
   const [pingingApi, setPingingApi] = useState(false);
   const [pingResult, setPingResult] = useState<{
@@ -385,6 +406,162 @@ export const AdminPage: React.FC = () => {
     });
     setCustomAwb((p) => ({ ...p, [orderRef]: "" }));
     showToast(`Saved Delhivery AWB #${awb}`);
+  };
+
+  const handlePingEkart = async () => {
+    setPingingEkart(true);
+    setEkartPingResult(null);
+    try {
+      const res = await fetch("/api?action=ekart_test_connection");
+      const data = await res.json();
+      setEkartPingResult(data);
+      if (data.status === "SUCCESS") {
+        showToast("Ekart Logistics API authenticated and ready!");
+      } else {
+        showToast(`Ekart check returned: ${data.message || "Notice"}`);
+      }
+    } catch {
+      setEkartPingResult({
+        status: "ERROR",
+        authenticated: false,
+        clientIdMasked: "EKART_6ae3...1963",
+        clientName: "Manopavana",
+        warehouse: "Manopavana",
+        originPincode: "560085",
+        message: "Network error connecting to Ekart API",
+      });
+      showToast("Error testing Ekart API");
+    } finally {
+      setPingingEkart(false);
+    }
+  };
+
+  const handleCheckEkartPincode = async (orderRef: string, pincode?: string) => {
+    if (!pincode) {
+      showToast("No valid pincode provided");
+      return;
+    }
+    setCheckingEkartPincode((p) => ({ ...p, [orderRef]: true }));
+    try {
+      const res = await fetch(
+        `/api?action=ekart_check_pincode&pincode=${encodeURIComponent(pincode)}`
+      );
+      const data = await res.json();
+      if (data.status === "SUCCESS") {
+        setEkartPincodeStatus((p) => ({
+          ...p,
+          [orderRef]: {
+            serviceable: data.serviceable,
+            cod: data.cod,
+            prepaid: data.prepaid,
+            expectedDays: data.expectedDays,
+            message: data.message,
+          },
+        }));
+        showToast(
+          `Ekart Pincode ${pincode}: ${
+            data.serviceable ? `Deliverable (${data.expectedDays})` : "Unserviceable"
+          }`
+        );
+      }
+    } catch {
+      showToast("Error checking Ekart pincode");
+    } finally {
+      setCheckingEkartPincode((p) => ({ ...p, [orderRef]: false }));
+    }
+  };
+
+  const handleManifestEkart = async (order: Order) => {
+    setManifestingEkart((p) => ({ ...p, [order.orderRef]: true }));
+    setEkartManifestError((p) => ({ ...p, [order.orderRef]: "" }));
+
+    const addr = order.shippingAddress || ({} as any);
+    const items = order.items || [];
+    const totalGrams =
+      items.reduce((acc: number, item: any) => {
+        const titleAndVariant = `${item?.title || ""} ${item?.variant || ""}`.toLowerCase();
+        const isLarge =
+          titleAndVariant.includes("5l") ||
+          titleAndVariant.includes("can") ||
+          titleAndVariant.includes("5 l") ||
+          titleAndVariant.includes("5000ml");
+        const gramsPerUnit = isLarge ? 5000 : 1000;
+        return acc + gramsPerUnit * (Number(item?.quantity) || 1);
+      }, 0) || 1000;
+
+    const fullStreetAddress = [
+      addr.addressLine1?.trim(),
+      addr.landmark?.trim() ? `Near ${addr.landmark.trim()}` : "",
+      addr.district || addr.city,
+    ]
+      .filter(Boolean)
+      .join(", ");
+
+    try {
+      const res = await fetch("/api?action=ekart_create_shipment", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          orderRef: order.orderRef,
+          customerName: addr.fullName?.trim() || "Customer",
+          phone: (addr.phone || "").replace(/\D/g, "").slice(-10),
+          address: fullStreetAddress,
+          pincode: (addr.pincode || "560058").replace(/\D/g, "").slice(0, 6),
+          city: addr.city || addr.district || "Bengaluru",
+          state: addr.state || "Karnataka",
+          paymentMode: order.paymentMethod === "cod" ? "COD" : "Prepaid",
+          totalAmount: order.total || 0,
+          weightGrams: totalGrams,
+          productsDesc:
+            items.map((i: any) => `${i.title} (${i.variant})`).join(", ") ||
+            "Wood-pressed Cooking Oil",
+          quantity: items.reduce(
+            (acc: number, i: any) => acc + (Number(i?.quantity) || 1),
+            0
+          ),
+        }),
+      });
+
+      const data = await res.json();
+      if (data.status === "SUCCESS" && data.waybill) {
+        await updateOrderDetails(order.orderRef, {
+          trackingNumber: data.waybill,
+          courier: "Ekart Logistics",
+          orderStatus: "Packed",
+        });
+        showToast(`Ekart Shipment Manifested! AWB: #${data.waybill}`);
+      } else {
+        const errMsg = data.message || "Failed to manifest shipment with Ekart";
+        setEkartManifestError((p) => ({
+          ...p,
+          [order.orderRef]: errMsg,
+        }));
+        showToast(`Ekart Error: ${errMsg}`);
+      }
+    } catch {
+      setEkartManifestError((p) => ({
+        ...p,
+        [order.orderRef]: "Network error connecting to Ekart API",
+      }));
+      showToast("Error contacting Ekart API");
+    } finally {
+      setManifestingEkart((p) => ({ ...p, [order.orderRef]: false }));
+    }
+  };
+
+  const handleSaveCustomEkartAwb = async (orderRef: string) => {
+    const awb = (customEkartAwb[orderRef] || "").trim();
+    if (!awb) {
+      showToast("Please enter a valid Ekart Tracking ID / AWB");
+      return;
+    }
+    await updateOrderDetails(orderRef, {
+      trackingNumber: awb,
+      courier: "Ekart Logistics",
+      orderStatus: "Packed",
+    });
+    setCustomEkartAwb((p) => ({ ...p, [orderRef]: "" }));
+    showToast(`Saved Ekart AWB #${awb}`);
   };
 
   const handleStatusChange = async (ord: Order, newStatus: OrderStatus) => {
@@ -833,13 +1010,41 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                 </span>
               </button>
 
+              <button
+                type="button"
+                onClick={handlePingEkart}
+                disabled={pingingEkart}
+                className="px-3.5 py-2 rounded-xl bg-sky-500/10 hover:bg-sky-500/20 text-sky-800 dark:text-sky-200 border border-sky-500/30 text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs"
+              >
+                <Activity
+                  className={`w-3.5 h-3.5 text-sky-500 ${
+                    pingingEkart ? "animate-spin" : ""
+                  }`}
+                />
+                <span>
+                  {pingingEkart
+                    ? "Testing Ekart..."
+                    : "Ping Ekart API"}
+                </span>
+              </button>
+
               <a
                 href="https://one.delhivery.com"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="px-3.5 py-2 rounded-xl bg-stone-100 dark:bg-stone-800 hover:bg-stone-200 dark:hover:bg-stone-700 text-[#1F120A] dark:text-[#FAF4EA] text-xs font-bold flex items-center gap-1.5 transition-all shadow-2xs"
               >
-                <span>Delhivery One Portal</span>
+                <span>Delhivery One</span>
+                <ExternalLink className="w-3.5 h-3.5 opacity-60" />
+              </a>
+
+              <a
+                href="https://app.ekartlogistics.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-3.5 py-2 rounded-xl bg-sky-100 dark:bg-sky-950/40 hover:bg-sky-200 dark:hover:bg-sky-900/60 text-sky-900 dark:text-sky-200 text-xs font-bold flex items-center gap-1.5 transition-all shadow-2xs border border-sky-500/20"
+              >
+                <span>Ekart Portal</span>
                 <ExternalLink className="w-3.5 h-3.5 opacity-60" />
               </a>
             </div>
@@ -857,7 +1062,7 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                 <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600" />
                 <div>
                   <span className="font-bold">
-                    Live API Status: {pingResult.message}
+                    Delhivery API: {pingResult.message}
                   </span>
                   <span className="block text-[11px] opacity-80 font-mono">
                     Origin Hub: {pingResult.originPincode} • Registered Facility:{" "}
@@ -870,6 +1075,31 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                   Waybill Sample: #{pingResult.sampleWaybill}
                 </span>
               )}
+            </div>
+          )}
+
+          {ekartPingResult && (
+            <div
+              className={`p-3.5 rounded-2xl border text-xs flex flex-wrap items-center justify-between gap-3 ${
+                ekartPingResult.authenticated
+                  ? "bg-sky-500/10 border-sky-500/30 text-sky-900 dark:text-sky-200"
+                  : "bg-red-500/10 border-red-500/30 text-red-800 dark:text-red-300"
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <Package className="w-4 h-4 shrink-0 text-sky-500" />
+                <div>
+                  <span className="font-bold">
+                    Ekart Logistics (Flipkart): {ekartPingResult.message}
+                  </span>
+                  <span className="block text-[11px] opacity-80 font-mono">
+                    Client ID: {ekartPingResult.clientIdMasked} • Hub: {ekartPingResult.warehouse} ({ekartPingResult.originPincode}) • Wallet: {ekartPingResult.walletBalance || "₹700.00"}
+                  </span>
+                </div>
+              </div>
+              <span className="px-2.5 py-1 rounded bg-amber-500/20 text-amber-800 dark:text-amber-300 font-mono text-[11px] font-bold border border-amber-500/30">
+                {ekartPingResult.accountStatus || "Under Review (24-48 hrs)"}
+              </span>
             </div>
           )}
         </div>
@@ -1237,62 +1467,110 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                           )}
                         </div>
 
-                        {/* Delhivery Carrier Dispatch Actions */}
+                        {/* Multi-Carrier Logistics Dispatch Actions (Delhivery & Ekart) */}
                         <div
-                          className={`p-3 rounded-xl border space-y-2.5 text-xs ${
+                          className={`p-3.5 rounded-xl border space-y-3 text-xs ${
                             isDark
                               ? "bg-[#191009] border-[#3D2514]"
                               : "bg-[#F7F2E8] border-[#DFD4BF]"
                           }`}
                         >
-                          <div className="flex flex-wrap items-center justify-between gap-2">
-                            <div className="flex items-center gap-1.5 font-bold">
-                              <Truck className="w-3.5 h-3.5 text-[#E08F35]" />
-                              <span
-                                className={
-                                  isDark ? "text-[#FAF4EA]" : "text-[#1F120A]"
-                                }
-                              >
-                                Delhivery Logistics Hub (Pan-India & Bengaluru)
-                              </span>
+                          <div className="flex flex-wrap items-center justify-between gap-2 border-b pb-2.5 border-stone-200 dark:border-stone-800">
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold text-xs">Courier Partner:</span>
+                              <div className="inline-flex p-0.5 rounded-lg bg-stone-200 dark:bg-stone-800 text-[11px] font-bold">
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setCarrierChoice((p) => ({
+                                      ...p,
+                                      [ord.orderRef]: "delhivery",
+                                    }))
+                                  }
+                                  className={`px-2.5 py-1 rounded-md transition-all cursor-pointer flex items-center gap-1 ${
+                                    (carrierChoice[ord.orderRef] || "delhivery") === "delhivery"
+                                      ? "bg-[#5E3210] text-white shadow-xs"
+                                      : "text-stone-600 dark:text-stone-400 hover:text-stone-900"
+                                  }`}
+                                >
+                                  <Truck className="w-3 h-3 text-amber-300" />
+                                  <span>Delhivery Express</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setCarrierChoice((p) => ({
+                                      ...p,
+                                      [ord.orderRef]: "ekart",
+                                    }))
+                                  }
+                                  className={`px-2.5 py-1 rounded-md transition-all cursor-pointer flex items-center gap-1 ${
+                                    carrierChoice[ord.orderRef] === "ekart"
+                                      ? "bg-[#0284C7] text-white shadow-xs"
+                                      : "text-stone-600 dark:text-stone-400 hover:text-stone-900"
+                                  }`}
+                                >
+                                  <Package className="w-3 h-3 text-sky-200" />
+                                  <span>Ekart Logistics</span>
+                                </button>
+                              </div>
                             </div>
 
+                            {/* Pincode Serviceability Check for Selected Carrier */}
                             <div className="flex items-center gap-2">
-                              {pincodeStatus[ord.orderRef] ? (
+                              {(carrierChoice[ord.orderRef] || "delhivery") === "delhivery" ? (
+                                pincodeStatus[ord.orderRef] ? (
+                                  <span
+                                    className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                                      pincodeStatus[ord.orderRef].serviceable
+                                        ? "bg-emerald-500/15 text-emerald-600 border border-emerald-500/30"
+                                        : "bg-red-500/15 text-red-600 border border-red-500/30"
+                                    }`}
+                                  >
+                                    {pincodeStatus[ord.orderRef].serviceable
+                                      ? `Delhivery Deliverable (COD: ${
+                                          pincodeStatus[ord.orderRef].cod ? "Yes" : "No"
+                                        })`
+                                      : "Delhivery Not Serviceable"}
+                                  </span>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleCheckPincode(ord.orderRef, addr.pincode)}
+                                    disabled={checkingPincode[ord.orderRef]}
+                                    className={`text-[10px] font-bold px-2 py-1 rounded-lg border transition-colors cursor-pointer ${
+                                      isDark
+                                        ? "bg-[#1C120B] border-[#3D2514] text-[#E08F35] hover:bg-[#28180E]"
+                                        : "bg-white border-[#DDD1BE] text-[#5E3210] hover:bg-[#FAF6EE]"
+                                    }`}
+                                  >
+                                    {checkingPincode[ord.orderRef] ? "Checking..." : `Verify Delhivery Pin`}
+                                  </button>
+                                )
+                              ) : ekartPincodeStatus[ord.orderRef] ? (
                                 <span
                                   className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                                    pincodeStatus[ord.orderRef].serviceable
-                                      ? "bg-emerald-500/15 text-emerald-600 border border-emerald-500/30"
+                                    ekartPincodeStatus[ord.orderRef].serviceable
+                                      ? "bg-sky-500/15 text-sky-700 dark:text-sky-300 border border-sky-500/30"
                                       : "bg-red-500/15 text-red-600 border border-red-500/30"
                                   }`}
                                 >
-                                  {pincodeStatus[ord.orderRef].serviceable
-                                    ? `Delhivery Deliverable (COD: ${
-                                        pincodeStatus[ord.orderRef].cod
-                                          ? "Yes"
-                                          : "No"
-                                      })`
-                                    : "Delhivery Not Serviceable"}
+                                  {ekartPincodeStatus[ord.orderRef].serviceable
+                                    ? `Ekart Serviceable (${ekartPincodeStatus[ord.orderRef].expectedDays})`
+                                    : "Ekart Unserviceable"}
                                 </span>
                               ) : (
                                 <button
                                   type="button"
-                                  onClick={() =>
-                                    handleCheckPincode(
-                                      ord.orderRef,
-                                      addr.pincode
-                                    )
-                                  }
-                                  disabled={checkingPincode[ord.orderRef]}
+                                  onClick={() => handleCheckEkartPincode(ord.orderRef, addr.pincode)}
+                                  disabled={checkingEkartPincode[ord.orderRef]}
                                   className={`text-[10px] font-bold px-2 py-1 rounded-lg border transition-colors cursor-pointer ${
                                     isDark
-                                      ? "bg-[#1C120B] border-[#3D2514] text-[#E08F35] hover:bg-[#28180E]"
-                                      : "bg-white border-[#DDD1BE] text-[#5E3210] hover:bg-[#FAF6EE]"
+                                      ? "bg-[#1C120B] border-[#3D2514] text-sky-400 hover:bg-[#28180E]"
+                                      : "bg-white border-[#DDD1BE] text-sky-700 hover:bg-[#FAF6EE]"
                                   }`}
                                 >
-                                  {checkingPincode[ord.orderRef]
-                                    ? "Checking..."
-                                    : `Verify Pin ${addr.pincode || ""}`}
+                                  {checkingEkartPincode[ord.orderRef] ? "Checking..." : `Verify Ekart Pin`}
                                 </button>
                               )}
                             </div>
@@ -1304,8 +1582,8 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                               <MapPin className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
                               <span>
                                 {addr.lat && addr.lng
-                                  ? "GPS Map Coordinates & Navigation Link shared with Delhivery"
-                                  : "Address location pin linked with Delhivery shipment"}
+                                  ? "GPS Map Coordinates & Navigation Link attached for delivery carrier"
+                                  : "Address location pin linked with shipment"}
                               </span>
                             </div>
                             <a
@@ -1322,9 +1600,7 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                           {ord.trackingNumber ? (
                             <div
                               className={`p-2.5 rounded-lg border space-y-2 ${
-                                isDark
-                                  ? "bg-[#140D07] border-[#362114]"
-                                  : "bg-white border-[#E5DAC8]"
+                                isDark ? "bg-[#140D07] border-[#362114]" : "bg-white border-[#E5DAC8]"
                               }`}
                             >
                               <div className="flex flex-wrap items-center justify-between gap-2">
@@ -1332,13 +1608,11 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                                   <span className="text-[10px] font-bold text-emerald-600 flex items-center gap-1">
                                     <CheckCircle2 className="w-3 h-3 text-emerald-600" />
                                     Shipment Booked (
-                                    {ord.courier || "Delhivery Express"})
+                                    {ord.courier || (ord.trackingNumber.startsWith("FMP") ? "Ekart Logistics" : "Delhivery Express")})
                                   </span>
                                   <span
                                     className={`font-mono text-xs font-bold ${
-                                      isDark
-                                        ? "text-[#FAF4EA]"
-                                        : "text-[#1F120A]"
+                                      isDark ? "text-[#FAF4EA]" : "text-[#1F120A]"
                                     }`}
                                   >
                                     AWB: {ord.trackingNumber}
@@ -1346,22 +1620,63 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                                 </div>
 
                                 <div className="flex items-center gap-2">
-                                  <a
-                                    href={`/api?action=delhivery_packing_slip&waybill=${encodeURIComponent(
-                                      ord.trackingNumber || ""
-                                    )}`}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className={`px-2.5 py-1 rounded-lg border font-bold text-[11px] flex items-center gap-1 transition-colors ${
-                                      isDark
-                                        ? "bg-[#1E130B] border-[#3D2514] text-[#FAF4EA] hover:bg-[#2A1A0F]"
-                                        : "bg-[#FAF6EE] border-[#DDD1BE] text-[#1F120A] hover:bg-[#EFE8DC]"
-                                    }`}
-                                    title="Print Delhivery Packing Slip"
-                                  >
-                                    <Printer className="w-2.5 h-2.5 text-[#E08F35]" />
-                                    <span>Print Label</span>
-                                  </a>
+                                  {ord.courier?.toLowerCase().includes("ekart") ||
+                                  ord.trackingNumber.startsWith("FMP") ? (
+                                    <>
+                                      <a
+                                        href={`https://ekartlogistics.com/shipmenttrack/${encodeURIComponent(
+                                          ord.trackingNumber
+                                        )}`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="px-2.5 py-1 rounded-lg bg-sky-600 hover:bg-sky-700 text-white font-bold text-[11px] flex items-center gap-1 transition-colors"
+                                      >
+                                        <span>Track Ekart</span>
+                                        <ExternalLink className="w-2.5 h-2.5" />
+                                      </a>
+                                      <a
+                                        href="https://app.ekartlogistics.com"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className={`px-2.5 py-1 rounded-lg border font-bold text-[11px] flex items-center gap-1 transition-colors ${
+                                          isDark
+                                            ? "bg-[#1E130B] border-[#3D2514] text-[#FAF4EA] hover:bg-[#2A1A0F]"
+                                            : "bg-[#FAF6EE] border-[#DDD1BE] text-[#1F120A] hover:bg-[#EFE8DC]"
+                                        }`}
+                                      >
+                                        <span>Ekart Dashboard</span>
+                                        <ExternalLink className="w-2.5 h-2.5 opacity-60" />
+                                      </a>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <a
+                                        href={`/api?action=delhivery_packing_slip&waybill=${encodeURIComponent(
+                                          ord.trackingNumber || ""
+                                        )}`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className={`px-2.5 py-1 rounded-lg border font-bold text-[11px] flex items-center gap-1 transition-colors ${
+                                          isDark
+                                            ? "bg-[#1E130B] border-[#3D2514] text-[#FAF4EA] hover:bg-[#2A1A0F]"
+                                            : "bg-[#FAF6EE] border-[#DDD1BE] text-[#1F120A] hover:bg-[#EFE8DC]"
+                                        }`}
+                                        title="Print Delhivery Packing Slip"
+                                      >
+                                        <Printer className="w-2.5 h-2.5 text-[#E08F35]" />
+                                        <span>Print Label</span>
+                                      </a>
+                                      <a
+                                        href={`https://www.delhivery.com/track/package/${ord.trackingNumber}`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="px-2.5 py-1 rounded-lg bg-[#5E3210] hover:bg-[#43230A] text-white font-bold text-[11px] flex items-center gap-1 transition-colors"
+                                      >
+                                        <span>Track Delhivery</span>
+                                        <ExternalLink className="w-2.5 h-2.5" />
+                                      </a>
+                                    </>
+                                  )}
                                 </div>
                               </div>
                             </div>
@@ -1375,21 +1690,76 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                                   : "Order Cancelled — Shipment Booking Disabled"}
                               </span>
                             </div>
+                          ) : (carrierChoice[ord.orderRef] || "delhivery") === "ekart" ? (
+                            /* Ekart Logistics Manifest Section */
+                            <div className="space-y-2">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => handleManifestEkart(ord)}
+                                  disabled={manifestingEkart[ord.orderRef]}
+                                  className="px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-700 disabled:opacity-50 text-white font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
+                                >
+                                  <Package className="w-3.5 h-3.5 text-sky-200" />
+                                  <span>
+                                    {manifestingEkart[ord.orderRef]
+                                      ? "Generating Ekart AWB..."
+                                      : "⚡ 1-Click Ekart Manifest"}
+                                  </span>
+                                </button>
+
+                                <div className="flex items-center gap-1.5 flex-1 min-w-[200px]">
+                                  <input
+                                    type="text"
+                                    placeholder="Or paste Ekart AWB (e.g. FMPP...)..."
+                                    value={customEkartAwb[ord.orderRef] || ""}
+                                    onChange={(e) =>
+                                      setCustomEkartAwb((p) => ({
+                                        ...p,
+                                        [ord.orderRef]: e.target.value,
+                                      }))
+                                    }
+                                    className={`flex-1 px-2.5 py-1 text-xs rounded-lg font-mono focus:outline-none focus:ring-1 focus:ring-sky-500 ${
+                                      isDark
+                                        ? "bg-[#140D07] border border-[#362114] text-[#FAF4EA] placeholder-[#8A7665]"
+                                        : "bg-white border border-[#DDD1BE] text-[#1F120A] placeholder-[#8A7665]"
+                                    }`}
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => handleSaveCustomEkartAwb(ord.orderRef)}
+                                    className="px-2.5 py-1 rounded-lg bg-sky-700 hover:bg-sky-800 text-white text-[11px] font-bold cursor-pointer transition-colors shrink-0"
+                                  >
+                                    Save Ekart AWB
+                                  </button>
+                                </div>
+                              </div>
+
+                              {ekartManifestError[ord.orderRef] && (
+                                <div className="p-2.5 rounded-lg bg-red-500/10 border border-red-500/20 text-red-700 dark:text-red-300 text-[11px] space-y-1">
+                                  <div className="flex items-center gap-1 font-bold">
+                                    <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                                    <span>Ekart Manifest Notice:</span>
+                                  </div>
+                                  <p className="opacity-90">{ekartManifestError[ord.orderRef]}</p>
+                                </div>
+                              )}
+                            </div>
                           ) : (
-                            /* Active manifest controls for confirmed orders (Placed / Packed / Dispatched) */
+                            /* Delhivery Express Manifest Section */
                             <div className="space-y-2">
                               <div className="flex flex-wrap items-center gap-2">
                                 <button
                                   type="button"
                                   onClick={() => handleManifestDelhivery(ord)}
                                   disabled={manifesting[ord.orderRef]}
-                                  className="px-3 py-1.5 rounded-lg bg-[#5E3210] hover:bg-[#43230A] disabled:opacity-50 text-white font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+                                  className="px-3 py-1.5 rounded-lg bg-[#5E3210] hover:bg-[#43230A] disabled:opacity-50 text-white font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
                                 >
                                   <Truck className="w-3.5 h-3.5 text-amber-300" />
                                   <span>
                                     {manifesting[ord.orderRef]
                                       ? "Generating Waybill..."
-                                      : "⚡ 1-Click Manifest"}
+                                      : "⚡ 1-Click Delhivery Manifest"}
                                   </span>
                                 </button>
 
@@ -1412,9 +1782,7 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                                   />
                                   <button
                                     type="button"
-                                    onClick={() =>
-                                      handleSaveCustomAwb(ord.orderRef)
-                                    }
+                                    onClick={() => handleSaveCustomAwb(ord.orderRef)}
                                     className="px-2.5 py-1 rounded-lg bg-stone-700 hover:bg-stone-800 text-white text-[11px] font-bold cursor-pointer transition-colors shrink-0"
                                   >
                                     Save AWB
@@ -1428,9 +1796,7 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                                     <AlertCircle className="w-3.5 h-3.5 shrink-0" />
                                     <span>Delhivery Manifest Error:</span>
                                   </div>
-                                  <p className="opacity-90">
-                                    {manifestError[ord.orderRef]}
-                                  </p>
+                                  <p className="opacity-90">{manifestError[ord.orderRef]}</p>
                                 </div>
                               )}
                             </div>
@@ -1483,15 +1849,22 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                           <a
                             href={
                               ord.trackingNumber
-                                ? `https://wa.me/91${cleanPhone}?text=${encodeURIComponent(
-                                    `Hi ${
-                                      addr.fullName || "Customer"
-                                    }, your MANOPAVANA order #${
-                                      ord.orderRef
-                                    } has been dispatched! Track your parcel live here: https://www.delhivery.com/track/package/${
-                                      ord.trackingNumber
-                                    }`
-                                  )}`
+                                ? (() => {
+                                    const isEkart =
+                                      ord.courier?.toLowerCase().includes("ekart") ||
+                                      ord.trackingNumber.startsWith("FMP");
+                                    const carrierName = isEkart ? "Ekart Logistics" : "Delhivery Express";
+                                    const trackUrl = isEkart
+                                      ? `https://ekartlogistics.com/shipmenttrack/${ord.trackingNumber}`
+                                      : `https://www.delhivery.com/track/package/${ord.trackingNumber}`;
+                                    return `https://wa.me/91${cleanPhone}?text=${encodeURIComponent(
+                                      `Hi ${
+                                        addr.fullName || "Customer"
+                                      }, your MANOPAVANA order #${
+                                        ord.orderRef
+                                      } has been dispatched via ${carrierName}! Track your parcel live here: ${trackUrl}`
+                                    )}`;
+                                  })()
                                 : waUrl
                             }
                             target="_blank"
