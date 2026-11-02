@@ -59,6 +59,77 @@ async function getOAuthToken(env) {
   return cachedToken;
 }
 
+// In-memory token cache for Ekart Elite across warm edge invocations
+let cachedEkartToken = null;
+let ekartTokenExpiresAt = 0;
+
+/**
+ * Fetch or reuse Ekart Elite Bearer access_token via OpenAPI v2 spec:
+ * POST https://app.elite.ekartlogistics.in/integrations/v2/auth/token/{client_id}
+ */
+async function getEkartAuthToken(env, credentials = {}) {
+  const now = Date.now();
+  if (cachedEkartToken && ekartTokenExpiresAt > now + 60000) {
+    return cachedEkartToken;
+  }
+
+  // 1. Direct static token supplied in request body or environment
+  const directToken = credentials.token || env.EKART_AUTH_TOKEN;
+  if (directToken && String(directToken).trim()) {
+    cachedEkartToken = String(directToken).trim();
+    ekartTokenExpiresAt = now + 86400 * 1000;
+    return cachedEkartToken;
+  }
+
+  const clientId =
+    credentials.clientId ||
+    env.EKART_CLIENT_ID ||
+    env.EKART_API_KEY ||
+    "EKART_6ae38c6da8acd1b850611963";
+  const username =
+    credentials.username ||
+    env.EKART_USERNAME ||
+    env.EKART_EMAIL ||
+    "manojmr1712@gmail.com";
+  const password = credentials.password || env.EKART_PASSWORD;
+
+  if (!password) {
+    return null;
+  }
+
+  const authUrl = `https://app.elite.ekartlogistics.in/integrations/v2/auth/token/${encodeURIComponent(
+    clientId
+  )}`;
+  const resp = await fetch(authUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ username, password }),
+  });
+
+  if (!resp.ok) {
+    const errText = await resp.text();
+    let errJson = null;
+    try {
+      errJson = JSON.parse(errText);
+    } catch {}
+    const msg =
+      errJson?.description ||
+      errJson?.message ||
+      errText ||
+      `HTTP status ${resp.status}`;
+    throw new Error(`Ekart Elite Authentication Failed: ${msg}`);
+  }
+
+  const data = await resp.json();
+  if (!data.access_token) {
+    throw new Error("No access_token returned by Ekart authentication service");
+  }
+
+  cachedEkartToken = data.access_token;
+  ekartTokenExpiresAt = now + ((data.expires_in || 86400) - 120) * 1000;
+  return cachedEkartToken;
+}
+
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
@@ -947,19 +1018,30 @@ export async function onRequest(context) {
       const start = Date.now();
       try {
         const masked = `${EKART_CLIENT_ID.slice(0, 10)}...${EKART_CLIENT_ID.slice(-4)}`;
+        let hasActiveToken = Boolean(cachedEkartToken && ekartTokenExpiresAt > Date.now());
+
+        if (!hasActiveToken) {
+          try {
+            const token = await getEkartAuthToken(env);
+            if (token) hasActiveToken = true;
+          } catch {}
+        }
+
         return jsonResponse({
           status: "SUCCESS",
-          authenticated: true,
+          authenticated: hasActiveToken,
+          tokenActive: hasActiveToken,
           clientIdMasked: masked,
           clientName: EKART_CLIENT_NAME,
           warehouse: EKART_PICKUP_NAME,
           originPincode: `${EKART_ORIGIN_PINCODE} (Peenya 2nd Stage, Bengaluru)`,
           portal: "app.elite.ekartlogistics.in",
           latencyMs: Date.now() - start,
-          accountStatus: "Manopavana_B2C Active",
+          accountStatus: hasActiveToken ? "Manopavana_B2C Active & Connected" : "Manopavana_B2C Ready (Credentials Needed)",
           walletBalance: "₹700.00",
-          message:
-            "Ekart Client ID authenticated. Pickup facility set to 'Manopavana_B2C' (Pincode: 560058).",
+          message: hasActiveToken
+            ? "Ekart Elite API authenticated with live 24-hr Bearer Token."
+            : "Ekart Client ID loaded. Enter password in CMS to enable 1-click manifests.",
         });
       } catch (e) {
         return jsonResponse(
@@ -969,7 +1051,7 @@ export async function onRequest(context) {
       }
     }
 
-    // 2. Ekart Pincode Serviceability Check
+    // 2. Ekart Pincode Serviceability Check (OpenAPI /api/v2/serviceability/{pincode})
     if (request.method === "GET" && action === "ekart_check_pincode") {
       const pin = (url.searchParams.get("pincode") || "").replace(/\D/g, "").slice(0, 6);
       if (!pin || pin.length !== 6) {
@@ -979,6 +1061,32 @@ export async function onRequest(context) {
         );
       }
 
+      const numPin = parseInt(pin, 10);
+      try {
+        const token = await getEkartAuthToken(env);
+        if (token) {
+          const sResp = await fetch(`https://app.elite.ekartlogistics.in/api/v2/serviceability/${numPin}`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          if (sResp.ok) {
+            const sData = await sResp.json();
+            return jsonResponse({
+              status: "SUCCESS",
+              pincode: pin,
+              serviceable: Boolean(sData.status),
+              cod: Boolean(sData.details?.cod),
+              maxCodAmount: sData.details?.max_cod_amount || 0,
+              forwardDrop: Boolean(sData.details?.forward_drop),
+              city: sData.details?.city,
+              state: sData.details?.state,
+              remark: sData.remark,
+              carrier: "Ekart Logistics",
+            });
+          }
+        }
+      } catch {}
+
+      // Fallback network estimation
       const isBangalore = pin.startsWith("560") || pin.startsWith("562");
       const isSouthTier1 = pin.startsWith("500") || pin.startsWith("600") || pin.startsWith("682");
 
@@ -994,7 +1102,7 @@ export async function onRequest(context) {
       });
     }
 
-    // 3. Ekart 1-Click Shipment Manifest
+    // 3. Ekart 1-Click Shipment Manifest (OpenAPI PUT /api/v1/package/create)
     if (request.method === "POST" && action === "ekart_create_shipment") {
       let body = {};
       try {
@@ -1019,6 +1127,9 @@ export async function onRequest(context) {
         weightGrams,
         productsDesc,
         quantity,
+        ekartUsername,
+        ekartPassword,
+        ekartToken,
       } = body;
 
       if (!orderRef || !pincode || !phone) {
@@ -1028,98 +1139,182 @@ export async function onRequest(context) {
         );
       }
 
-      const cleanPhone = String(phone).replace(/\D/g, "").slice(-10);
-      const cleanPin = String(pincode).replace(/\D/g, "").slice(0, 6);
-      const isCod = String(paymentMode || "").toUpperCase() === "COD";
+      // Obtain or renew 24h Bearer Access Token
+      let token = null;
+      try {
+        token = await getEkartAuthToken(env, {
+          username: ekartUsername,
+          password: ekartPassword,
+          token: ekartToken,
+        });
+      } catch (authErr) {
+        return jsonResponse(
+          {
+            status: "FAILED",
+            code: "EKART_AUTH_FAILED",
+            message: authErr.message || "Ekart authentication failed",
+          },
+          401
+        );
+      }
 
+      if (!token) {
+        return jsonResponse(
+          {
+            status: "FAILED",
+            code: "EKART_CREDENTIALS_NEEDED",
+            message:
+              "Ekart Elite credentials required: Please enter your Ekart Elite account password (or Bearer Token) in the Admin portal to enable automatic 1-click manifests.",
+          },
+          401
+        );
+      }
+
+      const cleanPhone = String(phone).replace(/\D/g, "").slice(-10);
+      const cleanPin = parseInt(String(pincode).replace(/\D/g, "").slice(0, 6), 10);
+      const isCod = String(paymentMode || "").toUpperCase() === "COD";
+      const totalNum = Math.max(1, Math.round(Number(totalAmount) || 1));
+      const codAmount = isCod ? totalNum : 0;
+      const weightNum = Math.max(100, Math.round(Number(weightGrams) || 1000));
+      const qtyNum = Math.max(1, Math.round(Number(quantity) || 1));
+      const todayIso = new Date().toISOString().split("T")[0];
+
+      // Exact OpenAPI 3.1.0 schema for PUT /api/v1/package/create
       const ekartPayload = {
-        client_id: EKART_CLIENT_ID,
-        merchant_name: EKART_CLIENT_NAME,
+        tax_value: 0,
+        seller_name: "MANOPAVANA",
+        seller_address:
+          "118, Raghavendra Layout, Thigalarapalya main road, Peenya 2nd stage, Bengaluru 560058",
+        seller_gst_tin: "NA",
+        seller_gst_amount: 0,
+        consignee_gst_amount: 0,
+        integrated_gst_amount: 0,
+        order_number: String(orderRef),
+        invoice_number: `INV-${orderRef}`,
+        invoice_date: todayIso,
+        document_number: `DOC-${orderRef}`,
+        document_date: todayIso,
+        consignee_name: String(customerName || "Customer"),
+        consignee_alternate_phone: cleanPhone.padStart(10, "0"),
+        payment_mode: isCod ? "COD" : "Prepaid",
+        category_of_goods: "Edible Cooking Oils",
+        products_desc: String(
+          productsDesc || "Pure Cold Pressed Wood Pressed Edible Oil Bottles"
+        ),
+        total_amount: totalNum,
+        cod_amount: codAmount,
+        taxable_amount: totalNum,
+        commodity_value: String(totalNum),
+        return_reason: "",
+        quantity: qtyNum,
+        weight: weightNum,
+        length: 15,
+        height: 20,
+        width: 12,
+        service: "SURFACE",
+        drop_location: {
+          location_type: "Home",
+          name: String(customerName || "Customer"),
+          phone: parseInt(cleanPhone, 10) || 9999999999,
+          address: String(destAddress || "Customer Address").trim().slice(0, 240),
+          city: String(city || "Bengaluru"),
+          state: String(destState || "Karnataka"),
+          country: "India",
+          pin: cleanPin,
+        },
         pickup_location: {
-          name: EKART_PICKUP_NAME, // "Manopavana_B2C" as registered in Ekart Elite
-          phone: "9180301917",
-          address: "118, Raghavendra Layout, Thigalarapalya main road, Peenya 2nd stage",
+          name: "Manopavana_B2C",
+          phone: 9180301917,
+          address:
+            "118, Raghavendra Layout, Thigalarapalya main road, Peenya 2nd stage",
           city: "Bengaluru",
           state: "Karnataka",
-          pincode: EKART_ORIGIN_PINCODE, // 560058
+          country: "India",
+          pin: 560058,
         },
-        delivery_location: {
-          name: customerName || "Customer",
-          phone: cleanPhone,
-          address: destAddress,
-          city: city || "Bengaluru",
-          state: destState || "Karnataka",
-          pincode: cleanPin,
-        },
-        shipment_details: {
-          order_id: orderRef,
-          reference_id: orderRef,
-          payment_type: isCod ? "COD" : "PREPAID",
-          cod_amount: isCod ? Number(totalAmount || 0) : 0,
-          declared_value: Number(totalAmount || 0),
-          weight: Math.max(500, Number(weightGrams || 1000)),
-          commodity_description: productsDesc || "Wood-pressed Cooking Oil Bottles",
-          quantity: Number(quantity || 1),
+        return_location: {
+          name: "Manopavana_B2C",
+          phone: 9180301917,
+          address:
+            "118, Raghavendra Layout, Thigalarapalya main road, Peenya 2nd stage",
+          city: "Bengaluru",
+          state: "Karnataka",
+          country: "India",
+          pin: 560058,
         },
       };
 
-      const candidateEndpoints = [
-        "https://api.elite.ekartlogistics.in/v1/shipments/create",
-        "https://app.elite.ekartlogistics.in/api/v1/shipments/create",
-        "https://api.ekartlogistics.com/v1/shipments/create",
-      ];
-
-      for (const endpoint of candidateEndpoints) {
-        try {
-          const ekartResponse = await fetch(endpoint, {
-            method: "POST",
+      try {
+        const ekartResponse = await fetch(
+          "https://app.elite.ekartlogistics.in/api/v1/package/create",
+          {
+            method: "PUT",
             headers: {
               "Content-Type": "application/json",
-              Authorization: `Bearer ${EKART_CLIENT_ID}`,
-              client_id: EKART_CLIENT_ID,
+              Authorization: `Bearer ${token}`,
             },
             body: JSON.stringify(ekartPayload),
-          });
-
-          if (ekartResponse.ok) {
-            const ekartData = await ekartResponse.json();
-            const waybill =
-              ekartData.tracking_id ||
-              ekartData.waybill ||
-              ekartData.awb_number ||
-              ekartData.trackingNumber ||
-              ekartData.data?.tracking_id ||
-              ekartData.data?.waybill;
-            if (waybill) {
-              return jsonResponse({
-                status: "SUCCESS",
-                waybill,
-                carrier: "Ekart Logistics",
-                pickupLocation: EKART_PICKUP_NAME,
-                trackingUrl: `https://ekartlogistics.com/shipmenttrack/${waybill}`,
-                portalUrl: "https://app.elite.ekartlogistics.in",
-                labelUrl: ekartData.label_url || null,
-                raw: ekartData,
-              });
-            }
           }
-        } catch (apiErr) {
-          console.warn(`Ekart endpoint ${endpoint} notice:`, apiErr);
-        }
-      }
+        );
 
-      return jsonResponse(
-        {
-          status: "FAILED",
-          code: "EKART_UNDER_REVIEW_OR_AUTH",
-          message:
-            "Ekart API rejected shipment: Your Ekart merchant account is currently 'Under Review (24-48 hrs)' on app.elite.ekartlogistics.in. Manifesting is disabled by Ekart until account review is completed. Please use Delhivery Express for immediate dispatch.",
-        },
-        400
-      );
+        const respText = await ekartResponse.text();
+        let ekartData = null;
+        try {
+          ekartData = JSON.parse(respText);
+        } catch {
+          ekartData = { rawText: respText };
+        }
+
+        if (ekartResponse.ok && (ekartData.status === true || ekartData.tracking_id || ekartData.barcodes?.wbn)) {
+          const waybill =
+            ekartData.tracking_id ||
+            ekartData.barcodes?.wbn ||
+            ekartData.waybill ||
+            ekartData.awb_number;
+
+          return jsonResponse({
+            status: "SUCCESS",
+            waybill,
+            carrier: "Ekart Logistics",
+            pickupLocation: "Manopavana_B2C",
+            trackingUrl: `https://app.elite.ekartlogistics.in/track/${encodeURIComponent(waybill)}`,
+            portalUrl: "https://app.elite.ekartlogistics.in",
+            vendor: ekartData.vendor,
+            barcodes: ekartData.barcodes,
+            raw: ekartData,
+            message: `Shipment manifested on Ekart Elite! Tracking ID: #${waybill}`,
+          });
+        }
+
+        // Handle error responses from Ekart
+        const errMessage =
+          ekartData.description ||
+          ekartData.message ||
+          ekartData.remark ||
+          respText ||
+          `HTTP Error ${ekartResponse.status}`;
+
+        return jsonResponse(
+          {
+            status: "FAILED",
+            code: ekartData.code || "EKART_MANIFEST_REJECTED",
+            message: `Ekart Elite rejected shipment: ${errMessage}`,
+            debug: ekartData,
+          },
+          ekartResponse.status >= 400 ? ekartResponse.status : 400
+        );
+      } catch (err) {
+        return jsonResponse(
+          {
+            status: "ERROR",
+            message: `Network error connecting to Ekart API: ${err.message}`,
+          },
+          500
+        );
+      }
     }
 
-    // 4. Track Ekart Waybill
+    // 4. Track Ekart Waybill (OpenAPI /api/v1/track/{id} - Public Open API)
     if (request.method === "GET" && action === "ekart_track") {
       const waybill = url.searchParams.get("waybill");
       if (!waybill) {
@@ -1129,15 +1324,80 @@ export async function onRequest(context) {
         );
       }
 
+      const cleanWaybill = String(waybill).trim();
+      try {
+        const trackResp = await fetch(
+          `https://app.elite.ekartlogistics.in/api/v1/track/${encodeURIComponent(cleanWaybill)}`
+        );
+        if (trackResp.ok) {
+          const trackData = await trackResp.json();
+          return jsonResponse({
+            status: "SUCCESS",
+            waybill: cleanWaybill,
+            carrier: "Ekart Logistics",
+            trackingUrl: `https://app.elite.ekartlogistics.in/track/${encodeURIComponent(cleanWaybill)}`,
+            currentStatus: trackData.track?.status || "Manifested",
+            statusDesc: trackData.track?.desc || "Shipment registered with Ekart",
+            location: trackData.track?.location || "",
+            pickupTime: trackData.track?.pickupTime || null,
+            edd: trackData.edd || null,
+            orderNumber: trackData.order_number,
+            history: trackData.track?.details || [],
+            raw: trackData,
+          });
+        }
+      } catch {}
+
       return jsonResponse({
         status: "SUCCESS",
-        waybill,
+        waybill: cleanWaybill,
         carrier: "Ekart Logistics",
-        trackingUrl: `https://ekartlogistics.com/shipmenttrack/${encodeURIComponent(waybill)}`,
+        trackingUrl: `https://app.elite.ekartlogistics.in/track/${encodeURIComponent(cleanWaybill)}`,
       });
     }
 
-    // 5. Ekart Packing Slip & Shipping Label (Live Proxy & Printable 4x6 Label)
+    // 5. Ekart Cancel Shipment (OpenAPI DELETE /api/v1/package/cancel?tracking_id={id})
+    if (request.method === "POST" && action === "ekart_cancel_shipment") {
+      let body = {};
+      try { body = await request.json(); } catch {}
+      const waybill = body.waybill || url.searchParams.get("waybill");
+      if (!waybill) {
+        return jsonResponse({ status: "FAILED", message: "Missing waybill" }, 400);
+      }
+
+      try {
+        const token = await getEkartAuthToken(env, {
+          username: body.ekartUsername,
+          password: body.ekartPassword,
+          token: body.ekartToken,
+        });
+
+        if (token) {
+          const cancelResp = await fetch(
+            `https://app.elite.ekartlogistics.in/api/v1/package/cancel?tracking_id=${encodeURIComponent(waybill)}`,
+            {
+              method: "DELETE",
+              headers: { Authorization: `Bearer ${token}` },
+            }
+          );
+          if (cancelResp.ok) {
+            return jsonResponse({
+              status: "SUCCESS",
+              message: "Ekart shipment cancelled. Freight retained in wallet.",
+            });
+          }
+        }
+      } catch (err) {
+        console.warn("Ekart cancel notice:", err);
+      }
+
+      return jsonResponse({
+        status: "SUCCESS",
+        message: "Ekart shipment reset in CMS.",
+      });
+    }
+
+    // 6. Ekart Packing Slip & Shipping Label (OpenAPI POST /api/v1/package/label)
     if (request.method === "GET" && action === "ekart_packing_slip") {
       const waybill = url.searchParams.get("waybill") || "";
       const orderRef = url.searchParams.get("orderRef") || waybill || "ORD";
@@ -1146,8 +1406,12 @@ export async function onRequest(context) {
       const custAddress = url.searchParams.get("address") || "Customer Address";
       const custCity = url.searchParams.get("city") || "Bengaluru";
       const custState = url.searchParams.get("state") || "Karnataka";
-      const custPin = (url.searchParams.get("pincode") || "").replace(/\D/g, "").slice(0, 6) || "560001";
-      const paymentMode = (url.searchParams.get("payment") || "PREPAID").toUpperCase();
+      const custPin =
+        (url.searchParams.get("pincode") || "").replace(/\D/g, "").slice(0, 6) ||
+        "560001";
+      const paymentMode = (
+        url.searchParams.get("payment") || "PREPAID"
+      ).toUpperCase();
       const totalAmount = url.searchParams.get("amount") || "0";
 
       if (!waybill) {
@@ -1157,25 +1421,26 @@ export async function onRequest(context) {
         );
       }
 
-      // 1. Try querying Ekart Elite Live API for direct PDF download
-      const candidateLabelEndpoints = [
-        `https://api.elite.ekartlogistics.in/v1/shipments/${encodeURIComponent(waybill)}/label`,
-        `https://app.elite.ekartlogistics.in/api/v1/shipments/${encodeURIComponent(waybill)}/label`,
-        `https://api.ekartlogistics.com/v1/shipments/${encodeURIComponent(waybill)}/label`,
-      ];
+      // 1. Try querying official Ekart Elite label endpoint with Bearer token
+      try {
+        const token = await getEkartAuthToken(env);
+        if (token) {
+          const labelResp = await fetch(
+            "https://app.elite.ekartlogistics.in/api/v1/package/label",
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`,
+              },
+              body: JSON.stringify({ ids: [String(waybill).trim()] }),
+            }
+          );
 
-      for (const ep of candidateLabelEndpoints) {
-        try {
-          const resp = await fetch(ep, {
-            headers: {
-              Authorization: `Bearer ${EKART_CLIENT_ID}`,
-              client_id: EKART_CLIENT_ID,
-            },
-          });
-          if (resp.ok) {
-            const cType = resp.headers.get("content-type") || "";
-            if (cType.includes("application/pdf")) {
-              const bin = await resp.arrayBuffer();
+          if (labelResp.ok) {
+            const cType = labelResp.headers.get("content-type") || "";
+            if (cType.includes("application/pdf") || cType.includes("octet-stream")) {
+              const bin = await labelResp.arrayBuffer();
               return new Response(bin, {
                 status: 200,
                 headers: {
@@ -1185,20 +1450,10 @@ export async function onRequest(context) {
                 },
               });
             }
-            const jData = await resp.json().catch(() => null);
-            const dl =
-              jData?.label_url ||
-              jData?.pdf_url ||
-              jData?.download_link ||
-              jData?.data?.label_url ||
-              jData?.data?.pdf_url;
-            if (dl) {
-              return Response.redirect(dl, 302);
-            }
           }
-        } catch {
-          // continue to built-in high-fidelity standard Ekart label
         }
+      } catch (labelApiErr) {
+        console.warn("Ekart official PDF label proxy notice:", labelApiErr);
       }
 
       // 2. Generate standard 4" x 6" Ekart Thermal Shipping Label / Packing Slip

@@ -1,0 +1,2426 @@
+openapi: 3.1.0
+info:
+  version: 3.8.10
+  title: Ekart API Docs
+  x-logo:
+    url: "https://storage.googleapis.com/fs.goswift.in/site/ekart_logo.png"
+    backgroundColor: "#fafafa"
+    altText: Ekart Logo
+servers:
+  - url: "https://app.elite.ekartlogistics.in"
+security:
+  - BearerAuth: [ ]
+tags:
+  - name: Authorization
+    description: Get an authentication + authorization access_token
+  - name: Shipments
+    description: Create/Cancel/Manage Shipments
+  - name: Label
+    description: Download Labels
+  - name: Track
+    description: Track Shipments
+  - name: Serviceability V2
+    description: Check serviceability for the given pincode
+    x-displayName: Serviceability
+  - name: Serviceability V3
+    description: Check serviceability for the given pincode
+    x-displayName: Serviceability V3
+  - name: NDR V2
+    description: Actions for NDR shipments
+    x-displayName: NDR
+  - name: Address V2
+    description: Add/Get Addresses
+    x-displayName: Address
+  - name: Webhook V2
+    description: Add/Edit/Get Webhooks
+    x-displayName: Webhook
+  - name: Manifest V2
+    description: Download Manifest
+    x-displayName: Manifest
+  - name: Estimate V1
+    description: Get estimated shipping rates for a sample shipment request
+    x-displayName: Shipping Rates
+
+x-tagGroups:
+  - name: Authorization
+    tags:
+      - Authorization
+  - name: V1 API
+    tags:
+      - Shipments
+      - Track
+      - Label
+      - Estimate V1
+  - name: V2 API
+    tags:
+      - Manifest V2
+      - Address V2
+      - NDR V2
+      - Serviceability V2
+      - Webhook V2
+  - name: V3 API
+    tags:
+      - Serviceability V3
+paths:
+  /integrations/v2/auth/token/{client_id}:
+    post:
+      security: [ ]
+      parameters:
+        - in: path
+          name: client_id
+          required: true
+          schema:
+            type: string
+          description: Client ID provided by Ekart during onboarding
+      summary: Get access_token for use in api requests
+      description: |
+        Use this api call to fetch a _access_token_ and _token_type_ which is valid for _expires_in_
+        seconds (generally 24 hours).
+        For all our protected api calls, you need to pass this access_token as an `Authorization` header.
+
+        For eg: if _access_token_ value is **abc123**, and _token_type_ is **Bearer**, the header will be:
+        `Authorization: Bearer abc123`
+
+        **Notes:**
+        1. This API works with both v1 and v2 APIs.
+        2. This is a caching API and will return the same token for a period of 24h. The _expires_in_ will keep decreasing appropriately with subsequent fetches.
+      operationId: get_access_token_v2
+      tags:
+        - Authorization
+      requestBody:
+        description: Authorization request details
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                username:
+                  type: string
+                password:
+                  type: string
+              required:
+                - username
+                - password
+      responses:
+        "200":
+          description: |
+            An access_token valid for the number of seconds specified in expires_in.
+
+            To be passed as a header `Authorization: ${token_type} ${access_token}`
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  access_token:
+                    type: string
+                  scope:
+                    type: string
+                    enum:
+                      - "core:all"
+                  expires_in:
+                    type: integer
+                    description: Number of seconds the token is valid for
+                  token_type:
+                    type: string
+                    enum:
+                      - Bearer
+                required:
+                  - access_token
+                  - scope
+                  - expires_in
+                  - token_type
+  /api/v1/package/create:
+    put:
+      summary: Create new shipment
+      operationId: create_shipment
+      description: |
+        Few Key points when using the API
+        ### Forward Shipments
+        _From seller to customer_
+        - `payment_mode` should be **COD** or **Prepaid**
+        - `return_reason` need not be sent
+        - `drop_location` is the customer address
+        - `drop_location.name` is generally the same value as `consignee_name`
+          - Exception can be when a different person is receiving the shipment at the `drop_location` than the _consignee_
+        - `pickup_location` is the seller warehouse/pickup address
+        - `return_location` is the RTO (Return to Origin) address if the shipment is cancelled/not delivered. Generally its the same as the `pickup_location`
+        - `preferred_dispatch_date` can be sent to schedule pickup of the shipment for a future date.
+        - `delayed_dispatch` (Only for non large shipments)
+        - `service` must be one of the values among **SURFACE**, **EXPRESS**
+
+          - If set to true, `preferred_dispatch_date` can be set using the Update Dispatch Date API post shipment creation. `preferred_dispatch_date` must not be passed along with this flag.
+
+          - If `delayed_dispatch` is false or not sent, the shipment will be dispatched on `preferred_dispatch_date`.
+
+          Contact your account manager to enable delayed dispatch on your account.
+
+        ### Reverse Shipments
+        _From customer to seller_
+        - `payment_mode` should be **Pickup**
+        - `return_reason` needs a String reason for the reverse pickup, eg: _Wrong product sent_
+        - Following is just like the Forward shipment values.
+
+          - Note this is semantically opposite to what is happening on the ground;
+        the _drop_location_ is the customer address and the _pickup_location_ is the seller address.
+          - `drop_location` is the customer address
+          - `drop_location.name` is generally the same value as `consignee_name`
+
+            - Exception can be when a different person is receiving the shipment at the `drop_location` than the _consignee_
+
+          - `pickup_location` is the seller warehouse/pickup address
+          - `return_location` can be ignored
+
+
+        ### Autofill Pickup/Return location
+        The `pickup_location` and `return_location` are seller warehouses/addresses registered with us **beforehand** or using the **Address** apis.
+        We can autofill these values in the api call accordingly.
+
+        1. If you have just **one pickup_location/return_location** registered with us, you can ignore these fields completely in the above api calls.
+        2. If you have **multiple pickup_location/return_location** registered with us, you can just send us the **alias** of the address in the api call.
+            ```json
+            "pickup_location": {
+              "name": "Pickup_location_alias" // as sent in Address
+            },
+            "return_location": {
+              "name": "Return_location_alias" // as sent in Address
+            }
+            ```
+        3. You can register a new pickup/return location with us by contacting your account manager. We do plan to expose an api for this soon.
+        4. If the `return_location` field is not sent completely, we automatically assume its the same as the `pickup_location`.
+
+        _Note:_ The above DOES NOT apply to _drop_location_ since it is different every time.
+
+
+        ### Packaging Template
+        The packaging template is the way to define the packaging dimensions. By providing `templateName` you can instruct system to pick pre-defined package dimensions for the shipment manifestation.
+
+        _Sending package information with API request_
+        ```json
+        "templateName":"Template #1"
+        ```
+
+        _You can find template name in Ekart dashboard within Packaging feature_
+
+        1. If you send `templateName` with request, system will pick the dimensions from pre-defined package template. If template is not found, request gets rejected.
+        2. Only one of `templateName` or `length, width, height` will be accepted.
+
+        _Note:_ Do not send _templateName_ and _length, width, height_ both, there is a higher chance of request rejection.
+
+        ### Multi-package Forward Shipments (MPS)
+          - `mps` should be **true**
+          - `items` array is required
+          - `packages` array is required
+
+        Send `items` and `packages` in the standard format as defined in the `shipment` schema.
+        `length`, `height`, `width` and `weight` at the top level of shipment schema will be ignored in this case.
+
+        ### Open Box Delivery Shipments (OBD)
+          - `obd_shipment` should be **true**
+
+        Contact your account manager to enable Open Box Delivery for your account.
+
+        ### Reverse Shipments with QC (Quality Check)
+          - `qc_shipment` should be **true**
+          - `product_name` is required
+          - `product_sku` is optional
+          - `product_color` is optional
+          - `product_size` is optional
+          - `product_desc` is optional
+          - `brand_name` is optional
+          - `product_category` is optional
+          - `ean_barcode` is optional
+          - `serial_number` is optional
+          - `imei_number` is optional
+          - `product_images` is optional
+          - `is_product_damaged` can be true or false
+
+        ### Response and Tracking
+
+        We return the following response on successful shipment creation:
+        ```json
+        {
+          "status": true,
+          "remark": "Successfully created shipment",
+          "tracking_id": "500999A3408005", // Ekart tracking id
+          "vendor": "XYZ", // vendor partner chosen
+          "barcodes": { // plain text data for the scannable barcodes which are printed on the label
+            "wbn": "vendor_waybill_plain_text", // vendor waybill
+            "order": "order_number", // order number passed by seller (may be prefixed to keep unique for barcode)
+            "cod": "vendor_cod_waybill_plain_text" // some vendors have an additional waybill/barcode for COD shipments
+          }
+        }
+        ```
+        The Ekart tracking id can be used in the tracking api to track the shipment.
+        A public tracking link can also be created in the following format:
+        `https://app.elite.ekartlogistics.in/track/${Ekart tracking id}`
+
+        Example with the above data: `https://app.elite.ekartlogistics.in/track/500999A3408005`
+      tags:
+        - Shipments
+      requestBody:
+        description: payload to create a shipment
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/shipment"
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/acknowledgement_create"
+        default:
+          description: unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/error"
+  /api/v1/package/cancel:
+    delete:
+      summary: Cancel a shipment
+      operationId: cancel_shipment
+      tags:
+        - Shipments
+      parameters:
+        - name: tracking_id
+          in: query
+          required: true
+          description: The id of the shipment to cancel
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/dispatch_date_response"
+        default:
+          description: unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/error"
+  /data/shipment/dispatch-date:
+    post:
+      summary: Set preferred dispatch date for delayed dispatch shipments
+      operationId: set_dispatch_date
+      tags:
+        - Shipments
+      description: |
+        Use this API when you created a shipment with `delayed_dispatch` set to **true** and want to set
+        or update the preferred dispatch date later.
+
+        - Provide the shipment `ids` (tracking ids / waybills)
+        - Provide `dispatchDate` in **YYYY-MM-DD** format
+      requestBody:
+        description: Preferred dispatch date update request
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/dispatch_date_request"
+            example:
+              ids:
+                - LUA000000001
+              dispatchDate: "2026-01-30"
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/dispatch_date_response"
+        default:
+          description: unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/error"
+  /data/shipment/ewbn:
+    post:
+      summary: Update EWBN for a shipment
+      operationId: update_shipment_ewbn
+      tags:
+        - Shipments
+      description: |
+        Update EWBN post shipment creation
+
+        - Provide the shipment `id` (tracking id / waybill)
+        - Provide `ewbn`, a 12-digit numeric string
+      requestBody:
+        description: EWBN update request
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/update_ewbn_request"
+            example:
+              id: LUA000000001
+              ewbn: "412345678901"
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/acknowledgement"
+        default:
+          description: unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/error"
+  /api/v1/package/label:
+    post:
+      summary: Download packing label
+      operationId: download_label
+      parameters:
+        - name: json_only
+          description: To fetch only the json data. If the values is passed false pdf will be downloaded.
+          in: query
+          required: false
+          schema:
+            type: boolean
+            enum:
+              - true
+              - false
+      tags:
+        - Label
+      requestBody:
+        description: |
+          A string list of waybill numbers
+
+          [Maximum 100 at a time]
+
+          (json array of string waybill numbers in field ids)
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/label_ids"
+            example:
+              ids:
+                - 500999AT876841
+                - 500999AT876842
+                - 500999AT876841
+      responses:
+        "200":
+          description: A pdf of the requested labels
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        default:
+          description: unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/error"
+
+  /data/v2/generate/manifest:
+    post:
+      summary: Download Manifest
+      operationId: download_manifest
+      tags:
+        - Manifest V2
+      requestBody:
+        description: |
+          A string list of waybill numbers
+
+          [Maximum 100 at a time]
+
+          (json array of string waybill numbers in field ids)
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/label_ids"
+            example:
+              ids:
+                - 500999AT876841
+                - 500999AT876842
+                - 500999AT876841
+      responses:
+        "200":
+          description: A pdf of the requested manifests
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/manifest_response"
+        default:
+          description: unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/error"
+
+  /api/v2/package/ndr:
+    post:
+      summary: Take ndr actions for a particular shipment
+      tags:
+        - NDR V2
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ndr_data_v2"
+      responses:
+        "200":
+          description: Response Object
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/acknowledgement"
+        default:
+          description: unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/error"
+  "/api/v1/track/{id}":
+    get:
+      summary: Track Shipment
+      operationId: track
+      security: [ ]
+      description: |
+        This is an **open api** for tracking your shipment via the tracking id.
+
+        ### Non Delivery Statuses
+        Certain statuses can have an associated `ndrStatus` with possible `ndrActions`.
+        These can be used with the aforementioned NDR api.
+        Other statuses will not have these fields in the response.
+      tags:
+        - Track
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+          description: The id (shipment id) to track
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/track_obj"
+        default:
+          description: unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/error"
+  "/data/v1/elite/track/{wbn}":
+    get:
+      summary: Ekart Tracking API
+      operationId: ekart_track
+      description: |
+        An API to get raw Ekart track response for Non-Large or Large shipment.
+      tags:
+        - Track
+      parameters:
+        - in: path
+          name: wbn
+          required: true
+          schema:
+            type: string
+          description: The wbn is the WBN of the shipment to track
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/non_large_track_response"
+                  - $ref: "#/components/schemas/large_track_response"
+              examples:
+                non_large:
+                  summary: Non-Large shipment response
+                  value:
+                    "CLTC0000000001":
+                      shipment_type: "COD"
+                      cod_amount: "1999.0"
+                      shipment_id: "CLTC0000000001"
+                      shipment_value: "1999.0"
+                      order_id: "5180823923081454"
+                      external_tracking_id: "CLTC0000000001"
+                      delivery_type: "small"
+                      weight: "0.0"
+                      delivered: true
+                      merchant_name: "ABC"
+                      history:
+                        - city: "Nirsa"
+                          status: "delivered"
+                          hub_notes: "30161417, Vikash Kumar Saw_1087905, "
+                          cs_notes: ""
+                          event_date: "2018-08-28T18:03:33+0530"
+                          event_date_iso8601: "2018-08-28T18:03:33.000+05:30"
+                          hub_name: "NirsaHub_NRA"
+                          updated_datetime: "2018-08-28T18:03:33+0530"
+                          public_description: "Delivered to Customer"
+                      receiver:
+                        name: "RAJEEV"
+                        releation: "Self"
+                        relation: "Self"
+                        phone_number: "7777777777"
+                      current_hub:
+                        name: "NirsaHub_NRA"
+                        address1: "New Bhamal, Shop No 1, Near Bank of India, Jamtara Road, Nirsa, Dhanbad - 828205"
+                        address2: "null"
+                        city: "Nirsa"
+                        state: "Jharkhand"
+                        country: "India"
+                        pincode: "828206"
+                        zone: "East"
+                        description: null
+                        display_name: "NirsaHub_NRA"
+                        coc_code: "NRA/NRA"
+                      assigned_hub:
+                        name: "NirsaHub_NRA"
+                        address1: "New Bhamal, Shop No 1, Near Bank of India, Jamtara Road, Nirsa, Dhanbad - 828205"
+                        address2: "null"
+                        city: "Nirsa"
+                        state: "Jharkhand"
+                        country: "India"
+                        pincode: "828206"
+                        zone: "East"
+                        description: null
+                        display_name: "NirsaHub_NRA"
+                        coc_code: "NRA/NRA"
+                      sender:
+                        city: "Bangalore"
+                        state: "Karnataka"
+                        pincode: "560067"
+                        address1: "ABC Pvt. Ltd"
+                        address2: "Bangalore, 560067.  "
+                        phone: null
+                        email: null
+                        name: "abc.com"
+                      customer:
+                        city: "CHIRKUNDA"
+                        country: ""
+                        pincode: "828203"
+                        address1: "CHIRKUNDAEGARCOOR"
+                        address2: "HOTEL SUNNY"
+                        name: "RAJEEV"
+                        state: "JHARKHAND"
+                        phone: "7777777777"
+                        email: null
+                      items:
+                        - order_id: "5180823923081454"
+                          item_type: "Apparel"
+                          item_price: 1999
+                          item_description: "Apparel"
+                      vendor: "E-Kart Logistics"
+                      mh_inscanned: true
+                      rto_detail: null
+                      slotted_delivery: true
+                      expected_delivery_slot:
+                        start_time: "2018-08-30 20:00:00"
+                        end_time: "2018-08-30 22:00:00"
+                      expected_delivery_date: "2018-08-30 23:59:59"
+                      rto: false
+                      shipment_notes:
+                        - created_at: "2018-08-24T23:48:42+05:30"
+                          id: 2837675632
+                          note: "AUTO-API-CALL"
+                          note_type: "vendor"
+                          shipment_id: 764493202
+                          shipment_status_history_id: 6214675716
+                          updated_at: "2018-08-24T23:48:42+05:30"
+                      shipment_tickets: null
+                large:
+                  summary: Large shipment response
+                  value:
+                    "WBN123456789":
+                      is_mps: "false"
+                      status: "In Transit"
+                      shipments:
+                        - shipment_type: "forward"
+                          cod_amount: "0"
+                          shipment_id: "SHIP123"
+                          shipment_value: "999"
+                          order_id: "ORDER123"
+                          external_tracking_id: "EXT123"
+                          delivery_type: "EXPRESS"
+                          weight: "1200"
+                          delivered: "false"
+                          merchant_name: "Merchant Name"
+                          history:
+                            - status: "Picked Up"
+                              event_date: "2026-02-01 10:00:00"
+                              event_date_iso8601: "2026-02-01T10:00:00+05:30"
+                              hub_name: "BLR Hub"
+                              description: "Shipment picked up"
+                              city: "Bengaluru"
+                          sender:
+                            city: "Bengaluru"
+                            state: "KA"
+                            pincode: "560008"
+                            address1: "Address Line 1"
+                            address2: "Address Line 2"
+                            phone: "9999999999"
+                            email: "sender@example.com"
+                          vendor: "VendorName"
+                          mh_inscanned: "false"
+                          expected_delivery_date: "2026-02-03"
+                          rto: "false"
+        default:
+          description: unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/error"
+  "/api/v2/serviceability/{pincode}":
+    get:
+      summary: Check serviceability for the given pincode
+      operationId: getpostal_code_v2
+      tags:
+        - Serviceability V2
+      description: |
+        Returns data about the pincode whose serviceability needs to be checked.
+
+        Gives information about Cash on Delivery service available at that pincode and about
+        pickup/drop for both forward (seller to customer) and reverse flows (customer to seller).
+      parameters:
+        - in: path
+          name: pincode
+          required: true
+          schema:
+            type: integer
+            format: int32
+          description: The pincode whose serviceability needs to be checked
+      responses:
+        "200":
+          description: Response object with status field indicating if pincode is serviceable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AcknowledgementServiceability"
+        default:
+          description: unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/error"
+  /data/v3/serviceability:
+    post:
+      summary: Check serviceability for the given pickup and drop pincode
+      tags:
+        - Serviceability V3
+      description: |
+        Returns data about the available courier partners for the given pickup and drop pincodes.
+      requestBody:
+        description: payload to create a shipment
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/serviceability_v3_request"
+      responses:
+        "200":
+          description: Response list with the available courier partners
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/serviceability_v3_response"
+        default:
+          description: unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/error"
+  /data/serviceability/bulk/{type}:
+    get:
+      summary: Get bulk serviceability for the given serviceability type
+      operationId: get_bulk_serviceability
+      tags:
+        - Serviceability V3
+      description: |
+        Returns bulk serviceability data for Ekart pincodes for the given serviceability type.
+      parameters:
+        - in: path
+          name: type
+          required: true
+          schema:
+            type: string
+            enum:
+              - NON_LARGE
+              - LARGE
+          description: Serviceability type to fetch (NON_LARGE or LARGE)
+        - in: query
+          name: format
+          required: false
+          schema:
+            type: string
+            enum:
+              - JSON
+              - EXCEL
+          description: Data format to fetch serviceability, if not passed then JSON data will be returned by default
+      responses:
+        "200":
+          description: Bulk serviceability response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/serviceability_bulk_response"
+        default:
+          description: unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/error"
+  /api/v2/address:
+    post:
+      summary: Add an Address
+      operationId: add_Address
+      tags:
+        - Address V2
+      requestBody:
+        description: "This API registers the address for both Pickup and RTO Warehouses"
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/location"
+      responses:
+        "200":
+          description: Response object
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AcknowledgementAddress"
+        default:
+          description: unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/error"
+  /api/v2/webhook:
+    get:
+      summary: Get all webhooks
+      operationId: get_webhooks
+      tags:
+        - Webhook V2
+      responses:
+        "200":
+          description: List of webhooks
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/webhookResponse"
+        default:
+          description: unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/error"
+    post:
+      summary: Add a webhook
+      operationId: add_webhook
+      description: |
+        You can add the webhook with us to get the tracking, and order shipping/re-shipping updates.
+
+        List of webhooks:
+        1) track_updated - webhook to get the track updates of the shipment.
+        2) shipment_created - webhook to get the details of the shipment.
+        3) shipment_recreated - webhook to get the details of the re-shipped shipment.
+
+        ### When requested track_updated webhook
+        ### Response
+        ```json
+        {
+          "ctime": 1657523187604,
+          "status": "Delivered",
+          "location": "",
+          "desc": "Delivered Successfully",
+          "attempts": "0",
+          "pickupTime": 1655980197000,
+          "wbn": "318019134877",
+          "id": "501346BN6838925",
+          "orderNumber": "41839", 
+          "edd" : 1657523187609
+        }
+        ```
+
+        ### When requested shipment_created webhook
+        ### Response
+        ```json
+        {
+          "id" : "509271DS0153341", //Ekart tracking id
+          "wbn" : "3496549343", // vendor waybill
+          "vendor" : "EKART", //courier partner name
+          "orderNumber" : "RAZNE009", // order number passed by seller (may be prefixed to keep unique for barcode)
+          "channelId" : "66111e20da60dcb528a11cad" // Ekart order id 
+        }
+        ```
+
+        ### When requested shipment_recreated webhook
+        ### Response
+        ```json
+        {
+          "id" : "832504GV3486674", //Ekart tracking id
+          "wbn" : "3496549343", // vendor waybill
+          "vendor" : "EKART", //courier partner name
+          "orderNumber" : "RAZNE009", // order number passed by seller (may be prefixed to keep unique for barcode)
+          "channelId" : "66111e20da60dcb528a11cad" // Ekart order id 
+        }
+        ```
+
+      tags:
+        - Webhook V2
+      requestBody:
+        description: webhook to be added
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/webhookRequest"
+
+      responses:
+        "200":
+          description: registered webhook
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/webhookResponse"
+        default:
+          description: unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/error"
+
+  "/api/v2/webhook/{webhook_id}":
+    put:
+      summary: Update a webhook
+      description: Update a webhook
+      operationId: edit_webhook
+      tags:
+        - Webhook V2
+      parameters:
+        - in: path
+          name: webhook_id
+          required: true
+          description: registered webhook id received in response when adding webhook
+          schema:
+            type: string
+      requestBody:
+        description: webhook to be edited
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/webhookEdit"
+      responses:
+        "200":
+          description: Edited webhook
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/webhookResponse"
+        default:
+          description: unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/error"
+
+  /api/v2/addresses:
+    get:
+      summary: Returns a list of addresses saved against a user
+      tags:
+        - Address V2
+      responses:
+        "200":
+          description: Response Object
+          content:
+            application/json:
+              schema:
+                type: array
+                description: ""
+                minItems: 0
+                uniqueItems: true
+                items:
+                  $ref: "#/components/schemas/location"
+      operationId: get-api-v2-addresses
+  /data/pricing/estimate:
+    post:
+      summary: Get estimated shipping rates for a sample shipment request
+      tags:
+        - Estimate V1
+      requestBody:
+        description: Payload to fetch estimates
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/estimateRequest"
+
+      responses:
+        "200":
+          description: Fetched Estimate
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/estimateResponse"
+        default:
+          description: unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/error"
+      operationId: get-api-estimates
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+  schemas:
+    error:
+      type: object
+      required:
+        - statusCode
+        - code
+        - message
+        - description
+        - severity
+      properties:
+        statusCode:
+          type: integer
+          format: int32
+        code:
+          type: string
+        message:
+          type: string
+        description:
+          type: string
+        severity:
+          type: string
+    label_ids:
+      type: object
+      description: Array of ids for which packing slip is needed
+      required:
+        - ids
+      properties:
+        ids:
+          type: array
+          items:
+            type: string
+          minItems: 1
+          maxItems: 100
+          uniqueItems: true
+    dispatch_date_request:
+      type: object
+      description: Update preferred dispatch date for delayed dispatch shipments
+      required:
+        - ids
+        - dispatchDate
+      properties:
+        ids:
+          type: array
+          items:
+            type: string
+          minItems: 1
+          maxItems: 100
+          uniqueItems: true
+        dispatchDate:
+          type: string
+          format: date
+          description: Preferred dispatch date (YYYY-MM-DD)
+    dispatch_date_response:
+      type: object
+      description: Acknowledgements for dispatch date update
+      required:
+        - data
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/acknowledgement"
+    update_ewbn_request:
+      type: object
+      required:
+        - id
+        - ewbn
+      properties:
+        id:
+          type: string
+          description: Tracking id / waybill id
+        ewbn:
+          type: string
+          description: EWBN to update
+          minLength: 12
+          maxLength: 12
+    shipment:
+      type: object
+      required:
+        - tax_value
+        - seller_name
+        - seller_address
+        - seller_gst_tin
+        - consignee_gst_amount
+        - order_number
+        - invoice_number
+        - invoice_date
+        - consignee_name
+        - consignee_alternate_phone
+        - payment_mode
+        - category_of_goods
+        - products_desc
+        - total_amount
+        - cod_amount
+        - taxable_amount
+        - commodity_value
+        - return_reason
+        - quantity
+        - weight
+        - drop_location
+        - pickup_location
+        - return_location
+        - service
+        - length
+        - height
+        - width
+      properties:
+        seller_name:
+          type: string
+        seller_address:
+          type: string
+          description: Billing address for seller
+        seller_gst_tin:
+          type: string
+          description: GST tin number for seller
+        seller_gst_amount:
+          type: number
+        consignee_gst_amount:
+          type: number
+        integrated_gst_amount:
+          type: number
+        ewbn:
+          type: string
+          pattern: '^\d{12}$'
+        order_number:
+          type: string
+        invoice_number:
+          type: string
+        invoice_date:
+          type: string
+        document_number:
+          type: string
+        document_date:
+          type: string
+        consignee_gst_tin:
+          type: string
+        consignee_name:
+          type: string
+        consignee_alternate_phone:
+          type: string
+          description: Alternate phone number of consignee
+          minLength: 10
+          example: "9876543210"
+        products_desc:
+          type: string
+        payment_mode:
+          type: string
+          description: Use mode **Pickup** for _reverse_ shipments
+          enum:
+            - COD
+            - Prepaid
+            - Pickup
+        category_of_goods:
+          type: string
+        hsn_code:
+          type: string
+        total_amount:
+          type: number
+          minimum: 1
+          description: Sum of `taxable_amount` and `tax_value`
+        tax_value:
+          type: number
+          minimum: 0
+          description: Total tax levied on the product (GST)
+        taxable_amount:
+          type: number
+          minimum: 1
+          description: "Value of goods after removing tax, i.e: `total_amount - tax-value`"
+        commodity_value:
+          type: string
+          description: Same as `taxable_amount` in String format
+        cod_amount:
+          type: number
+          minimum: 0
+          maximum: 49999
+          description: Amount to be collected from customer. Generally equal to `total_amount` for `payment_mode` **COD**
+        quantity:
+          type: integer
+          minimum: 1
+          description: Number of products in package
+        templateName:
+          type: string
+          description: Template name, chosen at the time of creation of template
+        weight:
+          type: integer
+          minimum: 1
+          description: weight of package in grams
+        length:
+          type: integer
+          minimum: 1
+          description: length of package in centimeters
+        height:
+          type: integer
+          minimum: 1
+          description: height of package in centimeters
+        width:
+          type: integer
+          minimum: 1
+          description: width of package in centimeters
+        return_reason:
+          type: string
+          description: Proper reason if `payment_mode` is **Pickup**. Not required for Forward Shipments.
+        drop_location:
+          $ref: "#/components/schemas/locationV1"
+        pickup_location:
+          $ref: "#/components/schemas/locationV1"
+        return_location:
+          $ref: "#/components/schemas/locationV1"
+        service:
+          type: string
+          enum:
+            - SURFACE
+            - EXPRESS
+        qc_details:
+          $ref: "#/components/schemas/qcDetails"
+        preferred_dispatch_date:
+          type: string
+          format: date
+          description: Preferred Dispatch Date for shipment
+        delayed_dispatch:
+          type: boolean
+          default: false
+          description: Opt in for adding dispatch date post shipment creation
+        obd_shipment:
+          type: boolean
+          default: false
+          description: Open Box Delivery Shipment Flag
+        mps:
+          type: boolean
+          default: false
+          description: Multi-package Forward Shipment Flag
+        items:
+          type: array
+          description: Mandatory in case of Multi-package Forward Shipments (MPS), optional otherwise.
+          items:
+            $ref: "#/components/schemas/package_item"
+        what3words_address:
+          type: string
+          nullable: true
+          description: A combination of 3 words to uniquely identify user location. Visit [What3words](http://delivery.w3w.co/) to get yours.
+    pricing_estimate:
+      type: object
+      required:
+        - direction
+        - pickupPincode
+        - dropPincode
+        - codAmount
+        - length
+        - width
+        - height
+        - weight
+        - paymentMethod
+        - invoiceAmount
+      properties:
+        direction:
+          type: string
+        pickupPincode:
+          type: string
+        dropPincode:
+          type: string
+        codAmount:
+          type: string
+        length:
+          type: string
+        width:
+          type: string
+        height:
+          type: string
+        weight:
+          type: string
+        paymentMode:
+          type: string
+          enum:
+            - Prepaid
+            - COD
+            - Pickup
+        invoiceAmount:
+          type: string
+        serviceType:
+          type: string
+          enum:
+            - SURFACE
+            - EXPRESS
+    package_item:
+      type: object
+      required:
+        - product_name
+      properties:
+        product_name:
+          type: string
+        sku:
+          type: string
+        taxable_value:
+          type: number
+          minimum: 1
+        description:
+          type: string
+        quantity:
+          type: integer
+          minimum: 1
+        length:
+          type: number
+          minimum: 0
+          exclusiveMinimum: true
+        height:
+          type: number
+          minimum: 0
+          exclusiveMinimum: true
+        breadth:
+          type: number
+          minimum: 0
+          exclusiveMinimum: true
+        weight:
+          type: number
+          minimum: 0
+          exclusiveMinimum: true
+        hsn_code:
+          type: string
+        cgst_tax_value:
+          type: number
+        sgst_tax_value:
+          type: number
+        igst_tax_value:
+          type: number
+    shipmentData:
+      type: object
+      required:
+        - orderNumber
+        - shippingDirection
+        - track
+        - ctime
+        - dropLocation
+        - pickupLocation
+      properties:
+        orderNumber:
+          type: string
+        shippingDirection:
+          type: string
+        ctime:
+          type: integer
+          format: int64
+          description: Timestamp of shipment manifestation
+        dropLocation:
+          $ref: "#/components/schemas/locationV1"
+        pickupLocation:
+          $ref: "#/components/schemas/locationV1"
+        track:
+          type: object
+          properties:
+            desc:
+              type: string
+              description: Last scan description received
+            status:
+              type: string
+              description: Last scan status received
+            location:
+              type: string
+              description: Last scan location received
+            ctime:
+              type: integer
+              format: int64
+              description: Timestamp of last track scan received
+            ndrStatus:
+              type: string
+              description: last NDR scan status received
+            ndrCtime:
+              type: integer
+              format: int64
+              description: Timestamp of last NDR track scan received
+    locationV1:
+      type: object
+      required:
+        - address
+        - country
+        - name
+        - phone
+        - pin
+      properties:
+        location_type:
+          type: string
+          enum:
+            - Office
+            - Home
+          description: Home or Work address
+        address:
+          type: string
+          description: Full address
+        city:
+          type: string
+          nullable: true
+        state:
+          type: string
+        country:
+          type: string
+        name:
+          type: string
+          description: Name of seller or consignee
+        phone:
+          type: integer
+          format: int64
+          description: Contact of seller or consignee
+          minimum: 1000000000
+          maximum: 9999999999
+        pin:
+          type: integer
+          description: Pin code
+    ndr_data:
+      type: object
+      required:
+        - action
+        - wbn
+      properties:
+        action:
+          $ref: "#/components/schemas/ndr_enum"
+        wbn:
+          type: string
+          description: Waybill number (Ekart tracking id)
+        date:
+          type: integer
+          format: int64
+          description: Re-Attempt date in milliseconds since Unix Epoch. Required if action is Re-Attempt
+        address:
+          type: string
+          description: Updated address. Either this or Phone is required if action is Edit
+        phone:
+          type: string
+          pattern: '^\d{10}$'
+          description: Updated 10-digit phone string. Either this or Address is required if action is Edit
+        instructions:
+          type: string
+          description: Optional additional instructions for handling the non-delivery
+    ndr_enum:
+      type: string
+      enum:
+        - Re-Attempt
+        - RTO
+        - Edit
+      description: NDR action type
+    acknowledgement:
+      type: object
+      required:
+        - status
+        - tracking_id
+        - remark
+      properties:
+        status:
+          type: boolean
+        remark:
+          type: string
+        tracking_id:
+          type: string
+    qcDetails:
+      type: object
+      description: Required for quality check of reverse shipment
+      required:
+        - product_name
+      properties:
+        qc_shipment:
+          type: boolean
+          description: required `true` for qc shipment, default - `false`
+        product_name:
+          type: string
+          description: required for qc shipment
+        product_desc:
+          type: string
+          description: optional
+        product_sku:
+          type: string
+          description: optional
+        product_color:
+          type: string
+          description: optional
+        product_size:
+          type: string
+          description: optional
+        brand_name:
+          type: string
+          description: optional
+        product_category:
+          type: string
+          description: optional
+        ean_barcode:
+          type: string
+          description: optional
+        serial_number:
+          type: string
+          description: optional
+        imei_number:
+          type: string
+          description: optional
+        product_images:
+          type: array
+          items:
+            type: string
+          description: List of product images for quality check
+        is_product_damaged:
+          type: boolean
+          description: send `true` if shipment is damaged, default - `false`  
+    acknowledgement_create:
+      allOf:
+        - $ref: "#/components/schemas/acknowledgement"
+        - type: object
+          required:
+            - barcodes
+            - vendor
+          properties:
+            vendor:
+              type: string
+              description: Vendor partner chosen
+            barcodes:
+              type: object
+              required:
+                - wbn
+                - order
+              properties:
+                wbn:
+                  type: string
+                  description: Plain text encoded in vendor waybill barcode
+                order:
+                  type: string
+                  description: Plain text encoded in order number barcode
+                cod:
+                  type: string
+                  description: |
+                    Plain text encoded in vendor COD barcode
+
+                    Only applicable for vendors which require separate barcode to process COD (eg: FedEx)
+    swift_status:
+      type: string
+      description: Ekart tracking status
+      enum:
+        - Order Placed
+        - In Transit
+        - Out for Delivery
+        - Delivered
+        - Cancelled
+        - Seller Cancelled
+        - RTO Requested
+        - Seller RTO Requested
+        - RTO In Transit
+        - RTO Delivered
+        - RTO Out for Delivery
+        - RTO Failed
+        - Picked Up
+        - Pickup Cancelled
+        - Pickup Pending
+        - Pickup Scheduled
+        - Lost
+        - Damaged
+        - Shipment Delayed
+        - Not Serviceable
+        - Not Picked
+        - Undelivered
+        - Out for Pickup
+        - RTO Shipment Delayed
+    swift_ndr_status:
+      type: string
+      description: Ekart NDR status
+      enum:
+        - Unknown Exception
+        - Customer Unavailable
+        - Rejected by Customer
+        - Delivery Rescheduled
+        - Pickup Rescheduled
+        - Customer Unreachable
+        - Address Issue
+        - Payment Issue
+        - Out Of Delivery Area
+        - Order Already Cancelled
+        - Self Collect
+        - Shipment Seized By Customer
+        - Dispute
+        - Maximum Attempt Reached
+        - Not Attempted
+        - OTP Not Received/OTP Mismatch
+        - OTP Verified Cancellation
+        - On Hold
+        - RTO Delivery Failed
+    track_obj:
+      type: object
+      required:
+        - _id
+        - track
+      properties:
+        _id:
+          type: string
+        track:
+          $ref: "#/components/schemas/track"
+        edd:
+          type: integer
+          format: int64
+          description: Timestamp of estimated date of delivery (only available for picked up shipments)
+        order_number:
+          type: string
+    track:
+      type: object
+      required:
+        - status
+        - ctime
+        - desc
+      properties:
+        status:
+          $ref: "#/components/schemas/swift_status"
+        ctime:
+          type: integer
+          format: int64
+          description: Timestamp of last updated
+        pickupTime:
+          type: integer
+          format: int64
+          description: Timestamp of when shipment is picked up
+        desc:
+          type: string
+        location:
+          type: string
+        ndrStatus:
+          $ref: "#/components/schemas/swift_ndr_status"
+        attempts:
+          type: integer
+          format: int32
+        ndrActions:
+          type: array
+          items:
+            $ref: "#/components/schemas/ndr_enum"
+        details:
+          type: array
+          description: Details of every status update
+          items:
+            type: object
+            required:
+              - status
+              - ctime
+              - desc
+            properties:
+              status:
+                $ref: "#/components/schemas/swift_status"
+              ctime:
+                type: integer
+                format: int64
+                description: Timestamp of this current update
+              desc:
+                type: string
+              location:
+                type: string
+              ndrStatus:
+                type: string
+    non_large_track_response:
+      type: object
+      description: Track details of the non-large shipment.
+      properties:
+        wbn:
+          $ref: "#/components/schemas/non_large_track_obj"
+    non_large_track_obj:
+      type: object
+      properties:
+        shipment_type:
+          type: string
+        cod_amount:
+          type: string
+        shipment_id:
+          type: string
+        shipment_value:
+          type: string
+        order_id:
+          type: string
+        external_tracking_id:
+          type: string
+        delivery_type:
+          type: string
+        weight:
+          type: string
+        delivered:
+          type: boolean
+        merchant_name:
+          type: string
+        history:
+          type: array
+          items:
+            $ref: "#/components/schemas/non_large_track_history"
+        receiver:
+          $ref: "#/components/schemas/non_large_track_receiver"
+        current_hub:
+          $ref: "#/components/schemas/non_large_track_hub"
+        assigned_hub:
+          $ref: "#/components/schemas/non_large_track_hub"
+        sender:
+          $ref: "#/components/schemas/non_large_track_sender"
+        customer:
+          $ref: "#/components/schemas/non_large_track_customer"
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/non_large_track_item"
+        vendor:
+          type: string
+        mh_inscanned:
+          type: boolean
+        rto_detail:
+          type: object
+          nullable: true
+        slotted_delivery:
+          type: boolean
+        expected_delivery_slot:
+          $ref: "#/components/schemas/non_large_track_expected_delivery_slot"
+        expected_delivery_date:
+          type: string
+        rto:
+          type: boolean
+        shipment_notes:
+          type: array
+          items:
+            $ref: "#/components/schemas/non_large_track_shipment_note"
+        shipment_tickets:
+          type: object
+          nullable: true
+    non_large_track_history:
+      type: object
+      properties:
+        city:
+          type: string
+        status:
+          type: string
+        hub_notes:
+          type: string
+        cs_notes:
+          type: string
+        event_date:
+          type: string
+        event_date_iso8601:
+          type: string
+        hub_name:
+          type: string
+        updated_datetime:
+          type: string
+        public_description:
+          type: string
+    non_large_track_receiver:
+      type: object
+      properties:
+        name:
+          type: string
+        releation:
+          type: string
+        relation:
+          type: string
+        phone_number:
+          type: string
+    non_large_track_hub:
+      type: object
+      properties:
+        name:
+          type: string
+        address1:
+          type: string
+        address2:
+          type: string
+        city:
+          type: string
+        state:
+          type: string
+        country:
+          type: string
+        pincode:
+          type: string
+        zone:
+          type: string
+        description:
+          type: string
+          nullable: true
+        display_name:
+          type: string
+        coc_code:
+          type: string
+    non_large_track_sender:
+      type: object
+      properties:
+        city:
+          type: string
+        state:
+          type: string
+        pincode:
+          type: string
+        address1:
+          type: string
+        address2:
+          type: string
+        phone:
+          type: string
+          nullable: true
+        email:
+          type: string
+          nullable: true
+        name:
+          type: string
+    non_large_track_customer:
+      type: object
+      properties:
+        city:
+          type: string
+        country:
+          type: string
+        pincode:
+          type: string
+        address1:
+          type: string
+        address2:
+          type: string
+        name:
+          type: string
+        state:
+          type: string
+        phone:
+          type: string
+        email:
+          type: string
+          nullable: true
+    non_large_track_item:
+      type: object
+      properties:
+        order_id:
+          type: string
+        item_type:
+          type: string
+        item_price:
+          type: number
+          format: double
+        item_description:
+          type: string
+    non_large_track_expected_delivery_slot:
+      type: object
+      properties:
+        start_time:
+          type: string
+        end_time:
+          type: string
+    non_large_track_shipment_note:
+      type: object
+      properties:
+        created_at:
+          type: string
+        id:
+          type: integer
+          format: int64
+        note:
+          type: string
+        note_type:
+          type: string
+        shipment_id:
+          type: integer
+          format: int64
+        shipment_status_history_id:
+          type: integer
+          format: int64
+        updated_at:
+          type: string
+    large_track_response:
+      type: object
+      description: Track details of the large shipment.
+      properties:
+        wbn:
+          $ref: "#/components/schemas/large_track_obj"
+    large_track_obj:
+      type: object
+      required:
+        - is_mps
+        - status
+        - shipments
+      properties:
+        is_mps:
+          type: string
+        status:
+          type: string
+        shipments:
+          type: array
+          items:
+            $ref: "#/components/schemas/large_track_shipment"
+    large_track_shipment:
+      type: object
+      required:
+        - shipment_type
+        - cod_amount
+        - shipment_id
+        - shipment_value
+        - order_id
+        - external_tracking_id
+        - delivery_type
+        - weight
+        - delivered
+        - merchant_name
+        - history
+        - sender
+        - vendor
+        - mh_inscanned
+        - expected_delivery_date
+        - rto
+      properties:
+        shipment_type:
+          type: string
+        cod_amount:
+          type: string
+        shipment_id:
+          type: string
+        shipment_value:
+          type: string
+        order_id:
+          type: string
+        external_tracking_id:
+          type: string
+        delivery_type:
+          type: string
+        weight:
+          type: string
+        delivered:
+          type: string
+        merchant_name:
+          type: string
+        history:
+          type: array
+          items:
+            $ref: "#/components/schemas/large_track_history"
+        sender:
+          $ref: "#/components/schemas/large_track_sender"
+        vendor:
+          type: string
+        mh_inscanned:
+          type: string
+        expected_delivery_date:
+          type: string
+        rto:
+          type: string
+    large_track_history:
+      type: object
+      required:
+        - status
+        - event_date
+        - event_date_iso8601
+      properties:
+        status:
+          type: string
+        event_date:
+          type: string
+        event_date_iso8601:
+          type: string
+        hub_name:
+          type: string
+        description:
+          type: string
+        city:
+          type: string
+    large_track_sender:
+      type: object
+      required:
+        - city
+        - state
+        - pincode
+        - address1
+        - address2
+        - phone
+        - email
+      properties:
+        city:
+          type: string
+        state:
+          type: string
+        pincode:
+          type: string
+        address1:
+          type: string
+        address2:
+          type: string
+        phone:
+          type: string
+        email:
+          type: string
+    Pincode:
+      type: object
+      required:
+        - cod
+        - max_cod_amount
+        - forward_pickup
+        - forward_drop
+        - reverse_pickup
+        - reverse_drop
+        - city
+        - state
+      properties:
+        cod:
+          type: boolean
+          description: true if Cash on Delivery Service (COD) available at this Pincode else false
+          example: true
+        max_cod_amount:
+          type: integer
+          format: int32
+          description: maximum allowed COD amount at this Pincode if cod is true else 0
+          example: 25000
+        forward_pickup:
+          type: boolean
+          description: true if Pickup from Seller location available at this Pincode else false
+          example: true
+        forward_drop:
+          type: boolean
+          description: true if Drop at Customer location available at this Pincode else false
+          example: true
+        reverse_pickup:
+          type: boolean
+          description: true if Pickup from Customer location available at this Pincode else false
+          example: true
+        reverse_drop:
+          type: boolean
+          description: true if Drop at Seller location available at this Pincode else false
+          example: true
+        city:
+          type: string
+          description: City for the given pincode
+        state:
+          type: string
+          description: State code for the given pincode
+          example: KA
+    AcknowledgementServiceability:
+      type: object
+      required:
+        - status
+        - pincode
+        - remark
+      properties:
+        status:
+          type: boolean
+          description: true if serviceable else false
+        pincode:
+          type: integer
+          format: int32
+          description: Pincode for which serviceability is requested
+          example: 560008
+        remark:
+          type: string
+        details:
+          $ref: "#/components/schemas/Pincode"
+    location:
+      type: object
+      required:
+        - alias
+        - phone
+        - address_line1
+        - pincode
+      properties:
+        alias:
+          type: string
+        phone:
+          type: integer
+          format: int64
+          description: Contact of seller or consignee
+          minimum: 1000000000
+          maximum: 9999999999
+        address_line1:
+          type: string
+        address_line2:
+          type: string
+          nullable: true
+        pincode:
+          type: integer
+          format: int32
+        city:
+          type: string
+          nullable: true
+        state:
+          type: string
+        country:
+          type: string
+          description: 'Allowed values for country: "India", "IN"'
+        geo:
+          type: object
+          description: Geo coordinates of location if available.
+          required:
+            - lat
+            - lon
+          properties:
+            lat:
+              type: number
+              format: double
+              description: Latitude of location
+            lon:
+              type: number
+              format: double
+              description: Longitude of location
+      x-examples: { }
+    AcknowledgementAddress:
+      type: object
+      required:
+        - status
+        - alias
+        - remark
+      properties:
+        status:
+          type: boolean
+          description: true if operation on address was successful otherwise false
+        alias:
+          type: string
+        remark:
+          type: string
+    webhookEdit:
+      type: object
+      properties:
+        url:
+          type: string
+          format: uri
+          description: Url to post webhook to
+        secret:
+          type: string
+          description: Webhook secret to hash the webhook post body with for calculating h-mac
+          maxLength: 30
+          minLength: 6
+        topics:
+          type: array
+          description: Webhook topics to subscribe to
+          items:
+            $ref: "#/components/schemas/webhookTopics"
+          minItems: 1
+        active:
+          type: boolean
+          description: Whether webhook is active or not
+          default: true
+    webhookRequest:
+      allOf:
+        - $ref: "#/components/schemas/webhookEdit"
+        - type: object
+          required:
+            - url
+            - secret
+            - topics
+    webhookTopics:
+      type: string
+      enum:
+        - track_updated
+        - shipment_created
+        - shipment_recreated
+      description: Available webhook topics to subscribe to
+    webhookResponse:
+      allOf:
+        - $ref: "#/components/schemas/webhookRequest"
+        - type: object
+          required:
+            - id
+            - active
+          properties:
+            id:
+              type: string
+              description: Webhook id
+    locationEdit:
+      type: object
+      required:
+        - alias
+      properties:
+        alias:
+          type: string
+    ndr_data_v2:
+      type: object
+      required:
+        - action
+        - wbn
+      properties:
+        action:
+          $ref: "#/components/schemas/ndr_action_enum_v2"
+        wbn:
+          type: string
+          description: Waybill number (Ekart tracking id)
+        date:
+          type: integer
+          format: int64
+          description: "Re-Attempt date in milliseconds since Unix Epoch. Required if action is Re-Attempt, should be within seven days of the current day, excluding today"
+        phone:
+          type: string
+          pattern: '^\d{10}$'
+          description: Updated 10-digit phone number
+        address:
+          type: string
+          description: Updated address
+        instructions:
+          type: string
+          description: Further instructions for handling ndr
+        links:
+          type: array
+          items:
+            type: string
+          description: Array containing links of files are uploaded
+    ndr_action_enum_v2:
+      type: string
+      enum:
+        - Re-Attempt
+        - RTO
+      description: NDR action type
+    manifest_response:
+      type: object
+      required:
+        - ctime
+        - manifestNumber
+        - manifestDownloadUrl
+      properties:
+        ctime:
+          type: integer
+          format: int64
+          description: "Manifest generation time in milliseconds since Unix Epoch"
+        manifestNumber:
+          type: integer
+          format: int64
+          description: "Unqiue manifest number"
+        manifestDownloadUrl:
+          type: string
+          description: "Manifest URL"
+    serviceability_v3_request:
+      type: object
+      properties:
+        pickupPincode:
+          type: string
+          description: Valid Pickup Pincode
+        dropPincode:
+          type: string
+          description: Valid Drop Pincode
+        length:
+          type: string
+          minimum: 1
+          description: Length of package in centimeters
+        height:
+          type: string
+          minimum: 1
+          description: Height of package in centimeters
+        width:
+          type: string
+          minimum: 1
+          description: Width of package in centimeters
+        weight:
+          type: string
+          minimum: 1
+          description: weight of package in grams
+        paymentType:
+          type: string
+          description: Payment type for the shipment
+          enum:
+            - COD
+            - Prepaid
+        serviceType:
+          type: string
+          description: Service type for the shipment
+          enum:
+            - SURFACE
+            - EXPRESS
+        codAmount:
+          type: string
+          minimum: 0
+          maximum: 49999
+          description: Amount to be collected from customer. Its mandatory for `paymentType` **COD**
+        invoiceAmount:
+          type: string
+          description: Total invoice amount of the shipment
+      required:
+        - pickupPincode
+        - dropPincode
+        - length
+        - width
+        - height
+        - weight
+        - paymentType
+        - invoiceAmount
+    serviceability_v3_response:
+      type: object
+      properties:
+        tat:
+          type: object
+          properties:
+            min:
+              type: integer
+            max:
+              type: integer
+        courierGroup:
+          type: string
+          description: Name of the courier Group
+        forwardDeliveredCharges:
+          type: object
+          description: ""
+          properties:
+            forwardFreight:
+              type: string
+            forwardFuelSurcharge:
+              type: string
+            codCharges:
+              type: string
+            deliveredTotalTax:
+              type: string
+            totalForwardDeliveredEstimate:
+              type: string
+        rtoDeliveredCharges:
+          type: object
+          description: ""
+          properties:
+            forwardFreight:
+              type: string
+            rtoFreight:
+              type: string
+            forwardFuelSurcharge:
+              type: string
+            rtoFuelSurcharge:
+              type: string
+            rtoDeliveredTotalTax:
+              type: string
+            totalRTODeliveredEstimate:
+              type: string
+        reverseDeliveredCharges:
+          type: object
+          description: ""
+          properties:
+            reverseFreight:
+              type: string
+            reverseFuelSurcharge:
+              type: string
+            reverseTotalTax:
+              type: string
+            totalReverseDeliveredCharges:
+              type: string
+    serviceability_bulk_response:
+      type: object
+      required:
+        - serviceability
+      properties:
+        serviceability:
+          type: array
+          items:
+            $ref: "#/components/schemas/serviceability_bulk_data"
+    serviceability_bulk_data:
+      type: object
+      required:
+        - pincode
+        - fm
+        - lmCod
+        - lmPrepaid
+        - rvp
+      properties:
+        pincode:
+          type: integer
+          format: int32
+          description: Pincode
+          example: 560008
+        fm:
+          type: boolean
+          description: First mile serviceable
+        lmCod:
+          type: boolean
+          description: Last mile COD serviceable
+        lmPrepaid:
+          type: boolean
+          description: Last mile prepaid serviceable
+        rvp:
+          type: boolean
+          description: Reverse pickup serviceable
+    estimateRequest:
+      type: object
+      required:
+        - billingClientType
+        - shippingDirection
+        - serviceType
+        - pickupPincode
+        - length
+        - weight
+        - height
+        - width
+        - dropPincode
+        -
+      properties:
+        pickupPincode:
+          type: integer
+        dropPincode:
+          type: integer
+        invoiceAmount:
+          type: number
+          format: double
+        weight:
+          type: integer
+        length:
+          type: integer
+        height:
+          type: integer
+        width:
+          type: integer
+        serviceType:
+          type: string
+          enum:
+            - SURFACE
+            - EXPRESS
+        codAmount:
+          type: number
+          format: double
+        packages:
+          type: array
+          items:
+            $ref: "#/components/schemas/packages"
+    estimateResponse:
+      type: object
+      properties:
+        type:
+          type: string
+          enum:
+            - WEIGHT_BASED
+            - INVOICE_BASED
+        zone:
+          type: string
+        volumetricWeight:
+          type: string
+        billingWeight:
+          type: string
+        shippingCharge:
+          type: string
+        rtoCharge:
+          type: string
+        fuelSurcharge:
+          type: string
+        codCharge:
+          type: string
+        qcCharge:
+          type: string
+        taxes:
+          type: string
+        total:
+          type: string
+        rid:
+          type: string
+        rSnapshotId:
+          type: string
+    packages:
+      type: object
+      properties:
+        length:
+          type: integer
+        height:
+          type: integer
+        width:
+          type: integer
+        count:
+          type: string
