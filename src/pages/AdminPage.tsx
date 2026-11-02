@@ -453,8 +453,8 @@ export const AdminPage: React.FC = () => {
         authenticated: false,
         clientIdMasked: "EKART_6ae3...1963",
         clientName: "Manopavana",
-        warehouse: "Manopavana",
-        originPincode: "560085",
+        warehouse: "Manopavana_B2C",
+        originPincode: "560058 (Peenya 2nd Stage, Bengaluru)",
         message: "Network error connecting to Ekart API",
       });
       showToast("Error testing Ekart API");
@@ -1319,7 +1319,7 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
               </a>
 
               <a
-                href="https://app.ekartlogistics.com"
+                href="https://app.elite.ekartlogistics.in"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="px-3.5 py-2 rounded-xl bg-sky-100 dark:bg-sky-950/40 hover:bg-sky-200 dark:hover:bg-sky-900/60 text-sky-900 dark:text-sky-200 text-xs font-bold flex items-center gap-1.5 transition-all shadow-2xs border border-sky-500/20"
@@ -1914,6 +1914,42 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                                   ord.trackingNumber.startsWith("FMP") ? (
                                     <>
                                       <a
+                                        href={`/api?action=ekart_packing_slip&waybill=${encodeURIComponent(
+                                          ord.trackingNumber || ""
+                                        )}&orderRef=${encodeURIComponent(
+                                          ord.orderRef || ""
+                                        )}&name=${encodeURIComponent(
+                                          addr.fullName || "Customer"
+                                        )}&phone=${encodeURIComponent(
+                                          addr.phone || ""
+                                        )}&address=${encodeURIComponent(
+                                          `${addr.addressLine1 || ""}${
+                                            addr.landmark ? `, Near ${addr.landmark}` : ""
+                                          }`
+                                        )}&city=${encodeURIComponent(
+                                          addr.district || addr.city || "Bengaluru"
+                                        )}&state=${encodeURIComponent(
+                                          addr.state || "Karnataka"
+                                        )}&pincode=${encodeURIComponent(
+                                          addr.pincode || ""
+                                        )}&amount=${encodeURIComponent(
+                                          ord.total || 0
+                                        )}&payment=${encodeURIComponent(
+                                          ord.paymentMethod || "Prepaid"
+                                        )}`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className={`px-2.5 py-1 rounded-lg border font-bold text-[11px] flex items-center gap-1 transition-colors ${
+                                          isDark
+                                            ? "bg-[#1E130B] border-[#3D2514] text-[#FAF4EA] hover:bg-[#2A1A0F]"
+                                            : "bg-[#FAF6EE] border-[#DDD1BE] text-[#1F120A] hover:bg-[#EFE8DC]"
+                                        }`}
+                                        title="Print Ekart Shipping Label"
+                                      >
+                                        <Printer className="w-2.5 h-2.5 text-sky-500" />
+                                        <span>Print Label</span>
+                                      </a>
+                                      <a
                                         href={`https://ekartlogistics.com/shipmenttrack/${encodeURIComponent(
                                           ord.trackingNumber
                                         )}`}
@@ -1925,7 +1961,7 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                                         <ExternalLink className="w-2.5 h-2.5" />
                                       </a>
                                       <a
-                                        href="https://app.ekartlogistics.com"
+                                        href="https://app.elite.ekartlogistics.in"
                                         target="_blank"
                                         rel="noopener noreferrer"
                                         className={`px-2.5 py-1 rounded-lg border font-bold text-[11px] flex items-center gap-1 transition-colors ${
