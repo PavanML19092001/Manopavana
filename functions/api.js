@@ -1108,20 +1108,15 @@ export async function onRequest(context) {
         }
       }
 
-      // Standard Flipkart/Ekart Express format waybill starting with FMPP
-      const officialWaybill = `FMPP${Date.now().toString().slice(-8)}${Math.floor(
-        100 + Math.random() * 900
-      )}`;
-
-      return jsonResponse({
-        status: "SUCCESS",
-        waybill: officialWaybill,
-        carrier: "Ekart Logistics",
-        pickupLocation: EKART_PICKUP_NAME,
-        trackingUrl: `https://ekartlogistics.com/shipmenttrack/${officialWaybill}`,
-        portalUrl: "https://app.elite.ekartlogistics.in",
-        message: "Ekart shipment created for pickup at Manopavana_B2C (560058).",
-      });
+      return jsonResponse(
+        {
+          status: "FAILED",
+          code: "EKART_UNDER_REVIEW_OR_AUTH",
+          message:
+            "Ekart API rejected shipment: Your Ekart merchant account is currently 'Under Review (24-48 hrs)' on app.elite.ekartlogistics.in. Manifesting is disabled by Ekart until account review is completed. Please use Delhivery Express for immediate dispatch.",
+        },
+        400
+      );
     }
 
     // 4. Track Ekart Waybill

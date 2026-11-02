@@ -28,6 +28,7 @@ import {
   Search,
   Navigation,
   Loader2,
+  RotateCcw,
   X,
 } from "lucide-react";
 import { useStore } from "../context/StoreContext";
@@ -589,6 +590,28 @@ export const AdminPage: React.FC = () => {
     });
     setCustomEkartAwb((p) => ({ ...p, [orderRef]: "" }));
     showToast(`Saved Ekart AWB #${awb}`);
+  };
+
+  // Reset manifest to allow re-manifesting or switching carrier to Delhivery
+  const handleResetManifest = async (orderRef: string) => {
+    if (
+      !window.confirm(
+        "Are you sure you want to reset this shipment manifest? This will clear the current tracking number and allow you to re-dispatch with Delhivery Express."
+      )
+    ) {
+      return;
+    }
+    try {
+      await updateOrderDetails(orderRef, {
+        trackingNumber: "",
+        courier: "",
+        orderStatus: "Placed",
+      });
+      setCarrierChoice((p) => ({ ...p, [orderRef]: "delhivery" }));
+      showToast("Shipment reset! You can now click 1-Click Delhivery Manifest.");
+    } catch {
+      showToast("Failed to reset shipment manifest");
+    }
   };
 
   // Open address edit modal for an order
@@ -2003,6 +2026,16 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                                       </a>
                                     </>
                                   )}
+
+                                  <button
+                                    type="button"
+                                    onClick={() => handleResetManifest(ord.orderRef)}
+                                    className="px-2.5 py-1 rounded-lg border border-amber-500/40 bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-400 font-bold text-[11px] flex items-center gap-1 transition-colors cursor-pointer ml-auto"
+                                    title="Reset shipment to re-manifest or switch to Delhivery"
+                                  >
+                                    <RotateCcw className="w-2.5 h-2.5" />
+                                    <span>Reset / Switch to Delhivery</span>
+                                  </button>
                                 </div>
                               </div>
                             </div>
