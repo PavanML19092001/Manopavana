@@ -130,6 +130,8 @@ export const CheckoutPage: React.FC = () => {
   });
   const [mapErrorHighlight, setMapErrorHighlight] = useState(false);
   const mapSectionRef = useRef<HTMLDivElement | null>(null);
+  const [phoneErrorHighlight, setPhoneErrorHighlight] = useState(false);
+  const phoneInputRef = useRef<HTMLInputElement | null>(null);
   const [isLocating, setIsLocating] = useState(false);
   const [iframePaymentUrl, setIframePaymentUrl] = useState<string | null>(null);
   const [pendingPhonePeRef, setPendingPhonePeRef] = useState<string | null>(null);
@@ -592,23 +594,18 @@ export const CheckoutPage: React.FC = () => {
       return;
     }
 
-    let cleanPhone = phone.trim().replace(/\D/g, "").slice(-10);
-    if (cleanPhone.length !== 10) {
-      const fallback =
-        (address.phone || "").replace(/\D/g, "").slice(-10) ||
-        (savedAddresses && savedAddresses.length > 0 ? (savedAddresses[0].phone || "").replace(/\D/g, "").slice(-10) : "") ||
-        (currentUser?.phoneNumber ? extractCleanPhone(currentUser.phoneNumber) : "") ||
-        (currentUser?.email ? extractCleanPhone(currentUser.email) : "");
-      if (fallback.length === 10) {
-        cleanPhone = fallback;
-        setPhone(fallback);
+    const cleanPhone = phone.trim().replace(/\D/g, "").slice(-10);
+    const isValidIndianPhone = cleanPhone.length === 10 && /^[6-9]\d{9}$/.test(cleanPhone);
+    if (!isValidIndianPhone) {
+      setPhoneErrorHighlight(true);
+      showToast("📱 Mandatory: Please enter a valid 10-digit mobile number for delivery and courier tracking.");
+      if (phoneInputRef.current) {
+        phoneInputRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
+        phoneInputRef.current.focus();
       }
-    }
-
-    if (cleanPhone.length !== 10) {
-      showToast("Please enter a valid 10-digit WhatsApp phone number.");
       return;
     }
+    setPhoneErrorHighlight(false);
 
     if (!addressLine1.trim()) {
       showToast("Please enter your flat / house / street delivery address.");
@@ -1126,23 +1123,48 @@ export const CheckoutPage: React.FC = () => {
                     </div>
 
                     <div>
-                      <label
-                        className={`block text-xs font-semibold mb-1 ${isDark ? "text-[#FAF4EA]" : "text-[#3D2514]"
+                      <div className="flex items-center justify-between mb-1">
+                        <label
+                          className={`block text-xs font-semibold ${isDark ? "text-[#FAF4EA]" : "text-[#3D2514]"}`}
+                        >
+                          Delivery Mobile Number *
+                        </label>
+                        <span className="text-[10px] bg-red-600 text-white font-extrabold px-1.5 py-0.5 rounded uppercase tracking-wide">
+                          Mandatory
+                        </span>
+                      </div>
+                      <div className="relative flex items-center">
+                        <span className={`absolute left-3 text-xs font-bold font-mono ${isDark ? "text-[#D49A37]" : "text-[#7A4B1A]"}`}>
+                          +91
+                        </span>
+                        <input
+                          ref={phoneInputRef}
+                          type="tel"
+                          required
+                          maxLength={10}
+                          placeholder="e.g. 9180301917"
+                          value={phone}
+                          onChange={(e) => {
+                            const val = e.target.value.replace(/\D/g, "").slice(0, 10);
+                            setPhone(val);
+                            if (val.length === 10 && /^[6-9]\d{9}$/.test(val)) {
+                              setPhoneErrorHighlight(false);
+                            }
+                          }}
+                          className={`w-full pl-12 pr-3.5 py-2.5 text-xs rounded-xl focus:outline-none focus:ring-2 font-mono font-bold tracking-wider ${
+                            phoneErrorHighlight
+                              ? "bg-red-500/10 border-2 border-red-500 text-red-700 dark:text-red-200 ring-2 ring-red-500/40"
+                              : isDark
+                              ? "bg-[#150D07] border border-[#362114] text-[#FAF4EA] placeholder-[#8C7A6B] focus:ring-[#E08F35]/40"
+                              : "bg-[#FAF7F2] border border-[#DDD1BE] text-[#23150C] placeholder-[#8C7A6B] focus:ring-[#E08F35]/40"
                           }`}
-                      >
-                        WhatsApp Contact Number *
-                      </label>
-                      <input
-                        type="tel"
-                        required
-                        placeholder="e.g. 9180301917"
-                        value={phone}
-                        onChange={(e) => setPhone(e.target.value)}
-                        className={`w-full px-3.5 py-2.5 text-xs rounded-xl focus:outline-none focus:ring-2 focus:ring-[#E08F35]/40 ${isDark
-                            ? "bg-[#150D07] border border-[#362114] text-[#FAF4EA] placeholder-[#8C7A6B]"
-                            : "bg-[#FAF7F2] border border-[#DDD1BE] text-[#23150C] placeholder-[#8C7A6B]"
-                          }`}
-                      />
+                        />
+                      </div>
+                      {phoneErrorHighlight && (
+                        <p className="text-[10px] text-red-500 font-semibold mt-1">
+                          ⚠️ Real 10-digit mobile number starting with 6, 7, 8, or 9 is required for delivery coordination and tracking.
+                        </p>
+                      )}
                     </div>
                   </div>
 

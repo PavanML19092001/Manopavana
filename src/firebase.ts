@@ -204,9 +204,9 @@ export async function checkEmailExistsInDatabase(rawEmail: string): Promise<{
 }
 
 /**
- * 1-Click Google Sign-In with Flipkart Pre-Check Gate:
- * Only permitted if the Google email is already linked to a registered customer account.
- * Unregistered accounts are blocked from first-time registration via email.
+ * 1-Click Google Sign-In:
+ * Allows seamless sign-in with Google account for all customers.
+ * Syncs customer profile and order history to Firestore.
  */
 export async function signInWithGoogle() {
   const result = await signInWithPopup(auth, googleProvider);
@@ -216,23 +216,12 @@ export async function signInWithGoogle() {
   }
 
   const cleanEmail = result.user.email.toLowerCase().trim();
-  const check = await checkEmailExistsInDatabase(cleanEmail);
 
-  if (!check.exists) {
-    // Immediately sign out to abort session
-    await signOut(auth);
-    const blockedErr = new Error(
-      "Unlinked Google Account: First-time registration is strictly via your WhatsApp Mobile Number. Please enter your mobile number below to verify and create your account. You can link your Google account afterwards in your profile."
-    );
-    (blockedErr as any).code = "AUTH_BLOCKED_UNREGISTERED_EMAIL";
-    throw blockedErr;
-  }
-
-  // Synchronize Google user with their linked mobile account
+  // Synchronize Google user into customer database
   await syncCustomerDoc(result.user, {
-    name: result.user.displayName || check.name || "Customer",
+    name: result.user.displayName || "Customer",
     email: cleanEmail,
-    phone: check.phone || undefined,
+    photoURL: result.user.photoURL || undefined,
   });
 
   return result.user;
@@ -587,7 +576,7 @@ export async function logoutUser() {
  */
 export async function syncCustomerDoc(
   user: FirebaseUser,
-  extra?: { name?: string; phone?: string; email?: string }
+  extra?: { name?: string; phone?: string; email?: string; photoURL?: string }
 ) {
   try {
     const userEmail = (extra?.email || user.email || "").toLowerCase().trim();
