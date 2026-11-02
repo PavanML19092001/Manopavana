@@ -136,7 +136,7 @@ export const OrdersPage = () => {
             onClick={() => setLoginModalOpen(true)}
             className="w-full py-3 rounded-xl bg-[#5E3210] hover:bg-[#43230A] text-white font-bold text-xs shadow-md transition-all cursor-pointer"
           >
-            Sign In / Register with Mobile
+            Sign In with Google
           </button>
         </div>
       </div>

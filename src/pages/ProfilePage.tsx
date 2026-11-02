@@ -208,7 +208,7 @@ export const ProfilePage = () => {
           <div className="space-y-2">
             <h2 className="text-xl font-bold font-serif">Sign in to view your Profile</h2>
             <p className="text-xs text-stone-500">
-              Manage your personal information, delivery addresses, and WhatsApp-anchored account.
+              Manage your personal information, delivery addresses, and order history.
             </p>
           </div>
           <button
@@ -216,7 +216,7 @@ export const ProfilePage = () => {
             onClick={() => setLoginModalOpen(true)}
             className="w-full py-3 rounded-xl bg-[#5E3210] hover:bg-[#43230A] text-white font-bold text-xs shadow-md transition-all cursor-pointer"
           >
-            Sign In with Mobile
+            Sign In with Google
           </button>
         </div>
       </div>

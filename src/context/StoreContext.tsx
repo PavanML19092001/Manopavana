@@ -43,7 +43,6 @@ import {
   extractCleanPhone,
   isSyntheticAccount,
   saveCustomerProfile,
-  checkEmailExistsInDatabase,
 } from "../firebase";
 import { doc, setDoc, onSnapshot, serverTimestamp } from "firebase/firestore";
 import { sendOrderConfirmationEmail } from "../services/emailService";
@@ -802,25 +801,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       isCartInitializedRef.current = false;
 
       if (user) {
-        // Flipkart Gate: If signing in with Google, verify that this email exists
-        // and is linked to an active mobile account BEFORE setting currentUser or creating docs
-        const isGoogleProvider =
-          user.providerData.some((p) => p.providerId === "google.com") ||
-          (!user.phoneNumber && !isSyntheticAccount(user.email || undefined));
-
-        if (isGoogleProvider && user.email) {
-          const check = await checkEmailExistsInDatabase(user.email);
-          if (!check.exists) {
-            console.warn("Unregistered Google account blocked at auth state listener:", user.email);
-            await signOut(auth);
-            setCurrentUser(null);
-            currentUidRef.current = null;
-            setCustomerProfile(null);
-            isCartInitializedRef.current = true;
-            return;
-          }
-        }
-
         currentUidRef.current = user.uid;
         setCurrentUser(user);
 
