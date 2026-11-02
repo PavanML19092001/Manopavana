@@ -247,23 +247,43 @@ declare global {
 
 /**
  * Initialize or reset invisible reCAPTCHA verifier for Phone Auth
+ * Reference: https://firebase.google.com/docs/auth/web/phone-auth
  */
 export function setupRecaptcha(containerId = "recaptcha-container"): RecaptchaVerifier {
   if (typeof window === "undefined") {
     throw new Error("Window is not available");
   }
+
+  const containerEl = document.getElementById(containerId);
+  if (!containerEl) {
+    throw new Error(`reCAPTCHA container '#${containerId}' was not found in the DOM.`);
+  }
+
   if (window.recaptchaVerifier) {
     try {
       window.recaptchaVerifier.clear();
     } catch {
       // ignore clear error
     }
+    window.recaptchaVerifier = undefined;
   }
-  const verifier = new RecaptchaVerifier(auth, containerId, {
+
+  const verifier = new RecaptchaVerifier(auth, containerEl, {
     size: "invisible",
-    callback: () => {},
-    "expired-callback": () => {},
+    callback: () => {
+      // reCAPTCHA solved - allow signInWithPhoneNumber
+    },
+    "expired-callback": () => {
+      // Response expired - clear verifier
+      if (window.recaptchaVerifier) {
+        try {
+          window.recaptchaVerifier.clear();
+        } catch {}
+        window.recaptchaVerifier = undefined;
+      }
+    },
   });
+
   window.recaptchaVerifier = verifier;
   return verifier;
 }

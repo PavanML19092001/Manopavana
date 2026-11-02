@@ -4,18 +4,19 @@ import {
   User,
   ShieldCheck,
   LogOut,
-  MessageSquare,
+  Smartphone,
   RefreshCw,
   CheckCircle2,
-  ArrowRight,
 } from "lucide-react";
 import { useStore } from "../context/StoreContext";
 import {
   signInWithGoogle,
-  signInWithPhoneOrEmail,
+  sendPhoneOtp,
+  confirmPhoneOtp,
   logoutUser,
   extractCleanPhone,
 } from "../firebase";
+import type { ConfirmationResult } from "firebase/auth";
 
 export const LoginModal: React.FC = () => {
   const {
@@ -27,8 +28,7 @@ export const LoginModal: React.FC = () => {
 
   const [phoneNumber, setPhoneNumber] = useState("");
   const [isOtpSent, setIsOtpSent] = useState(false);
-  const [secretWaOtp, setSecretWaOtp] = useState<string | null>(null);
-  const [otpExpiryTime, setOtpExpiryTime] = useState<number>(0);
+  const [confirmationResult, setConfirmationResult] = useState<ConfirmationResult | null>(null);
 
   // User input code
   const [inputOtp, setInputOtp] = useState("");
@@ -54,7 +54,7 @@ export const LoginModal: React.FC = () => {
 
   const resetOtpFlow = () => {
     setIsOtpSent(false);
-    setSecretWaOtp(null);
+    setConfirmationResult(null);
     setInputOtp("");
     setErrorMessage(null);
     setStatusNotice(null);
@@ -76,7 +76,7 @@ export const LoginModal: React.FC = () => {
         (e.message && (e.message.includes("not yet linked") || e.message.includes("Unlinked Google Account")))
       ) {
         setErrorMessage(
-          "Unlinked Google Account: First-time registration is strictly via your WhatsApp Mobile Number. Please enter your mobile number below to verify and create your account. You can link your Google account afterwards in your profile."
+          "Unlinked Google Account: First-time registration is strictly via your Mobile SMS verification. Please enter your mobile number below to verify and create your account. You can link your Google account afterwards in your profile."
         );
       } else {
         setErrorMessage(e.message || "Google sign-in could not be completed.");
@@ -86,9 +86,8 @@ export const LoginModal: React.FC = () => {
     }
   };
 
-  // Dispatch WhatsApp OTP:
-  // Sent from MANOPAVANA (+91 91803 01917) to customer's WhatsApp in background.
-  const handleSendWhatsAppOtp = async () => {
+  // Dispatch Firebase SMS OTP via official telecom network
+  const handleSendSmsOtp = async () => {
     if (!isPhoneValid) {
       setErrorMessage("Please enter a valid 10-digit mobile number.");
       return;
@@ -99,94 +98,70 @@ export const LoginModal: React.FC = () => {
       setErrorMessage(null);
       setStatusNotice(null);
 
-      // Generate secret 6-digit OTP
-      const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
-      setSecretWaOtp(otpCode);
-      setOtpExpiryTime(Date.now() + 5 * 60 * 1000); // 5 min expiry
-
-      // Call server endpoint to dispatch WhatsApp message from +91 91803 01917 to user's number
-      let failureReason: string | null = null;
-      let isSimulated = false;
-
-      try {
-        const res = await fetch("/api?action=send_whatsapp_otp", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            phone: cleanPhone,
-            otp: otpCode,
-            greenApiId: localStorage.getItem("manopavana_green_id") || "710722779911",
-            greenApiToken:
-              localStorage.getItem("manopavana_green_token") ||
-              "33bc6b945ad347d2b708ab7678bd80d66643fc2dfc5547b499",
-          }),
-        });
-        const data = await res.json();
-        if (data.status === "FAILED" || data.sent === false) {
-          failureReason =
-            data.message ||
-            data.data?.message ||
-            "WhatsApp gateway not connected or instance unauthorized";
-        } else if (data.simulated) {
-          isSimulated = true;
-        }
-      } catch (apiErr) {
-        console.warn("WhatsApp API route notice:", apiErr);
-      }
-
+      const confirmResult = await sendPhoneOtp(cleanPhone, "recaptcha-container");
+      setConfirmationResult(confirmResult);
       setIsOtpSent(true);
-      setResendCooldown(30);
-
-      if (failureReason) {
-        setStatusNotice(
-          `WhatsApp Gateway Notice: ${failureReason}. (Verification code: ${otpCode})`
-        );
-      } else if (isSimulated) {
-        setStatusNotice(
-          `WhatsApp gateway notice: Verification code is ${otpCode}.`
-        );
-      } else {
-        showToast(`WhatsApp OTP sent to +91 ${cleanPhone}!`);
-        setStatusNotice(
-          `We have sent a 6-digit verification code from MANOPAVANA (+91 91803 01917) to your WhatsApp (+91 ${cleanPhone}).`
-        );
-      }
+      setResendCooldown(45);
+      showToast(`SMS verification code sent to +91 ${cleanPhone}!`);
+      setStatusNotice(
+        `We have sent an official 6-digit SMS verification code to +91 ${cleanPhone}. Please check your Messages app.`
+      );
     } catch (err: unknown) {
-      const e = err as { message?: string };
-      setErrorMessage(e.message || "Failed to send WhatsApp OTP. Please try again.");
+      console.warn("Firebase Phone Auth error:", err);
+      const e = err as { message?: string; code?: string };
+      let friendlyMsg = e.message || "Failed to send SMS OTP. Please try again.";
+      if (e.code === "auth/operation-not-allowed") {
+        friendlyMsg =
+          "Phone authentication is not yet enabled in Firebase Console. Please go to Firebase Console > Authentication > Sign-in method and toggle 'Phone' to Enabled.";
+      } else if (e.code === "auth/app-not-authorized" || e.code === "auth/unauthorized-domain") {
+        friendlyMsg =
+          "Domain not authorized in Firebase. Please ensure manopavana.com is listed under Firebase Console > Authentication > Settings > Authorized Domains.";
+      } else if (e.code === "auth/billing-not-enabled") {
+        friendlyMsg =
+          "Firebase billing (Blaze plan) is required to dispatch real telecom SMS. Please upgrade your Firebase project to Blaze in the Firebase console.";
+      } else if (e.code === "auth/invalid-phone-number") {
+        friendlyMsg = "The phone number entered is invalid. Please check your 10-digit number.";
+      } else if (e.code === "auth/too-many-requests") {
+        friendlyMsg = "Too many SMS requests sent from this device. Please wait a few minutes.";
+      } else if (e.code === "auth/captcha-check-failed") {
+        friendlyMsg = "reCAPTCHA verification failed. Please refresh the page and try again.";
+      }
+      setErrorMessage(friendlyMsg);
     } finally {
       setLoading(false);
     }
   };
 
-  // Verify WhatsApp OTP
-  const handleVerifyWhatsAppOtp = async (e: React.FormEvent) => {
+  // Verify Firebase SMS OTP
+  const handleVerifySmsOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!inputOtp.trim() || inputOtp.trim().length !== 6) {
-      setErrorMessage("Please enter the 6-digit OTP received on your WhatsApp.");
+      setErrorMessage("Please enter the 6-digit SMS verification code.");
       return;
     }
 
-    if (Date.now() > otpExpiryTime) {
-      setErrorMessage("This OTP has expired. Please request a new code.");
-      return;
-    }
-
-    if (secretWaOtp && inputOtp.trim() !== secretWaOtp) {
-      setErrorMessage("Incorrect OTP. Please check the code received on WhatsApp and try again.");
+    if (!confirmationResult) {
+      setErrorMessage("Session expired. Please request a new SMS verification code.");
       return;
     }
 
     try {
       setLoading(true);
       setErrorMessage(null);
-      await signInWithPhoneOrEmail(cleanPhone);
-      showToast("Verified successfully! Account synced.");
+      await confirmPhoneOtp(confirmationResult, inputOtp.trim(), cleanPhone);
+      showToast("Verified successfully! Welcome to MANOPAVANA.");
       setLoginModalOpen(false);
       resetOtpFlow();
     } catch (err: unknown) {
-      const e = err as { message?: string };
-      setErrorMessage(e.message || "Could not complete sign-in. Please try again.");
+      console.warn("Firebase Verify OTP error:", err);
+      const e = err as { message?: string; code?: string };
+      let friendlyMsg = "Incorrect verification code. Please check the SMS and try again.";
+      if (e.code === "auth/code-expired") {
+        friendlyMsg = "This SMS code has expired. Please request a new one.";
+      } else if (e.code === "auth/invalid-verification-code") {
+        friendlyMsg = "Invalid SMS code. Please re-check the 6-digit code received on your phone.";
+      }
+      setErrorMessage(friendlyMsg);
     } finally {
       setLoading(false);
     }
@@ -210,6 +185,9 @@ export const LoginModal: React.FC = () => {
       className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in"
     >
       <div className="relative w-full max-w-md bg-gradient-to-b from-[#24160F] to-[#140D09] text-[#FDF6EC] rounded-3xl shadow-[0_25px_60px_rgba(0,0,0,0.95)] border border-[#4A301E] overflow-hidden flex flex-col">
+        {/* Invisible reCAPTCHA container for Firebase Phone Auth */}
+        <div id="recaptcha-container" />
+
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4.5 bg-[#120A06] border-b border-[#3A2417]">
           <div className="flex items-center gap-3">
@@ -223,7 +201,7 @@ export const LoginModal: React.FC = () => {
               <p className="text-[11px] text-[#A88D77]">
                 {currentUser
                   ? "Manage your profile & order history"
-                  : "Sign in with Google or WhatsApp OTP"}
+                  : "Sign in with Official Mobile SMS OTP"}
               </p>
             </div>
           </div>
@@ -260,7 +238,7 @@ export const LoginModal: React.FC = () => {
                 </div>
                 <div className="pt-2 border-t border-[#2D1B10] flex items-center gap-2 text-emerald-400 font-semibold">
                   <ShieldCheck className="w-4 h-4 text-emerald-400" />
-                  <span>Synced to Firestore Customer Database</span>
+                  <span>Verified Customer Identity • Synced to Database</span>
                 </div>
               </div>
 
@@ -293,19 +271,19 @@ export const LoginModal: React.FC = () => {
                     <span>Mobile-First Security Notice</span>
                   </div>
                   <p className="text-[11px] text-amber-200/90 leading-relaxed">
-                    Unregistered Google accounts cannot log in directly. First-time registration is strictly through your verified WhatsApp Mobile Number. Please enter your mobile number below to register.
+                    Unregistered Google accounts cannot log in directly. First-time registration is strictly through your verified Mobile Number. Please enter your mobile number below to register.
                   </p>
                 </div>
               )}
 
-              {/* ---------------- 1. PRIMARY: MOBILE WHATSAPP OTP ---------------- */}
+              {/* ---------------- 1. PRIMARY: OFFICIAL MOBILE SMS OTP ---------------- */}
               <div className="space-y-3">
                 {!isOtpSent ? (
                   <form
                     onSubmit={(e) => {
                       e.preventDefault();
                       if (isPhoneValid && !loading) {
-                        handleSendWhatsAppOtp();
+                        handleSendSmsOtp();
                       }
                     }}
                     className="space-y-3.5"
@@ -313,11 +291,11 @@ export const LoginModal: React.FC = () => {
                     <div>
                       <div className="flex items-center justify-between mb-1">
                         <label className="block text-xs font-semibold text-[#D6BEAA]">
-                          WhatsApp Mobile Number
+                          Mobile Phone Number
                         </label>
                         <span className="text-[10px] text-emerald-400 font-medium flex items-center gap-1.5 bg-emerald-950/40 px-2.5 py-0.5 rounded-full border border-emerald-800/40">
                           <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                          Primary Identity & Login
+                          Official SMS OTP
                         </span>
                       </div>
                       <div className="relative flex items-center">
@@ -340,13 +318,13 @@ export const LoginModal: React.FC = () => {
                             setPhoneNumber(clean);
                             setErrorMessage(null);
                           }}
-                          className="w-full pl-16 pr-3.5 py-3 text-sm bg-[#120A06] border border-[#4A301E] rounded-xl focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/50 text-[#FDF6EC] placeholder-[#7A6150] font-mono tracking-widest font-bold"
+                          className="w-full pl-16 pr-3.5 py-3 text-sm bg-[#120A06] border border-[#4A301E] rounded-xl focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/50 text-[#FDF6EC] placeholder-[#7A6150] font-mono tracking-widest font-bold"
                           autoFocus
                         />
                       </div>
                     </div>
 
-                    {/* General Error Banner (if not unlinked google alert) */}
+                    {/* General Error Banner */}
                     {errorMessage && !errorMessage.includes("Unlinked Google Account") && (
                       <div className="p-3 bg-red-950/50 rounded-xl border border-red-800/40">
                         <p className="text-xs text-red-300 font-semibold leading-relaxed">
@@ -355,22 +333,22 @@ export const LoginModal: React.FC = () => {
                       </div>
                     )}
 
-                    {/* WhatsApp OTP Button */}
+                    {/* Send SMS OTP Button */}
                     <button
                       type="submit"
                       disabled={loading || !isPhoneValid}
-                      className="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-600 hover:brightness-110 text-white font-serif font-black tracking-wider text-xs shadow-lg shadow-emerald-950/50 border border-emerald-400/40 flex items-center justify-center gap-2 cursor-pointer transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                      className="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-amber-600 via-amber-500 to-amber-700 hover:brightness-110 text-white font-serif font-black tracking-wider text-xs shadow-lg shadow-amber-950/50 border border-amber-400/40 flex items-center justify-center gap-2 cursor-pointer transition-all disabled:opacity-40 disabled:cursor-not-allowed"
                     >
                       {loading ? (
                         <RefreshCw className="w-4 h-4 animate-spin text-white" />
                       ) : (
-                        <MessageSquare className="w-4 h-4 text-white" />
+                        <Smartphone className="w-4 h-4 text-white" />
                       )}
                       <span>
                         {loading
-                          ? "Sending WhatsApp OTP..."
+                          ? "Sending SMS OTP..."
                           : isPhoneValid
-                          ? `Send OTP to WhatsApp (+91 ${cleanPhone})`
+                          ? `Send SMS OTP to +91 ${cleanPhone}`
                           : "Enter 10-Digit Mobile Number"}
                       </span>
                     </button>
@@ -411,13 +389,13 @@ export const LoginModal: React.FC = () => {
                     </button>
                   </form>
                 ) : (
-                  /* WhatsApp OTP Verification Input */
-                  <form onSubmit={handleVerifyWhatsAppOtp} className="space-y-3 animate-fade-in">
-                    <div className="p-3 bg-[#0F2416]/50 border border-emerald-700/50 rounded-xl space-y-1">
+                  /* SMS OTP Verification Input */
+                  <form onSubmit={handleVerifySmsOtp} className="space-y-3 animate-fade-in">
+                    <div className="p-3 bg-amber-950/40 border border-amber-600/40 rounded-xl space-y-1">
                       <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold text-emerald-400 flex items-center gap-1.5">
-                          <MessageSquare className="w-3.5 h-3.5" />
-                          <span>WhatsApp OTP Sent</span>
+                        <span className="text-xs font-bold text-amber-400 flex items-center gap-1.5">
+                          <Smartphone className="w-3.5 h-3.5" />
+                          <span>SMS OTP Dispatched</span>
                         </span>
                         <button
                           type="button"
@@ -428,13 +406,13 @@ export const LoginModal: React.FC = () => {
                         </button>
                       </div>
                       <p className="text-[11px] text-[#D6BEAA] leading-relaxed">
-                        We sent a 6-digit OTP from MANOPAVANA (+91 91803 01917) to your WhatsApp (+91 {cleanPhone}).
+                        We sent an official 6-digit SMS verification code to +91 {cleanPhone}.
                       </p>
                     </div>
 
                     <div>
                       <label className="block text-xs font-semibold text-[#D6BEAA] mb-1">
-                        Enter 6-Digit WhatsApp Code
+                        Enter 6-Digit SMS Verification Code
                       </label>
                       <input
                         type="text"
@@ -443,7 +421,7 @@ export const LoginModal: React.FC = () => {
                         placeholder="• • • • • •"
                         value={inputOtp}
                         onChange={(e) => setInputOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
-                        className="w-full text-center tracking-[0.6em] text-xl font-mono py-2.5 bg-[#120A06] border border-[#4A301E] rounded-xl focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/50 text-[#FDF6EC] font-bold"
+                        className="w-full text-center tracking-[0.6em] text-xl font-mono py-2.5 bg-[#120A06] border border-[#4A301E] rounded-xl focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/50 text-[#FDF6EC] font-bold"
                         autoFocus
                       />
                     </div>
@@ -473,12 +451,12 @@ export const LoginModal: React.FC = () => {
                       <button
                         type="button"
                         disabled={resendCooldown > 0 || loading}
-                        onClick={handleSendWhatsAppOtp}
+                        onClick={handleSendSmsOtp}
                         className="text-[11px] text-[#A88D77] hover:text-[#FFD885] disabled:opacity-50 inline-flex items-center gap-1 cursor-pointer"
                       >
                         <RefreshCw className="w-3 h-3" />
                         <span>
-                          {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : "Resend WhatsApp Code"}
+                          {resendCooldown > 0 ? `Resend SMS in ${resendCooldown}s` : "Resend SMS Code"}
                         </span>
                       </button>
                     </div>

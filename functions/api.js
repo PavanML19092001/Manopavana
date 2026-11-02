@@ -1125,7 +1125,6 @@ export async function onRequest(context) {
         orderRef,
         customerName,
         phone,
-        alternatePhone,
         address: destAddress,
         pincode,
         city,
@@ -1179,7 +1178,6 @@ export async function onRequest(context) {
       }
 
       const cleanPhone = String(phone).replace(/\D/g, "").slice(-10);
-      const cleanAltPhone = alternatePhone ? String(alternatePhone).replace(/\D/g, "").slice(-10) : "";
       const cleanPin = parseInt(String(pincode).replace(/\D/g, "").slice(0, 6), 10);
       const isCod = String(paymentMode || "").toUpperCase() === "COD";
       const totalNum = Math.max(1, Math.round(Number(totalAmount) || 1));
@@ -1204,6 +1202,7 @@ export async function onRequest(context) {
         document_number: `DOC-${orderRef}`,
         document_date: todayIso,
         consignee_name: String(customerName || "Customer"),
+        consignee_alternate_phone: cleanPhone.padStart(10, "0"),
         payment_mode: isCod ? "COD" : "Prepaid",
         category_of_goods: "Edible Cooking Oils",
         products_desc: String(
@@ -1251,10 +1250,6 @@ export async function onRequest(context) {
           pin: 560058,
         },
       };
-
-      if (cleanAltPhone && cleanAltPhone.length === 10 && cleanAltPhone !== cleanPhone) {
-        ekartPayload.consignee_alternate_phone = cleanAltPhone;
-      }
 
       try {
         const ekartResponse = await fetch(
