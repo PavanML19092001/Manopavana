@@ -67,17 +67,9 @@ let ekartTokenExpiresAt = 0;
  * Fetch or reuse Ekart Elite Bearer access_token via OpenAPI v2 spec:
  * POST https://app.elite.ekartlogistics.in/integrations/v2/auth/token/{client_id}
  */
-async function getEkartAuthToken(env, credentials = {}) {
+async function getEkartAuthToken(env, credentials = {}, forceRefresh = false) {
   const now = Date.now();
-  if (cachedEkartToken && ekartTokenExpiresAt > now + 60000) {
-    return cachedEkartToken;
-  }
-
-  // 1. Direct static token supplied in request body or environment
-  const directToken = credentials.token || env.EKART_AUTH_TOKEN;
-  if (directToken && String(directToken).trim()) {
-    cachedEkartToken = String(directToken).trim();
-    ekartTokenExpiresAt = now + 86400 * 1000;
+  if (!forceRefresh && cachedEkartToken && ekartTokenExpiresAt > now + 60000) {
     return cachedEkartToken;
   }
 
@@ -93,41 +85,56 @@ async function getEkartAuthToken(env, credentials = {}) {
     "manojmr1712@gmail.com";
   const password = credentials.password || env.EKART_PASSWORD;
 
-  if (!password) {
-    return null;
+  // 1. If password is provided, prioritize official authentication endpoint to get genuine signed JWT
+  if (password && String(password).trim()) {
+    const authUrl = `https://app.elite.ekartlogistics.in/integrations/v2/auth/token/${encodeURIComponent(
+      clientId
+    )}`;
+    const resp = await fetch(authUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username, password: String(password).trim() }),
+    });
+
+    if (!resp.ok) {
+      const errText = await resp.text();
+      let errJson = null;
+      try {
+        errJson = JSON.parse(errText);
+      } catch {}
+      const msg =
+        errJson?.description ||
+        errJson?.message ||
+        errText ||
+        `HTTP status ${resp.status}`;
+      throw new Error(`Ekart Elite Authentication Failed: ${msg}`);
+    }
+
+    const data = await resp.json();
+    if (!data.access_token) {
+      throw new Error("No access_token returned by Ekart authentication service");
+    }
+
+    cachedEkartToken = data.access_token;
+    ekartTokenExpiresAt = now + ((data.expires_in || 86400) - 120) * 1000;
+    return cachedEkartToken;
   }
 
-  const authUrl = `https://app.elite.ekartlogistics.in/integrations/v2/auth/token/${encodeURIComponent(
-    clientId
-  )}`;
-  const resp = await fetch(authUrl, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ username, password }),
-  });
-
-  if (!resp.ok) {
-    const errText = await resp.text();
-    let errJson = null;
-    try {
-      errJson = JSON.parse(errText);
-    } catch {}
-    const msg =
-      errJson?.description ||
-      errJson?.message ||
-      errText ||
-      `HTTP status ${resp.status}`;
-    throw new Error(`Ekart Elite Authentication Failed: ${msg}`);
+  // 2. Direct static token supplied in request body or environment
+  const directToken = credentials.token || env.EKART_AUTH_TOKEN;
+  if (directToken && String(directToken).trim()) {
+    const trimmed = String(directToken).trim();
+    if (trimmed.startsWith("EKART_") || trimmed.length < 30) {
+      throw new Error(
+        `The value provided (${trimmed.slice(0, 15)}...) is an Ekart Client ID, not a signed Bearer token. Please enter your portal password in 'Configure Ekart API' to authenticate.`
+      );
+    }
+    cachedEkartToken = trimmed;
+    ekartTokenExpiresAt = now + 86400 * 1000;
+    return cachedEkartToken;
   }
 
-  const data = await resp.json();
-  if (!data.access_token) {
-    throw new Error("No access_token returned by Ekart authentication service");
-  }
-
-  cachedEkartToken = data.access_token;
-  ekartTokenExpiresAt = now + ((data.expires_in || 86400) - 120) * 1000;
-  return cachedEkartToken;
+  return null;
 }
 
 const CORS_HEADERS = {
@@ -1287,6 +1294,11 @@ export async function onRequest(context) {
         }
 
         // Handle error responses from Ekart
+        if (ekartResponse.status === 401 || String(respText).toLowerCase().includes("token") || String(respText).toLowerCase().includes("signature")) {
+          cachedEkartToken = null;
+          ekartTokenExpiresAt = 0;
+        }
+
         const errMessage =
           ekartData.description ||
           ekartData.message ||
@@ -1297,7 +1309,10 @@ export async function onRequest(context) {
         return jsonResponse(
           {
             status: "FAILED",
-            code: ekartData.code || "EKART_MANIFEST_REJECTED",
+            code:
+              ekartResponse.status === 401 || String(errMessage).toLowerCase().includes("signature") || String(errMessage).toLowerCase().includes("token")
+                ? "EKART_AUTH_INVALID"
+                : ekartData.code || "EKART_MANIFEST_REJECTED",
             message: `Ekart Elite rejected shipment: ${errMessage}`,
             debug: ekartData,
           },
