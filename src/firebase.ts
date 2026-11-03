@@ -13,7 +13,7 @@ import {
   sendPasswordResetEmail,
 } from "firebase/auth";
 import {
-  getFirestore,
+  initializeFirestore,
   doc,
   setDoc,
   getDoc,
@@ -27,16 +27,22 @@ import {
   serverTimestamp,
   increment,
   arrayUnion,
-  getDocFromServer,
   FieldValue,
 } from "firebase/firestore";
 import firebaseConfig from "../firebase-applet-config.json";
 import { CustomerReview, Order, StoreCMSConfig } from "./types";
 
-// Initialize Firebase safely with provisioned Database ID
+// Initialize Firebase safely with provisioned Database ID and auto-detect long polling
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 export const auth = getAuth(app);
-export const db = getFirestore(app, (firebaseConfig as any).firestoreDatabaseId);
+const firestoreDbId = (firebaseConfig as any).firestoreDatabaseId || "(default)";
+export const db = initializeFirestore(
+  app,
+  {
+    experimentalAutoDetectLongPolling: true,
+  },
+  firestoreDbId
+);
 export const googleProvider = new GoogleAuthProvider();
 googleProvider.setCustomParameters({ prompt: "select_account" });
 
@@ -86,18 +92,6 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
   };
   console.warn("Firestore Error: ", JSON.stringify(errInfo));
 }
-
-// Test live database connectivity at boot
-async function testFirestoreConnection() {
-  try {
-    await getDocFromServer(doc(db, "test", "connection"));
-  } catch (error) {
-    if (error instanceof Error && error.message.includes("the client is offline")) {
-      console.warn("Firestore offline notice. Please verify network.");
-    }
-  }
-}
-testFirestoreConnection();
 
 /**
  * Clean phone number to 10 digits
@@ -570,9 +564,9 @@ export async function logoutUser() {
 }
 
 /**
- * Sync & Deduplicate customer details in Firestore 'customers' collection:
- * Treats Mobile Number and Email as a SINGLE UNIFIED ACCOUNT.
- * Automatically maps and syncs profile, savedAddresses, cart, and past orders together.
+ * Sync customer details in Firestore 'customers' collection:
+ * Strictly isolated to the authenticated user's own document (customers/${user.uid}).
+ * Never cross-links, borrows, or shares data with any other account.
  */
 export async function syncCustomerDoc(
   user: FirebaseUser,
@@ -580,115 +574,11 @@ export async function syncCustomerDoc(
 ) {
   try {
     const userEmail = (extra?.email || user.email || "").toLowerCase().trim();
-    let canonicalEmail = isSyntheticAccount(userEmail) ? "" : userEmail;
-
-    const rawPhone = extra?.phone || user.phoneNumber || "";
-    let cleanPhone =
-      extractCleanPhone(rawPhone) ||
-      (isSyntheticAccount(userEmail) ? userEmail.replace(/\D/g, "").slice(-10) : "");
-
     const customerRef = doc(db, "customers", user.uid);
     const snap = await getDoc(customerRef);
 
-    let existingData: Record<string, unknown> = snap.exists() ? snap.data() : {};
-    let primaryUid = (existingData.primaryUid as string) || user.uid;
+    const existingData: Record<string, unknown> = snap.exists() ? snap.data() : {};
 
-    // 1. Single Unified Account Mapping via settings/account_mappings
-    try {
-      const mappingRef = doc(db, "settings", "account_mappings");
-      const mappingSnap = await getDoc(mappingRef);
-      const mappingData = mappingSnap.exists()
-        ? mappingSnap.data()
-        : { byPhone: {}, byEmail: {} };
-
-      const byPhone = (mappingData.byPhone || {}) as Record<string, any>;
-      const byEmail = (mappingData.byEmail || {}) as Record<string, any>;
-
-      const phoneLink = cleanPhone ? byPhone[cleanPhone] : null;
-      const emailLink = canonicalEmail ? byEmail[canonicalEmail] : null;
-
-      // Unify primary account UID across phone and email
-      if (phoneLink?.primaryUid) {
-        primaryUid = phoneLink.primaryUid;
-      } else if (emailLink?.primaryUid) {
-        primaryUid = emailLink.primaryUid;
-      }
-
-      // Cross-fill missing phone or email from existing mapping
-      if (!cleanPhone && emailLink?.phone) {
-        cleanPhone = emailLink.phone;
-      }
-      if (!canonicalEmail && phoneLink?.email) {
-        canonicalEmail = phoneLink.email;
-      }
-    } catch (mapErr) {
-      console.warn("Account mapping read notice:", mapErr);
-    }
-
-    // 2. Direct Firestore query fallback: check customers collection where phone == cleanPhone
-    if (cleanPhone && primaryUid === user.uid) {
-      try {
-        const phoneQ = query(collection(db, "customers"), where("phone", "==", cleanPhone));
-        const phoneDocs = await getDocs(phoneQ);
-        for (const d of phoneDocs.docs) {
-          if (d.id !== user.uid) {
-            const data = d.data();
-            const targetMasterUid = (data.primaryUid as string) || d.id;
-            primaryUid = targetMasterUid;
-            existingData = { ...data, ...existingData };
-            if (!canonicalEmail && data.email && !isSyntheticAccount(data.email)) {
-              canonicalEmail = data.email;
-            }
-            break;
-          }
-        }
-      } catch (phoneErr) {
-        console.warn("Direct phone lookup error:", phoneErr);
-      }
-    }
-
-    // 3. Direct Firestore query fallback: check customers collection where email == canonicalEmail
-    if (canonicalEmail && primaryUid === user.uid) {
-      try {
-        const emailQ = query(collection(db, "customers"), where("email", "==", canonicalEmail));
-        const emailDocs = await getDocs(emailQ);
-        for (const d of emailDocs.docs) {
-          if (d.id !== user.uid) {
-            const data = d.data();
-            const targetMasterUid = (data.primaryUid as string) || d.id;
-            primaryUid = targetMasterUid;
-            existingData = { ...data, ...existingData };
-            if (!cleanPhone && data.phone) {
-              cleanPhone = extractCleanPhone(data.phone);
-            }
-            break;
-          }
-        }
-      } catch (emailErr) {
-        console.warn("Direct email lookup error:", emailErr);
-      }
-    }
-
-    // 4. If primaryUid is different from user.uid, fetch master document to inherit full profile
-    if (primaryUid !== user.uid) {
-      try {
-        const masterSnap = await getDoc(doc(db, "customers", primaryUid));
-        if (masterSnap.exists()) {
-          const masterData = masterSnap.data();
-          existingData = { ...masterData, ...existingData };
-          if (!canonicalEmail && masterData.email && !isSyntheticAccount(masterData.email)) {
-            canonicalEmail = masterData.email;
-          }
-          if (!cleanPhone && masterData.phone) {
-            cleanPhone = extractCleanPhone(masterData.phone);
-          }
-        }
-      } catch (masterErr) {
-        console.warn("Master document load error:", masterErr);
-      }
-    }
-
-    // 5. Clean, human display name resolution (never use machine IDs like user_6361509415)
     const rawNames = [
       extra?.name,
       user.displayName,
@@ -710,20 +600,15 @@ export async function syncCustomerDoc(
       }
     }
 
-    const resolvedEmail =
-      canonicalEmail ||
-      (existingData.email && !isSyntheticAccount(String(existingData.email)) ? String(existingData.email) : "") ||
-      "";
-
-    const resolvedPhone = cleanPhone || (existingData.phone as string) || "";
+    const resolvedEmail = userEmail || (existingData.email as string) || "";
+    const cleanPhone = extractCleanPhone(extra?.phone || (existingData.phone as string) || user.phoneNumber || "");
 
     const mergedPayload: Record<string, unknown> = {
       uid: user.uid,
-      primaryUid,
-      uids: arrayUnion(user.uid, primaryUid),
-      name: resolvedName,
+      name: resolvedName || user.displayName || "Customer",
       email: resolvedEmail,
-      phone: resolvedPhone,
+      phone: cleanPhone || "",
+      photoURL: extra?.photoURL || user.photoURL || (existingData.photoURL as string) || "",
       lastLogin: serverTimestamp(),
       updatedAt: serverTimestamp(),
     };
@@ -734,65 +619,20 @@ export async function syncCustomerDoc(
       mergedPayload.totalSpent = 0;
     }
 
-    // Ensure savedAddress and savedAddresses are preserved and inherited from master account
     if (existingData.savedAddress) {
       mergedPayload.savedAddress = existingData.savedAddress;
     }
-    if (Array.isArray(existingData.savedAddresses) && existingData.savedAddresses.length > 0) {
+    if (Array.isArray(existingData.savedAddresses)) {
       mergedPayload.savedAddresses = existingData.savedAddresses;
     }
-    if (Array.isArray(existingData.cart) && existingData.cart.length > 0) {
+    if (Array.isArray(existingData.cart)) {
       mergedPayload.cart = existingData.cart;
     }
 
     const cleanPayload = cleanFirestoreObject(mergedPayload);
-
-    // Save to current user's document
     await setDoc(customerRef, cleanPayload, { merge: true });
 
-    // Also mirror to primary master document if different
-    if (primaryUid !== user.uid) {
-      try {
-        await setDoc(doc(db, "customers", primaryUid), cleanPayload, { merge: true });
-      } catch (masterErr) {
-        console.warn("Could not mirror to master customer doc:", masterErr);
-      }
-    }
-
-    // Update global account_mappings registry
-    try {
-      const mappingRef = doc(db, "settings", "account_mappings");
-      const mappingSnap = await getDoc(mappingRef);
-      const mappingData = mappingSnap.exists()
-        ? mappingSnap.data()
-        : { byPhone: {}, byEmail: {} };
-
-      const byPhone = (mappingData.byPhone || {}) as Record<string, any>;
-      const byEmail = (mappingData.byEmail || {}) as Record<string, any>;
-
-      const entry = {
-        primaryUid,
-        phone: resolvedPhone,
-        email: resolvedEmail,
-        name: resolvedName,
-        savedAddress: cleanPayload.savedAddress || null,
-        savedAddresses: cleanPayload.savedAddresses || [],
-        updatedAt: Date.now(),
-      };
-
-      if (resolvedPhone) {
-        byPhone[resolvedPhone] = entry;
-      }
-      if (resolvedEmail) {
-        byEmail[resolvedEmail] = entry;
-      }
-
-      await setDoc(mappingRef, { byPhone, byEmail, updatedAt: serverTimestamp() }, { merge: true });
-    } catch (mapUpdateErr) {
-      console.warn("Account mapping update notice:", mapUpdateErr);
-    }
-
-    return { ...existingData, ...cleanPayload, primaryUid };
+    return { ...existingData, ...cleanPayload };
   } catch (e) {
     handleFirestoreError(e, OperationType.WRITE, `customers/${user.uid}`);
     return null;
@@ -800,9 +640,8 @@ export async function syncCustomerDoc(
 }
 
 /**
- * Persist and synchronize customer profile across Firestore customer documents
- * and global settings/account_mappings so that Google sign-in and Phone sign-in
- * always auto-fetch the customer's name, mobile number, email, and saved addresses.
+ * Persist and synchronize customer profile strictly to the user's own customer document.
+ * Never leaks or copies data to other documents or global mappings.
  */
 export async function saveCustomerProfile(
   userUid: string,
@@ -822,9 +661,6 @@ export async function saveCustomerProfile(
     const canonicalEmail = isSyntheticAccount(cleanEmail) ? "" : cleanEmail;
 
     const customerRef = doc(db, "customers", userUid);
-    const snap = await getDoc(customerRef);
-    const existing = snap.exists() ? snap.data() : {};
-    const primaryUid = (existing.primaryUid as string) || userUid;
 
     const payload: Record<string, any> = {
       updatedAt: serverTimestamp(),
@@ -850,41 +686,6 @@ export async function saveCustomerProfile(
     }
 
     await setDoc(customerRef, payload, { merge: true });
-
-    if (primaryUid !== userUid) {
-      try {
-        await setDoc(doc(db, "customers", primaryUid), payload, { merge: true });
-      } catch {}
-    }
-
-    // Register / update in account_mappings
-    if (cleanPhone || canonicalEmail) {
-      try {
-        const mappingRef = doc(db, "settings", "account_mappings");
-        const mapSnap = await getDoc(mappingRef);
-        const mapData = mapSnap.exists() ? mapSnap.data() : { byPhone: {}, byEmail: {} };
-        const byPhone = (mapData.byPhone || {}) as Record<string, any>;
-        const byEmail = (mapData.byEmail || {}) as Record<string, any>;
-
-        const resolvedName = payload.name || existing.name || "";
-        const entry = {
-          primaryUid,
-          phone: cleanPhone || byEmail[canonicalEmail]?.phone || existing.phone || "",
-          email: canonicalEmail || byPhone[cleanPhone]?.email || existing.email || "",
-          name: resolvedName,
-          savedAddress: payload.savedAddress || existing.savedAddress || null,
-          savedAddresses: payload.savedAddresses || existing.savedAddresses || [],
-          updatedAt: Date.now(),
-        };
-
-        if (cleanPhone) byPhone[cleanPhone] = entry;
-        if (canonicalEmail) byEmail[canonicalEmail] = entry;
-
-        await setDoc(mappingRef, { byPhone, byEmail, updatedAt: serverTimestamp() }, { merge: true });
-      } catch (e) {
-        console.warn("Account mapping update error:", e);
-      }
-    }
   } catch (err) {
     handleFirestoreError(err, OperationType.WRITE, `customers/${userUid}`);
   }
@@ -954,9 +755,8 @@ export async function saveOrderToFirestore(order: Order, userUid?: string): Prom
     const orderDocRef = doc(db, "orders", order.orderRef);
     const cleanPhone = extractCleanPhone(order.shippingAddress?.phone || order.customerPhone || "");
     const cleanEmail = (order.shippingAddress?.email || order.customerEmail || "").toLowerCase().trim();
-    const phoneUid = cleanPhone ? `phone_${cleanPhone}` : null;
 
-    const uid = userUid || order.customerUid || (order as any).firebaseUid || phoneUid || null;
+    const uid = userUid || order.customerUid || null;
     const rawPayload = {
       ...order,
       customerUid: uid,
@@ -975,20 +775,6 @@ export async function saveOrderToFirestore(order: Order, userUid?: string): Prom
       const customerRef = doc(db, "customers", uid);
       setDoc(
         customerRef,
-        {
-          totalOrders: increment(1),
-          totalSpent: increment(order.total || 0),
-          lastOrderRef: order.orderRef,
-          lastOrderAt: serverTimestamp(),
-          updatedAt: serverTimestamp(),
-        },
-        { merge: true }
-      ).catch(() => {});
-    }
-
-    if (phoneUid && phoneUid !== uid) {
-      setDoc(
-        doc(db, "customers", phoneUid),
         {
           totalOrders: increment(1),
           totalSpent: increment(order.total || 0),
@@ -1046,91 +832,42 @@ export async function deleteOrderFromFirestore(orderRef: string): Promise<boolea
 
 /**
  * Listen to orders for a specific user in real-time.
- * Guarantees order parity across mobile number and linked email accounts
- * by querying both customerUid and customerPhone.
+ * Strictly queries orders belonging to this user's UID (customerUid == userUid).
+ * Never leaks or queries orders across phone numbers or other accounts.
  */
 export function subscribeUserOrders(
   userUid: string | undefined,
-  phone: string | undefined,
-  email: string | undefined,
-  callback: (orders: Order[]) => void,
-  primaryUid?: string
+  _phone?: string | undefined,
+  _email?: string | undefined,
+  callback: (orders: Order[]) => void = () => {},
+  _primaryUid?: string
 ) {
-  const cleanPhone = extractCleanPhone(phone);
-  const phoneUid = cleanPhone ? `phone_${cleanPhone}` : undefined;
-  const allowedUids = Array.from(
-    new Set([userUid, primaryUid, phoneUid].filter(Boolean))
-  ) as string[];
-
-  if (allowedUids.length === 0 && !cleanPhone) {
+  if (!userUid) {
     callback([]);
     return () => {};
   }
 
   try {
     const ordersCol = collection(db, "orders");
-    const unsubs: (() => void)[] = [];
-    const uidOrdersMap = new Map<string, Order>();
-    const phoneOrdersMap = new Map<string, Order>();
+    const qOrders = query(ordersCol, where("customerUid", "==", userUid));
 
-    const emitOrders = () => {
-      const mergedMap = new Map<string, Order>();
-      uidOrdersMap.forEach((ord, key) => mergedMap.set(key, ord));
-      phoneOrdersMap.forEach((ord, key) => mergedMap.set(key, ord));
-      const list = Array.from(mergedMap.values());
-      list.sort(
-        (a, b) => (b.timestamp || b.timestampMs || 0) - (a.timestamp || a.timestampMs || 0)
-      );
-      callback(list);
-    };
-
-    if (allowedUids.length > 0) {
-      const qOrders =
-        allowedUids.length === 1
-          ? query(ordersCol, where("customerUid", "==", allowedUids[0]))
-          : query(ordersCol, where("customerUid", "in", allowedUids.slice(0, 10)));
-
-      const unsub1 = onSnapshot(
-        qOrders,
-        (snapshot) => {
-          uidOrdersMap.clear();
-          snapshot.forEach((d) => {
-            const data = d.data() as Order;
-            const ref = data.orderRef || d.id;
-            uidOrdersMap.set(ref, data);
-          });
-          emitOrders();
-        },
-        (error) => {
-          handleFirestoreError(error, OperationType.GET, "orders");
-        }
-      );
-      unsubs.push(unsub1);
-    }
-
-    if (cleanPhone) {
-      const qPhone = query(ordersCol, where("customerPhone", "==", cleanPhone));
-      const unsub2 = onSnapshot(
-        qPhone,
-        (snapshot) => {
-          phoneOrdersMap.clear();
-          snapshot.forEach((d) => {
-            const data = d.data() as Order;
-            const ref = data.orderRef || d.id;
-            phoneOrdersMap.set(ref, data);
-          });
-          emitOrders();
-        },
-        (error) => {
-          handleFirestoreError(error, OperationType.GET, "orders");
-        }
-      );
-      unsubs.push(unsub2);
-    }
-
-    return () => {
-      unsubs.forEach((u) => u());
-    };
+    return onSnapshot(
+      qOrders,
+      (snapshot) => {
+        const list: Order[] = [];
+        snapshot.forEach((d) => {
+          const data = d.data() as Order;
+          list.push(data);
+        });
+        list.sort(
+          (a, b) => (b.timestamp || b.timestampMs || 0) - (a.timestamp || a.timestampMs || 0)
+        );
+        callback(list);
+      },
+      (error) => {
+        handleFirestoreError(error, OperationType.GET, "orders");
+      }
+    );
   } catch (err) {
     handleFirestoreError(err, OperationType.LIST, "orders");
     return () => {};

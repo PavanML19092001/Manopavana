@@ -49,6 +49,7 @@ export const AccountPage = () => {
     showToast,
     currentUser,
     customerProfile,
+    isAuthLoading,
     saveProfile,
     setLoginModalOpen,
     logoutUser,
@@ -58,24 +59,14 @@ export const AccountPage = () => {
   const isDark = themeMode === "dark";
 
   const visibleOrders = React.useMemo(() => {
+    const userUid = currentUser?.uid;
+    if (!userUid) return [];
+
     const seen = new Set<string>();
     const res: Order[] = [];
-    const userUid = currentUser?.uid;
-    const primaryUid = customerProfile?.primaryUid;
-    const userPhone = customerProfile?.phone || (currentUser?.phoneNumber ? extractCleanPhone(currentUser.phoneNumber) : "");
-    const phoneUid = userPhone ? `phone_${userPhone}` : undefined;
-    const allowedUids = new Set([userUid, primaryUid, phoneUid].filter(Boolean) as string[]);
-
-    if (allowedUids.size === 0 && !userPhone) return [];
 
     for (const o of orders) {
-      const orderPhone = extractCleanPhone(o.customerPhone || o.shippingAddress?.phone || "");
-      const isMine =
-        (o.customerUid && allowedUids.has(o.customerUid)) ||
-        ((o as any).firebaseUid && allowedUids.has((o as any).firebaseUid)) ||
-        (userPhone && orderPhone && orderPhone === userPhone);
-
-      if (isMine) {
+      if (o.customerUid === userUid || (o as any).firebaseUid === userUid) {
         const key = o.orderRef || o.id;
         if (key && !seen.has(key)) {
           seen.add(key);
@@ -83,8 +74,8 @@ export const AccountPage = () => {
         }
       }
     }
-    return res;
-  }, [orders, currentUser, customerProfile?.primaryUid, customerProfile?.phone]);
+    return res.sort((a, b) => (b.timestampMs || b.timestamp || 0) - (a.timestampMs || a.timestamp || 0));
+  }, [orders, currentUser?.uid]);
 
   const [searchQuery, setSearchQuery] = useState(targetRef || "");
   const [selectedOrderRef, setSelectedOrderRef] = useState<string>(
@@ -194,7 +185,19 @@ export const AccountPage = () => {
     navigate("/", { replace: true });
   };
 
-  if (!currentUser && visibleOrders.length === 0 && !targetRef) {
+  if (isAuthLoading) {
+    return (
+      <div
+        className={`w-full min-h-[calc(100vh-80px)] py-16 flex items-center justify-center transition-colors box-border ${
+          isDark ? "bg-[#140D09]" : "bg-[#FAF7F2]"
+        }`}
+      >
+        <div className="w-10 h-10 border-3 border-[#D49A37] border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (!currentUser) {
     return (
       <div
         className={`w-full min-h-[calc(100vh-80px)] py-16 flex items-center justify-center transition-colors box-border ${

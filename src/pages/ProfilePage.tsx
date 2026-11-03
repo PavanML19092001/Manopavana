@@ -26,6 +26,7 @@ export const ProfilePage = () => {
   const {
     currentUser,
     customerProfile,
+    isAuthLoading,
     saveProfile,
     address,
     savedAddresses,
@@ -189,6 +190,18 @@ export const ProfilePage = () => {
     }
     resetAddressForm();
   };
+
+  if (isAuthLoading) {
+    return (
+      <div
+        className={`w-full min-h-[70vh] flex items-center justify-center p-6 ${
+          isDark ? "bg-[#140D09]" : "bg-[#FAF7F2]"
+        }`}
+      >
+        <div className="w-10 h-10 border-3 border-[#D49A37] border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
 
   if (!currentUser) {
     return (

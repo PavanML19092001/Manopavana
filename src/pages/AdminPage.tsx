@@ -1,7 +1,6 @@
 import React, { useEffect, useState, useRef } from "react";
 import L from "leaflet";
 import { StorefrontCMSPanel } from "../components/admin/StoreFrontCmsPanel";
-import { WhatsAppGatewayPanel } from "../components/admin/WhatsAppGatewayPanel";
 import {
   Lock,
   ShieldAlert,
@@ -30,23 +29,14 @@ import {
   Loader2,
   RotateCcw,
   X,
+  Archive,
+  Unlock,
 } from "lucide-react";
 import { useStore } from "../context/StoreContext";
 import { BUSINESS_CONFIG, INDIAN_STATES_DISTRICTS } from "../constants";
 import { OrderStatus, Order } from "../types";
 import { collection, onSnapshot, doc, setDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "../firebase";
-
-const getOrdinalSuffix = (n: number | string | undefined): string => {
-  const num = Number(n);
-  if (!num || isNaN(num)) return `${n || ""}`;
-  const j = num % 10;
-  const k = num % 100;
-  if (j === 1 && k !== 11) return `${num}st`;
-  if (j === 2 && k !== 12) return `${num}nd`;
-  if (j === 3 && k !== 13) return `${num}rd`;
-  return `${num}th`;
-};
 
 export const AdminPage: React.FC = () => {
   const {
@@ -151,50 +141,6 @@ export const AdminPage: React.FC = () => {
     latencyMs?: number;
     message?: string;
   } | null>(null);
-
-  // Subscriptions Management State (Direct Firestore Real-time)
-  const [adminSubscriptions, setAdminSubscriptions] = useState<any[]>([]);
-  const [subSearch, setSubSearch] = useState("");
-  const [subStatusFilter, setSubStatusFilter] = useState<string>("all");
-  const [isUpdatingSub, setIsUpdatingSub] = useState<Record<string, boolean>>({});
-
-  // Direct Firestore real-time listener for subscriptions collection
-  useEffect(() => {
-    if (!isAdminAuthenticated) return;
-    try {
-      const unsub = onSnapshot(collection(db, "subscriptions"), (snap) => {
-        const subs = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-        setAdminSubscriptions(subs);
-      }, (err) => {
-        console.warn("Notice loading subscriptions in admin:", err);
-      });
-      return () => unsub();
-    } catch (err) {
-      console.warn("Subscriptions listener setup notice:", err);
-    }
-  }, [isAdminAuthenticated]);
-
-  const handleToggleSubStatus = async (subId: string, currentStatus: string) => {
-    const nextStatus = currentStatus === "paused" ? "active" : "paused";
-    setIsUpdatingSub((p) => ({ ...p, [subId]: true }));
-    try {
-      await setDoc(
-        doc(db, "subscriptions", subId),
-        {
-          status: nextStatus,
-          updatedAt: serverTimestamp(),
-          lastModifiedNote: `Status changed to ${nextStatus} by Administrator`,
-        },
-        { merge: true }
-      );
-      showToast(`Subscription ${nextStatus === "paused" ? "paused" : "resumed"} successfully!`);
-    } catch (e) {
-      showToast("Error updating subscription status in Firestore.");
-    } finally {
-      setIsUpdatingSub((p) => ({ ...p, [subId]: false }));
-    }
-  };
-
 
   // Helper to map live Delhivery carrier status strings to website order stages
   const mapDelhiveryToWebStatus = (
@@ -1087,9 +1033,41 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
     }, 2500);
   };
 
+  // Segregated Orders Navigation: "active" (ongoing) vs "completed" (locked records)
+  const [orderViewTab, setOrderViewTab] = useState<"active" | "completed">("active");
+  const [unlockedOrders, setUnlockedOrders] = useState<Record<string, boolean>>({});
+
+  const handleToggleOrderLock = (orderRef: string) => {
+    const isCurrentlyUnlocked = !!unlockedOrders[orderRef];
+    if (isCurrentlyUnlocked) {
+      setUnlockedOrders((p) => ({ ...p, [orderRef]: false }));
+      showToast(`Order #${orderRef} re-locked.`);
+    } else {
+      if (
+        window.confirm(
+          `Unlock completed order #${orderRef} for emergency supervisor adjustments? Please be cautious not to trigger duplicate manifests.`
+        )
+      ) {
+        setUnlockedOrders((p) => ({ ...p, [orderRef]: true }));
+        showToast(`Order #${orderRef} unlocked for editing.`);
+      }
+    }
+  };
+
+  const isTerminalOrder = (status?: string) => {
+    return status === "Delivered" || status === "Cancelled" || status === "Failed (Expired)";
+  };
+
   const rawOrders = (adminOrders && adminOrders.length > 0 ? adminOrders : orders) || [];
 
+  const activeOrdersCount = rawOrders.filter((o) => !isTerminalOrder(o.orderStatus)).length;
+  const completedOrdersCount = rawOrders.filter((o) => isTerminalOrder(o.orderStatus)).length;
+
   const displayOrders = rawOrders.filter((ord) => {
+    const isCompleted = isTerminalOrder(ord.orderStatus);
+    if (orderViewTab === "active" && isCompleted) return false;
+    if (orderViewTab === "completed" && !isCompleted) return false;
+
     const q = adminOrderSearch.toLowerCase().trim();
     const matchesSearch =
       !q ||
@@ -1601,13 +1579,19 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
               }`}
             >
                 <div className="flex items-center gap-2">
-                  <Truck className="w-4 h-4 text-[#E08F35]" />
+                  {orderViewTab === "active" ? (
+                    <Truck className="w-4 h-4 text-[#E08F35]" />
+                  ) : (
+                    <Archive className="w-4 h-4 text-emerald-500" />
+                  )}
                   <h2
                     className={`text-sm font-bold font-serif ${
                       isDark ? "text-[#FAF4EA]" : "text-[#1F120A]"
                     }`}
                   >
-                    Live Orders & Delhivery Queue ({displayOrders.length})
+                    {orderViewTab === "active"
+                      ? `Active Dispatch Queue (${displayOrders.length})`
+                      : `Completed & Locked Archives (${displayOrders.length})`}
                   </h2>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
@@ -1641,17 +1625,77 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                 </div>
               </div>
 
+              {/* View Switcher: Active Dispatch Queue vs Completed & Archived Records */}
+              <div className="flex items-center gap-2 p-1 rounded-2xl bg-stone-100 dark:bg-stone-900/80 border border-stone-200 dark:border-stone-800">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setOrderViewTab("active");
+                    setAdminStatusFilter("all");
+                  }}
+                  className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-2 ${
+                    orderViewTab === "active"
+                      ? "bg-[#5E3210] text-white shadow-sm"
+                      : "text-stone-600 dark:text-stone-400 hover:text-stone-900 dark:hover:text-stone-200"
+                  }`}
+                >
+                  <Truck className="w-3.5 h-3.5 text-amber-300" />
+                  <span>Active Ongoing Orders</span>
+                  <span
+                    className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
+                      orderViewTab === "active"
+                        ? "bg-amber-400/30 text-amber-200 border border-amber-300/30"
+                        : "bg-stone-200 dark:bg-stone-800 text-stone-700 dark:text-stone-300"
+                    }`}
+                  >
+                    {activeOrdersCount}
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setOrderViewTab("completed");
+                    setAdminStatusFilter("all");
+                  }}
+                  className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-2 ${
+                    orderViewTab === "completed"
+                      ? "bg-[#5E3210] text-white shadow-sm"
+                      : "text-stone-600 dark:text-stone-400 hover:text-stone-900 dark:hover:text-stone-200"
+                  }`}
+                >
+                  <Archive className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Completed & Locked Archives</span>
+                  <span
+                    className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
+                      orderViewTab === "completed"
+                        ? "bg-emerald-400/30 text-emerald-200 border border-emerald-300/30"
+                        : "bg-stone-200 dark:bg-stone-800 text-stone-700 dark:text-stone-300"
+                    }`}
+                  >
+                    {completedOrdersCount}
+                  </span>
+                </button>
+              </div>
+
               {/* Order Search & Quick Filter Pills */}
               <div className="space-y-2">
                 <input
                   type="text"
-                  placeholder="Filter by Order Ref, Customer Name, Phone, Pincode..."
+                  placeholder={
+                    orderViewTab === "active"
+                      ? "Filter active orders by Order Ref, Customer Name, Phone, Pincode..."
+                      : "Search completed/archived orders by Ref, Customer Name, Phone, AWB..."
+                  }
                   value={adminOrderSearch}
                   onChange={(e) => setAdminOrderSearch(e.target.value)}
                   className="w-full px-3 py-2 rounded-xl text-xs border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900/40"
                 />
                 <div className="flex flex-wrap gap-1">
-                  {["all", "Placed", "Packed", "Dispatched", "Delivered", "Cancelled"].map((st) => (
+                  {(orderViewTab === "active"
+                    ? ["all", "Placed", "Packed", "Dispatched", "Payment Incomplete"]
+                    : ["all", "Delivered", "Cancelled", "Failed (Expired)"]
+                  ).map((st) => (
                     <button
                       key={st}
                       type="button"
@@ -1676,11 +1720,14 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                 >
                   <Package className="w-8 h-8 mx-auto text-[#DDD1BE]" />
                   <p className="text-xs font-semibold">
-                    No customer orders placed yet
+                    {orderViewTab === "active"
+                      ? "No active ongoing orders right now"
+                      : "No completed or cancelled orders in this view"}
                   </p>
                   <p className="text-[11px] opacity-80">
-                    New orders will automatically appear here in real time as
-                    customers complete checkout.
+                    {orderViewTab === "active"
+                      ? "When customers place orders, they will appear here in the active dispatch queue."
+                      : "Delivered and cancelled orders will be archived and locked here for permanent record-keeping."}
                   </p>
                 </div>
               ) : (
@@ -1688,10 +1735,12 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                   {displayOrders.map((ord) => {
                     const addr = (ord?.shippingAddress || {}) as any;
                     const rawItems = ord?.items;
+                    const isTerminal = isTerminalOrder(ord.orderStatus);
+                    const isLocked = isTerminal && !unlockedOrders[ord.orderRef];
                     const isUnfulfillable =
-  ord.orderStatus === "Cancelled" ||
-  ord.orderStatus === "Failed (Expired)" ||
-  ord.orderStatus === "Payment Incomplete";
+                      ord.orderStatus === "Cancelled" ||
+                      ord.orderStatus === "Failed (Expired)" ||
+                      ord.orderStatus === "Payment Incomplete";
                     const items: any[] = Array.isArray(rawItems)
                       ? rawItems
                       : rawItems && typeof rawItems === "object"
@@ -1768,51 +1817,80 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                             </p>
                           </div>
 
-                          {/* Status Selector */}
+                          {/* Status Selector / Locked Badge */}
                           <div className="flex items-center gap-1.5">
-                            <select
-                              value={ord.orderStatus}
-                              onChange={(e) =>
-                                handleStatusChange(
-                                  ord,
-                                  e.target.value as OrderStatus
-                                )
-                              }
-                              className={`px-2.5 py-1 rounded-lg text-xs font-bold focus:ring-1 focus:ring-[#E08F35] ${
-                                isDark
-                                  ? "bg-[#1C120B] border border-[#3D2514] text-amber-200"
-                                  : "bg-white border border-[#DDD1BE] text-[#5E3210]"
-                              }`}
-                            >
-                              <option value="Placed">Placed</option>
-                              <option value="Payment Incomplete">
-                                Payment Incomplete
-                              </option>
-                              <option value="Packed">Packed</option>
-                              <option value="Dispatched">Dispatched</option>
-                              <option value="Delivered">Delivered</option>
-                              <option value="Cancelled">Cancelled</option>
-                              <option value="Failed (Expired)">
-                                Failed (Expired)
-                              </option>
-                            </select>
+                            {isLocked ? (
+                              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-bold bg-stone-100 dark:bg-stone-900 border border-stone-300 dark:border-stone-800 text-stone-700 dark:text-stone-300 shadow-2xs">
+                                <Lock className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+                                <span>{ord.orderStatus} (Locked)</span>
+                                <button
+                                  type="button"
+                                  onClick={() => handleToggleOrderLock(ord.orderRef)}
+                                  className="text-[10px] text-amber-600 dark:text-amber-400 hover:underline font-semibold ml-1 cursor-pointer"
+                                  title="Emergency supervisor unlock"
+                                >
+                                  Unlock
+                                </button>
+                              </div>
+                            ) : (
+                              <>
+                                <select
+                                  value={ord.orderStatus}
+                                  onChange={(e) =>
+                                    handleStatusChange(
+                                      ord,
+                                      e.target.value as OrderStatus
+                                    )
+                                  }
+                                  className={`px-2.5 py-1 rounded-lg text-xs font-bold focus:ring-1 focus:ring-[#E08F35] ${
+                                    isDark
+                                      ? "bg-[#1C120B] border border-[#3D2514] text-amber-200"
+                                      : "bg-white border border-[#DDD1BE] text-[#5E3210]"
+                                  }`}
+                                >
+                                  <option value="Placed">Placed</option>
+                                  <option value="Payment Incomplete">
+                                    Payment Incomplete
+                                  </option>
+                                  <option value="Packed">Packed</option>
+                                  <option value="Dispatched">Dispatched</option>
+                                  <option value="Delivered">Delivered</option>
+                                  <option value="Cancelled">Cancelled</option>
+                                  <option value="Failed (Expired)">
+                                    Failed (Expired)
+                                  </option>
+                                </select>
+                                {isTerminal && !isLocked && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleToggleOrderLock(ord.orderRef)}
+                                    className="p-1 rounded text-amber-600 hover:text-amber-700 cursor-pointer"
+                                    title="Re-lock order"
+                                  >
+                                    <Lock className="w-3.5 h-3.5" />
+                                  </button>
+                                )}
+                              </>
+                            )}
 
-                            <button
-                              type="button"
-                              onClick={() => {
-                                if (
-                                  window.confirm(
-                                    `Delete order #${ord.orderRef}?`
-                                  )
-                                ) {
-                                  deleteOrder(ord.orderRef);
-                                }
-                              }}
-                              className="p-1.5 rounded-lg text-stone-400 hover:text-red-500 hover:bg-red-500/10 transition-colors"
-                              title="Delete Order"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
+                            {!isLocked && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (
+                                    window.confirm(
+                                      `Delete order #${ord.orderRef}?`
+                                    )
+                                  ) {
+                                    deleteOrder(ord.orderRef);
+                                  }
+                                }}
+                                className="p-1.5 rounded-lg text-stone-400 hover:text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer"
+                                title="Delete Order"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            )}
                           </div>
                         </div>
 
@@ -1894,13 +1972,132 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                         </div>
 
                         {/* Multi-Carrier Logistics Dispatch Actions (Delhivery & Ekart) */}
-                        <div
-                          className={`p-3.5 rounded-xl border space-y-3 text-xs ${
-                            isDark
-                              ? "bg-[#191009] border-[#3D2514]"
-                              : "bg-[#F7F2E8] border-[#DFD4BF]"
-                          }`}
-                        >
+                        {isLocked ? (
+                          <div
+                            className={`p-3.5 rounded-2xl border space-y-2.5 text-xs ${
+                              isDark
+                                ? "bg-[#160E08] border-[#2E1A0F]"
+                                : "bg-[#F9F6F0] border-[#E8DFC8]"
+                            }`}
+                          >
+                            <div className="flex flex-wrap items-center justify-between gap-2 border-b pb-2 border-stone-200 dark:border-stone-800">
+                              <div className="flex items-center gap-1.5 text-xs font-bold text-stone-700 dark:text-stone-300">
+                                <Lock className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+                                <span>Completed Order Record (Logistics Locked)</span>
+                              </div>
+                              <span
+                                className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                                  ord.orderStatus === "Delivered"
+                                    ? "bg-emerald-500/15 text-emerald-600 border border-emerald-500/30"
+                                    : "bg-red-500/15 text-red-600 border border-red-500/30"
+                                }`}
+                              >
+                                {ord.orderStatus === "Delivered" ? "Delivered to Customer" : "Cancelled / Closed"}
+                              </span>
+                            </div>
+
+                            <p className="text-[11px] text-stone-500">
+                              Fulfillment is finalized. Courier manifest actions and carrier dispatch are locked to prevent accidental modifications or duplicate shipments.
+                            </p>
+
+                            {ord.trackingNumber ? (
+                              <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-stone-200/60 dark:border-stone-800">
+                                <div className="text-xs">
+                                  <span className="font-semibold text-stone-500">Carrier: </span>
+                                  <span className="font-bold text-stone-800 dark:text-stone-200">
+                                    {ord.courier || (ord.trackingNumber.startsWith("FMP") ? "Ekart Logistics" : "Delhivery Express")}
+                                  </span>
+                                  <span className="font-mono text-stone-600 dark:text-stone-400 ml-1.5">
+                                    (AWB: {ord.trackingNumber})
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  {ord.courier?.toLowerCase().includes("ekart") || ord.trackingNumber.startsWith("FMP") ? (
+                                    <>
+                                      <a
+                                        href={`/api?action=ekart_packing_slip&waybill=${encodeURIComponent(
+                                          ord.trackingNumber || ""
+                                        )}&orderRef=${encodeURIComponent(
+                                          ord.orderRef || ""
+                                        )}&name=${encodeURIComponent(
+                                          addr.fullName || "Customer"
+                                        )}&phone=${encodeURIComponent(
+                                          addr.phone || ""
+                                        )}&address=${encodeURIComponent(
+                                          `${addr.addressLine1 || ""}${
+                                            addr.landmark ? `, Near ${addr.landmark}` : ""
+                                          }`
+                                        )}&city=${encodeURIComponent(
+                                          addr.district || addr.city || "Bengaluru"
+                                        )}&state=${encodeURIComponent(
+                                          addr.state || "Karnataka"
+                                        )}&pincode=${encodeURIComponent(
+                                          addr.pincode || ""
+                                        )}&amount=${encodeURIComponent(
+                                          ord.total || 0
+                                        )}&payment=${encodeURIComponent(
+                                          ord.paymentMethod || "Prepaid"
+                                        )}`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="px-2.5 py-1 rounded-lg border border-sky-500/30 text-sky-700 dark:text-sky-300 font-bold text-[11px] flex items-center gap-1"
+                                      >
+                                        <Printer className="w-2.5 h-2.5 text-sky-500" />
+                                        <span>Print Slip</span>
+                                      </a>
+                                      <a
+                                        href={`https://ekartlogistics.com/shipmenttrack/${encodeURIComponent(ord.trackingNumber)}`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="px-2.5 py-1 rounded-lg bg-sky-600 hover:bg-sky-700 text-white font-bold text-[11px] flex items-center gap-1 transition-colors"
+                                      >
+                                        <span>Track Ekart</span>
+                                        <ExternalLink className="w-2.5 h-2.5" />
+                                      </a>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <a
+                                        href={`/api?action=delhivery_packing_slip&waybill=${encodeURIComponent(
+                                          ord.trackingNumber || ""
+                                        )}`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="px-2.5 py-1 rounded-lg border border-amber-500/30 text-amber-800 dark:text-amber-200 font-bold text-[11px] flex items-center gap-1"
+                                      >
+                                        <Printer className="w-2.5 h-2.5 text-[#E08F35]" />
+                                        <span>Print Slip</span>
+                                      </a>
+                                      <a
+                                        href={`https://www.delhivery.com/track/package/${ord.trackingNumber}`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="px-2.5 py-1 rounded-lg bg-[#5E3210] hover:bg-[#43230A] text-white font-bold text-[11px] flex items-center gap-1 transition-colors"
+                                      >
+                                        <span>Track Delhivery</span>
+                                        <ExternalLink className="w-2.5 h-2.5" />
+                                      </a>
+                                    </>
+                                  )}
+                                  <button
+                                    type="button"
+                                    onClick={() => handleToggleOrderLock(ord.orderRef)}
+                                    className="px-2 py-1 rounded-lg border border-stone-300 dark:border-stone-700 text-[10px] text-stone-500 hover:text-stone-800 dark:hover:text-stone-200 cursor-pointer"
+                                  >
+                                    Unlock
+                                  </button>
+                                </div>
+                              </div>
+                            ) : null}
+                          </div>
+                        ) : (
+                          <div
+                            className={`p-3.5 rounded-xl border space-y-3 text-xs ${
+                              isDark
+                                ? "bg-[#191009] border-[#3D2514]"
+                                : "bg-[#F7F2E8] border-[#DFD4BF]"
+                            }`}
+                          >
                           <div className="flex flex-wrap items-center justify-between gap-2 border-b pb-2.5 border-stone-200 dark:border-stone-800">
                             <div className="flex items-center gap-2">
                               <span className="font-bold text-xs">Courier Partner:</span>
@@ -2303,6 +2500,7 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                           )}
 
                         </div>
+                      )}
 
                         {/* Customer Actions */}
                         <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
@@ -2322,19 +2520,21 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                               <ExternalLink className="w-3 h-3 text-[#A69788]" />
                             </a>
 
-                            <button
-                              type="button"
-                              onClick={() => handleOpenEditAddress(ord)}
-                              className={`px-3 py-1.5 rounded-lg border text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer ${
-                                isDark
-                                  ? "bg-[#1C120B] border-[#362114] text-amber-300 hover:border-[#E08F35] hover:bg-[#28180E]"
-                                  : "bg-white border-[#DDD1BE] hover:border-[#E08F35] text-[#5E3210] hover:bg-amber-50"
-                              }`}
-                              title="Edit address, phone, or adjust doorstep GPS pin before courier dispatch"
-                            >
-                              <Edit2 className="w-3.5 h-3.5 text-[#E08F35]" />
-                              <span>Edit Address & Pin</span>
-                            </button>
+                            {!isLocked && (
+                              <button
+                                type="button"
+                                onClick={() => handleOpenEditAddress(ord)}
+                                className={`px-3 py-1.5 rounded-lg border text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer ${
+                                  isDark
+                                    ? "bg-[#1C120B] border-[#362114] text-amber-300 hover:border-[#E08F35] hover:bg-[#28180E]"
+                                    : "bg-white border-[#DDD1BE] hover:border-[#E08F35] text-[#5E3210] hover:bg-amber-50"
+                                }`}
+                                title="Edit address, phone, or adjust doorstep GPS pin before courier dispatch"
+                              >
+                                <Edit2 className="w-3.5 h-3.5 text-[#E08F35]" />
+                                <span>Edit Address & Pin</span>
+                              </button>
+                            )}
 
                             <button
                               type="button"
@@ -2406,280 +2606,6 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
           <StorefrontCMSPanel isDark={isDark} />
         </div>
 
-        {/* Monthly Cooking Oil Subscriptions Management Hub (Direct Firestore) */}
-        <div
-          className={`rounded-3xl border p-6 sm:p-8 shadow-sm space-y-6 transition-colors ${
-            isDark ? "bg-[#1C120B] border-[#362114]" : "bg-white border-[#E8DEC8]"
-          }`}
-        >
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-4 border-stone-200 dark:border-stone-800">
-            <div className="flex items-center gap-3">
-              <div className="p-3 rounded-2xl bg-[#E08F35]/15 text-[#E08F35]">
-                <Calendar className="w-6 h-6 text-[#E08F35]" />
-              </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <h2 className="text-lg sm:text-xl font-bold font-serif">
-                    Monthly Oil Subscriptions Hub ({adminSubscriptions.length})
-                  </h2>
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                    Direct Firestore
-                  </span>
-                </div>
-                <p className="text-xs text-stone-500 mt-0.5">
-                  Live real-time feed of subscribers. When customers customize or edit their combo, it updates here immediately.
-                </p>
-              </div>
-            </div>
-
-            {/* Quick Metrics */}
-            <div className="flex items-center gap-3">
-              <div className="p-3 rounded-2xl bg-amber-500/5 border border-amber-500/20 text-right">
-                <span className="text-[10px] uppercase font-bold text-stone-500 block">
-                  Active Subscribers
-                </span>
-                <span className="text-lg font-black text-[#E08F35] font-serif">
-                  {adminSubscriptions.filter((s) => s.status === "active").length}
-                </span>
-              </div>
-              <div className="p-3 rounded-2xl bg-emerald-500/5 border border-emerald-500/20 text-right">
-                <span className="text-[10px] uppercase font-bold text-stone-500 block">
-                  Monthly Run Rate (MRR)
-                </span>
-                <span className="text-lg font-black text-emerald-600 font-serif">
-                  ₹
-                  {adminSubscriptions
-                    .filter((s) => s.status === "active")
-                    .reduce((acc, s) => acc + (Number(s.monthlyPrice) || 0), 0)
-                    .toLocaleString("en-IN")}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* Search & Filters */}
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
-            <input
-              type="text"
-              placeholder="Search by customer name, phone, combo, or city..."
-              value={subSearch}
-              onChange={(e) => setSubSearch(e.target.value)}
-              className="w-full sm:max-w-md px-3.5 py-2 rounded-xl text-xs border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-900/50"
-            />
-            <div className="flex items-center gap-1 self-start sm:self-auto">
-              {["all", "active", "paused", "cancelled"].map((st) => (
-                <button
-                  key={st}
-                  type="button"
-                  onClick={() => setSubStatusFilter(st)}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold capitalize transition-all cursor-pointer ${
-                    subStatusFilter === st
-                      ? "bg-[#5E3210] text-white shadow-xs"
-                      : "bg-stone-100 dark:bg-stone-800 text-stone-600 dark:text-stone-300"
-                  }`}
-                >
-                  {st}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Subscriptions Grid */}
-          {(() => {
-            const query = subSearch.toLowerCase().trim();
-            const filteredSubs = adminSubscriptions.filter((sub) => {
-              const matchesFilter =
-                subStatusFilter === "all" ||
-                (sub.status || "active").toLowerCase() === subStatusFilter.toLowerCase();
-              const matchesQuery =
-                !query ||
-                (sub.customerName || "").toLowerCase().includes(query) ||
-                (sub.customerPhone || "").includes(query) ||
-                (sub.comboName || "").toLowerCase().includes(query) ||
-                (sub.shippingAddress?.district || "").toLowerCase().includes(query) ||
-                (sub.shippingAddress?.pincode || "").includes(query);
-              return matchesFilter && matchesQuery;
-            });
-
-            if (filteredSubs.length === 0) {
-              return (
-                <div className="p-8 text-center text-stone-400 space-y-2">
-                  <Calendar className="w-8 h-8 mx-auto text-stone-300" />
-                  <p className="text-xs font-semibold">No subscriptions found matching filter</p>
-                  <p className="text-[11px]">
-                    Subscribers will appear here automatically when they join the Monthly Oil Club.
-                  </p>
-                </div>
-              );
-            }
-
-            return (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {filteredSubs.map((sub) => {
-                  const cleanPhone = (sub.customerPhone || "").replace(/\D/g, "").slice(-10);
-                  const upiIntent = `upi://pay?pa=manopavana@ybl&pn=MANOPAVANA&am=${sub.monthlyPrice}&cu=INR&tn=${encodeURIComponent(
-                    `MANOPAVANA Sub ${sub.id}`
-                  )}`;
-                  const waMsg = encodeURIComponent(
-                    `🌿 *MANOPAVANA Wood-Pressed Cooking Oils*\n*Monthly Subscription Renewal & Dispatch*\n\n` +
-                      `Namaskara ${sub.customerName || "Customer"}! 🙏\n` +
-                      `Your monthly cold-pressed oil box is scheduled for fresh wooden-press batching and dispatch on *${
-                        sub.nextDispatchDate || `${getOrdinalSuffix(sub.deliveryDay)} of this month`
-                      }*.\n\n` +
-                      `📦 *Your Monthly Box:* ${sub.comboName}\n` +
-                      `🛢️ *Bottles:* ${(sub.items || []).join(", ")}\n` +
-                      `💰 *Monthly Subscription Total (10% Off Applied):* ₹${sub.monthlyPrice}\n` +
-                      `📍 *Delivery Address:* ${sub.shippingAddress?.addressLine1 || ""}, ${
-                        sub.shippingAddress?.district || "Bengaluru"
-                      } - ${sub.shippingAddress?.pincode || ""}\n\n` +
-                      `💳 *Click to Pay directly via PhonePe / UPI:* \n${upiIntent}\n\n` +
-                      `_Or reply here to update your bottle choices or pause your cycle._\n\n` +
-                      `Thank you for trusting pure, authentic Marachekku health!`
-                  );
-                  const waUrl = `https://wa.me/91${cleanPhone}?text=${waMsg}`;
-
-                  return (
-                    <div
-                      key={sub.id}
-                      className={`p-5 rounded-2xl border space-y-4 transition-all ${
-                        isDark ? "bg-[#25150C]/60 border-[#3B2516]" : "bg-amber-50/40 border-[#E8DFC8]"
-                      }`}
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <h3 className="font-bold text-sm text-stone-900 dark:text-stone-100">
-                              {sub.customerName || "Valued Customer"}
-                            </h3>
-                            <span
-                              className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
-                                sub.status === "active"
-                                  ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
-                                  : sub.status === "paused"
-                                  ? "bg-amber-500/15 text-amber-700 dark:text-amber-300"
-                                  : "bg-red-500/15 text-red-600"
-                              }`}
-                            >
-                              {sub.status || "active"}
-                            </span>
-                          </div>
-                          <p className="text-xs text-stone-500 mt-0.5 font-mono">
-                            +91 {cleanPhone || "No Phone"} • {sub.customerEmail || "No Email"}
-                          </p>
-                        </div>
-
-                        <div className="text-right shrink-0">
-                          <span className="text-base font-black font-serif text-[#C8751B] dark:text-amber-300 block">
-                            ₹{sub.monthlyPrice}/mo
-                          </span>
-                          <span className="text-[10px] text-stone-500 uppercase tracking-wider block">
-                            {sub.paymentPlan === "annual_prepaid" ? "Prepaid 1-Yr" : "Monthly Online"}
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Combo Details & Itemized Bottles */}
-                      <div className="p-3 rounded-xl bg-white/70 dark:bg-stone-800/70 border border-amber-500/20 space-y-2 text-xs">
-                        <div className="flex items-center justify-between">
-                          <span className="font-bold text-stone-800 dark:text-stone-200">
-                            {sub.comboName}
-                          </span>
-                          {sub.comboType === "custom" && (
-                            <span className="px-2 py-0.5 rounded text-[9px] font-bold bg-[#E08F35]/20 text-[#E08F35] uppercase">
-                              Custom Box
-                            </span>
-                          )}
-                        </div>
-
-                        {/* Bottles Pills */}
-                        <div className="flex flex-wrap gap-1.5 pt-1">
-                          {(sub.items || []).map((it: string, i: number) => (
-                            <span
-                              key={i}
-                              className="px-2 py-0.5 rounded-lg bg-amber-500/10 text-stone-700 dark:text-stone-300 text-[11px] font-medium border border-amber-500/20"
-                            >
-                              {it}
-                            </span>
-                          ))}
-                        </div>
-
-                        {/* Customer modification highlight note */}
-                        {sub.lastModifiedNote && (
-                          <div className="p-2 rounded-lg bg-amber-500/15 border border-amber-500/30 text-[11px] text-[#5E3210] dark:text-amber-200 flex items-start gap-1.5">
-                            <AlertCircle className="w-3.5 h-3.5 text-[#E08F35] shrink-0 mt-0.5" />
-                            <span>{sub.lastModifiedNote}</span>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Schedule & Delivery Address */}
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] text-stone-600 dark:text-stone-400">
-                        <div className="space-y-0.5">
-                          <span className="text-[10px] uppercase font-bold text-stone-400 block">
-                            Delivery Cycle
-                          </span>
-                          <p className="font-bold text-stone-800 dark:text-stone-200">
-                            {getOrdinalSuffix(sub.deliveryDay)} of Every Month
-                          </p>
-                          <p className="text-[10px] text-emerald-600 font-semibold">
-                            Next Dispatch: {sub.nextDispatchDate}
-                          </p>
-                        </div>
-
-                        <div className="space-y-0.5">
-                          <span className="text-[10px] uppercase font-bold text-stone-400 block">
-                            Delivery Address
-                          </span>
-                          <p className="line-clamp-2">
-                            {sub.shippingAddress?.addressLine1 || "No street address"},{" "}
-                            {sub.shippingAddress?.district || "Bengaluru"} -{" "}
-                            {sub.shippingAddress?.pincode || ""}
-                          </p>
-                        </div>
-                      </div>
-
-                      {/* Action Buttons */}
-                      <div className="pt-2 border-t border-amber-500/20 flex items-center justify-between gap-2">
-                        <button
-                          type="button"
-                          disabled={isUpdatingSub[sub.id]}
-                          onClick={() => handleToggleSubStatus(sub.id, sub.status || "active")}
-                          className="px-3 py-1.5 rounded-xl border border-stone-300 dark:border-stone-700 text-xs font-semibold hover:bg-stone-100 dark:hover:bg-stone-800 transition-colors cursor-pointer flex items-center gap-1.5"
-                        >
-                          {sub.status === "active" ? (
-                            <>
-                              <Pause className="w-3.5 h-3.5 text-amber-500" />
-                              <span>Pause</span>
-                            </>
-                          ) : (
-                            <>
-                              <Play className="w-3.5 h-3.5 text-emerald-500" />
-                              <span>Resume</span>
-                            </>
-                          )}
-                        </button>
-
-                        <a
-                          href={waUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer"
-                        >
-                          <MessageCircle className="w-3.5 h-3.5" />
-                          <span>WhatsApp Reminder</span>
-                        </a>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            );
-          })()}
-        </div>
-
-        {/* WhatsApp Authentication & Gateway Hub (Placed at bottom for maintenance/reference) */}
-        <WhatsAppGatewayPanel isDark={isDark} showToast={showToast} />
 
         {/* Order Delivery Address & GPS Coordinates Editor Modal */}
         {editingOrderAddress && (

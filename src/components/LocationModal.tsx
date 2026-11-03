@@ -17,6 +17,7 @@ import L from "leaflet";
 
 export const LocationModal: React.FC = () => {
   const {
+    currentUser,
     address,
     savedAddresses,
     selectSavedAddress,
@@ -29,11 +30,11 @@ export const LocationModal: React.FC = () => {
     showToast,
   } = useStore();
 
-  const [fullName, setFullName] = useState(address.fullName);
-  const [phone, setPhone] = useState(address.phone);
-  const [email, setEmail] = useState(address.email || "");
-  const [addressLine1, setAddressLine1] = useState(address.addressLine1);
-  const [landmark, setLandmark] = useState(address.landmark);
+  const [fullName, setFullName] = useState(currentUser ? address.fullName : "");
+  const [phone, setPhone] = useState(currentUser ? address.phone : "");
+  const [email, setEmail] = useState(currentUser ? (address.email || "") : "");
+  const [addressLine1, setAddressLine1] = useState(currentUser ? address.addressLine1 : "");
+  const [landmark, setLandmark] = useState(currentUser ? address.landmark : "");
   const [state, setState] = useState(address.state || "Karnataka");
   const [district, setDistrict] = useState(address.district || "Bengaluru Urban");
   const [pincode, setPincode] = useState(address.pincode || "560058");
@@ -51,20 +52,28 @@ export const LocationModal: React.FC = () => {
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const searchTimeoutRef = useRef<any>(null);
 
-  // Sync initial state if address updates externally
+  // Sync state when address or auth state changes
   useEffect(() => {
-    setFullName(address.fullName);
-    setPhone(address.phone);
-    setEmail(address.email || "");
-    setAddressLine1(address.addressLine1);
-    setLandmark(address.landmark);
+    if (currentUser) {
+      setFullName(address.fullName || "");
+      setPhone(address.phone || "");
+      setEmail(address.email || "");
+      setAddressLine1(address.addressLine1 || "");
+      setLandmark(address.landmark || "");
+    } else {
+      setFullName("");
+      setPhone("");
+      setEmail("");
+      setAddressLine1("");
+      setLandmark("");
+    }
     setState(address.state || "Karnataka");
     setDistrict(address.district || "Bengaluru Urban");
     setPincode(address.pincode || "560058");
     if (address.lat && address.lng) {
       setCoords([address.lat, address.lng]);
     }
-  }, [address]);
+  }, [address, currentUser]);
 
   // Leaflet map setup
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
@@ -341,9 +350,6 @@ export const LocationModal: React.FC = () => {
       });
     }
 
-    try {
-      localStorage.setItem("manopavana_address_saved", "true");
-    } catch { }
     setLocationModalOpen(false);
     showToast(
       isBLR
@@ -390,8 +396,8 @@ export const LocationModal: React.FC = () => {
 
         {/* Content Body */}
         <div className="overflow-y-auto p-5 sm:p-6 space-y-5">
-          {/* Saved Addresses Section */}
-          {savedAddresses && savedAddresses.length > 0 && (
+          {/* Saved Addresses Section (Strictly Authenticated) */}
+          {currentUser && savedAddresses && savedAddresses.length > 0 && (
             <div className="space-y-2.5">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-[#FFD885] flex items-center gap-1.5">

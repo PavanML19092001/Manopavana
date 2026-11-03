@@ -177,7 +177,7 @@ export const CheckoutPage: React.FC = () => {
     }
   };
 
-  // 1. Auto-fill from Auth & Address updates
+  // 1. Auto-fill from Auth & Address updates (Strictly Authenticated)
   useEffect(() => {
     if (currentUser) {
       if (!fullName && currentUser.displayName) setFullName(currentUser.displayName);
@@ -187,27 +187,34 @@ export const CheckoutPage: React.FC = () => {
           ? extractCleanPhone(currentUser.email)
           : "";
       if (!phone && cleanPhone.length === 10) setPhone(cleanPhone);
-    }
-    if (address) {
-      if (address.fullName && !fullName) setFullName(address.fullName);
-      if (address.phone && (!phone || phone.length !== 10)) setPhone(address.phone);
-      if (address.addressLine1 && !addressLine1) setAddressLine1(address.addressLine1);
-      if (address.landmark && !landmark) setLandmark(address.landmark);
-      if (address.state) setState(address.state);
-      if (address.district) setDistrict(address.district);
-      if (address.pincode && (!pincode || pincode === "560058")) setPincode(address.pincode);
-      if (Number.isFinite(address.lat) && Number.isFinite(address.lng)) {
-        const lat = address.lat as number;
-        const lng = address.lng as number;
-        setCoords([lat, lng]);
-        safeUpdateMapCenter(lat, lng, 15);
+
+      if (address) {
+        if (address.fullName && !fullName) setFullName(address.fullName);
+        if (address.phone && (!phone || phone.length !== 10)) setPhone(address.phone);
+        if (address.addressLine1 && !addressLine1) setAddressLine1(address.addressLine1);
+        if (address.landmark && !landmark) setLandmark(address.landmark);
+        if (address.state) setState(address.state);
+        if (address.district) setDistrict(address.district);
+        if (address.pincode && (!pincode || pincode === "560058")) setPincode(address.pincode);
+        if (Number.isFinite(address.lat) && Number.isFinite(address.lng)) {
+          const lat = address.lat as number;
+          const lng = address.lng as number;
+          setCoords([lat, lng]);
+          safeUpdateMapCenter(lat, lng, 15);
+        }
       }
+    } else {
+      // Logged out: Clear any lingering personal details from prior session
+      setFullName("");
+      setPhone("");
+      setAddressLine1("");
+      setLandmark("");
     }
   }, [address, currentUser]);
 
-  // Auto-sync form with active saved address on mount or when savedAddresses load
+  // Auto-sync form with active saved address on mount or when savedAddresses load (authenticated only)
   useEffect(() => {
-    if (savedAddresses && savedAddresses.length > 0 && !isAddingNewAddress) {
+    if (currentUser && savedAddresses && savedAddresses.length > 0 && !isAddingNewAddress) {
       const active = savedAddresses.find((a) => a.id === selectedAddressId) || savedAddresses[0];
       if (active) {
         if (active.phone && (!phone || phone.length !== 10)) {
@@ -230,32 +237,16 @@ export const CheckoutPage: React.FC = () => {
         }
       }
     }
-  }, [savedAddresses, selectedAddressId, isAddingNewAddress]);
+  }, [currentUser, savedAddresses, selectedAddressId, isAddingNewAddress]);
 
-  // 2. Direct Firestore Customer Profile Sync on mount
+  // 2. Direct Firestore Customer Profile Sync on mount (strictly isolated to currentUser.uid)
   useEffect(() => {
     if (!currentUser?.uid) return;
     let isMounted = true;
     async function loadCustomerFromFirestore() {
       try {
         const snap = await getDoc(doc(db, "customers", currentUser!.uid));
-        let data = snap.exists() ? snap.data() : {};
-
-        // If phone or savedAddress is missing, cross-fetch from account_mappings by email
-        if (!data.phone || !data.savedAddress) {
-          try {
-            const mapSnap = await getDoc(doc(db, "settings", "account_mappings"));
-            if (mapSnap.exists()) {
-              const mapData = mapSnap.data();
-              const userEmail = (currentUser?.email || "").toLowerCase().trim();
-              const userPhone = extractCleanPhone(currentUser?.phoneNumber || "");
-              const mapped = mapData.byEmail?.[userEmail] || (userPhone ? mapData.byPhone?.[userPhone] : null);
-              if (mapped) {
-                data = { ...mapped, ...data };
-              }
-            }
-          } catch {}
-        }
+        const data = snap.exists() ? snap.data() : {};
 
         if (isMounted && data) {
           const resolvedName = data.name || currentUser?.displayName;
@@ -307,7 +298,7 @@ export const CheckoutPage: React.FC = () => {
                 addToCart(it, it.quantity);
               });
             }
-            if (ord.shippingAddress) {
+            if (currentUser && ord.shippingAddress && (ord.customerUid === currentUser.uid || (ord as any).firebaseUid === currentUser.uid)) {
               updateAddress(ord.shippingAddress);
             }
             showToast("Recovered your ordered items into checkout bag!");
@@ -929,8 +920,8 @@ export const CheckoutPage: React.FC = () => {
                 </button>
               </div>
 
-              {/* Saved Address Cards */}
-              {savedAddresses && savedAddresses.length > 0 && (
+              {/* Saved Address Cards (Strictly Authenticated) */}
+              {currentUser && savedAddresses && savedAddresses.length > 0 && (
                 <div className="space-y-3 pb-2">
                   <label className={`block text-xs font-bold ${isDark ? "text-[#FAF4EA]" : "text-[#3D2514]"}`}>
                     Select Saved Delivery Address

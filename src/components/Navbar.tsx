@@ -812,15 +812,8 @@ export const Navbar: React.FC = () => {
           </Link>
 
           {/* 4. Profile */}
-          <button
-            type="button"
-            onClick={() => {
-              if (currentUser) {
-                navigate("/profile");
-              } else {
-                setLoginModalOpen(true);
-              }
-            }}
+          <Link
+            to="/profile"
             className={`flex-1 flex flex-col items-center justify-center py-1 transition-colors cursor-pointer ${
               location.pathname === "/profile"
                 ? isLight
@@ -840,7 +833,7 @@ export const Navbar: React.FC = () => {
             <span className="text-[10px] tracking-tight mt-0.5 truncate max-w-[62px]">
               {currentUser ? firstName : "Profile"}
             </span>
-          </button>
+          </Link>
 
           {/* 5. Cart / Bag */}
           <Link

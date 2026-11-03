@@ -59,13 +59,9 @@ export const StorefrontCMSPanel: React.FC<{ isDark: boolean }> = ({ isDark }) =>
     cmsConfig,
     updateCMSConfig,
     showToast,
-    adminOrders,
-    refreshAdminOrders,
-    updateOrderStatus,
   } = useStore();
 
   const [activeTab, setActiveTab] = useState<
-    | "orders"
     | "brand"
     | "products"
     | "combos"
@@ -76,10 +72,6 @@ export const StorefrontCMSPanel: React.FC<{ isDark: boolean }> = ({ isDark }) =>
     | "facility"
     | "policies"
   >("brand");
-
-  const [orderSearch, setOrderSearch] = useState("");
-  const [orderStatusFilter, setOrderStatusFilter] = useState<string>("all");
-  const [isRefreshingOrders, setIsRefreshingOrders] = useState(false);
 
   // Tab 1: Global Brand, Hero Banner, Audio & Media
   const [brandName, setBrandName] = useState(cmsConfig?.brandName || BUSINESS_CONFIG.BRAND_NAME);
@@ -143,11 +135,6 @@ export const StorefrontCMSPanel: React.FC<{ isDark: boolean }> = ({ isDark }) =>
   const [festiveBtnLink, setFestiveBtnLink] = useState(
     cmsConfig?.festiveBanner?.btnLink || "/#catalog"
   );
-  const [subDiscountPercent, setSubDiscountPercent] = useState<number>(
-    cmsConfig?.subscriptionDiscountPercent ?? 10
-  );
-
-
 
   // Tab 2: Facility & Legal Credentials
   const [founderName, setFounderName] = useState(cmsConfig?.founderName || BUSINESS_CONFIG.FOUNDER_NAME);
@@ -399,7 +386,6 @@ export const StorefrontCMSPanel: React.FC<{ isDark: boolean }> = ({ isDark }) =>
       heroHighlights: parsedHighlights.length > 0 ? parsedHighlights : prev.heroHighlights,
       freeShippingThreshold: Number(threshold),
       standardShippingFee: Number(stdFee),
-      subscriptionDiscountPercent: Number(subDiscountPercent),
       founderName,
       primaryPhone,
       altPhone,
@@ -539,7 +525,6 @@ export const StorefrontCMSPanel: React.FC<{ isDark: boolean }> = ({ isDark }) =>
       {/* Navigation Tabs */}
       <div className="flex flex-wrap gap-2 border-b pb-2 border-stone-200 dark:border-stone-800">
         {[
-          { key: "orders", label: `Live Orders (${adminOrders.length})` },
           { key: "brand", label: "Brand, Hero & Media" },
           { key: "products", label: "Product Catalog (A-Z)" },
           { key: "combos", label: "Value Combos (A-Z)" },
@@ -562,206 +547,13 @@ export const StorefrontCMSPanel: React.FC<{ isDark: boolean }> = ({ isDark }) =>
                 : "bg-stone-100 text-[#5C4230] hover:bg-stone-200"
             }`}
           >
-            {tab.key === "orders" && (
-              <span className={`w-2 h-2 rounded-full ${adminOrders.length > 0 ? "bg-emerald-400 animate-pulse" : "bg-stone-400"}`} />
-            )}
             <span>{tab.label}</span>
           </button>
         ))}
       </div>
 
       <form onSubmit={handleSaveAll} className="space-y-5 text-xs">
-        {/* TAB 1: LIVE ORDERS */}
-        {activeTab === "orders" && (
-          <div className="space-y-4 animate-fade-in">
-            <div className="p-4 rounded-xl border border-stone-200 dark:border-stone-800 bg-stone-50/60 dark:bg-black/20 space-y-3">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div>
-                  <h3 className="font-bold text-sm text-[#1F120A] dark:text-[#FAF4EA] flex items-center gap-1.5">
-                    <Truck className="w-4 h-4 text-[#E08F35]" />
-                    <span>Real-Time Customer Orders & Dispatch Tracker</span>
-                  </h3>
-                  <p className="text-[11px] text-[#6A523E] dark:text-[#C4B29E]">
-                    Synced live directly with Firestore `orders` collection
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={async () => {
-                    setIsRefreshingOrders(true);
-                    await refreshAdminOrders();
-                    setIsRefreshingOrders(false);
-                  }}
-                  disabled={isRefreshingOrders}
-                  className="px-3.5 py-1.5 rounded-xl bg-[#E08F35] text-[#140D09] hover:bg-amber-400 font-bold text-xs flex items-center gap-1.5 transition-all self-start sm:self-auto cursor-pointer"
-                >
-                  <RefreshCw className={`w-3.5 h-3.5 ${isRefreshingOrders ? "animate-spin" : ""}`} />
-                  <span>Refresh Orders</span>
-                </button>
-              </div>
-
-              {/* Filters */}
-              <div className="flex flex-col sm:flex-row gap-2 pt-1">
-                <div className="relative flex-1">
-                  <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" />
-                  <input
-                    type="text"
-                    placeholder="Search by Order ID, customer phone, name, pincode..."
-                    value={orderSearch}
-                    onChange={(e) => setOrderSearch(e.target.value)}
-                    className="w-full pl-8 pr-3 py-1.5 rounded-lg border border-stone-300 dark:border-stone-700 bg-white dark:bg-transparent text-xs"
-                  />
-                </div>
-                <select
-                  value={orderStatusFilter}
-                  onChange={(e) => setOrderStatusFilter(e.target.value)}
-                  className="px-3 py-1.5 rounded-lg border border-stone-300 dark:border-stone-700 bg-white dark:bg-stone-900 text-xs font-semibold"
-                >
-                  <option value="all">All Statuses ({adminOrders.length})</option>
-                  <option value="Placed">Placed</option>
-                  <option value="Payment Incomplete">Payment Incomplete</option>
-                  <option value="Packed">Packed</option>
-                  <option value="Dispatched">Dispatched</option>
-                  <option value="Delivered">Delivered</option>
-                  <option value="Cancelled">Cancelled</option>
-                </select>
-              </div>
-            </div>
-
-            {/* Orders Feed */}
-            {adminOrders.length === 0 ? (
-              <div className="p-8 text-center rounded-xl border border-dashed border-stone-300 dark:border-stone-800 space-y-2">
-                <Clock className="w-8 h-8 text-stone-400 mx-auto animate-pulse" />
-                <p className="font-bold text-sm">No orders recorded in Firestore yet</p>
-                <p className="text-stone-500 text-xs">Customer orders will appear here automatically in real time.</p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {adminOrders
-                  .filter((o) => {
-                    if (orderStatusFilter !== "all" && o.orderStatus !== orderStatusFilter) return false;
-                    if (!orderSearch.trim()) return true;
-                    const q = orderSearch.toLowerCase();
-                    const ref = (o.orderRef || o.id || "").toLowerCase();
-                    const phone = (o.shippingAddress?.phone || o.customerPhone || "").toLowerCase();
-                    const name = (o.shippingAddress?.fullName || "").toLowerCase();
-                    const pin = (o.shippingAddress?.pincode || "").toLowerCase();
-                    return ref.includes(q) || phone.includes(q) || name.includes(q) || pin.includes(q);
-                  })
-                  .map((o) => {
-                    const cleanPhone = (o.shippingAddress?.phone || o.customerPhone || "").replace(/\D/g, "").slice(-10);
-                    return (
-                      <div
-                        key={o.orderRef || o.id}
-                        className="p-4 rounded-xl border border-stone-200 dark:border-stone-800 bg-white dark:bg-black/20 space-y-3 hover:border-[#D49A37] transition-all shadow-xs"
-                      >
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b pb-2 border-stone-100 dark:border-stone-800">
-                          <div className="flex items-center gap-2">
-                            <span className="font-mono font-bold text-amber-700 dark:text-amber-400 text-xs">
-                              #{o.orderRef || o.id}
-                            </span>
-                            <span className="text-[10px] text-stone-400">{o.date}</span>
-                            <span
-                              className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                                o.orderStatus === "Delivered"
-                                  ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300"
-                                  : o.orderStatus === "Cancelled"
-                                  ? "bg-red-100 text-red-800 dark:bg-red-950/50 dark:text-red-300"
-                                  : "bg-amber-100 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300"
-                              }`}
-                            >
-                              {o.orderStatus}
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <span className="font-bold text-sm text-[#1F120A] dark:text-[#FAF4EA]">
-                              ₹{o.total}
-                            </span>
-                            <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded bg-stone-100 dark:bg-stone-800 text-stone-700 dark:text-stone-300">
-                              {o.paymentMethod || o.paymentMode || "COD"}
-                            </span>
-                          </div>
-                        </div>
-
-                        {/* Customer & Address Details */}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-                          <div className="space-y-1">
-                            <div className="font-bold flex items-center gap-1.5">
-                              <User className="w-3.5 h-3.5 text-amber-600" />
-                              <span>{o.shippingAddress?.fullName || "Valued Customer"}</span>
-                            </div>
-                            <div className="text-stone-500 flex items-center gap-2">
-                              <span>📱 {cleanPhone || "N/A"}</span>
-                              {cleanPhone && (
-                                <a
-                                  href={`https://wa.me/91${cleanPhone}?text=Hi%20${encodeURIComponent(
-                                    o.shippingAddress?.fullName || "there"
-                                  )},%20update%20regarding%20your%20MANOPAVANA%20Order%20%23${o.orderRef}`}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="text-emerald-600 font-bold hover:underline flex items-center gap-0.5"
-                                >
-                                  <MessageCircle className="w-3 h-3" />
-                                  <span>WhatsApp</span>
-                                </a>
-                              )}
-                            </div>
-                          </div>
-                          <div className="space-y-1">
-                            <div className="font-bold flex items-center gap-1.5">
-                              <MapPin className="w-3.5 h-3.5 text-amber-600" />
-                              <span>
-                                {o.shippingAddress?.city || "Bengaluru"} ({o.shippingAddress?.pincode || "560058"})
-                              </span>
-                            </div>
-                            <p className="text-stone-500 truncate">{o.shippingAddress?.addressLine1}</p>
-                          </div>
-                        </div>
-
-                        {/* Line Items */}
-                        <div className="p-2.5 rounded-lg bg-stone-50 dark:bg-stone-900/40 text-[11px] space-y-1">
-                          <span className="font-bold text-stone-600 dark:text-stone-400">Order Items:</span>
-                          <div className="space-y-0.5">
-                            {o.items?.map((item, i) => (
-                              <div key={i} className="flex justify-between">
-                                <span>
-                                  {item.title} ({item.variant}) × {item.quantity}
-                                </span>
-                                <span className="font-semibold">₹{item.price * item.quantity}</span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-
-                        {/* Inline Status Updater */}
-                        <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-stone-100 dark:border-stone-800">
-                          <span className="text-[11px] text-stone-500">Update Order Status:</span>
-                          <div className="flex flex-wrap gap-1.5">
-                            {(["Placed", "Packed", "Dispatched", "Delivered", "Cancelled"] as OrderStatus[]).map((st) => (
-                              <button
-                                key={st}
-                                type="button"
-                                onClick={() => updateOrderStatus(o.orderRef, st)}
-                                className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all cursor-pointer ${
-                                  o.orderStatus === st
-                                    ? "bg-[#5E3210] text-white shadow-xs"
-                                    : "bg-stone-100 dark:bg-stone-800 text-stone-700 dark:text-stone-300 hover:bg-stone-200"
-                                }`}
-                              >
-                                {st}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* TAB 2: BRAND, HERO & MEDIA */}
+        {/* TAB 1: BRAND, HERO & MEDIA */}
         {activeTab === "brand" && (
           <div className="space-y-4 animate-fade-in">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -932,28 +724,6 @@ export const StorefrontCMSPanel: React.FC<{ isDark: boolean }> = ({ isDark }) =>
                     onChange={(e) => setFestiveBtnTextEnglish(e.target.value)}
                     className="w-full px-3 py-1.5 rounded-xl border border-stone-300 dark:border-stone-700 bg-transparent text-xs"
                   />
-                </div>
-              </div>
-
-              <div className="pt-2 border-t border-amber-500/20 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div>
-                  <label className="block font-semibold text-xs text-stone-800 dark:text-stone-200">
-                    Monthly Subscription Discount (%)
-                  </label>
-                  <p className="text-[10px] text-stone-500">
-                    Discount automatically applied on all recurring monthly subscriptions
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="number"
-                    min="1"
-                    max="50"
-                    value={subDiscountPercent}
-                    onChange={(e) => setSubDiscountPercent(Number(e.target.value))}
-                    className="w-20 px-2.5 py-1 text-center font-bold text-xs rounded-lg border border-amber-500/40 bg-transparent"
-                  />
-                  <span className="text-xs font-bold text-stone-500">% Off</span>
                 </div>
               </div>
             </div>
@@ -1153,7 +923,7 @@ export const StorefrontCMSPanel: React.FC<{ isDark: boolean }> = ({ isDark }) =>
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-1">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
                 <div>
                   <label className="block font-semibold mb-1">Free Delivery Threshold (₹)</label>
                   <input
@@ -1176,20 +946,6 @@ export const StorefrontCMSPanel: React.FC<{ isDark: boolean }> = ({ isDark }) =>
                   />
                   <span className="text-[10px] text-stone-500 block mt-1">
                     Flat fee for 1-bottle orders under ₹{threshold} (Default: ₹70)
-                  </span>
-                </div>
-                <div>
-                  <label className="block font-semibold mb-1">Subscription / Repeat Discount (%)</label>
-                  <input
-                    type="number"
-                    min="0"
-                    max="50"
-                    value={subDiscountPercent}
-                    onChange={(e) => setSubDiscountPercent(Number(e.target.value))}
-                    className="w-full px-3 py-2 rounded-xl border border-stone-300 dark:border-stone-700 bg-white dark:bg-transparent font-bold text-amber-700 dark:text-amber-400 text-xs"
-                  />
-                  <span className="text-[10px] text-stone-500 block mt-1">
-                    Automatic 10% discount across orders
                   </span>
                 </div>
               </div>
