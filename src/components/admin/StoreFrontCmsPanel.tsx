@@ -129,14 +129,14 @@ export const StorefrontCMSPanel: React.FC<{ isDark: boolean }> = ({ isDark }) =>
     cmsConfig?.festiveBanner?.enabled !== false
   );
   const [festiveTitle, setFestiveTitle] = useState(
-    cmsConfig?.festiveBanner?.title || "FIRST 25 KITCHENS"
+    cmsConfig?.festiveBanner?.title || "ಕನ್ನಡ ರಾಜ್ಯೋತ್ಸವದ ಶುಭಾಶಯಗಳು!"
   );
   const [festiveBadge, setFestiveBadge] = useState(
-    cmsConfig?.festiveBanner?.badge || "FLAT 30% OFF YOUR FIRST ORDER"
+    cmsConfig?.festiveBanner?.badge || "ನಮ್ಮ ನಾಡಿನ ಅಪ್ಪಟ ಗಾಣ"
   );
   const [festiveTagline, setFestiveTagline] = useState(
     cmsConfig?.festiveBanner?.tagline ||
-      "YOUR KITCHEN DESERVES SOMETHING BETTER. Be among the first 25 customers to welcome MANOPAVANA into your kitchen."
+      "Authentic 100% Marachekku Wood-Pressed Cooking Oils • Direct from Karnataka Farmers to Your Home"
   );
   const [festiveBtnTextKannada, setFestiveBtnTextKannada] = useState(
     cmsConfig?.festiveBanner?.btnTextKannada || "ಈಗಲೇ ಖರೀದಿಸಿ"
@@ -606,7 +606,7 @@ export const StorefrontCMSPanel: React.FC<{ isDark: boolean }> = ({ isDark }) =>
                 <div className="flex items-center gap-2">
                   <Sparkles className="w-4 h-4 text-[#E08F35]" />
                   <h4 className="font-bold text-xs sm:text-sm text-stone-900 dark:text-stone-100">
-                    Campaign & Festive Celebratory Banner (ಅಭಿಯಾನ / ಹಬ್ಬದ ಬ್ಯಾನರ್)
+                    Occasion & Festive Celebratory Banner (ರಾಜ್ಯೋತ್ಸವ / ಹಬ್ಬದ ಬ್ಯಾನರ್)
                   </h4>
                 </div>
                 <label className="flex items-center gap-2 cursor-pointer font-bold text-xs self-start sm:self-auto">
@@ -629,16 +629,16 @@ export const StorefrontCMSPanel: React.FC<{ isDark: boolean }> = ({ isDark }) =>
                   <button
                     type="button"
                     onClick={() => {
-                      setFestiveTitle("FIRST 25 KITCHENS");
-                      setFestiveBadge("FLAT 30% OFF YOUR FIRST ORDER");
-                      setFestiveTagline("YOUR KITCHEN DESERVES SOMETHING BETTER. Be among the first 25 customers to welcome MANOPAVANA into your kitchen.");
+                      setFestiveTitle("ಕನ್ನಡ ರಾಜ್ಯೋತ್ಸವದ ಶುಭಾಶಯಗಳು!");
+                      setFestiveBadge("ನಮ್ಮ ನಾಡಿನ ಅಪ್ಪಟ ಗಾಣ");
+                      setFestiveTagline("Authentic 100% Marachekku Wood-Pressed Cooking Oils • Direct from Karnataka Farmers to Your Home");
                       setFestiveBtnTextKannada("ಈಗಲೇ ಖರೀದಿಸಿ");
-                      setFestiveBtnTextEnglish("SHOP NOW (30% OFF)");
+                      setFestiveBtnTextEnglish("Flat 10% OFF Above ₹1,000");
                       setFestiveBtnLink("/#catalog");
                     }}
-                    className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-[#0B2E1B] text-[#F3D17A] border border-[#F3D17A]/40 hover:brightness-110 transition-colors cursor-pointer"
+                    className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-amber-500/20 text-[#5E3210] dark:text-amber-200 border border-amber-500/30 hover:bg-amber-500/30 transition-colors cursor-pointer"
                   >
-                    FIRST 25 KITCHENS (30% OFF)
+                    ಕನ್ನಡ ರಾಜ್ಯೋತ್ಸವ (Rajyotsava)
                   </button>
                   <button
                     type="button"
@@ -693,7 +693,7 @@ export const StorefrontCMSPanel: React.FC<{ isDark: boolean }> = ({ isDark }) =>
                     value={festiveTitle}
                     onChange={(e) => setFestiveTitle(e.target.value)}
                     className="w-full px-3 py-1.5 rounded-xl border border-stone-300 dark:border-stone-700 bg-transparent text-xs"
-                    placeholder="e.g. FIRST 25 KITCHENS"
+                    placeholder="e.g. ಕನ್ನಡ ರಾಜ್ಯೋತ್ಸವದ ಶುಭಾಶಯಗಳು!"
                   />
                 </div>
                 <div>

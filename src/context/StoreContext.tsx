@@ -10,8 +10,6 @@ import {
   Order,
   Product,
   StoreCMSConfig,
-  First25KitchensCampaign,
-  CampaignTier,
 } from "../types";
 import {
   BUSINESS_CONFIG,
@@ -45,16 +43,7 @@ import {
   extractCleanPhone,
   isSyntheticAccount,
   saveCustomerProfile,
-  DEFAULT_FIRST_25_CAMPAIGN,
-  subscribeFirst25Campaign,
-  processFirst25OrderTransaction,
-  resetFirst25Campaign,
-  updateFirst25CampaignSlots,
 } from "../firebase";
-import {
-  determineCampaignTier,
-  CampaignTierInfo,
-} from "../utils/campaignPricing";
 import { doc, setDoc, onSnapshot, serverTimestamp } from "firebase/firestore";
 import { sendOrderConfirmationEmail } from "../services/emailService";
 
@@ -72,16 +61,7 @@ interface StoreContextType {
   clearCart: () => void;
   cartCount: number;
   subtotal: number;
-  originalSubtotal: number;
-  campaignSavings: number;
   discount: number;
-  isFirstTimeCustomer: boolean;
-  campaign: First25KitchensCampaign;
-  campaignTierInfo: CampaignTierInfo;
-  successfulOrdersCount: number;
-  isFirst25KitchensMember: boolean;
-  resetCampaign: () => Promise<boolean>;
-  updateCampaignSlots: (claimedSlots: number) => Promise<boolean>;
   shippingFee: number;
   total: number;
   freeShippingProgress: number;
@@ -163,8 +143,8 @@ interface StoreContextType {
   toastMessage: string | null;
   showToast: (msg: string) => void;
 
-  themeMode: "light" | "dark" | "blend";
-  setThemeMode: (mode?: any) => void;
+  themeMode: "blend" | "light" | "dark";
+  setThemeMode: (mode: "blend" | "light" | "dark") => void;
 
   addProductReview: (reviewData: {
     productId: string;
@@ -191,22 +171,22 @@ const DEFAULT_ADDRESS: Address = {
 };
 
 const DEFAULT_CMS_CONFIG: StoreCMSConfig = {
-  announcementTicker: "FIRST 25 KITCHENS OFFER | FLAT 30% OFF YOUR FIRST ORDER",
+  announcementTicker: "FREE Doorstep Delivery across India on orders above ₹800 (or 2+ bottles) | 100% Marachekku Cold-Pressed",
   festiveBanner: {
     enabled: true,
-    title: "FIRST 25 KITCHENS",
-    badge: "30% OFF FIRST ORDER",
-    tagline: "YOUR KITCHEN DESERVES SOMETHING BETTER. FLAT 30% OFF ON YOUR FIRST ORDER",
-    btnTextKannada: "Shop Now",
-    btnTextEnglish: "FLAT 30% OFF",
+    title: "ಕನ್ನಡ ರಾಜ್ಯೋತ್ಸವದ ಶುಭಾಶಯಗಳು!",
+    badge: "ನಮ್ಮ ನಾಡಿನ ಅಪ್ಪಟ ಗಾಣ",
+    tagline: "Authentic 100% Marachekku Wood-Pressed Cooking Oils • Direct from Karnataka Farmers to Your Home",
+    btnTextKannada: "ಈಗಲೇ ಖರೀದಿಸಿ",
+    btnTextEnglish: "Flat 10% OFF Above ₹1,000",
     btnLink: "/#catalog",
   },
-  brandName: "MANOPAVANA",
+  brandName: BUSINESS_CONFIG.BRAND_NAME,
   heroHeadline: BUSINESS_CONFIG.HERO_HEADLINE,
   heroSubhead: BUSINESS_CONFIG.HERO_SUBHEAD,
   heroEyebrow: "⚜️ GOOD FOOD STARTS HERE",
   heroCtaPrimaryText: "Explore The Collection →",
-  brandTagline: "PURE BY NATURE, TRUSTED FOR LIFE.",
+  brandTagline: "Pure by nature, trusted for life",
   brandLogoUrl: MEDIA_ASSETS.logo,
 
   chekkuVideoUrl: MEDIA_ASSETS.heroVideo,
@@ -337,32 +317,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [customerProfile, setCustomerProfile] = useState<CustomerProfile | null>(null);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
   const [isLoginModalOpen, setLoginModalOpen] = useState(false);
-
-  // Real-time Firestore First 25 Kitchens Campaign State
-  const [campaign, setCampaign] = useState<First25KitchensCampaign>(DEFAULT_FIRST_25_CAMPAIGN);
-
-  useEffect(() => {
-    const unsub = subscribeFirst25Campaign((liveCampaign) => {
-      setCampaign(liveCampaign);
-    });
-    return () => unsub();
-  }, []);
-
-  const resetCampaign = async () => {
-    const ok = await resetFirst25Campaign(25);
-    if (ok) {
-      showToast("First 25 Kitchens campaign reset to 0 claimed slots.");
-    }
-    return ok;
-  };
-
-  const updateCampaignSlots = async (slots: number) => {
-    const ok = await updateFirst25CampaignSlots(slots, campaign.maxSlots || 25);
-    if (ok) {
-      showToast(`Campaign slots updated to ${slots} claimed.`);
-    }
-    return ok;
-  };
 
   const isCartInitializedRef = useRef(false);
   const currentUidRef = useRef<string | null>(null);
@@ -1477,11 +1431,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         : itemsToUse.reduce((acc, c) => acc + c.price * c.quantity, 0);
     const finalDiscount =
       target?.discount ??
-      (campaignTierInfo.tier === "COHORT_ORDER_2_20"
-        ? Math.round((finalSubtotal * 20) / 100)
-        : campaignTierInfo.tier === "COHORT_ORDER_3_10"
-        ? Math.round((finalSubtotal * 10) / 100)
-        : 0);
+      (loyalty.isActive && finalSubtotal >= 1000 ? Math.round((finalSubtotal * loyalty.discountPercent) / 100) : 0);
     const finalShipping =
       target?.shippingFee ??
       (finalSubtotal - finalDiscount >= cmsConfig.freeShippingThreshold ? 0 : cmsConfig.standardShippingFee);
@@ -1859,21 +1809,24 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     "terms" | "shipping" | "returns" | "privacy" | null
   >(null);
 
-  const [themeMode] = useState<"light" | "dark" | "blend">("light");
-
-  const setThemeMode = (_mode?: any) => {
+  const [themeMode, setThemeModeState] = useState<"blend" | "light" | "dark">(() => {
     try {
-      localStorage.setItem("manopavana_theme_mode", "light");
+      const saved = localStorage.getItem("manopavana_theme_mode");
+      if (saved === "blend" || saved === "light" || saved === "dark") {
+        return saved;
+      }
+      return "blend";
+    } catch {
+      return "blend";
+    }
+  });
+
+  const setThemeMode = (mode: "blend" | "light" | "dark") => {
+    setThemeModeState(mode);
+    try {
+      localStorage.setItem("manopavana_theme_mode", mode);
     } catch {}
   };
-
-  useEffect(() => {
-    try {
-      localStorage.setItem("manopavana_theme_mode", "light");
-      document.documentElement.classList.remove("dark");
-      document.documentElement.setAttribute("data-theme", "light");
-    } catch {}
-  }, []);
 
   const addToCart = (item: Omit<CartItem, "quantity">, qty = 1) => {
     lastLocalCartMutationTimeRef.current = Date.now();
@@ -1976,101 +1929,21 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   };
 
-  const successfulOrdersCount = useMemo(() => {
-    if (!currentUser) return 0;
-    const verifiedOrders = orders.filter(
-      (o) => o.orderStatus !== "Cancelled" && o.orderStatus !== "Failed (Expired)"
-    );
-    const profileCount = customerProfile?.successfulOrdersCount;
-    if (typeof profileCount === "number" && profileCount >= 0) {
-      return Math.max(profileCount, verifiedOrders.length);
-    }
-    return verifiedOrders.length;
-  }, [currentUser, customerProfile?.successfulOrdersCount, orders]);
-
-  const isFirst25KitchensMember = useMemo(() => {
-    if (!currentUser) return false;
-    if (customerProfile?.isFirst25KitchensMember) return true;
-    if (campaign?.enrolledCustomerUids && campaign.enrolledCustomerUids.includes(currentUser.uid)) {
-      return true;
-    }
-    return false;
-  }, [currentUser, customerProfile?.isFirst25KitchensMember, campaign?.enrolledCustomerUids]);
-
-  const campaignTierInfo = useMemo(() => {
-    return determineCampaignTier(
-      successfulOrdersCount,
-      campaign.claimedSlots,
-      isFirst25KitchensMember,
-      campaign.maxSlots
-    );
-  }, [successfulOrdersCount, campaign.claimedSlots, isFirst25KitchensMember, campaign.maxSlots]);
-
-  const isFirstTimeCustomer = useMemo(() => {
-    return campaignTierInfo.tier === "NEW_CUSTOMER_30";
-  }, [campaignTierInfo.tier]);
-
   const cartCount = useMemo(() => {
     return cart.reduce((acc, curr) => acc + curr.quantity, 0);
   }, [cart]);
 
-  const originalSubtotal = useMemo(() => {
-    return cart.reduce(
-      (acc, curr) =>
-        acc +
-        (curr.regularPrice && curr.regularPrice > 0 ? curr.regularPrice : curr.price) *
-          curr.quantity,
-      0
-    );
+  const subtotal = useMemo(() => {
+    return cart.reduce((acc, curr) => acc + curr.price * curr.quantity, 0);
   }, [cart]);
 
-  const subtotal = useMemo(() => {
-    if (campaignTierInfo.tier === "NEW_CUSTOMER_30") {
-      // 30% first order launch pricing
-      return cart.reduce((acc, curr) => {
-        const regular =
-          curr.regularPrice && curr.regularPrice > 0 ? curr.regularPrice : curr.price;
-        const offer =
-          curr.price && curr.price < regular ? curr.price : Math.round(regular * 0.7);
-        return acc + offer * curr.quantity;
-      }, 0);
-    }
-
-    // For Stage 2, 3, or 4: base subtotal is standard regular price
-    return cart.reduce((acc, curr) => {
-      const regular =
-        curr.regularPrice && curr.regularPrice > 0 ? curr.regularPrice : curr.price;
-      return acc + regular * curr.quantity;
-    }, 0);
-  }, [cart, campaignTierInfo.tier]);
-
   const discount = useMemo(() => {
-    // Stage 2: Order #2 (Cohort Member) -> 20% OFF subtotal
-    if (campaignTierInfo.tier === "COHORT_ORDER_2_20") {
-      return Math.round((subtotal * 20) / 100);
-    }
-
-    // Stage 3: Order #3 & Beyond (Cohort Member) -> 10% OFF subtotal
-    if (campaignTierInfo.tier === "COHORT_ORDER_3_10") {
+    // 10% discount automatically applies to all orders of ₹1,000 or above
+    if (subtotal >= 1000) {
       return Math.round((subtotal * 10) / 100);
     }
-
-    // Stage 1 (New Customer 30% first order) & Stage 4 (Unenrolled / Standard): No 10% on 1000
     return 0;
-  }, [subtotal, campaignTierInfo.tier]);
-
-  const campaignSavings = useMemo(() => {
-    if (campaignTierInfo.tier === "NEW_CUSTOMER_30") {
-      return Math.max(0, originalSubtotal - subtotal);
-    }
-    if (
-      campaignTierInfo.tier === "COHORT_ORDER_2_20" ||
-      campaignTierInfo.tier === "COHORT_ORDER_3_10"
-    ) {
-      return discount;
-    }
-    return Math.max(0, originalSubtotal - subtotal) + discount;
-  }, [campaignTierInfo.tier, originalSubtotal, subtotal, discount]);
+  }, [subtotal]);
 
   const discountedSubtotal = subtotal - discount;
 
@@ -2113,16 +1986,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         clearCart,
         cartCount,
         subtotal,
-        originalSubtotal,
-        campaignSavings,
         discount,
-        isFirstTimeCustomer,
-        campaign,
-        campaignTierInfo,
-        successfulOrdersCount,
-        isFirst25KitchensMember,
-        resetCampaign,
-        updateCampaignSlots,
         shippingFee,
         total,
         freeShippingProgress,

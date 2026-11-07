@@ -16,7 +16,6 @@ import {
 } from "lucide-react";
 import { useStore } from "../context/StoreContext";
 import { BUSINESS_CONFIG } from "../constants";
-import { CartKitchensBenefitCard } from "../components/campaign/CartKitchensBenefitCard";
 
 export const CartPage: React.FC = () => {
   const navigate = useNavigate();
@@ -26,11 +25,7 @@ export const CartPage: React.FC = () => {
     removeFromCart,
     clearCart,
     subtotal,
-    originalSubtotal,
-    campaignSavings,
     discount,
-    isFirstTimeCustomer,
-    campaignTierInfo,
     shippingFee,
     total,
     freeShippingProgress,
@@ -181,11 +176,6 @@ export const CartPage: React.FC = () => {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
           {/* Left Column: Cart Items */}
           <div className="lg:col-span-7 space-y-4">
-            {/* FIRST 25 KITCHENS BENEFIT BANNER */}
-            {campaignTierInfo.tier !== "STANDARD_PRICE_0" && (
-              <CartKitchensBenefitCard totalSavings={campaignSavings} />
-            )}
-
             {cart.map((item) => (
               <div
                 key={item.id}
@@ -217,10 +207,10 @@ export const CartPage: React.FC = () => {
                       <p className={`text-xs ${isDark ? "text-[#D6C4B0]" : "text-[#5C402D]"}`}>
                         {item.subtitle} • <span className="font-semibold">{item.variant}</span>
                       </p>
-                      <div className="flex items-baseline gap-2 pt-0.5 flex-wrap">
+                      <div className="flex items-baseline gap-2 pt-0.5">
                         <span
                           className={`text-sm font-extrabold ${
-                            isDark ? "text-amber-300" : "text-[#0B2E1B]"
+                            isDark ? "text-amber-300" : "text-[#C8751B]"
                           }`}
                         >
                           ₹{item.price}
@@ -230,11 +220,6 @@ export const CartPage: React.FC = () => {
                             className="text-xs line-through text-[#8C7A6B]"
                           >
                             ₹{item.regularPrice}
-                          </span>
-                        )}
-                        {item.regularPrice > item.price && (
-                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-black bg-[#0B2E1B] text-[#F3D17A]">
-                            SAVE ₹{item.regularPrice - item.price} (30% OFF)
                           </span>
                         )}
                         <span className="text-[10px] text-emerald-600 font-semibold">
@@ -328,91 +313,53 @@ export const CartPage: React.FC = () => {
               </div>
             ))}
 
-            {/* Promotional Offer Status Card */}
-            {campaignTierInfo.tier === "NEW_CUSTOMER_30" ? (
-              <div
-                className={`p-4 rounded-2xl border flex items-center justify-between gap-4 ${
-                  isDark
-                    ? "bg-[#0B2E1B]/30 border-[#1B5E20] text-[#E8F5E9]"
-                    : "bg-[#0B2E1B]/5 border-[#0B2E1B]/20 text-[#0B2E1B]"
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <Sparkles className="w-5 h-5 text-[#C8751B] shrink-0" />
-                  <div>
-                    <p className="text-xs font-black text-[#0B2E1B] dark:text-[#F3D17A]">
-                      🎉 FIRST 25 KITCHENS BENEFIT APPLIED
-                    </p>
-                    <p
-                      className={`text-[11px] font-medium ${
-                        isDark ? "text-[#D6C4B0]" : "text-[#5C402D]"
-                      }`}
-                    >
-                      {campaignSavings > 0
-                        ? `You are saving ₹${campaignSavings} with flat 30% OFF on your first order. Complete purchase to unlock your returning reward!`
-                        : "Flat 30% OFF applied on all 1L bottles for your first order."}
-                    </p>
-                  </div>
+            {/* 10% Discount on Orders Above ₹1,000 Card */}
+            <div
+              className={`p-4 rounded-2xl border flex items-center justify-between gap-4 ${
+                subtotal >= 1000
+                  ? "bg-emerald-500/10 border-emerald-500/30"
+                  : isDark
+                  ? "bg-[#1C120B] border-[#362114]"
+                  : "bg-amber-50/90 border border-amber-200"
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <Sparkles className="w-5 h-5 text-[#E08F35] shrink-0" />
+                <div>
+                  <p
+                    className={`text-xs font-black ${
+                      subtotal >= 1000
+                        ? "text-emerald-800 dark:text-emerald-400"
+                        : isDark
+                        ? "text-amber-200"
+                        : "text-[#5A381E]"
+                    }`}
+                  >
+                    {subtotal >= 1000
+                      ? "🎉 10% Discount Unlocked!"
+                      : "Get 10% OFF on Orders Above ₹1,000"}
+                  </p>
+                  <p
+                    className={`text-[11px] font-medium ${
+                      isDark ? "text-[#D6C4B0]" : "text-[#5C402D]"
+                    }`}
+                  >
+                    {subtotal >= 1000
+                      ? `Flat 10% discount (-₹${discount}) automatically deducted from your total.`
+                      : `Add ₹${1000 - subtotal} more of wood-pressed oils to unlock 10% instant savings!`}
+                  </p>
                 </div>
-                <span className="text-xs font-black text-[#0B2E1B] bg-[#F3D17A] px-3 py-1 rounded-xl shrink-0 shadow-xs">
-                  30% OFF
-                </span>
               </div>
-            ) : campaignTierInfo.tier === "COHORT_ORDER_2_20" ? (
-              <div
-                className={`p-4 rounded-2xl border flex items-center justify-between gap-4 ${
-                  isDark
-                    ? "bg-[#0B2E1B]/30 border-[#1B5E20] text-[#E8F5E9]"
-                    : "bg-[#0B2E1B]/5 border-[#0B2E1B]/20 text-[#0B2E1B]"
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <Sparkles className="w-5 h-5 text-[#C8751B] shrink-0" />
-                  <div>
-                    <p className="text-xs font-black text-[#0B2E1B] dark:text-[#F3D17A]">
-                      🎉 FIRST 25 REWARD: 20% OFF YOUR 2ND ORDER
-                    </p>
-                    <p
-                      className={`text-[11px] font-medium ${
-                        isDark ? "text-[#D6C4B0]" : "text-[#5C402D]"
-                      }`}
-                    >
-                      Welcome back! Flat 20% OFF (-₹{discount}) is automatically deducted from your cart subtotal.
-                    </p>
-                  </div>
-                </div>
-                <span className="text-xs font-black text-[#0B2E1B] bg-[#F3D17A] px-3 py-1 rounded-xl shrink-0 shadow-xs">
-                  20% OFF
+              {subtotal >= 1000 ? (
+                <span className="text-xs font-black text-emerald-800 bg-emerald-100 dark:bg-emerald-950/60 dark:text-emerald-300 px-3 py-1 rounded-xl shrink-0 border border-emerald-400">
+                  10% APPLIED
                 </span>
-              </div>
-            ) : campaignTierInfo.tier === "COHORT_ORDER_3_10" ? (
-              <div
-                className={`p-4 rounded-2xl border flex items-center justify-between gap-4 ${
-                  isDark
-                    ? "bg-[#0B2E1B]/30 border-[#1B5E20] text-[#E8F5E9]"
-                    : "bg-[#0B2E1B]/5 border-[#0B2E1B]/20 text-[#0B2E1B]"
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <Sparkles className="w-5 h-5 text-[#C8751B] shrink-0" />
-                  <div>
-                    <p className="text-xs font-black text-[#0B2E1B] dark:text-[#F3D17A]">
-                      🎉 LOYAL KITCHEN PRIVILEGE: 10% OFF
-                    </p>
-                    <p
-                      className={`text-[11px] font-medium ${
-                        isDark ? "text-[#D6C4B0]" : "text-[#5C402D]"
-                      }`}
-                    >
-                      Flat 10% OFF (-₹{discount}) applied automatically for life as a founding First 25 Kitchens member.
-                    </p>
-                  </div>
-                </div>
-                <span className="text-xs font-black text-[#0B2E1B] bg-[#F3D17A] px-3 py-1 rounded-xl shrink-0 shadow-xs">
-                  10% OFF
+              ) : (
+                <span className="text-[11px] font-black text-amber-900 bg-amber-100 dark:bg-amber-950/60 dark:text-amber-300 px-3 py-1 rounded-xl shrink-0 border border-amber-400">
+                  Min ₹1,000
                 </span>
-              </div>
-            ) : null}
+              )}
+            </div>
           </div>
 
           {/* Right Column: Price Breakdown & Checkout Action */}
@@ -433,93 +380,36 @@ export const CartPage: React.FC = () => {
               </h2>
 
               <div className="space-y-2.5 text-xs">
-                {campaignTierInfo.tier === "NEW_CUSTOMER_30" ? (
-                  <>
-                    <div
-                      className={`flex items-center justify-between ${
-                        isDark ? "text-[#D6C4B0]" : "text-[#5C402D]"
-                      }`}
-                    >
-                      <span>Original Subtotal</span>
-                      <span className="line-through text-stone-500 font-medium">
-                        ₹{originalSubtotal}
-                      </span>
-                    </div>
+                <div
+                  className={`flex items-center justify-between ${
+                    isDark ? "text-[#D6C4B0]" : "text-[#5C402D]"
+                  }`}
+                >
+                  <span>Items Subtotal</span>
+                  <span
+                    className={`font-bold ${
+                      isDark ? "text-[#FAF4EA]" : "text-[#23150C]"
+                    }`}
+                  >
+                    ₹{subtotal}
+                  </span>
+                </div>
 
-                    <div className="flex items-center justify-between text-[#0B2E1B] dark:text-[#F3D17A] font-bold">
-                      <span className="flex items-center gap-1">
-                        <Sparkles className="w-3.5 h-3.5 text-[#C8751B]" />
-                        <span>First 25 Kitchens Benefit (30% OFF)</span>
-                      </span>
-                      <span className="font-extrabold">-₹{campaignSavings}</span>
-                    </div>
+                {subtotal >= 1000 && (
+                  <div className="flex items-center justify-between text-emerald-600 font-bold">
+                    <span className="flex items-center gap-1">
+                      <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                      <span>10% Order Discount (Orders &gt; ₹1,000)</span>
+                    </span>
+                    <span className="font-bold">-₹{discount}</span>
+                  </div>
+                )}
 
-                    <div
-                      className={`flex items-center justify-between font-bold ${
-                        isDark ? "text-[#FAF4EA]" : "text-[#23150C]"
-                      }`}
-                    >
-                      <span>Offer Subtotal</span>
-                      <span className="font-extrabold text-sm">
-                        ₹{subtotal}
-                      </span>
-                    </div>
-                  </>
-                ) : campaignTierInfo.tier === "COHORT_ORDER_2_20" ? (
-                  <>
-                    <div
-                      className={`flex items-center justify-between ${
-                        isDark ? "text-[#D6C4B0]" : "text-[#5C402D]"
-                      }`}
-                    >
-                      <span>Order Subtotal</span>
-                      <span className="font-bold">₹{subtotal}</span>
-                    </div>
-
-                    <div className="flex items-center justify-between text-emerald-600 dark:text-[#F3D17A] font-bold">
-                      <span className="flex items-center gap-1">
-                        <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-                        <span>First 25 Reward: 20% OFF 2nd Order</span>
-                      </span>
-                      <span className="font-extrabold">-₹{discount}</span>
-                    </div>
-                  </>
-                ) : campaignTierInfo.tier === "COHORT_ORDER_3_10" ? (
-                  <>
-                    <div
-                      className={`flex items-center justify-between ${
-                        isDark ? "text-[#D6C4B0]" : "text-[#5C402D]"
-                      }`}
-                    >
-                      <span>Order Subtotal</span>
-                      <span className="font-bold">₹{subtotal}</span>
-                    </div>
-
-                    <div className="flex items-center justify-between text-emerald-600 dark:text-[#F3D17A] font-bold">
-                      <span className="flex items-center gap-1">
-                        <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-                        <span>Loyal Kitchen Privilege: 10% OFF</span>
-                      </span>
-                      <span className="font-extrabold">-₹{discount}</span>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div
-                      className={`flex items-center justify-between ${
-                        isDark ? "text-[#D6C4B0]" : "text-[#5C402D]"
-                      }`}
-                    >
-                      <span>Items Subtotal</span>
-                      <span
-                        className={`font-bold ${
-                          isDark ? "text-[#FAF4EA]" : "text-[#23150C]"
-                        }`}
-                      >
-                        ₹{subtotal}
-                      </span>
-                    </div>
-                  </>
+                {subtotal < 1000 && (
+                  <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-[11px] text-amber-900 dark:text-amber-200 flex items-center justify-between font-bold">
+                    <span>Add ₹{1000 - subtotal} more to get 10% OFF</span>
+                    <span className="font-black text-amber-700">Orders &gt; ₹1000</span>
+                  </div>
                 )}
 
                 <div
