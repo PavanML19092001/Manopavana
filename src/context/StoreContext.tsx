@@ -61,7 +61,10 @@ interface StoreContextType {
   clearCart: () => void;
   cartCount: number;
   subtotal: number;
+  originalSubtotal: number;
+  campaignSavings: number;
   discount: number;
+  isFirstTimeCustomer: boolean;
   shippingFee: number;
   total: number;
   freeShippingProgress: number;
@@ -143,8 +146,8 @@ interface StoreContextType {
   toastMessage: string | null;
   showToast: (msg: string) => void;
 
-  themeMode: "blend" | "light" | "dark";
-  setThemeMode: (mode: "blend" | "light" | "dark") => void;
+  themeMode: "light" | "dark" | "blend";
+  setThemeMode: (mode?: any) => void;
 
   addProductReview: (reviewData: {
     productId: string;
@@ -171,22 +174,22 @@ const DEFAULT_ADDRESS: Address = {
 };
 
 const DEFAULT_CMS_CONFIG: StoreCMSConfig = {
-  announcementTicker: "FREE Doorstep Delivery across India on orders above ₹800 (or 2+ bottles) | 100% Marachekku Cold-Pressed",
+  announcementTicker: "FIRST 25 KITCHENS OFFER | FLAT 30% OFF YOUR FIRST ORDER",
   festiveBanner: {
     enabled: true,
-    title: "ಕನ್ನಡ ರಾಜ್ಯೋತ್ಸವದ ಶುಭಾಶಯಗಳು!",
-    badge: "ನಮ್ಮ ನಾಡಿನ ಅಪ್ಪಟ ಗಾಣ",
-    tagline: "Authentic 100% Marachekku Wood-Pressed Cooking Oils • Direct from Karnataka Farmers to Your Home",
-    btnTextKannada: "ಈಗಲೇ ಖರೀದಿಸಿ",
-    btnTextEnglish: "Flat 10% OFF Above ₹1,000",
+    title: "FIRST 25 KITCHENS",
+    badge: "30% OFF FIRST ORDER",
+    tagline: "YOUR KITCHEN DESERVES SOMETHING BETTER. FLAT 30% OFF ON YOUR FIRST ORDER",
+    btnTextKannada: "Shop Now",
+    btnTextEnglish: "FLAT 30% OFF",
     btnLink: "/#catalog",
   },
-  brandName: BUSINESS_CONFIG.BRAND_NAME,
+  brandName: "MANOPAVANA",
   heroHeadline: BUSINESS_CONFIG.HERO_HEADLINE,
   heroSubhead: BUSINESS_CONFIG.HERO_SUBHEAD,
   heroEyebrow: "⚜️ GOOD FOOD STARTS HERE",
   heroCtaPrimaryText: "Explore The Collection →",
-  brandTagline: "Pure by nature, trusted for life",
+  brandTagline: "PURE BY NATURE, TRUSTED FOR LIFE.",
   brandLogoUrl: MEDIA_ASSETS.logo,
 
   chekkuVideoUrl: MEDIA_ASSETS.heroVideo,
@@ -1809,24 +1812,21 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     "terms" | "shipping" | "returns" | "privacy" | null
   >(null);
 
-  const [themeMode, setThemeModeState] = useState<"blend" | "light" | "dark">(() => {
-    try {
-      const saved = localStorage.getItem("manopavana_theme_mode");
-      if (saved === "blend" || saved === "light" || saved === "dark") {
-        return saved;
-      }
-      return "blend";
-    } catch {
-      return "blend";
-    }
-  });
+  const [themeMode] = useState<"light" | "dark" | "blend">("light");
 
-  const setThemeMode = (mode: "blend" | "light" | "dark") => {
-    setThemeModeState(mode);
+  const setThemeMode = (_mode?: any) => {
     try {
-      localStorage.setItem("manopavana_theme_mode", mode);
+      localStorage.setItem("manopavana_theme_mode", "light");
     } catch {}
   };
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("manopavana_theme_mode", "light");
+      document.documentElement.classList.remove("dark");
+      document.documentElement.setAttribute("data-theme", "light");
+    } catch {}
+  }, []);
 
   const addToCart = (item: Omit<CartItem, "quantity">, qty = 1) => {
     lastLocalCartMutationTimeRef.current = Date.now();
@@ -1933,17 +1933,37 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return cart.reduce((acc, curr) => acc + curr.quantity, 0);
   }, [cart]);
 
+  const originalSubtotal = useMemo(() => {
+    return cart.reduce(
+      (acc, curr) => acc + (curr.regularPrice && curr.regularPrice > curr.price ? curr.regularPrice : curr.price) * curr.quantity,
+      0
+    );
+  }, [cart]);
+
   const subtotal = useMemo(() => {
     return cart.reduce((acc, curr) => acc + curr.price * curr.quantity, 0);
   }, [cart]);
 
+  const isFirstTimeCustomer = useMemo(() => {
+    if (!currentUser) return true;
+    return orders.length === 0;
+  }, [currentUser, orders.length]);
+
+  const campaignSavings = useMemo(() => {
+    return Math.max(0, originalSubtotal - subtotal);
+  }, [originalSubtotal, subtotal]);
+
   const discount = useMemo(() => {
-    // 10% discount automatically applies to all orders of ₹1,000 or above
+    // If the customer already has 30% First 25 Kitchens discount applied, do not stack 10% discount
+    if (isFirstTimeCustomer && campaignSavings > 0) {
+      return 0;
+    }
+    // Standard 10% discount automatically applies to orders of ₹1,000 or above for returning/non-campaign orders
     if (subtotal >= 1000) {
       return Math.round((subtotal * 10) / 100);
     }
     return 0;
-  }, [subtotal]);
+  }, [subtotal, isFirstTimeCustomer, campaignSavings]);
 
   const discountedSubtotal = subtotal - discount;
 
@@ -1986,7 +2006,10 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         clearCart,
         cartCount,
         subtotal,
+        originalSubtotal,
+        campaignSavings,
         discount,
+        isFirstTimeCustomer,
         shippingFee,
         total,
         freeShippingProgress,

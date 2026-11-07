@@ -39,6 +39,10 @@ import {
   THEMED_PRODUCT_IMAGES,
 } from "../constants";
 import { BottleVolume, Product } from "../types";
+import { First25KitchensBanner } from "../components/campaign/First25KitchensBanner";
+import { ProductOfferPriceBlock } from "../components/campaign/ProductOfferPriceBlock";
+import { NextOrderRewardSection } from "../components/campaign/NextOrderRewardSection";
+import { getProductCampaignPricing } from "../utils/campaignPricing";
 
 export const HomePage: React.FC = () => {
   const navigate = useNavigate();
@@ -58,6 +62,7 @@ export const HomePage: React.FC = () => {
     reviews,
     submitReview,
     deleteReview,
+    isFirstTimeCustomer,
     currentUser,
     setLoginModalOpen,
     themeMode,
@@ -131,24 +136,22 @@ export const HomePage: React.FC = () => {
 
   const handleQuickAdd = (product: Product) => {
     const variant = selectedVariants[product.id] || "1L";
-    const price = product.prices[variant];
-    const mrp = product.mrp[variant];
+    const pricing = getProductCampaignPricing(product.id, variant, product.prices[variant], isFirstTimeCustomer);
     addToCart({
       id: `${product.id}-${variant}`,
       productId: product.id,
       title: product.name,
       subtitle: `Marachekku Pure • ${variant}`,
       variant,
-      price,
-      regularPrice: mrp,
+      price: pricing.offerPrice,
+      regularPrice: pricing.originalPrice,
       image: THEMED_PRODUCT_IMAGES[product.id]?.light || product.images[0] || product.labelImage,
     });
   };
 
   const handleBuyNow = (product: Product) => {
     const variant = selectedVariants[product.id] || "1L";
-    const price = product.prices[variant];
-    const mrp = product.mrp[variant];
+    const pricing = getProductCampaignPricing(product.id, variant, product.prices[variant], isFirstTimeCustomer);
     const image = THEMED_PRODUCT_IMAGES[product.id]?.light || product.images[0] || product.labelImage;
     startBuyNow(
       {
@@ -157,8 +160,8 @@ export const HomePage: React.FC = () => {
         title: product.name,
         subtitle: `Marachekku Pure • ${variant}`,
         variant,
-        price,
-        regularPrice: mrp,
+        price: pricing.offerPrice,
+        regularPrice: pricing.originalPrice,
         image,
       },
       1
@@ -200,50 +203,8 @@ export const HomePage: React.FC = () => {
 
   return (
     <div className="w-full max-w-full overflow-x-hidden flex flex-col box-border">
-      {/* KANNADA PRIDE / FESTIVE OCCASION CELEBRATION BRAND BANNER */}
-      {cmsConfig?.festiveBanner?.enabled !== false && (
-        <section
-          className={`w-full relative shadow-xs border-b transition-colors overflow-hidden ${
-            isDark
-              ? "bg-gradient-to-r from-[#1A0E08] via-[#2A160A] to-[#1A0E08] border-amber-900/40 text-[#FAF4EA]"
-              : "bg-gradient-to-r from-[#F6EEDF] via-[#EFE2CC] to-[#F6EEDF] border-[#E3D3BA] text-[#24140A]"
-          }`}
-        >
-          <div className="max-w-7xl mx-auto py-2 sm:py-2.5 px-4 sm:px-6 relative z-10 flex items-center justify-between gap-3">
-            <div className="flex items-center gap-3 min-w-0">
-              {/* Karnataka Flag Emblem on the Left */}
-              <div
-                title="ಕನ್ನಡ ಧ್ವಜ (Karnataka Flag)"
-                className={`relative w-9 h-6 sm:w-10 sm:h-6.5 rounded-sm overflow-hidden border shadow-xs shrink-0 flex flex-col group transform hover:scale-105 transition-transform ${
-                  isDark ? "border-amber-400/80" : "border-amber-500/70"
-                }`}
-              >
-                <div className="w-full h-1/2 bg-[#FFD700]" />
-                <div className="w-full h-1/2 bg-[#DC2626]" />
-              </div>
-
-              {/* One Main Line & One Tagline Only */}
-              <div className="min-w-0">
-                <h3
-                  className={`font-bold text-xs sm:text-sm font-serif tracking-wide truncate ${
-                    isDark ? "text-amber-300" : "text-[#3B1E08]"
-                  }`}
-                >
-                  {cmsConfig?.festiveBanner?.title || "ಕನ್ನಡ ರಾಜ್ಯೋತ್ಸವದ ಶುಭಾಶಯಗಳು!"}
-                </h3>
-                <p
-                  className={`text-[11px] sm:text-xs font-medium leading-tight truncate ${
-                    isDark ? "text-amber-100/90" : "text-[#6A472A]"
-                  }`}
-                >
-                  {cmsConfig?.festiveBanner?.tagline ||
-                    "Authentic 100% Marachekku Wood-Pressed Cooking Oils • Direct from Karnataka Farmers to Your Home"}
-                </p>
-              </div>
-            </div>
-          </div>
-        </section>
-      )}
+      {/* MANOPAVANA — FIRST 25 KITCHENS CAMPAIGN HERO BANNER */}
+      <First25KitchensBanner />
 
       {/* 1. HERO SECTION (SPLIT-SCREEN 2-COLUMN LAYOUT) */}
       <section
@@ -621,29 +582,18 @@ export const HomePage: React.FC = () => {
                         </div>
                       </div>
 
-                      {/* Honest Pricing */}
-                      <div className="pt-1 flex items-baseline justify-between">
-                        <div>
-                          <div className="flex items-baseline gap-1.5">
-                            <span
-                              className={`text-2xl font-black font-serif ${
-                                isDark ? "text-[#FAF4EA]" : "text-[#1F120A]"
-                              }`}
-                            >
-                              ₹{price}
-                            </span>
-                            <span
-                              className={`text-[11px] font-medium ${
-                                isDark ? "text-[#A89482]" : "text-[#6A523E]"
-                              }`}
-                            >
-                              (Inclusive of GST)
-                            </span>
-                          </div>
-                        </div>
+                      {/* First 25 Kitchens Promotional Pricing Hierarchy */}
+                      <div className="pt-1 flex items-start justify-between gap-2">
+                        <ProductOfferPriceBlock
+                          productId={product.id}
+                          variant={currentVolume}
+                          basePrice={price}
+                          isFirstTimeCustomer={isFirstTimeCustomer}
+                          isDark={isDark}
+                        />
                         <Link
                           to={`/product/${product.id}`}
-                          className="text-xs font-bold text-[#B86B14] hover:text-[#E08F35] transition-colors"
+                          className="text-xs font-bold text-[#0B2E1B] dark:text-[#F3D17A] hover:underline transition-colors shrink-0 pt-1"
                         >
                           Details →
                         </Link>
@@ -722,6 +672,9 @@ export const HomePage: React.FC = () => {
           </div>
         </div>
       </section>
+
+      {/* MANOPAVANA — FIRST 25 KITCHENS NEXT-ORDER REWARD SECTION */}
+      <NextOrderRewardSection />
 
       {/* 3. FUNCTIONAL BOTTLE PACKAGING SHOWCASE */}
       <section

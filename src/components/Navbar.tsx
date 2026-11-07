@@ -192,46 +192,32 @@ export const Navbar: React.FC = () => {
             : "bg-gradient-to-b from-[#25150C] via-[#1B0F08] to-[#140C07] text-[#FAF4EA] border-b border-[#D4A373]/30 shadow-2xl backdrop-blur-md"
         }`}
     >
-      {/* COMPACT TOP ANNOUNCEMENT TICKER */}
+      {/* PREMIUM PROMOTIONAL ANNOUNCEMENT BAR — FIRST 25 KITCHENS OFFER */}
       <div
-        className={`py-1 px-3 text-[11px] font-bold border-b tracking-wide flex items-center justify-between box-border transition-colors ${isLight
-            ? "bg-[#4D2811] text-[#FFE8BD] border-[#653517]"
-            : isDark
-              ? "bg-[#0A0503] text-[#F5BC51] border-[#2A160C]"
-              : "bg-[#0D0603] text-[#F5BC51] border-[#3D2212]"
-          }`}
+        className="w-full py-1.5 px-3 sm:px-4 bg-[#0B2E1B] border-b border-[#164E2E] text-[#FAF7F2] tracking-wide flex items-center justify-between box-border text-[10.5px] sm:text-xs font-bold transition-colors"
       >
-        <div className="flex items-center gap-1.5 truncate flex-1 justify-center sm:justify-start">
-          <Sparkles className="w-3.5 h-3.5 text-[#E08F35] shrink-0 animate-pulse" />
-          <span className="truncate">{cmsConfig.announcementTicker}</span>
-          <button
-            onClick={() => openLoyaltyQuiz()}
-            className="hidden md:inline-flex items-center gap-1 ml-2 text-[10px] bg-[#E08F35] text-[#140D09] font-black px-2 py-0.5 rounded-full hover:bg-amber-300 transition-colors cursor-pointer"
+        <div className="flex items-center justify-center sm:justify-start flex-1 min-w-0 flex-wrap gap-x-2 gap-y-0.5 text-center sm:text-left">
+          <span className="text-[#F3D17A] tracking-wider uppercase font-black shrink-0">
+            FIRST 25 KITCHENS OFFER
+          </span>
+          <span className="text-white/40 hidden sm:inline" aria-hidden="true">|</span>
+          <span className="text-[#FAF7F2] font-semibold">
+            FLAT 30% OFF YOUR FIRST ORDER
+          </span>
+          <a
+            href="/#catalog"
+            onClick={(e) => {
+              const target = document.getElementById("catalog");
+              if (target) {
+                e.preventDefault();
+                target.scrollIntoView({ behavior: "smooth" });
+              }
+            }}
+            className="inline-flex items-center font-black text-[#F3D17A] hover:text-white transition-colors underline underline-offset-2 shrink-0 cursor-pointer ml-1"
           >
-            Scan Bottle for 10% Off →
-          </button>
+            <span>SHOP NOW →</span>
+          </a>
         </div>
-
-        {/* Mobile Quick Theme Switcher Pill in Top Bar */}
-        <button
-          type="button"
-          onClick={() => {
-            const nextMode = themeMode === "blend" ? "light" : themeMode === "light" ? "dark" : "blend";
-            setThemeMode(nextMode);
-          }}
-          aria-label="Toggle theme mode"
-          className="md:hidden flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-white/10 hover:bg-white/20 transition-colors shrink-0 ml-2 cursor-pointer"
-          title={`Theme Mode: ${themeMode.toUpperCase()}`}
-        >
-          {themeMode === "blend" ? (
-            <Palette className="w-3 h-3 text-[#D49A37]" />
-          ) : themeMode === "light" ? (
-            <Sun className="w-3 h-3 text-amber-300" />
-          ) : (
-            <Moon className="w-3 h-3 text-amber-200" />
-          )}
-          <span className="capitalize">{themeMode}</span>
-        </button>
       </div>
 
       {/* STREAMLINED 2-ROW MOBILE HEADER (md:hidden) - FLIPKART STYLE */}
@@ -534,53 +520,6 @@ export const Navbar: React.FC = () => {
               {loyalty.isActive ? `10% Off (${loyaltyRemainingText || "Active"})` : "Bottle QR 10% Off"}
             </span>
           </button>
-
-          {/* Theme Selector (Blend / Light / Dark) */}
-          <div className={`flex items-center ${isLight ? "bg-[#FAF6EE] border-[#DDD0BF]" : "bg-[#24150C] border-[#5A3820]"
-            } border rounded-lg p-0.5 text-[11px] font-bold`}>
-            <button
-              type="button"
-              onClick={() => setThemeMode("blend")}
-              className={`px-2 py-1 rounded-md transition-all flex items-center gap-1 cursor-pointer ${themeMode === "blend"
-                  ? "bg-[#D49A37] text-[#140D09] shadow-xs"
-                  : isLight
-                    ? "text-[#7A5538] hover:text-[#1F120A]"
-                    : "text-[#D4A373] hover:text-[#FAF4EA]"
-                }`}
-              title="Harmonious Blend: Signature mixture of dark hero/combos & warm linen catalog"
-            >
-              <Palette className="w-3 h-3" />
-              <span className="hidden lg:inline">Blend</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setThemeMode("light")}
-              className={`px-2 py-1 rounded-md transition-all flex items-center gap-1 cursor-pointer ${themeMode === "light"
-                  ? "bg-[#D49A37] text-[#140D09] shadow-xs"
-                  : isLight
-                    ? "text-[#7A5538] hover:text-[#1F120A]"
-                    : "text-[#D4A373] hover:text-[#FAF4EA]"
-                }`}
-              title="Warm Light: Crisp ivory & cream parchment"
-            >
-              <Sun className="w-3 h-3" />
-              <span className="hidden lg:inline">Light</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setThemeMode("dark")}
-              className={`px-2 py-1 rounded-md transition-all flex items-center gap-1 cursor-pointer ${themeMode === "dark"
-                  ? "bg-[#D49A37] text-[#140D09] shadow-xs"
-                  : isLight
-                    ? "text-[#7A5538] hover:text-[#1F120A]"
-                    : "text-[#D4A373] hover:text-[#FAF4EA]"
-                }`}
-              title="Teakwood Dark: Midnight teakwood luxury"
-            >
-              <Moon className="w-3 h-3" />
-              <span className="hidden lg:inline">Dark</span>
-            </button>
-          </div>
 
           {/* Account / Login with Anchor Dropdown */}
           <div ref={desktopUserMenuRef} className="relative">

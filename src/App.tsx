@@ -260,15 +260,7 @@ export default function App() {
   // Dedicated Admin Header with Escape & Logout Options
   if (isStoreAdmin && !isPreviewStorefront) {
     return (
-      <div
-        className={`w-full max-w-full overflow-x-hidden min-h-screen flex flex-col font-['Outfit',sans-serif] box-border transition-colors duration-200 ${
-          themeMode === "dark"
-            ? "bg-[#140D09] text-[#FDF6EC]"
-            : themeMode === "light"
-            ? "bg-[#FAF7F2] text-[#24140A]"
-            : "bg-[#FAF6F0] text-[#24140A]"
-        }`}
-      >
+      <div className="w-full max-w-full overflow-x-hidden min-h-screen flex flex-col font-['Outfit',sans-serif] box-border bg-[#FAF7F2] text-[#24140A]">
         <ScrollToTop />
 
         {/* Global Admin Navigation Bar to prevent ever getting trapped */}
@@ -322,15 +314,7 @@ export default function App() {
   }
 
   return (
-    <div
-      className={`w-full max-w-full overflow-x-hidden min-h-screen flex flex-col font-['Outfit',sans-serif] box-border transition-colors duration-200 ${
-        themeMode === "dark"
-          ? "bg-[#140D09] text-[#FDF6EC]"
-          : themeMode === "light"
-          ? "bg-[#FAF7F2] text-[#24140A]"
-          : "bg-[#FAF6F0] text-[#24140A]"
-      }`}
-    >
+    <div className="w-full max-w-full overflow-x-hidden min-h-screen flex flex-col font-['Outfit',sans-serif] box-border bg-[#FAF7F2] text-[#24140A]">
       <ScrollToTop />
 
       {/* Admin Customer Storefront Preview Sticky Top Bar */}

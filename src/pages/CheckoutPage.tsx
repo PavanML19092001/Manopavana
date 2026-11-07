@@ -20,6 +20,7 @@ import {
   Loader2,
   Edit2,
   Trash2,
+  Sparkles,
 } from "lucide-react";
 import L from "leaflet";
 import { useStore, LabeledAddress } from "../context/StoreContext";
@@ -59,6 +60,7 @@ export const CheckoutPage: React.FC = () => {
     setLoginModalOpen,
     getOrder,
     currentUser,
+    isFirstTimeCustomer,
     themeMode,
   } = useStore();
 
@@ -69,10 +71,19 @@ export const CheckoutPage: React.FC = () => {
   const checkoutItems = isBuyNowMode && buyNowItem ? [buyNowItem] : cart;
 
   const checkoutSubtotal = checkoutItems.reduce((acc, curr) => acc + curr.price * curr.quantity, 0);
+  const checkoutOriginalSubtotal = checkoutItems.reduce(
+    (acc, curr) => acc + (curr.regularPrice || curr.price) * curr.quantity,
+    0
+  );
+  const checkoutCampaignSavings = checkoutOriginalSubtotal - checkoutSubtotal;
+
+  // Prevent duplicate discounting: first-order 30% benefit already applied; otherwise 10% for orders >= 1000
   const checkoutDiscount =
-    checkoutSubtotal >= 1000
-      ? Math.round((checkoutSubtotal * 10) / 100)
-      : 0;
+    isFirstTimeCustomer
+      ? 0
+      : checkoutSubtotal >= 1000
+        ? Math.round((checkoutSubtotal * 10) / 100)
+        : 0;
   const checkoutDiscountedSubtotal = checkoutSubtotal - checkoutDiscount;
   const checkoutBottleCount = checkoutItems.reduce((acc, curr) => acc + curr.quantity, 0);
   const freeThreshold = cmsConfig?.freeShippingThreshold || BUSINESS_CONFIG.FREE_SHIPPING_THRESHOLD;
@@ -1756,24 +1767,53 @@ export const CheckoutPage: React.FC = () => {
                         </p>
                       </div>
                     </div>
-                    <span className="font-extrabold text-[#E08F35]">
-                      ₹{item.price * item.quantity}
-                    </span>
+                    <div className="text-right">
+                      <span className="font-extrabold text-[#E08F35] block">
+                        ₹{item.price * item.quantity}
+                      </span>
+                      {item.regularPrice && item.regularPrice > item.price && (
+                        <span className="text-[10px] line-through text-stone-400">
+                          ₹{item.regularPrice * item.quantity}
+                        </span>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>
 
               {/* Price Breakdown */}
               <div className="space-y-2 pt-3 border-t border-stone-200 dark:border-stone-800 text-xs">
-                <div className="flex justify-between text-stone-500">
-                  <span>Items Subtotal:</span>
-                  <span>₹{checkoutSubtotal}</span>
-                </div>
-                {checkoutDiscount > 0 && (
-                  <div className="flex justify-between text-emerald-600 font-bold">
-                    <span>10% Discount (Orders &gt; ₹1,000):</span>
-                    <span>-₹{checkoutDiscount}</span>
-                  </div>
+                {isFirstTimeCustomer && checkoutCampaignSavings > 0 ? (
+                  <>
+                    <div className="flex justify-between text-stone-500">
+                      <span>Original Subtotal:</span>
+                      <span className="line-through">₹{checkoutOriginalSubtotal}</span>
+                    </div>
+                    <div className="flex justify-between text-[#0B2E1B] dark:text-[#F3D17A] font-bold">
+                      <span className="flex items-center gap-1">
+                        <Sparkles className="w-3.5 h-3.5 text-[#C8751B]" />
+                        <span>First 25 Kitchens Benefit (30% OFF):</span>
+                      </span>
+                      <span className="font-extrabold">-₹{checkoutCampaignSavings}</span>
+                    </div>
+                    <div className="flex justify-between font-bold text-stone-700 dark:text-stone-300">
+                      <span>Offer Subtotal:</span>
+                      <span>₹{checkoutSubtotal}</span>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="flex justify-between text-stone-500">
+                      <span>Items Subtotal:</span>
+                      <span>₹{checkoutSubtotal}</span>
+                    </div>
+                    {checkoutDiscount > 0 && (
+                      <div className="flex justify-between text-emerald-600 font-bold">
+                        <span>10% Discount (Orders &gt; ₹1,000):</span>
+                        <span>-₹{checkoutDiscount}</span>
+                      </div>
+                    )}
+                  </>
                 )}
                 <div className="flex justify-between text-stone-500">
                   <span>Doorstep Delivery:</span>

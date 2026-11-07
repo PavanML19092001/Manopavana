@@ -39,6 +39,65 @@ function saveWhatsAppConfig(cfg: Record<string, any>) {
   }
 }
 
+/**
+ * Genuine Code 128B Vector SVG Barcode Generator
+ * Emits pure vector SVG <rect fill="#000000"> elements that NEVER disappear during
+ * printing or browser "Save as PDF" downloads (unlike CSS background spans).
+ */
+function generateCode128SVG(text: string): string {
+  const clean = String(text || '').trim();
+  if (!clean) return '';
+  const CODE128_PATTERNS = [
+    "212222","222122","222221","121223","121322","131222","122213","122312","132212","221213",
+    "221312","231212","112232","122132","122231","113222","123122","123221","223211","221132",
+    "221231","213212","223112","312131","311222","321122","321221","312212","322112","322211",
+    "212123","212321","232121","111323","131123","131321","112313","132113","132311","211313",
+    "231113","231311","112133","112331","132131","113123","113321","133121","313121","211331",
+    "231131","213113","213311","213131","311123","311321","331121","312113","312311","332111",
+    "314111","221411","431111","111224","111422","121124","121421","141122","141221","112214",
+    "112412","122114","122411","142112","142211","241211","221114","413111","241112","134111",
+    "111242","121142","121241","114212","124112","124211","411212","421112","421211","212141",
+    "214121","412121","111143","111341","131141","114113","114311","411113","411311","113141",
+    "114131","311141","411131","211412","211214","211232","2331112"
+  ];
+  const START_B = 104;
+  const STOP = 106;
+
+  const codes = [START_B];
+  let checkSum = START_B;
+
+  for (let i = 0; i < clean.length; i++) {
+    const code = clean.charCodeAt(i) - 32;
+    if (code >= 0 && code <= 95) {
+      codes.push(code);
+      checkSum += code * (i + 1);
+    }
+  }
+
+  codes.push(checkSum % 103);
+  codes.push(STOP);
+
+  let patternStr = "";
+  for (const c of codes) {
+    patternStr += CODE128_PATTERNS[c] || "";
+  }
+
+  let rects = "";
+  let x = 6;
+  let isBar = true;
+  for (let i = 0; i < patternStr.length; i++) {
+    const w = parseInt(patternStr[i], 10) * 2;
+    if (isBar) {
+      rects += `<rect x="${x}" y="0" width="${w}" height="48" fill="#000000" style="fill:#000000 !important;" />`;
+    }
+    x += w;
+    isBar = !isBar;
+  }
+  const fullSvgWidth = x + 6;
+
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${fullSvgWidth} 48" width="100%" height="48" preserveAspectRatio="none" style="display:block;max-width:320px;height:48px;margin:0 auto;overflow:visible;">${rects}</svg>`;
+}
+
 export default defineConfig(() => {
   return {
     plugins: [
@@ -911,6 +970,7 @@ export default defineConfig(() => {
                 const paymentMode = (url.searchParams.get('payment') || 'PREPAID').toUpperCase();
                 const totalAmount = url.searchParams.get('amount') || '0';
                 const dateStr = new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+                const barcodeSvg = generateCode128SVG(waybill);
 
                 const labelHtml = `<!DOCTYPE html>
 <html lang="en">
@@ -918,12 +978,64 @@ export default defineConfig(() => {
   <meta charset="UTF-8">
   <title>Shadowfax Shipping Label - ${waybill}</title>
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f1f5f9; display: flex; flex-direction: column; align-items: center; padding: 20px; }
-    .no-print-bar { width: 100%; max-width: 420px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; background: #fff; padding: 12px 16px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.06); }
-    .btn { padding: 8px 16px; font-size: 13px; font-weight: 700; border-radius: 8px; border: none; cursor: pointer; }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+      color-adjust: exact !important;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #f1f5f9;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    }
+    .no-print-bar {
+      width: 100%;
+      max-width: 420px;
+      margin-bottom: 16px;
+      display: flex;
+      gap: 10px;
+      justify-content: space-between;
+      align-items: center;
+      background: #fff;
+      padding: 12px 16px;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+    }
+    .btn {
+      padding: 8px 16px;
+      font-size: 13px;
+      font-weight: 700;
+      border-radius: 8px;
+      border: none;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
     .btn-primary { background: #008040; color: #fff; }
-    .shipping-label { width: 100mm; min-height: 150mm; background: #fff; border: 2px solid #000; padding: 8mm 6mm; box-shadow: 0 10px 25px rgba(0,0,0,0.1); display: flex; flex-direction: column; justify-content: space-between; }
+    .btn-primary:hover { background: #006030; }
+    .btn-secondary { background: #e2e8f0; color: #334155; }
+    .shipping-label {
+      width: 100mm;
+      min-height: 150mm;
+      background: #fff;
+      border: 2px solid #000;
+      padding: 8mm 6mm;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    }
     .header-row { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #000; padding-bottom: 6px; }
     .brand-logo { font-size: 19px; font-weight: 900; color: #008040; }
     .brand-logo span { color: #84cc16; }
@@ -935,21 +1047,33 @@ export default defineConfig(() => {
     .hub-cell { flex: 1; padding: 6px 4px; text-align: right; }
     .hub-cell .mode { font-size: 14px; font-weight: 900; padding: 2px 4px; background: ${paymentMode === "COD" ? "#dc2626" : "#008040"}; color: #fff; border-radius: 3px; display: inline-block; }
     .barcode-section { text-align: center; padding: 8px 0 6px 0; border-bottom: 2px solid #000; }
-    .barcode-lines { height: 38px; display: flex; justify-content: center; gap: 1.5px; margin-bottom: 4px; }
-    .barcode-lines .b { background: #000; }
+    .barcode-svg-wrap { width: 100%; max-width: 320px; margin: 0 auto 4px auto; display: flex; justify-content: center; }
+    .barcode-svg-wrap svg { display: block; width: 100%; height: 48px; }
+    .barcode-svg-wrap svg rect { fill: #000000 !important; }
     .barcode-text { font-family: monospace; font-size: 14px; font-weight: 800; letter-spacing: 3px; }
     .address-section { padding: 8px 0; border-bottom: 2px solid #000; font-size: 11px; line-height: 1.35; }
     .shipper-section { padding: 6px 0; border-bottom: 1.5px dashed #000; font-size: 9.5px; line-height: 1.3; color: #1e293b; }
     .meta-table { width: 100%; border-collapse: collapse; font-size: 9.5px; margin-top: 6px; }
     .meta-table td { padding: 3px 2px; border-bottom: 1px solid #cbd5e1; }
     .footer-stamp { margin-top: 6px; display: flex; justify-content: space-between; font-size: 8px; font-weight: 700; color: #64748b; }
-    @media print { body { background: #fff; padding: 0; } .no-print-bar { display: none !important; } .shipping-label { width: 100mm; height: 150mm; box-shadow: none; } @page { size: 100mm 150mm; margin: 0; } }
+    @media print {
+      * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+      body { background: #fff !important; padding: 0 !important; }
+      .no-print-bar { display: none !important; }
+      .shipping-label { width: 100mm !important; min-height: 150mm !important; border: 2px solid #000 !important; box-shadow: none !important; }
+      .barcode-svg-wrap svg { display: block !important; }
+      .barcode-svg-wrap svg rect { fill: #000000 !important; }
+      @page { size: 100mm 150mm; margin: 0; }
+    }
   </style>
 </head>
 <body>
   <div class="no-print-bar">
     <div style="font-size: 12px; font-weight: 700; color: #008040;">⚡ Shadowfax 360 Ready-To-Print Label</div>
-    <div><button class="btn btn-primary" onclick="window.print()">🖨️ Print Label / Save PDF</button></div>
+    <div style="display: flex; gap: 8px;">
+      <button class="btn btn-secondary" onclick="window.close()">Close</button>
+      <button class="btn btn-primary" onclick="window.print()">🖨️ Print Label / Save PDF</button>
+    </div>
   </div>
   <div class="shipping-label">
     <div class="header-row">
@@ -967,17 +1091,8 @@ export default defineConfig(() => {
       </div>
     </div>
     <div class="barcode-section">
-      <div class="barcode-lines">
-        <span class="b" style="width: 3px;"></span><span style="width: 2px;"></span>
-        <span class="b" style="width: 2px;"></span><span style="width: 3px;"></span>
-        <span class="b" style="width: 4px;"></span><span style="width: 2px;"></span>
-        <span class="b" style="width: 2px;"></span><span style="width: 1px;"></span>
-        <span class="b" style="width: 3px;"></span><span style="width: 2px;"></span>
-        <span class="b" style="width: 5px;"></span><span style="width: 2px;"></span>
-        <span class="b" style="width: 2px;"></span><span style="width: 3px;"></span>
-        <span class="b" style="width: 4px;"></span><span style="width: 1px;"></span>
-        <span class="b" style="width: 3px;"></span><span style="width: 2px;"></span>
-        <span class="b" style="width: 2px;"></span><span style="width: 3px;"></span>
+      <div class="barcode-svg-wrap">
+        ${barcodeSvg}
       </div>
       <div class="barcode-text">${waybill}</div>
     </div>
@@ -1007,6 +1122,361 @@ export default defineConfig(() => {
     </div>
   </div>
   <script>window.addEventListener('load', function() { setTimeout(function() { if (!window.location.search.includes('noprint')) window.print(); }, 400); });</script>
+</body>
+</html>`;
+                res.setHeader('Content-Type', 'text/html; charset=utf-8');
+                res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+                res.end(labelHtml);
+                return;
+              }
+
+              // 5b. Ekart Packing Slip
+              if (req.method === 'GET' && action === 'ekart_packing_slip') {
+                const waybill = url.searchParams.get('waybill') || '';
+                const orderRef = url.searchParams.get('orderRef') || waybill || 'ORD';
+                const custName = url.searchParams.get('name') || 'Valued Customer';
+                const custPhone = url.searchParams.get('phone') || '';
+                const custAddress = url.searchParams.get('address') || 'Customer Address';
+                const custCity = url.searchParams.get('city') || 'Bengaluru';
+                const custState = url.searchParams.get('state') || 'Karnataka';
+                const custPin = (url.searchParams.get('pincode') || '').replace(/\D/g, '').slice(0, 6) || '560001';
+                const paymentMode = (url.searchParams.get('payment') || 'PREPAID').toUpperCase();
+                const totalAmount = url.searchParams.get('amount') || '0';
+                const dateStr = new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+                const barcodeSvg = generateCode128SVG(waybill);
+
+                const labelHtml = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ekart Shipping Label - ${waybill}</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+      color-adjust: exact !important;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background: #f1f5f9;
+      color: #0f172a;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    }
+    .no-print-bar {
+      width: 100%;
+      max-width: 420px;
+      margin-bottom: 16px;
+      display: flex;
+      gap: 10px;
+      justify-content: space-between;
+      align-items: center;
+      background: #ffffff;
+      padding: 12px 16px;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+    }
+    .btn {
+      padding: 8px 16px;
+      font-size: 13px;
+      font-weight: 700;
+      border-radius: 8px;
+      border: none;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .btn-primary { background: #0284c7; color: #fff; }
+    .btn-primary:hover { background: #0369a1; }
+    .btn-secondary { background: #e2e8f0; color: #334155; }
+
+    /* Standard 4x6 inch (100mm x 150mm) Shipping Label Card */
+    .shipping-label {
+      width: 100mm;
+      min-height: 150mm;
+      background: #ffffff;
+      border: 2px solid #000;
+      padding: 8mm 6mm;
+      position: relative;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    }
+
+    /* Top Header */
+    .header-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 2px solid #000;
+      padding-bottom: 6px;
+    }
+    .brand-logo {
+      font-size: 20px;
+      font-weight: 900;
+      letter-spacing: -0.5px;
+      color: #000;
+    }
+    .brand-logo span { color: #0284c7; }
+    .service-tag {
+      font-size: 11px;
+      font-weight: 800;
+      border: 1.5px solid #000;
+      padding: 2px 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    /* Routing Pincode Box */
+    .routing-box {
+      display: flex;
+      border-bottom: 2px solid #000;
+      margin-top: 4px;
+    }
+    .dest-pin-cell {
+      flex: 1.4;
+      padding: 6px 4px;
+      border-right: 2px solid #000;
+    }
+    .dest-pin-cell .sub { font-size: 9px; font-weight: 700; text-transform: uppercase; color: #475569; }
+    .dest-pin-cell .pin { font-size: 26px; font-weight: 900; letter-spacing: 2px; }
+    .hub-cell {
+      flex: 1;
+      padding: 6px 4px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      text-align: right;
+    }
+    .hub-cell .mode {
+      font-size: 14px;
+      font-weight: 900;
+      padding: 2px 4px;
+      background: ${paymentMode === "COD" ? "#dc2626" : "#000"};
+      color: #fff;
+      display: inline-block;
+      align-self: flex-end;
+      border-radius: 3px;
+    }
+    .hub-cell .amt { font-size: 11px; font-weight: 800; margin-top: 2px; }
+
+    /* Barcode Section */
+    .barcode-section {
+      text-align: center;
+      padding: 8px 0 6px 0;
+      border-bottom: 2px solid #000;
+    }
+    .barcode-svg-wrap {
+      width: 100%;
+      max-width: 320px;
+      margin: 0 auto 4px auto;
+      display: flex;
+      justify-content: center;
+    }
+    .barcode-svg-wrap svg {
+      display: block;
+      width: 100%;
+      height: 48px;
+    }
+    .barcode-svg-wrap svg rect {
+      fill: #000000 !important;
+    }
+    .barcode-text {
+      font-family: monospace;
+      font-size: 14px;
+      font-weight: 800;
+      letter-spacing: 3px;
+    }
+
+    /* Ship To / Delivery Address */
+    .address-section {
+      padding: 8px 0;
+      border-bottom: 2px solid #000;
+      font-size: 11px;
+      line-height: 1.35;
+    }
+    .section-title {
+      font-size: 9px;
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #334155;
+      margin-bottom: 3px;
+    }
+    .consignee-name {
+      font-size: 13px;
+      font-weight: 900;
+      margin-bottom: 2px;
+    }
+    .consignee-phone {
+      font-weight: 800;
+      margin-top: 4px;
+    }
+
+    /* Shipper / Return Address */
+    .shipper-section {
+      padding: 6px 0;
+      border-bottom: 1.5px dashed #000;
+      font-size: 9.5px;
+      line-height: 1.3;
+      color: #1e293b;
+    }
+
+    /* Order & Item Meta Table */
+    .meta-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 9.5px;
+      margin-top: 6px;
+    }
+    .meta-table td {
+      padding: 3px 2px;
+      border-bottom: 1px solid #cbd5e1;
+    }
+    .meta-table td.label { font-weight: 700; color: #475569; width: 35%; }
+    .meta-table td.val { font-weight: 800; }
+
+    /* Footer Stamp */
+    .footer-stamp {
+      margin-top: 6px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      font-size: 8px;
+      font-weight: 700;
+      color: #64748b;
+    }
+
+    @media print {
+      * {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+      }
+      body { background: #fff !important; padding: 0 !important; }
+      .no-print-bar { display: none !important; }
+      .shipping-label {
+        width: 100mm !important;
+        min-height: 150mm !important;
+        border: 2px solid #000 !important;
+        box-shadow: none !important;
+        page-break-after: avoid !important;
+        page-break-inside: avoid !important;
+      }
+      .barcode-svg-wrap svg { display: block !important; }
+      .barcode-svg-wrap svg rect { fill: #000000 !important; }
+      @page {
+        size: 100mm 150mm;
+        margin: 0;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="no-print-bar">
+    <div style="font-size: 12px; font-weight: 700; color: #0284c7;">⚡ Ekart Ready-To-Print Label</div>
+    <div style="display: flex; gap: 8px;">
+      <button class="btn btn-secondary" onclick="window.close()">Close</button>
+      <button class="btn btn-primary" onclick="window.print()">🖨️ Print Label / Save PDF</button>
+    </div>
+  </div>
+
+  <div class="shipping-label">
+    <!-- Header -->
+    <div class="header-row">
+      <div class="brand-logo">e<span>kart</span> <span style="font-size: 11px; font-weight: 700; color: #000;">LOGISTICS</span></div>
+      <div class="service-tag">SURFACE EXPRESS</div>
+    </div>
+
+    <!-- Routing Pincode -->
+    <div class="routing-box">
+      <div class="dest-pin-cell">
+        <div class="sub">DESTINATION HUB PIN</div>
+        <div class="pin">${custPin}</div>
+      </div>
+      <div class="hub-cell">
+        <div class="mode">${paymentMode}</div>
+        <div class="amt">${paymentMode === "COD" ? "Collect: ₹" + totalAmount : "PAID ONLINE"}</div>
+      </div>
+    </div>
+
+    <!-- Real Vector Barcode -->
+    <div class="barcode-section">
+      <div class="barcode-svg-wrap">
+        ${barcodeSvg}
+      </div>
+      <div class="barcode-text">${waybill}</div>
+    </div>
+
+    <!-- Delivery Address -->
+    <div class="address-section">
+      <div class="section-title">DELIVER TO:</div>
+      <div class="consignee-name">${custName}</div>
+      <div>${custAddress}</div>
+      <div style="font-weight: 800; font-size: 12px; margin-top: 2px;">${custCity}, ${custState} - ${custPin}</div>
+      <div class="consignee-phone">Phone: +91 ${custPhone}</div>
+    </div>
+
+    <!-- Shipper Info -->
+    <div class="shipper-section">
+      <div class="section-title">RETURN & DISPATCH FACILITY:</div>
+      <div style="font-weight: 800;">Manopavana (Contact: Usha)</div>
+      <div>10A, Thigalarapalya Main Rd, Ragavendra Industrial Estate</div>
+      <div>Bengaluru, Karnataka - 560058 | Contact: +91 8970831829</div>
+    </div>
+
+    <!-- Manifest Meta -->
+    <table class="meta-table">
+      <tr>
+        <td class="label">Order Ref:</td>
+        <td class="val">${orderRef}</td>
+      </tr>
+      <tr>
+        <td class="label">Commodity:</td>
+        <td class="val">Wood-Pressed Healthy Cooking Oils</td>
+      </tr>
+      <tr>
+        <td class="label">Invoice Value:</td>
+        <td class="val">₹${totalAmount} (Taxes Paid)</td>
+      </tr>
+      <tr>
+        <td class="label">Manifest Date:</td>
+        <td class="val">${dateStr}</td>
+      </tr>
+      <tr>
+        <td class="label">Logistics Partner:</td>
+        <td class="val">Ekart Elite Surface B2C</td>
+      </tr>
+    </table>
+
+    <!-- Footer Stamp -->
+    <div class="footer-stamp">
+      <div>Ekart Elite B2C • Verified Dispatch</div>
+      <div>HUB: BENGALURU-560058</div>
+    </div>
+  </div>
+
+  <script>
+    // Auto-trigger native print dialog for 1-click thermal barcode printing
+    window.addEventListener('load', function() {
+      setTimeout(function() {
+        if (!window.location.search.includes('noprint')) {
+          window.print();
+        }
+      }, 400);
+    });
+  </script>
 </body>
 </html>`;
                 res.setHeader('Content-Type', 'text/html; charset=utf-8');

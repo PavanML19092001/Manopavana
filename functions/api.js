@@ -153,6 +153,65 @@ function jsonResponse(payload, status = 200) {
   });
 }
 
+/**
+ * Genuine Code 128B Vector SVG Barcode Generator
+ * Emits pure vector SVG <rect fill="#000000"> elements that NEVER disappear during
+ * printing or browser "Save as PDF" downloads (unlike CSS background spans).
+ */
+function generateCode128SVG(text) {
+  const clean = String(text || '').trim();
+  if (!clean) return '';
+  const CODE128_PATTERNS = [
+    "212222","222122","222221","121223","121322","131222","122213","122312","132212","221213",
+    "221312","231212","112232","122132","122231","113222","123122","123221","223211","221132",
+    "221231","213212","223112","312131","311222","321122","321221","312212","322112","322211",
+    "212123","212321","232121","111323","131123","131321","112313","132113","132311","211313",
+    "231113","231311","112133","112331","132131","113123","113321","133121","313121","211331",
+    "231131","213113","213311","213131","311123","311321","331121","312113","312311","332111",
+    "314111","221411","431111","111224","111422","121124","121421","141122","141221","112214",
+    "112412","122114","122411","142112","142211","241211","221114","413111","241112","134111",
+    "111242","121142","121241","114212","124112","124211","411212","421112","421211","212141",
+    "214121","412121","111143","111341","131141","114113","114311","411113","411311","113141",
+    "114131","311141","411131","211412","211214","211232","2331112"
+  ];
+  const START_B = 104;
+  const STOP = 106;
+
+  const codes = [START_B];
+  let checkSum = START_B;
+
+  for (let i = 0; i < clean.length; i++) {
+    const code = clean.charCodeAt(i) - 32;
+    if (code >= 0 && code <= 95) {
+      codes.push(code);
+      checkSum += code * (i + 1);
+    }
+  }
+
+  codes.push(checkSum % 103);
+  codes.push(STOP);
+
+  let patternStr = "";
+  for (const c of codes) {
+    patternStr += CODE128_PATTERNS[c] || "";
+  }
+
+  let rects = "";
+  let x = 6;
+  let isBar = true;
+  for (let i = 0; i < patternStr.length; i++) {
+    const w = parseInt(patternStr[i], 10) * 2;
+    if (isBar) {
+      rects += `<rect x="${x}" y="0" width="${w}" height="48" fill="#000000" style="fill:#000000 !important;" />`;
+    }
+    x += w;
+    isBar = !isBar;
+  }
+  const fullSvgWidth = x + 6;
+
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${fullSvgWidth} 48" width="100%" height="48" preserveAspectRatio="none" style="display:block;max-width:320px;height:48px;margin:0 auto;overflow:visible;">${rects}</svg>`;
+}
+
 export async function onRequest(context) {
   const { request, env } = context;
 
@@ -1478,6 +1537,8 @@ export async function onRequest(context) {
         year: "numeric",
       });
 
+      const barcodeSvg = generateCode128SVG(waybill);
+
       const labelHtml = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1485,7 +1546,14 @@ export async function onRequest(context) {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Ekart Shipping Label - ${waybill}</title>
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+      color-adjust: exact !important;
+    }
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
       background: #f1f5f9;
@@ -1494,6 +1562,8 @@ export async function onRequest(context) {
       flex-direction: column;
       align-items: center;
       padding: 20px;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
     }
     .no-print-bar {
       width: 100%;
@@ -1535,6 +1605,8 @@ export async function onRequest(context) {
       display: flex;
       flex-direction: column;
       justify-content: space-between;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
     }
 
     /* Top Header */
@@ -1600,15 +1672,21 @@ export async function onRequest(context) {
       padding: 8px 0 6px 0;
       border-bottom: 2px solid #000;
     }
-    .barcode-lines {
-      height: 38px;
+    .barcode-svg-wrap {
+      width: 100%;
+      max-width: 320px;
+      margin: 0 auto 4px auto;
       display: flex;
       justify-content: center;
-      align-items: stretch;
-      gap: 1.5px;
-      margin-bottom: 4px;
     }
-    .barcode-lines .b { background: #000; }
+    .barcode-svg-wrap svg {
+      display: block;
+      width: 100%;
+      height: 48px;
+    }
+    .barcode-svg-wrap svg rect {
+      fill: #000000 !important;
+    }
     .barcode-text {
       font-family: monospace;
       font-size: 14px;
@@ -1676,16 +1754,22 @@ export async function onRequest(context) {
     }
 
     @media print {
-      body { background: #fff; padding: 0; }
+      * {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+      }
+      body { background: #fff !important; padding: 0 !important; }
       .no-print-bar { display: none !important; }
       .shipping-label {
-        width: 100mm;
-        height: 150mm;
-        border: 2px solid #000;
-        box-shadow: none;
-        page-break-after: avoid;
-        page-break-inside: avoid;
+        width: 100mm !important;
+        min-height: 150mm !important;
+        border: 2px solid #000 !important;
+        box-shadow: none !important;
+        page-break-after: avoid !important;
+        page-break-inside: avoid !important;
       }
+      .barcode-svg-wrap svg { display: block !important; }
+      .barcode-svg-wrap svg rect { fill: #000000 !important; }
       @page {
         size: 100mm 150mm;
         margin: 0;
@@ -1721,29 +1805,10 @@ export async function onRequest(context) {
       </div>
     </div>
 
-    <!-- Barcode -->
+    <!-- Real Vector Barcode -->
     <div class="barcode-section">
-      <div class="barcode-lines" aria-label="Barcode">
-        <span class="b" style="width: 3px;"></span><span style="width: 2px;"></span>
-        <span class="b" style="width: 2px;"></span><span style="width: 3px;"></span>
-        <span class="b" style="width: 4px;"></span><span style="width: 2px;"></span>
-        <span class="b" style="width: 2px;"></span><span style="width: 1px;"></span>
-        <span class="b" style="width: 3px;"></span><span style="width: 2px;"></span>
-        <span class="b" style="width: 5px;"></span><span style="width: 2px;"></span>
-        <span class="b" style="width: 2px;"></span><span style="width: 3px;"></span>
-        <span class="b" style="width: 4px;"></span><span style="width: 1px;"></span>
-        <span class="b" style="width: 3px;"></span><span style="width: 2px;"></span>
-        <span class="b" style="width: 2px;"></span><span style="width: 3px;"></span>
-        <span class="b" style="width: 4px;"></span><span style="width: 2px;"></span>
-        <span class="b" style="width: 3px;"></span><span style="width: 1px;"></span>
-        <span class="b" style="width: 2px;"></span><span style="width: 3px;"></span>
-        <span class="b" style="width: 4px;"></span><span style="width: 2px;"></span>
-        <span class="b" style="width: 2px;"></span><span style="width: 1px;"></span>
-        <span class="b" style="width: 3px;"></span><span style="width: 2px;"></span>
-        <span class="b" style="width: 5px;"></span><span style="width: 3px;"></span>
-        <span class="b" style="width: 2px;"></span><span style="width: 2px;"></span>
-        <span class="b" style="width: 4px;"></span><span style="width: 1px;"></span>
-        <span class="b" style="width: 3px;"></span><span style="width: 2px;"></span>
+      <div class="barcode-svg-wrap">
+        ${barcodeSvg}
       </div>
       <div class="barcode-text">${waybill}</div>
     </div>
@@ -2088,6 +2153,8 @@ export async function onRequest(context) {
         year: "numeric",
       });
 
+      const barcodeSvg = generateCode128SVG(waybill);
+
       const labelHtml = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -2095,7 +2162,14 @@ export async function onRequest(context) {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Shadowfax Shipping Label - ${waybill}</title>
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+      color-adjust: exact !important;
+    }
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
       background: #f1f5f9;
@@ -2104,6 +2178,8 @@ export async function onRequest(context) {
       flex-direction: column;
       align-items: center;
       padding: 20px;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
     }
     .no-print-bar {
       width: 100%;
@@ -2144,6 +2220,8 @@ export async function onRequest(context) {
       display: flex;
       flex-direction: column;
       justify-content: space-between;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
     }
 
     .header-row {
@@ -2208,15 +2286,21 @@ export async function onRequest(context) {
       padding: 8px 0 6px 0;
       border-bottom: 2px solid #000;
     }
-    .barcode-lines {
-      height: 38px;
+    .barcode-svg-wrap {
+      width: 100%;
+      max-width: 320px;
+      margin: 0 auto 4px auto;
       display: flex;
       justify-content: center;
-      align-items: stretch;
-      gap: 1.5px;
-      margin-bottom: 4px;
     }
-    .barcode-lines .b { background: #000; }
+    .barcode-svg-wrap svg {
+      display: block;
+      width: 100%;
+      height: 48px;
+    }
+    .barcode-svg-wrap svg rect {
+      fill: #000000 !important;
+    }
     .barcode-text {
       font-family: monospace;
       font-size: 14px;
@@ -2280,16 +2364,22 @@ export async function onRequest(context) {
     }
 
     @media print {
-      body { background: #fff; padding: 0; }
+      * {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+      }
+      body { background: #fff !important; padding: 0 !important; }
       .no-print-bar { display: none !important; }
       .shipping-label {
-        width: 100mm;
-        height: 150mm;
-        border: 2px solid #000;
-        box-shadow: none;
-        page-break-after: avoid;
-        page-break-inside: avoid;
+        width: 100mm !important;
+        min-height: 150mm !important;
+        border: 2px solid #000 !important;
+        box-shadow: none !important;
+        page-break-after: avoid !important;
+        page-break-inside: avoid !important;
       }
+      .barcode-svg-wrap svg { display: block !important; }
+      .barcode-svg-wrap svg rect { fill: #000000 !important; }
       @page {
         size: 100mm 150mm;
         margin: 0;
@@ -2323,28 +2413,10 @@ export async function onRequest(context) {
       </div>
     </div>
 
+    <!-- Real Vector Barcode -->
     <div class="barcode-section">
-      <div class="barcode-lines" aria-label="Barcode">
-        <span class="b" style="width: 3px;"></span><span style="width: 2px;"></span>
-        <span class="b" style="width: 2px;"></span><span style="width: 3px;"></span>
-        <span class="b" style="width: 4px;"></span><span style="width: 2px;"></span>
-        <span class="b" style="width: 2px;"></span><span style="width: 1px;"></span>
-        <span class="b" style="width: 3px;"></span><span style="width: 2px;"></span>
-        <span class="b" style="width: 5px;"></span><span style="width: 2px;"></span>
-        <span class="b" style="width: 2px;"></span><span style="width: 3px;"></span>
-        <span class="b" style="width: 4px;"></span><span style="width: 1px;"></span>
-        <span class="b" style="width: 3px;"></span><span style="width: 2px;"></span>
-        <span class="b" style="width: 2px;"></span><span style="width: 3px;"></span>
-        <span class="b" style="width: 4px;"></span><span style="width: 2px;"></span>
-        <span class="b" style="width: 3px;"></span><span style="width: 1px;"></span>
-        <span class="b" style="width: 2px;"></span><span style="width: 3px;"></span>
-        <span class="b" style="width: 4px;"></span><span style="width: 2px;"></span>
-        <span class="b" style="width: 2px;"></span><span style="width: 1px;"></span>
-        <span class="b" style="width: 3px;"></span><span style="width: 2px;"></span>
-        <span class="b" style="width: 5px;"></span><span style="width: 3px;"></span>
-        <span class="b" style="width: 2px;"></span><span style="width: 2px;"></span>
-        <span class="b" style="width: 4px;"></span><span style="width: 1px;"></span>
-        <span class="b" style="width: 3px;"></span><span style="width: 2px;"></span>
+      <div class="barcode-svg-wrap">
+        ${barcodeSvg}
       </div>
       <div class="barcode-text">${waybill}</div>
     </div>

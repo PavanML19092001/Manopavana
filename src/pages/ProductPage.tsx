@@ -20,6 +20,8 @@ import {
 } from "lucide-react";
 import { useStore } from "../context/StoreContext";
 import { BottleVolume } from "../types";
+import { ProductOfferPriceBlock } from "../components/campaign/ProductOfferPriceBlock";
+import { getProductCampaignPricing } from "../utils/campaignPricing";
 
 export const ProductPage = () => {
   const { id } = useParams<Record<string, string | undefined>>();
@@ -38,6 +40,7 @@ export const ProductPage = () => {
     setLoginModalOpen,
     addProductReview,
     showToast,
+    isFirstTimeCustomer,
   } = useStore();
 
   const isDark = themeMode === "dark";
@@ -58,11 +61,16 @@ export const ProductPage = () => {
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
 
-  const price = product.prices[selectedVolume];
-  const mrp = product.mrp[selectedVolume];
+  const rawPrice = product.prices[selectedVolume];
+  const rawMrp = product.mrp[selectedVolume];
+  const pricing1L = getProductCampaignPricing(product.id, "1L", product.prices["1L"], isFirstTimeCustomer);
+  const pricing500ml = getProductCampaignPricing(product.id, "500ml", product.prices["500ml"], isFirstTimeCustomer);
+  const currentPricing = selectedVolume === "1L" ? pricing1L : pricing500ml;
+  const price = currentPricing.offerPrice;
+  const mrp = currentPricing.originalPrice;
   const inStock = product.inStock[selectedVolume];
-  const discountAmount = Math.max(0, mrp - price);
-  const discountPercent = mrp > 0 ? Math.round((discountAmount / mrp) * 100) : 0;
+  const discountAmount = currentPricing.savings;
+  const discountPercent = currentPricing.discountPercent;
 
   const cartItemId = `${product.id}-${selectedVolume}`;
   const cartItem = cart.find((item) => item.id === cartItemId);
@@ -474,28 +482,18 @@ export const ProductPage = () => {
             isDark ? "bg-[#1C120B] border-[#362114]" : "bg-white border-[#E8DEC8]"
           }`}
         >
-          {/* Price display with MRP & Savings */}
-          <div className="space-y-1">
-            <div className="flex items-baseline gap-3 flex-wrap">
-              <span className={`text-3xl sm:text-4xl font-black font-serif ${isDark ? "text-[#FAF4EA]" : "text-[#23150C]"}`}>
-                ₹{price}
-              </span>
-              {mrp > price && (
-                <span className="text-base sm:text-lg line-through text-stone-400 font-semibold">
-                  ₹{mrp}
-                </span>
-              )}
-              {discountPercent > 0 && (
-                <span className="text-xs font-black text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-md">
-                  {discountPercent}% OFF (Save ₹{discountAmount})
-                </span>
-              )}
-              <span className="text-xs font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md">
-                Inclusive of GST
-              </span>
-            </div>
+          {/* First 25 Kitchens Promotional Price Display */}
+          <div className="space-y-2">
+            <ProductOfferPriceBlock
+              productId={product.id}
+              variant={selectedVolume}
+              basePrice={rawPrice}
+              isFirstTimeCustomer={isFirstTimeCustomer}
+              size="lg"
+              isDark={isDark}
+            />
             <p className={`text-xs ${isDark ? "text-[#A8907E]" : "text-[#7A5E48]"}`}>
-              Direct artisan price. Free delivery across India unlocked on orders above ₹500.
+              Direct artisan price. Free delivery across India unlocked on orders above ₹800 (or 2+ bottles).
             </p>
           </div>
 
@@ -510,11 +508,7 @@ export const ProductPage = () => {
                 onClick={() => setSelectedVolume("1L")}
                 className={`p-4 rounded-2xl border-2 text-left transition-all cursor-pointer ${
                   selectedVolume === "1L"
-                    ? isDark
-                      ? "bg-amber-950/40 border-[#E08F35] ring-2 ring-[#E08F35]/30 text-white shadow-md"
-                      : "bg-amber-50/90 border-[#E08F35] ring-2 ring-[#E08F35]/30 text-[#23150C] shadow-md"
-                    : isDark
-                    ? "bg-[#140D07] border-[#2E1A0F] text-[#D6C4B0] hover:border-[#D49A37]"
+                    ? "bg-[#FAF7F2] border-[#0B2E1B] ring-2 ring-[#0B2E1B]/20 text-[#23150C] shadow-md"
                     : "bg-[#FAF7F2] border-[#E8DEC8] text-[#5C402D] hover:border-[#DDD1BE]"
                 }`}
               >
@@ -522,19 +516,31 @@ export const ProductPage = () => {
                   <div className="flex items-center gap-2">
                     <span
                       className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 ${
-                        selectedVolume === "1L" ? "border-[#E08F35] bg-[#E08F35]" : "border-stone-400"
+                        selectedVolume === "1L" ? "border-[#0B2E1B] bg-[#0B2E1B]" : "border-stone-400"
                       }`}
                     >
-                      {selectedVolume === "1L" && <span className="w-1.5 h-1.5 rounded-full bg-white" />}
+                      {selectedVolume === "1L" && <span className="w-1.5 h-1.5 rounded-full bg-[#F3D17A]" />}
                     </span>
-                    <span className="font-bold text-sm sm:text-base">1 Litre Bottle</span>
+                    <div>
+                      <span className="font-bold text-sm sm:text-base block">1 Litre Bottle</span>
+                      <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100 px-1.5 py-0.2 rounded">
+                        FIRST 25 KITCHENS (30% OFF)
+                      </span>
+                    </div>
                   </div>
-                  <span className="font-black text-base text-[#C8751B]">
-                    ₹{product.prices["1L"]}
-                  </span>
+                  <div className="text-right">
+                    <span className="font-black text-base text-[#0B2E1B] block">
+                      ₹{pricing1L.offerPrice}
+                    </span>
+                    {pricing1L.savings > 0 && (
+                      <span className="text-[11px] line-through text-stone-400 block font-semibold">
+                        ₹{pricing1L.originalPrice}
+                      </span>
+                    )}
+                  </div>
                 </div>
-                <span className={`text-[11px] mt-1 pl-6 block ${isDark ? "text-[#A8907E]" : "text-[#7A5E48]"}`}>
-                  Best value for daily cooking & frying
+                <span className="text-[11px] mt-1 pl-6 block text-[#7A5E48]">
+                  Best value for daily cooking & frying • Save ₹{pricing1L.savings}
                 </span>
               </button>
 
@@ -543,11 +549,7 @@ export const ProductPage = () => {
                 onClick={() => setSelectedVolume("500ml")}
                 className={`p-4 rounded-2xl border-2 text-left transition-all cursor-pointer ${
                   selectedVolume === "500ml"
-                    ? isDark
-                      ? "bg-amber-950/40 border-[#E08F35] ring-2 ring-[#E08F35]/30 text-white shadow-md"
-                      : "bg-amber-50/90 border-[#E08F35] ring-2 ring-[#E08F35]/30 text-[#23150C] shadow-md"
-                    : isDark
-                    ? "bg-[#140D07] border-[#2E1A0F] text-[#D6C4B0] hover:border-[#D49A37]"
+                    ? "bg-[#FAF7F2] border-[#0B2E1B] ring-2 ring-[#0B2E1B]/20 text-[#23150C] shadow-md"
                     : "bg-[#FAF7F2] border-[#E8DEC8] text-[#5C402D] hover:border-[#DDD1BE]"
                 }`}
               >
@@ -555,19 +557,35 @@ export const ProductPage = () => {
                   <div className="flex items-center gap-2">
                     <span
                       className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 ${
-                        selectedVolume === "500ml" ? "border-[#E08F35] bg-[#E08F35]" : "border-stone-400"
+                        selectedVolume === "500ml" ? "border-[#0B2E1B] bg-[#0B2E1B]" : "border-stone-400"
                       }`}
                     >
-                      {selectedVolume === "500ml" && <span className="w-1.5 h-1.5 rounded-full bg-white" />}
+                      {selectedVolume === "500ml" && <span className="w-1.5 h-1.5 rounded-full bg-[#F3D17A]" />}
                     </span>
-                    <span className="font-bold text-sm sm:text-base">500 ml Bottle</span>
+                    <div>
+                      <span className="font-bold text-sm sm:text-base block">500 ml Bottle</span>
+                      {pricing500ml.savings > 0 && (
+                        <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100 px-1.5 py-0.2 rounded">
+                          FIRST ORDER (30% OFF)
+                        </span>
+                      )}
+                    </div>
                   </div>
-                  <span className="font-black text-base text-[#C8751B]">
-                    ₹{product.prices["500ml"]}
-                  </span>
+                  <div className="text-right">
+                    <span className="font-black text-base text-[#0B2E1B] block">
+                      ₹{pricing500ml.offerPrice}
+                    </span>
+                    {pricing500ml.savings > 0 && (
+                      <span className="text-[11px] line-through text-stone-400 block font-semibold">
+                        ₹{pricing500ml.originalPrice}
+                      </span>
+                    )}
+                  </div>
                 </div>
-                <span className={`text-[11px] mt-1 pl-6 block ${isDark ? "text-[#A8907E]" : "text-[#7A5E48]"}`}>
-                  Compact bottle for smaller kitchen needs
+                <span className="text-[11px] mt-1 pl-6 block text-[#7A5E48]">
+                  {pricing500ml.savings > 0
+                    ? `Compact bottle for smaller kitchen needs • Save ₹${pricing500ml.savings}`
+                    : "Compact bottle for smaller kitchen needs"}
                 </span>
               </button>
             </div>
