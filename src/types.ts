@@ -122,6 +122,21 @@ export interface Address {
   isBangalore: boolean;
 }
 
+export type CampaignTier =
+  | "NEW_CUSTOMER_30"
+  | "COHORT_ORDER_2_20"
+  | "COHORT_ORDER_3_10"
+  | "STANDARD_PRICE_0";
+
+export interface First25KitchensCampaign {
+  campaignId: "first25kitchens";
+  maxSlots: number;
+  claimedSlots: number;
+  isActive: boolean;
+  enrolledCustomerUids: string[];
+  updatedAt?: any;
+}
+
 export interface CustomerProfile {
   uid: string;
   primaryUid?: string;
@@ -135,6 +150,10 @@ export interface CustomerProfile {
   uids?: string[];
   totalOrders?: number;
   totalSpent?: number;
+  isFirst25KitchensMember?: boolean;
+  first25EnrolledOrderRef?: string;
+  successfulOrdersCount?: number;
+  lastOrderDate?: any;
   createdAt?: any;
   updatedAt?: any;
 }

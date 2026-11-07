@@ -28,9 +28,10 @@ import {
   increment,
   arrayUnion,
   FieldValue,
+  runTransaction,
 } from "firebase/firestore";
 import firebaseConfig from "../firebase-applet-config.json";
-import { CustomerReview, Order, StoreCMSConfig } from "./types";
+import { CustomerReview, Order, StoreCMSConfig, First25KitchensCampaign } from "./types";
 
 // Initialize Firebase safely with provisioned Database ID and auto-detect long polling
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
@@ -784,6 +785,13 @@ export async function saveOrderToFirestore(order: Order, userUid?: string): Prom
         },
         { merge: true }
       ).catch(() => {});
+
+      if (order.orderStatus === "Placed") {
+        processFirst25OrderTransaction(uid, order.orderRef, {
+          phone: cleanPhone,
+          email: cleanEmail,
+        }).catch((e) => console.warn("Notice in First 25 auto-enrollment:", e));
+      }
     }
 
     return true;
@@ -808,6 +816,25 @@ export async function updateFirestoreOrderStatus(
     });
 
     await setDoc(orderDocRef, cleanUpdates, { merge: true });
+
+    if (updates.orderStatus === "Placed") {
+      try {
+        const snap = await getDoc(orderDocRef);
+        if (snap.exists()) {
+          const ord = snap.data();
+          const targetUid = ord.customerUid || ord.firebaseUid;
+          if (targetUid) {
+            processFirst25OrderTransaction(targetUid, orderRef, {
+              phone: ord.customerPhone,
+              email: ord.customerEmail,
+            }).catch((e) => console.warn("Notice in First 25 status hook:", e));
+          }
+        }
+      } catch (hookErr) {
+        console.warn("Notice checking order for First 25 transaction:", hookErr);
+      }
+    }
+
     return true;
   } catch (err) {
     handleFirestoreError(err, OperationType.UPDATE, `orders/${orderRef}`);
@@ -1068,3 +1095,279 @@ export async function fetchAllOrdersOnce(): Promise<Order[]> {
     return [];
   }
 }
+
+/* =========================================================================
+ * FIRST 25 KITCHENS — CLOUD FIRESTORE SINGLE SOURCE OF TRUTH
+ * ========================================================================= */
+
+export const DEFAULT_FIRST_25_CAMPAIGN: First25KitchensCampaign = {
+  campaignId: "first25kitchens",
+  maxSlots: 25,
+  claimedSlots: 0,
+  isActive: true,
+  enrolledCustomerUids: [],
+};
+
+/**
+ * Subscribe to the First 25 Kitchens campaign document in real-time.
+ * Auto-seeds the document in Firestore if it doesn't exist yet.
+ */
+export function subscribeFirst25Campaign(
+  callback: (campaign: First25KitchensCampaign) => void
+) {
+  try {
+    const campaignRef = doc(db, "campaigns", "first25kitchens");
+    return onSnapshot(
+      campaignRef,
+      (snap) => {
+        if (!snap.exists()) {
+          const initPayload = {
+            ...DEFAULT_FIRST_25_CAMPAIGN,
+            updatedAt: serverTimestamp(),
+          };
+          setDoc(campaignRef, initPayload).catch((err) => {
+            console.warn("Notice seeding campaigns/first25kitchens:", err);
+          });
+          callback(DEFAULT_FIRST_25_CAMPAIGN);
+          return;
+        }
+
+        const data = snap.data();
+        const maxSlots = typeof data.maxSlots === "number" ? data.maxSlots : 25;
+        const claimedSlots = typeof data.claimedSlots === "number" ? data.claimedSlots : 0;
+        const enrolledCustomerUids = Array.isArray(data.enrolledCustomerUids)
+          ? data.enrolledCustomerUids
+          : [];
+        const isActive =
+          typeof data.isActive === "boolean" ? data.isActive : claimedSlots < maxSlots;
+
+        callback({
+          campaignId: "first25kitchens",
+          maxSlots,
+          claimedSlots,
+          isActive,
+          enrolledCustomerUids,
+          updatedAt: data.updatedAt,
+        });
+      },
+      (error) => {
+        handleFirestoreError(error, OperationType.GET, "campaigns/first25kitchens");
+        callback(DEFAULT_FIRST_25_CAMPAIGN);
+      }
+    );
+  } catch (err) {
+    handleFirestoreError(err, OperationType.GET, "campaigns/first25kitchens");
+    return () => {};
+  }
+}
+
+/**
+ * Atomic Firestore transaction to process order completion and update
+ * the First 25 Kitchens campaign & customer membership progression.
+ */
+export async function processFirst25OrderTransaction(
+  userUid: string,
+  orderRef: string,
+  extra?: { phone?: string; email?: string }
+): Promise<{
+  isMember: boolean;
+  successfulOrdersCount: number;
+  claimedSlots: number;
+  enrolledNow: boolean;
+}> {
+  if (!userUid) {
+    return { isMember: false, successfulOrdersCount: 1, claimedSlots: 0, enrolledNow: false };
+  }
+
+  const campaignRef = doc(db, "campaigns", "first25kitchens");
+  const customerRef = doc(db, "customers", userUid);
+
+  try {
+    const result = await runTransaction(db, async (transaction) => {
+      const campaignSnap = await transaction.get(campaignRef);
+      const customerSnap = await transaction.get(customerRef);
+
+      const campaignData = campaignSnap.exists() ? campaignSnap.data() : null;
+      const currentClaimed =
+        campaignData && typeof campaignData.claimedSlots === "number"
+          ? campaignData.claimedSlots
+          : 0;
+      const enrolledUids: string[] =
+        campaignData && Array.isArray(campaignData.enrolledCustomerUids)
+          ? [...campaignData.enrolledCustomerUids]
+          : [];
+      const maxSlots =
+        campaignData && typeof campaignData.maxSlots === "number"
+          ? campaignData.maxSlots
+          : 25;
+
+      const customerData = customerSnap.exists() ? customerSnap.data() : null;
+      const existingSuccessCount =
+        customerData && typeof customerData.successfulOrdersCount === "number"
+          ? customerData.successfulOrdersCount
+          : 0;
+
+      // Prevent duplicate increment if this exact order was already processed
+      if (customerData?.lastOrderRef === orderRef && existingSuccessCount > 0) {
+        return {
+          isMember: Boolean(customerData.isFirst25KitchensMember),
+          successfulOrdersCount: existingSuccessCount,
+          claimedSlots: currentClaimed,
+          enrolledNow: false,
+        };
+      }
+
+      const wasMember = Boolean(
+        customerData?.isFirst25KitchensMember || enrolledUids.includes(userUid)
+      );
+
+      // Scenario A: Customer is ALREADY a First 25 Kitchens Member (Order #2, #3, etc.)
+      if (wasMember) {
+        const nextCount = existingSuccessCount + 1;
+        transaction.set(
+          customerRef,
+          cleanFirestoreObject({
+            uid: userUid,
+            isFirst25KitchensMember: true,
+            successfulOrdersCount: nextCount,
+            lastOrderDate: serverTimestamp(),
+            lastOrderRef: orderRef,
+            updatedAt: serverTimestamp(),
+            ...(extra?.phone ? { phone: extractCleanPhone(extra.phone) } : {}),
+            ...(extra?.email ? { email: extra.email.toLowerCase().trim() } : {}),
+          }),
+          { merge: true }
+        );
+        return {
+          isMember: true,
+          successfulOrdersCount: nextCount,
+          claimedSlots: currentClaimed,
+          enrolledNow: false,
+        };
+      }
+
+      // Scenario B: Customer is NEW (Order #1) AND SLOTS ARE OPEN (< 25)
+      if (currentClaimed < maxSlots) {
+        const newClaimed = currentClaimed + 1;
+        const newIsActive = newClaimed < maxSlots;
+        if (!enrolledUids.includes(userUid)) {
+          enrolledUids.push(userUid);
+        }
+
+        transaction.set(
+          campaignRef,
+          cleanFirestoreObject({
+            campaignId: "first25kitchens",
+            maxSlots,
+            claimedSlots: newClaimed,
+            isActive: newIsActive,
+            enrolledCustomerUids: enrolledUids,
+            updatedAt: serverTimestamp(),
+          }),
+          { merge: true }
+        );
+
+        transaction.set(
+          customerRef,
+          cleanFirestoreObject({
+            uid: userUid,
+            isFirst25KitchensMember: true,
+            first25EnrolledOrderRef: orderRef,
+            successfulOrdersCount: 1,
+            lastOrderDate: serverTimestamp(),
+            lastOrderRef: orderRef,
+            updatedAt: serverTimestamp(),
+            ...(extra?.phone ? { phone: extractCleanPhone(extra.phone) } : {}),
+            ...(extra?.email ? { email: extra.email.toLowerCase().trim() } : {}),
+          }),
+          { merge: true }
+        );
+
+        return {
+          isMember: true,
+          successfulOrdersCount: 1,
+          claimedSlots: newClaimed,
+          enrolledNow: true,
+        };
+      }
+
+      // Scenario C: Customer #26+ (Cap reached, slots >= 25, not enrolled)
+      const nextCount = existingSuccessCount + 1;
+      transaction.set(
+        customerRef,
+        cleanFirestoreObject({
+          uid: userUid,
+          isFirst25KitchensMember: false,
+          successfulOrdersCount: nextCount,
+          lastOrderDate: serverTimestamp(),
+          lastOrderRef: orderRef,
+          updatedAt: serverTimestamp(),
+          ...(extra?.phone ? { phone: extractCleanPhone(extra.phone) } : {}),
+          ...(extra?.email ? { email: extra.email.toLowerCase().trim() } : {}),
+        }),
+        { merge: true }
+      );
+
+      return {
+        isMember: false,
+        successfulOrdersCount: nextCount,
+        claimedSlots: currentClaimed,
+        enrolledNow: false,
+      };
+    });
+
+    return result;
+  } catch (err) {
+    console.warn("Transaction error in processFirst25OrderTransaction:", err);
+    handleFirestoreError(err, OperationType.WRITE, "campaigns/first25kitchens");
+    return { isMember: false, successfulOrdersCount: 1, claimedSlots: 0, enrolledNow: false };
+  }
+}
+
+/**
+ * Admin action: Reset First 25 Kitchens Campaign
+ */
+export async function resetFirst25Campaign(maxSlots = 25): Promise<boolean> {
+  try {
+    const campaignRef = doc(db, "campaigns", "first25kitchens");
+    await setDoc(campaignRef, {
+      campaignId: "first25kitchens",
+      maxSlots,
+      claimedSlots: 0,
+      isActive: true,
+      enrolledCustomerUids: [],
+      updatedAt: serverTimestamp(),
+    });
+    return true;
+  } catch (err) {
+    handleFirestoreError(err, OperationType.WRITE, "campaigns/first25kitchens");
+    return false;
+  }
+}
+
+/**
+ * Admin action: Manually override First 25 Kitchens claimed slots count
+ */
+export async function updateFirst25CampaignSlots(
+  claimedSlots: number,
+  maxSlots = 25
+): Promise<boolean> {
+  try {
+    const campaignRef = doc(db, "campaigns", "first25kitchens");
+    const numClaimed = Math.max(0, Math.min(maxSlots, claimedSlots));
+    await setDoc(
+      campaignRef,
+      {
+        claimedSlots: numClaimed,
+        isActive: numClaimed < maxSlots,
+        updatedAt: serverTimestamp(),
+      },
+      { merge: true }
+    );
+    return true;
+  } catch (err) {
+    handleFirestoreError(err, OperationType.WRITE, "campaigns/first25kitchens");
+    return false;
+  }
+}
+

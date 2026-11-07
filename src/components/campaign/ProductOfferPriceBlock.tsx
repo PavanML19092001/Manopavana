@@ -1,5 +1,6 @@
 import React from "react";
 import { getProductCampaignPricing } from "../../utils/campaignPricing";
+import { useStore } from "../../context/StoreContext";
 
 interface ProductOfferPriceBlockProps {
   productId: string;
@@ -14,11 +15,18 @@ export const ProductOfferPriceBlock: React.FC<ProductOfferPriceBlockProps> = ({
   productId,
   variant,
   basePrice,
-  isFirstTimeCustomer = true,
+  isFirstTimeCustomer: propIsFirstTime,
   size = "md",
   isDark = false,
 }) => {
-  const info = getProductCampaignPricing(productId, variant, basePrice, isFirstTimeCustomer);
+  const { campaignTierInfo } = useStore();
+
+  const isEligibleFor30 =
+    propIsFirstTime !== undefined
+      ? propIsFirstTime
+      : campaignTierInfo.isEligibleFor30ProductPrice;
+
+  const info = getProductCampaignPricing(productId, variant, basePrice, isEligibleFor30);
 
   return (
     <div className="space-y-1.5">
@@ -51,8 +59,8 @@ export const ProductOfferPriceBlock: React.FC<ProductOfferPriceBlockProps> = ({
         </span>
       </div>
 
-      {/* Campaign Badge Hierarchy: SAVE badge, 30% OFF badge, FIRST ORDER OFFER label */}
-      {info.savings > 0 && (
+      {/* Campaign Badge Hierarchy */}
+      {info.savings > 0 ? (
         <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
           <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-[#0B2E1B] text-[#F3D17A] text-[10px] sm:text-[11px] font-black uppercase tracking-wider shadow-2xs">
             SAVE ₹{info.savings}
@@ -64,7 +72,19 @@ export const ProductOfferPriceBlock: React.FC<ProductOfferPriceBlockProps> = ({
             {info.supportingLabel}
           </span>
         </div>
-      )}
+      ) : campaignTierInfo.tier === "COHORT_ORDER_2_20" ? (
+        <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
+          <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-[#0B2E1B] text-[#F3D17A] text-[10px] sm:text-[11px] font-black uppercase tracking-wider">
+            FIRST 25 REWARD: 20% OFF IN CART
+          </span>
+        </div>
+      ) : campaignTierInfo.tier === "COHORT_ORDER_3_10" ? (
+        <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
+          <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-[#0B2E1B] text-[#F3D17A] text-[10px] sm:text-[11px] font-black uppercase tracking-wider">
+            LOYAL PRIVILEGE: 10% OFF IN CART
+          </span>
+        </div>
+      ) : null}
     </div>
   );
 };

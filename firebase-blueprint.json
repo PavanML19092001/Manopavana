@@ -14,6 +14,10 @@
         "totalOrders": { "type": "number" },
         "totalSpent": { "type": "number" },
         "lastOrderRef": { "type": "string" },
+        "isFirst25KitchensMember": { "type": "boolean" },
+        "first25EnrolledOrderRef": { "type": "string" },
+        "successfulOrdersCount": { "type": "number" },
+        "lastOrderDate": { "type": "string", "format": "date-time" },
         "createdAt": { "type": "string", "format": "date-time" },
         "updatedAt": { "type": "string", "format": "date-time" }
       },
@@ -109,9 +113,27 @@
         "policies": { "type": "object" },
         "updatedAt": { "type": "string", "format": "date-time" }
       }
+    },
+    "Campaign": {
+      "title": "Campaign",
+      "description": "Global promotional campaign tracker and slot allocation",
+      "type": "object",
+      "properties": {
+        "campaignId": { "type": "string" },
+        "maxSlots": { "type": "number" },
+        "claimedSlots": { "type": "number" },
+        "isActive": { "type": "boolean" },
+        "enrolledCustomerUids": { "type": "array" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["campaignId", "maxSlots", "claimedSlots", "isActive"]
     }
   },
   "firestore": {
+    "/campaigns/{campaignId}": {
+      "schema": { "$ref": "#/entities/Campaign" },
+      "description": "Promotional campaigns such as First 25 Kitchens"
+    },
     "/customers/{userId}": {
       "schema": { "$ref": "#/entities/Customer" },
       "description": "Customer accounts and synced carts"

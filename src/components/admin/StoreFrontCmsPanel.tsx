@@ -59,6 +59,9 @@ export const StorefrontCMSPanel: React.FC<{ isDark: boolean }> = ({ isDark }) =>
     cmsConfig,
     updateCMSConfig,
     showToast,
+    campaign,
+    resetCampaign,
+    updateCampaignSlots,
   } = useStore();
 
   const [activeTab, setActiveTab] = useState<
@@ -71,7 +74,16 @@ export const StorefrontCMSPanel: React.FC<{ isDark: boolean }> = ({ isDark }) =>
     | "faqs"
     | "facility"
     | "policies"
+    | "campaign"
   >("brand");
+
+  const [simulatedSlots, setSimulatedSlots] = useState<number>(campaign.claimedSlots);
+  const [isUpdatingSlots, setIsUpdatingSlots] = useState(false);
+  const [isResettingCampaign, setIsResettingCampaign] = useState(false);
+
+  React.useEffect(() => {
+    setSimulatedSlots(campaign.claimedSlots);
+  }, [campaign.claimedSlots]);
 
   // Tab 1: Global Brand, Hero Banner, Audio & Media
   const [brandName, setBrandName] = useState(cmsConfig?.brandName || BUSINESS_CONFIG.BRAND_NAME);
@@ -130,7 +142,7 @@ export const StorefrontCMSPanel: React.FC<{ isDark: boolean }> = ({ isDark }) =>
     cmsConfig?.festiveBanner?.btnTextKannada || "ಈಗಲೇ ಖರೀದಿಸಿ"
   );
   const [festiveBtnTextEnglish, setFestiveBtnTextEnglish] = useState(
-    cmsConfig?.festiveBanner?.btnTextEnglish || "Flat 10% OFF Above ₹1,000"
+    cmsConfig?.festiveBanner?.btnTextEnglish || "Free Delivery Above ₹800"
   );
   const [festiveBtnLink, setFestiveBtnLink] = useState(
     cmsConfig?.festiveBanner?.btnLink || "/#catalog"
@@ -525,6 +537,7 @@ export const StorefrontCMSPanel: React.FC<{ isDark: boolean }> = ({ isDark }) =>
       {/* Navigation Tabs */}
       <div className="flex flex-wrap gap-2 border-b pb-2 border-stone-200 dark:border-stone-800">
         {[
+          { key: "campaign", label: "🔥 First 25 Kitchens" },
           { key: "brand", label: "Brand, Hero & Media" },
           { key: "products", label: "Product Catalog (A-Z)" },
           { key: "combos", label: "Value Combos (A-Z)" },
@@ -634,7 +647,7 @@ export const StorefrontCMSPanel: React.FC<{ isDark: boolean }> = ({ isDark }) =>
                       setFestiveBadge("ಶುದ್ಧ ಎಣ್ಣೆಯೊಂದಿಗೆ ದೀಪದ ಬೆಳಗು");
                       setFestiveTagline("Celebrate Deepavali with pure unrefined cold-pressed oils. Free doorstep delivery across India!");
                       setFestiveBtnTextKannada("ಈಗಲೇ ಖರೀದಿಸಿ");
-                      setFestiveBtnTextEnglish("Flat 10% OFF Above ₹1,000");
+                      setFestiveBtnTextEnglish("Free Delivery Above ₹800");
                       setFestiveBtnLink("/#catalog");
                     }}
                     className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-amber-500/20 text-[#5E3210] dark:text-amber-200 border border-amber-500/30 hover:bg-amber-500/30 transition-colors cursor-pointer"
@@ -648,7 +661,7 @@ export const StorefrontCMSPanel: React.FC<{ isDark: boolean }> = ({ isDark }) =>
                       setFestiveBadge("ಎಳ್ಳು-ಬೆಲ್ಲದ ಸಿಹಿ, ಮರದ ಗಾಣದ ಎಣ್ಣೆ");
                       setFestiveTagline("Pure wood-pressed Sesame, Groundnut & Coconut oils for festive treats. Direct from Karnataka artisans.");
                       setFestiveBtnTextKannada("ಈಗಲೇ ಖರೀದಿಸಿ");
-                      setFestiveBtnTextEnglish("Flat 10% OFF Above ₹1,000");
+                      setFestiveBtnTextEnglish("Free Delivery Above ₹800");
                       setFestiveBtnLink("/#catalog");
                     }}
                     className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-amber-500/20 text-[#5E3210] dark:text-amber-200 border border-amber-500/30 hover:bg-amber-500/30 transition-colors cursor-pointer"
@@ -662,7 +675,7 @@ export const StorefrontCMSPanel: React.FC<{ isDark: boolean }> = ({ isDark }) =>
                       setFestiveBadge("ಹೊಸ ವರ್ಷದ ಆರೋಗ್ಯಕರ ಆರಂಭ");
                       setFestiveTagline("Start the new year with pure, cold-pressed health for your entire family.");
                       setFestiveBtnTextKannada("ಈಗಲೇ ಖರೀದಿಸಿ");
-                      setFestiveBtnTextEnglish("Flat 10% OFF Above ₹1,000");
+                      setFestiveBtnTextEnglish("Free Delivery Above ₹800");
                       setFestiveBtnLink("/#catalog");
                     }}
                     className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-amber-500/20 text-[#5E3210] dark:text-amber-200 border border-amber-500/30 hover:bg-amber-500/30 transition-colors cursor-pointer"
@@ -1984,6 +1997,320 @@ export const StorefrontCMSPanel: React.FC<{ isDark: boolean }> = ({ isDark }) =>
                 </div>
               </div>
             ))}
+          </div>
+        )}
+
+        {/* TAB: FIRST 25 KITCHENS CAMPAIGN (FIRESTORE SINGLE SOURCE OF TRUTH) */}
+        {activeTab === "campaign" && (
+          <div className="space-y-5 animate-fade-in">
+            {/* Header / Status Banner */}
+            <div className="p-4 rounded-2xl bg-gradient-to-r from-[#0B2E1B] via-[#123824] to-[#0B2E1B] text-[#F3D17A] border border-[#F3D17A]/30 shadow-md">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-[#F3D17A]" />
+                    <span className="text-[10px] font-mono uppercase tracking-wider text-[#F3D17A]/80 font-bold">
+                      Firestore Document: campaigns/first25kitchens
+                    </span>
+                  </div>
+                  <h3 className="text-base sm:text-lg font-serif font-bold text-white flex items-center gap-2">
+                    First 25 Kitchens Cohort Management
+                    {campaign.isActive && campaign.claimedSlots < campaign.maxSlots ? (
+                      <span className="text-[10px] font-sans px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 font-bold uppercase tracking-wide">
+                        ● Live & Accepting Orders
+                      </span>
+                    ) : (
+                      <span className="text-[10px] font-sans px-2.5 py-0.5 rounded-full bg-red-500/20 text-red-300 border border-red-500/40 font-bold uppercase tracking-wide">
+                        ● Cap Reached (25/25) — Reverted to Standard MRP
+                      </span>
+                    )}
+                  </h3>
+                  <p className="text-xs text-[#E8DEC8]/80 leading-relaxed max-w-2xl">
+                    Managed with zero browser localStorage dependency. All slots, cohort memberships, and tier discounts are read directly and verified atomically on Google Cloud Firestore.
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0 self-start sm:self-auto">
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      if (window.confirm("Are you sure you want to reset the First 25 Kitchens campaign to 0 slots?")) {
+                        setIsResettingCampaign(true);
+                        const ok = await resetCampaign();
+                        setIsResettingCampaign(false);
+                        if (ok) {
+                          showToast("Campaign reset successfully! 25 slots reopened.");
+                        } else {
+                          showToast("Failed to reset campaign in Firestore.");
+                        }
+                      }
+                    }}
+                    disabled={isResettingCampaign}
+                    className="px-3 py-1.5 rounded-xl bg-red-600/80 hover:bg-red-600 text-white font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer shadow-sm disabled:opacity-50"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${isResettingCampaign ? "animate-spin" : ""}`} />
+                    <span>{isResettingCampaign ? "Resetting..." : "Reset to 0 Slots"}</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Progress Metric */}
+              <div className="mt-4 pt-3 border-t border-white/10 grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
+                <div className="p-2.5 rounded-xl bg-black/25">
+                  <span className="text-[10px] text-[#E8DEC8]/70 uppercase block font-medium">Claimed Slots</span>
+                  <span className="text-xl font-bold font-serif text-white">
+                    {campaign.claimedSlots} <span className="text-xs text-[#E8DEC8]/60">/ {campaign.maxSlots}</span>
+                  </span>
+                </div>
+                <div className="p-2.5 rounded-xl bg-black/25">
+                  <span className="text-[10px] text-[#E8DEC8]/70 uppercase block font-medium">Remaining Slots</span>
+                  <span className="text-xl font-bold font-serif text-[#F3D17A]">
+                    {Math.max(0, campaign.maxSlots - campaign.claimedSlots)}
+                  </span>
+                </div>
+                <div className="p-2.5 rounded-xl bg-black/25">
+                  <span className="text-[10px] text-[#E8DEC8]/70 uppercase block font-medium">Enrolled Cohort Members</span>
+                  <span className="text-xl font-bold font-serif text-emerald-300">
+                    {campaign.enrolledCustomerUids?.length || 0}
+                  </span>
+                </div>
+                <div className="p-2.5 rounded-xl bg-black/25">
+                  <span className="text-[10px] text-[#E8DEC8]/70 uppercase block font-medium">Status</span>
+                  <span className="text-xs font-bold block mt-1 uppercase text-amber-200">
+                    {campaign.claimedSlots >= campaign.maxSlots ? "Capped (Standard Price)" : "30% 1st Order Live"}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Admin Simulation & Manual Slot Override */}
+            <div className={`p-4 rounded-2xl border space-y-4 ${
+              isDark ? "bg-[#150D07] border-[#362114]" : "bg-stone-50 border-stone-200"
+            }`}>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b pb-2 border-stone-200 dark:border-stone-800">
+                <div className="flex items-center gap-2">
+                  <Flame className="w-4 h-4 text-amber-500" />
+                  <h4 className="font-bold text-xs sm:text-sm text-stone-900 dark:text-stone-100">
+                    Simulate & Test Campaign Slots (Real-Time Cloud Sync)
+                  </h4>
+                </div>
+                <span className="text-[11px] text-stone-500">
+                  Instantly tests how homepage, cart, checkout & navigation update
+                </span>
+              </div>
+
+              {/* Preset Buttons */}
+              <div className="space-y-1.5">
+                <span className="text-[10px] font-bold text-stone-500 uppercase block">
+                  Quick Simulation Presets:
+                </span>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      setSimulatedSlots(0);
+                      setIsUpdatingSlots(true);
+                      await updateCampaignSlots(0);
+                      setIsUpdatingSlots(false);
+                      showToast("Simulated 0 slots claimed (Fresh campaign launch)!");
+                    }}
+                    className="px-3 py-1.5 rounded-lg text-xs font-bold bg-[#0B2E1B] text-[#F3D17A] border border-[#F3D17A]/40 hover:brightness-110 transition-all cursor-pointer"
+                  >
+                    0 Claimed (25 Open Slots)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      setSimulatedSlots(14);
+                      setIsUpdatingSlots(true);
+                      await updateCampaignSlots(14);
+                      setIsUpdatingSlots(false);
+                      showToast("Simulated 14 slots claimed (11 open slots left)!");
+                    }}
+                    className="px-3 py-1.5 rounded-lg text-xs font-bold bg-amber-500/20 text-[#5E3210] dark:text-amber-200 border border-amber-500/30 hover:bg-amber-500/30 transition-all cursor-pointer"
+                  >
+                    14 Claimed (11 Open Slots)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      setSimulatedSlots(24);
+                      setIsUpdatingSlots(true);
+                      await updateCampaignSlots(24);
+                      setIsUpdatingSlots(false);
+                      showToast("Simulated 24 slots claimed (Final slot remaining)!");
+                    }}
+                    className="px-3 py-1.5 rounded-lg text-xs font-bold bg-orange-500/20 text-orange-700 dark:text-orange-300 border border-orange-500/30 hover:bg-orange-500/30 transition-all cursor-pointer"
+                  >
+                    24 Claimed (1 Final Slot Left)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      setSimulatedSlots(25);
+                      setIsUpdatingSlots(true);
+                      await updateCampaignSlots(25);
+                      setIsUpdatingSlots(false);
+                      showToast("Simulated 25/25 slots claimed (Campaign capped & reverted to standard MRP)!");
+                    }}
+                    className="px-3 py-1.5 rounded-lg text-xs font-bold bg-red-500/20 text-red-700 dark:text-red-300 border border-red-500/30 hover:bg-red-500/30 transition-all cursor-pointer"
+                  >
+                    25 Claimed (Cap Reached - Standard MRP)
+                  </button>
+                </div>
+              </div>
+
+              {/* Custom number input */}
+              <div className="flex flex-col sm:flex-row sm:items-center gap-3 pt-2">
+                <div className="flex-1 max-w-xs">
+                  <label className="block text-[11px] font-semibold mb-1">
+                    Custom Claimed Slots Count (0 - 25)
+                  </label>
+                  <input
+                    type="number"
+                    min={0}
+                    max={25}
+                    value={simulatedSlots}
+                    onChange={(e) => setSimulatedSlots(Math.max(0, Math.min(25, Number(e.target.value))))}
+                    className="w-full px-3 py-2 rounded-xl border border-stone-300 dark:border-stone-700 bg-white dark:bg-transparent font-bold text-sm"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    setIsUpdatingSlots(true);
+                    const ok = await updateCampaignSlots(simulatedSlots);
+                    setIsUpdatingSlots(false);
+                    if (ok) {
+                      showToast(`Updated campaign to ${simulatedSlots}/25 claimed slots!`);
+                    } else {
+                      showToast("Failed to update slots in Firestore.");
+                    }
+                  }}
+                  disabled={isUpdatingSlots}
+                  className="px-4 py-2 mt-auto rounded-xl bg-[#5E3210] hover:bg-[#43230A] text-white font-bold text-xs flex items-center gap-2 transition-colors cursor-pointer shadow-sm disabled:opacity-50"
+                >
+                  <Save className={`w-3.5 h-3.5 ${isUpdatingSlots ? "animate-spin" : ""}`} />
+                  <span>{isUpdatingSlots ? "Saving to Firestore..." : "Apply Slot Change"}</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Enrolled Customers Cohort List */}
+            <div className={`p-4 rounded-2xl border space-y-3 ${
+              isDark ? "bg-[#150D07] border-[#362114]" : "bg-stone-50 border-stone-200"
+            }`}>
+              <div className="flex items-center justify-between border-b pb-2 border-stone-200 dark:border-stone-800">
+                <div className="flex items-center gap-2">
+                  <Award className="w-4 h-4 text-emerald-500" />
+                  <h4 className="font-bold text-xs sm:text-sm text-stone-900 dark:text-stone-100">
+                    Enrolled First 25 Cohort Members ({campaign.enrolledCustomerUids?.length || 0})
+                  </h4>
+                </div>
+                <span className="text-[10px] text-stone-500">
+                  Tagged in customers/{`{userUid}`} with isFirst25KitchensMember: true
+                </span>
+              </div>
+
+              {campaign.enrolledCustomerUids && campaign.enrolledCustomerUids.length > 0 ? (
+                <div className="flex flex-wrap gap-2 max-h-40 overflow-y-auto p-1">
+                  {campaign.enrolledCustomerUids.map((uid, index) => (
+                    <span
+                      key={uid}
+                      className="px-2.5 py-1 rounded-lg text-[10px] font-mono bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20 flex items-center gap-1.5"
+                    >
+                      <span className="font-bold">#{index + 1}</span>
+                      <span>{uid}</span>
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-stone-500 italic py-2">
+                  No customers enrolled yet. When any customer completes their first order while slots &lt; 25, a Firestore transaction enrolls their UID and locks their membership for life.
+                </p>
+              )}
+            </div>
+
+            {/* Discount Tier Progression Reference Table */}
+            <div className={`p-4 rounded-2xl border space-y-3 ${
+              isDark ? "bg-[#150D07] border-[#362114]" : "bg-white border-stone-200"
+            }`}>
+              <h4 className="font-bold text-xs sm:text-sm text-stone-900 dark:text-stone-100 flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                Automatic 4-Tier Progression Architecture (Firestore Authoritative)
+              </h4>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead>
+                    <tr className="border-b border-stone-200 dark:border-stone-800 text-[10px] text-stone-500 uppercase tracking-wider">
+                      <th className="py-2 px-2">Stage</th>
+                      <th className="py-2 px-2">Qualifying Condition</th>
+                      <th className="py-2 px-2">Applicable Discount</th>
+                      <th className="py-2 px-2">Cart / Product Pricing Behavior</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-stone-100 dark:divide-stone-800 text-[11px]">
+                    <tr className="hover:bg-amber-500/5">
+                      <td className="py-2 px-2 font-bold text-emerald-700 dark:text-emerald-400">
+                        1. New Customer (Slots Open)
+                      </td>
+                      <td className="py-2 px-2 font-mono text-[10px]">
+                        successfulOrdersCount == 0 && claimedSlots &lt; 25
+                      </td>
+                      <td className="py-2 px-2 font-bold text-[#E08F35]">
+                        30% OFF
+                      </td>
+                      <td className="py-2 px-2 text-stone-600 dark:text-stone-400">
+                        Groundnut ₹279 (was ₹399), Coconut ₹349 (was ₹499), Sesame ₹349 (was ₹499). Enrolls into cohort on checkout.
+                      </td>
+                    </tr>
+                    <tr className="hover:bg-amber-500/5">
+                      <td className="py-2 px-2 font-bold text-blue-700 dark:text-blue-400">
+                        2. Order #2 (Cohort Member)
+                      </td>
+                      <td className="py-2 px-2 font-mono text-[10px]">
+                        isFirst25KitchensMember == true && successfulOrdersCount == 1
+                      </td>
+                      <td className="py-2 px-2 font-bold text-[#E08F35]">
+                        FLAT 20% OFF
+                      </td>
+                      <td className="py-2 px-2 text-stone-600 dark:text-stone-400">
+                        Applied automatically across cart subtotal. Dedicated banner congratulates them on Order #2 reward.
+                      </td>
+                    </tr>
+                    <tr className="hover:bg-amber-500/5">
+                      <td className="py-2 px-2 font-bold text-purple-700 dark:text-purple-400">
+                        3. Order #3 & Beyond (Cohort Member)
+                      </td>
+                      <td className="py-2 px-2 font-mono text-[10px]">
+                        isFirst25KitchensMember == true && successfulOrdersCount &gt;= 2
+                      </td>
+                      <td className="py-2 px-2 font-bold text-[#E08F35]">
+                        FLAT 10% OFF
+                      </td>
+                      <td className="py-2 px-2 text-stone-600 dark:text-stone-400">
+                        Lifetime Loyal Kitchen privilege applied automatically on all subsequent orders without coupons.
+                      </td>
+                    </tr>
+                    <tr className="hover:bg-amber-500/5">
+                      <td className="py-2 px-2 font-bold text-stone-500">
+                        4. Customer #26+ (Cap Reached / Unenrolled)
+                      </td>
+                      <td className="py-2 px-2 font-mono text-[10px]">
+                        successfulOrdersCount == 0 && claimedSlots &gt;= 25
+                      </td>
+                      <td className="py-2 px-2 font-bold text-stone-500">
+                        0% (Standard MRP)
+                      </td>
+                      <td className="py-2 px-2 text-stone-600 dark:text-stone-400">
+                        Groundnut ₹399, Coconut ₹499, Sesame ₹499. Campaign banners revert to standard artisanal craft messaging.
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
         )}
 

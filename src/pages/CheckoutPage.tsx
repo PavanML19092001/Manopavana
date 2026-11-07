@@ -61,6 +61,7 @@ export const CheckoutPage: React.FC = () => {
     getOrder,
     currentUser,
     isFirstTimeCustomer,
+    campaignTierInfo,
     themeMode,
   } = useStore();
 
@@ -70,20 +71,41 @@ export const CheckoutPage: React.FC = () => {
   const isBuyNowMode = searchParams.get("mode") === "buynow" && buyNowItem !== null;
   const checkoutItems = isBuyNowMode && buyNowItem ? [buyNowItem] : cart;
 
-  const checkoutSubtotal = checkoutItems.reduce((acc, curr) => acc + curr.price * curr.quantity, 0);
   const checkoutOriginalSubtotal = checkoutItems.reduce(
-    (acc, curr) => acc + (curr.regularPrice || curr.price) * curr.quantity,
+    (acc, curr) =>
+      acc +
+      (curr.regularPrice && curr.regularPrice > 0 ? curr.regularPrice : curr.price) *
+        curr.quantity,
     0
   );
-  const checkoutCampaignSavings = checkoutOriginalSubtotal - checkoutSubtotal;
 
-  // Prevent duplicate discounting: first-order 30% benefit already applied; otherwise 10% for orders >= 1000
+  const checkoutSubtotal =
+    campaignTierInfo.tier === "NEW_CUSTOMER_30"
+      ? checkoutItems.reduce((acc, curr) => {
+          const regular =
+            curr.regularPrice && curr.regularPrice > 0 ? curr.regularPrice : curr.price;
+          const offer =
+            curr.price && curr.price < regular ? curr.price : Math.round(regular * 0.7);
+          return acc + offer * curr.quantity;
+        }, 0)
+      : checkoutItems.reduce((acc, curr) => {
+          const regular =
+            curr.regularPrice && curr.regularPrice > 0 ? curr.regularPrice : curr.price;
+          return acc + regular * curr.quantity;
+        }, 0);
+
   const checkoutDiscount =
-    isFirstTimeCustomer
-      ? 0
-      : checkoutSubtotal >= 1000
-        ? Math.round((checkoutSubtotal * 10) / 100)
-        : 0;
+    campaignTierInfo.tier === "COHORT_ORDER_2_20"
+      ? Math.round((checkoutSubtotal * 20) / 100)
+      : campaignTierInfo.tier === "COHORT_ORDER_3_10"
+      ? Math.round((checkoutSubtotal * 10) / 100)
+      : 0;
+
+  const checkoutCampaignSavings =
+    campaignTierInfo.tier === "NEW_CUSTOMER_30"
+      ? Math.max(0, checkoutOriginalSubtotal - checkoutSubtotal)
+      : checkoutDiscount;
+
   const checkoutDiscountedSubtotal = checkoutSubtotal - checkoutDiscount;
   const checkoutBottleCount = checkoutItems.reduce((acc, curr) => acc + curr.quantity, 0);
   const freeThreshold = cmsConfig?.freeShippingThreshold || BUSINESS_CONFIG.FREE_SHIPPING_THRESHOLD;
@@ -1783,7 +1805,7 @@ export const CheckoutPage: React.FC = () => {
 
               {/* Price Breakdown */}
               <div className="space-y-2 pt-3 border-t border-stone-200 dark:border-stone-800 text-xs">
-                {isFirstTimeCustomer && checkoutCampaignSavings > 0 ? (
+                {campaignTierInfo.tier === "NEW_CUSTOMER_30" ? (
                   <>
                     <div className="flex justify-between text-stone-500">
                       <span>Original Subtotal:</span>
@@ -1801,19 +1823,39 @@ export const CheckoutPage: React.FC = () => {
                       <span>₹{checkoutSubtotal}</span>
                     </div>
                   </>
-                ) : (
+                ) : campaignTierInfo.tier === "COHORT_ORDER_2_20" ? (
                   <>
                     <div className="flex justify-between text-stone-500">
-                      <span>Items Subtotal:</span>
+                      <span>Order Subtotal:</span>
                       <span>₹{checkoutSubtotal}</span>
                     </div>
-                    {checkoutDiscount > 0 && (
-                      <div className="flex justify-between text-emerald-600 font-bold">
-                        <span>10% Discount (Orders &gt; ₹1,000):</span>
-                        <span>-₹{checkoutDiscount}</span>
-                      </div>
-                    )}
+                    <div className="flex justify-between text-emerald-600 dark:text-[#F3D17A] font-bold">
+                      <span className="flex items-center gap-1">
+                        <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                        <span>First 25 Reward (20% OFF 2nd Order):</span>
+                      </span>
+                      <span className="font-extrabold">-₹{checkoutDiscount}</span>
+                    </div>
                   </>
+                ) : campaignTierInfo.tier === "COHORT_ORDER_3_10" ? (
+                  <>
+                    <div className="flex justify-between text-stone-500">
+                      <span>Order Subtotal:</span>
+                      <span>₹{checkoutSubtotal}</span>
+                    </div>
+                    <div className="flex justify-between text-emerald-600 dark:text-[#F3D17A] font-bold">
+                      <span className="flex items-center gap-1">
+                        <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                        <span>Loyal Kitchen Privilege (10% OFF Lifetime):</span>
+                      </span>
+                      <span className="font-extrabold">-₹{checkoutDiscount}</span>
+                    </div>
+                  </>
+                ) : (
+                  <div className="flex justify-between text-stone-500">
+                    <span>Items Subtotal:</span>
+                    <span>₹{checkoutSubtotal}</span>
+                  </div>
                 )}
                 <div className="flex justify-between text-stone-500">
                   <span>Doorstep Delivery:</span>

@@ -44,6 +44,7 @@ export const Navbar: React.FC = () => {
     setThemeMode,
     isPlayingAudio,
     toggleAudio,
+    campaign,
   } = useStore();
 
   const isLight = themeMode === "light";
@@ -192,32 +193,51 @@ export const Navbar: React.FC = () => {
             : "bg-gradient-to-b from-[#25150C] via-[#1B0F08] to-[#140C07] text-[#FAF4EA] border-b border-[#D4A373]/30 shadow-2xl backdrop-blur-md"
         }`}
     >
-      {/* PREMIUM PROMOTIONAL ANNOUNCEMENT BAR — FIRST 25 KITCHENS OFFER */}
+      {/* PREMIUM PROMOTIONAL ANNOUNCEMENT BAR — FIRST 25 KITCHENS OFFER OR STANDARD BRAND */}
       <div
         className="w-full py-1.5 px-3 sm:px-4 bg-[#0B2E1B] border-b border-[#164E2E] text-[#FAF7F2] tracking-wide flex items-center justify-between box-border text-[10.5px] sm:text-xs font-bold transition-colors"
       >
-        <div className="flex items-center justify-center sm:justify-start flex-1 min-w-0 flex-wrap gap-x-2 gap-y-0.5 text-center sm:text-left">
-          <span className="text-[#F3D17A] tracking-wider uppercase font-black shrink-0">
-            FIRST 25 KITCHENS OFFER
-          </span>
-          <span className="text-white/40 hidden sm:inline" aria-hidden="true">|</span>
-          <span className="text-[#FAF7F2] font-semibold">
-            FLAT 30% OFF YOUR FIRST ORDER
-          </span>
-          <a
-            href="/#catalog"
-            onClick={(e) => {
-              const target = document.getElementById("catalog");
-              if (target) {
-                e.preventDefault();
-                target.scrollIntoView({ behavior: "smooth" });
-              }
-            }}
-            className="inline-flex items-center font-black text-[#F3D17A] hover:text-white transition-colors underline underline-offset-2 shrink-0 cursor-pointer ml-1"
-          >
-            <span>SHOP NOW →</span>
-          </a>
-        </div>
+        {campaign.claimedSlots < campaign.maxSlots && campaign.isActive ? (
+          <div className="flex items-center justify-center sm:justify-start flex-1 min-w-0 flex-wrap gap-x-2 gap-y-0.5 text-center sm:text-left">
+            <span className="text-[#F3D17A] tracking-wider uppercase font-black shrink-0">
+              FIRST 25 KITCHENS OFFER
+            </span>
+            <span className="text-white/40 hidden sm:inline" aria-hidden="true">|</span>
+            <span className="text-[#FAF7F2] font-semibold">
+              FLAT 30% OFF YOUR FIRST ORDER
+            </span>
+            <span className="text-[#F3D17A] text-[10px] hidden md:inline font-semibold">
+              ({Math.max(0, campaign.maxSlots - campaign.claimedSlots)} slots remaining)
+            </span>
+            <a
+              href="/#catalog"
+              onClick={(e) => {
+                const target = document.getElementById("catalog");
+                if (target) {
+                  e.preventDefault();
+                  target.scrollIntoView({ behavior: "smooth" });
+                }
+              }}
+              className="inline-flex items-center font-black text-[#F3D17A] hover:text-white transition-colors underline underline-offset-2 shrink-0 cursor-pointer ml-1"
+            >
+              <span>SHOP NOW →</span>
+            </a>
+          </div>
+        ) : (
+          <div className="flex items-center justify-center sm:justify-start flex-1 min-w-0 flex-wrap gap-x-2 gap-y-0.5 text-center sm:text-left">
+            <span className="text-[#F3D17A] tracking-wider uppercase font-black shrink-0">
+              MANOPAVANA ARTISANAL OILS
+            </span>
+            <span className="text-white/40 hidden sm:inline" aria-hidden="true">|</span>
+            <span className="text-[#FAF7F2] font-semibold">
+              PURE BY NATURE, TRUSTED FOR LIFE
+            </span>
+            <span className="text-white/40 hidden sm:inline" aria-hidden="true">|</span>
+            <span className="text-[#FAF7F2]/80 text-[10.5px] hidden md:inline">
+              Cold-Pressed in Peenya, Bengaluru
+            </span>
+          </div>
+        )}
       </div>
 
       {/* STREAMLINED 2-ROW MOBILE HEADER (md:hidden) - FLIPKART STYLE */}
