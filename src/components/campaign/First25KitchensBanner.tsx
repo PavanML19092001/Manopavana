@@ -1,5 +1,5 @@
 import React from "react";
-import { Sparkles, ShieldCheck } from "lucide-react";
+import { Sparkles, ShieldCheck, Award } from "lucide-react";
 import { useStore } from "../../context/StoreContext";
 
 interface First25KitchensBannerProps {
@@ -27,7 +27,97 @@ export const First25KitchensBanner: React.FC<First25KitchensBannerProps> = ({
   const isSlotsOpen = campaign.claimedSlots < campaign.maxSlots && campaign.isActive;
   const remainingSlots = Math.max(0, campaign.maxSlots - campaign.claimedSlots);
 
-  // If slots are reached (25/25 claimed), adapt to standard showcase brand messaging
+  // Cohort Member: Order #2 (20% OFF Reward)
+  if (campaignTierInfo.tier === "COHORT_ORDER_2_20") {
+    return (
+      <section
+        aria-label="First 25 Kitchens Order 2 Reward"
+        onClick={handleClick}
+        className="relative w-full overflow-hidden bg-[#0A2617] border-b border-[#D4AF37]/25 text-[#FAF7F2] cursor-pointer select-none transition-colors hover:bg-[#0c2e1c]"
+      >
+        <div
+          aria-hidden="true"
+          className="absolute inset-0 bg-[radial-gradient(circle_at_center,#114328_0%,#082013_70%,#05180e_100%)] pointer-events-none"
+        />
+        <div
+          aria-hidden="true"
+          className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[350px] bg-[#D4AF37]/10 rounded-full blur-3xl pointer-events-none"
+        />
+
+        <div className="relative max-w-4xl mx-auto px-4 sm:px-6 py-12 sm:py-16 md:py-20 flex flex-col items-center text-center space-y-5 sm:space-y-6">
+          <div className="inline-flex items-center gap-2 px-5 py-1.5 rounded-full border border-[#C5A04D]/60 bg-[#0B2A1B]/60 text-[#F3D17A] text-xs sm:text-sm font-bold tracking-[0.22em] uppercase shadow-xs">
+            <Award className="w-4 h-4 text-[#F3D17A] stroke-[2.2]" />
+            <span>FOUNDING FIRST 25 MEMBER • ORDER #2 UNLOCKED</span>
+          </div>
+
+          <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-[40px] font-bold font-serif text-[#FAF7F2] tracking-wide leading-snug max-w-2xl">
+            WELCOME BACK TO
+            <br className="hidden sm:inline" /> AUTHENTIC ARTISANAL PURITY.
+          </h2>
+
+          <div className="space-y-1.5 sm:space-y-2 pt-1 sm:pt-2">
+            <div className="text-4xl sm:text-6xl md:text-7xl lg:text-8xl font-black font-serif tracking-tight text-[#F3D17A] drop-shadow-[0_4px_24px_rgba(243,209,122,0.25)]">
+              FLAT 20% OFF
+            </div>
+            <div className="text-base sm:text-2xl md:text-3xl font-extrabold tracking-wider text-white uppercase font-sans">
+              YOUR 2ND ORDER REWARD
+            </div>
+          </div>
+
+          <p className="pt-2 text-xs sm:text-sm md:text-base text-[#E5D7C3] leading-relaxed max-w-xl font-normal">
+            Your exclusive 20% founding cohort reward is unlocked and applied automatically to your cart subtotal. Thank you for welcoming MANOPAVANA into your home.
+          </p>
+        </div>
+      </section>
+    );
+  }
+
+  // Cohort Member: Order #3 & Beyond (Lifetime 10% Loyal Privilege)
+  if (campaignTierInfo.tier === "COHORT_ORDER_3_10") {
+    return (
+      <section
+        aria-label="First 25 Kitchens Lifetime Loyal Kitchen Privilege"
+        onClick={handleClick}
+        className="relative w-full overflow-hidden bg-[#0A2617] border-b border-[#D4AF37]/25 text-[#FAF7F2] cursor-pointer select-none transition-colors hover:bg-[#0c2e1c]"
+      >
+        <div
+          aria-hidden="true"
+          className="absolute inset-0 bg-[radial-gradient(circle_at_center,#114328_0%,#082013_70%,#05180e_100%)] pointer-events-none"
+        />
+        <div
+          aria-hidden="true"
+          className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[350px] bg-[#D4AF37]/10 rounded-full blur-3xl pointer-events-none"
+        />
+
+        <div className="relative max-w-4xl mx-auto px-4 sm:px-6 py-12 sm:py-16 md:py-20 flex flex-col items-center text-center space-y-5 sm:space-y-6">
+          <div className="inline-flex items-center gap-2 px-5 py-1.5 rounded-full border border-[#C5A04D]/60 bg-[#0B2A1B]/60 text-[#F3D17A] text-xs sm:text-sm font-bold tracking-[0.22em] uppercase shadow-xs">
+            <Award className="w-4 h-4 text-[#F3D17A] stroke-[2.2]" />
+            <span>FOUNDING FIRST 25 MEMBER • LIFETIME PRIVILEGE</span>
+          </div>
+
+          <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-[40px] font-bold font-serif text-[#FAF7F2] tracking-wide leading-snug max-w-2xl">
+            YOUR FAMILY KITCHEN
+            <br className="hidden sm:inline" /> DESERVES LIFETIME TRUST.
+          </h2>
+
+          <div className="space-y-1.5 sm:space-y-2 pt-1 sm:pt-2">
+            <div className="text-4xl sm:text-6xl md:text-7xl lg:text-8xl font-black font-serif tracking-tight text-[#F3D17A] drop-shadow-[0_4px_24px_rgba(243,209,122,0.25)]">
+              FLAT 10% OFF
+            </div>
+            <div className="text-base sm:text-2xl md:text-3xl font-extrabold tracking-wider text-white uppercase font-sans">
+              ON EVERY REFILL FOR LIFE
+            </div>
+          </div>
+
+          <p className="pt-2 text-xs sm:text-sm md:text-base text-[#E5D7C3] leading-relaxed max-w-xl font-normal">
+            As a permanent founding kitchen, your 10% privilege is automatically deducted from every order subtotal forever with zero coupon codes needed.
+          </p>
+        </div>
+      </section>
+    );
+  }
+
+  // If slots are reached (25/25 claimed) and unenrolled, adapt to standard showcase brand messaging
   if (!isSlotsOpen) {
     return (
       <section

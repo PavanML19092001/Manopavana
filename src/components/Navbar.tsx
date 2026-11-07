@@ -45,6 +45,7 @@ export const Navbar: React.FC = () => {
     isPlayingAudio,
     toggleAudio,
     campaign,
+    campaignTierInfo,
   } = useStore();
 
   const isLight = themeMode === "light";
@@ -197,7 +198,53 @@ export const Navbar: React.FC = () => {
       <div
         className="w-full py-1.5 px-3 sm:px-4 bg-[#0B2E1B] border-b border-[#164E2E] text-[#FAF7F2] tracking-wide flex items-center justify-between box-border text-[10.5px] sm:text-xs font-bold transition-colors"
       >
-        {campaign.claimedSlots < campaign.maxSlots && campaign.isActive ? (
+        {campaignTierInfo.tier === "COHORT_ORDER_2_20" ? (
+          <div className="flex items-center justify-center sm:justify-start flex-1 min-w-0 flex-wrap gap-x-2 gap-y-0.5 text-center sm:text-left">
+            <span className="text-[#F3D17A] tracking-wider uppercase font-black shrink-0">
+              FIRST 25 FOUNDING MEMBER
+            </span>
+            <span className="text-white/40 hidden sm:inline" aria-hidden="true">|</span>
+            <span className="text-[#FAF7F2] font-semibold">
+              FLAT 20% OFF UNLOCKED FOR YOUR 2ND ORDER
+            </span>
+            <a
+              href="/#catalog"
+              onClick={(e) => {
+                const target = document.getElementById("catalog");
+                if (target) {
+                  e.preventDefault();
+                  target.scrollIntoView({ behavior: "smooth" });
+                }
+              }}
+              className="inline-flex items-center font-black text-[#F3D17A] hover:text-white transition-colors underline underline-offset-2 shrink-0 cursor-pointer ml-1"
+            >
+              <span>CLAIM 20% OFF →</span>
+            </a>
+          </div>
+        ) : campaignTierInfo.tier === "COHORT_ORDER_3_10" ? (
+          <div className="flex items-center justify-center sm:justify-start flex-1 min-w-0 flex-wrap gap-x-2 gap-y-0.5 text-center sm:text-left">
+            <span className="text-[#F3D17A] tracking-wider uppercase font-black shrink-0">
+              LOYAL KITCHEN PRIVILEGE
+            </span>
+            <span className="text-white/40 hidden sm:inline" aria-hidden="true">|</span>
+            <span className="text-[#FAF7F2] font-semibold">
+              FLAT 10% OFF APPLIED AUTOMATICALLY FOR LIFE
+            </span>
+            <a
+              href="/#catalog"
+              onClick={(e) => {
+                const target = document.getElementById("catalog");
+                if (target) {
+                  e.preventDefault();
+                  target.scrollIntoView({ behavior: "smooth" });
+                }
+              }}
+              className="inline-flex items-center font-black text-[#F3D17A] hover:text-white transition-colors underline underline-offset-2 shrink-0 cursor-pointer ml-1"
+            >
+              <span>ORDER REFILLS →</span>
+            </a>
+          </div>
+        ) : campaign.claimedSlots < campaign.maxSlots && campaign.isActive ? (
           <div className="flex items-center justify-center sm:justify-start flex-1 min-w-0 flex-wrap gap-x-2 gap-y-0.5 text-center sm:text-left">
             <span className="text-[#F3D17A] tracking-wider uppercase font-black shrink-0">
               FIRST 25 KITCHENS OFFER
