@@ -923,9 +923,15 @@ export const HomePage: React.FC = () => {
                             (Inclusive of GST)
                           </span>
                         </div>
-                        <span className="text-[11px] text-emerald-400 font-bold block mt-0.5">
-                          ✨ Free Doorstep Delivery Included Pan-India
-                        </span>
+                        {combo.regularPrice >= 1000 ? (
+                          <span className="text-[11px] text-emerald-400 font-bold block mt-0.5">
+                            🎉 10% OFF at checkout (Pay ₹{Math.round(combo.regularPrice * 0.9)})
+                          </span>
+                        ) : (
+                          <span className="text-[11px] text-amber-300 font-medium block mt-0.5">
+                            Add ₹{1000 - combo.regularPrice} more to unlock 10% OFF
+                          </span>
+                        )}
                       </div>
 
                       <div className="flex items-center gap-2">
@@ -1003,7 +1009,7 @@ export const HomePage: React.FC = () => {
               <div className="space-y-4 max-w-2xl text-center lg:text-left">
                 <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-black uppercase tracking-wider bg-amber-500/15 text-[#C8751B] border border-[#C8751B]/30 shadow-xs">
                   <Sparkles className="w-3.5 h-3.5 text-[#C8751B]" />
-                  <span>MANOPAVANA ARTISANAL PURITY • ಅಪ್ಪಟ ಗಾಣದ ಎಣ್ಣೆ</span>
+                  <span>MANOPAVANA KITCHEN VALUE • ಆಕರ್ಷಕ ರಿಯಾಯಿತಿ</span>
                 </div>
 
                 <h2
@@ -1011,7 +1017,7 @@ export const HomePage: React.FC = () => {
                     isDark ? "text-[#FAF4EA]" : "text-[#1F120A]"
                   }`}
                 >
-                  Pure Wood-Pressed Oils & Free Doorstep Delivery
+                  Flat 10% Instant OFF on Orders Above ₹1,000
                 </h2>
 
                 <p
@@ -1019,7 +1025,7 @@ export const HomePage: React.FC = () => {
                     isDark ? "text-[#D6C4B0]" : "text-[#5C402D]"
                   }`}
                 >
-                  Stock your home with authentic cold-pressed cooking oils extracted in authentic Vaagai wood pestles below 45°C. Zero chemical refining, zero micro-plastic filtration, and zero solvent preservatives. Plus, enjoy completely Free Doorstep Delivery across India on orders above ₹800 or 2+ bottles!
+                  Stock your home with authentic cold-pressed cooking oils. Any order reaching ₹1,000 automatically receives a 10% discount at checkout — no coupon code or subscription lock-in needed. Plus, enjoy completely Free Doorstep Delivery across India on all orders above ₹500!
                 </p>
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
@@ -1031,7 +1037,7 @@ export const HomePage: React.FC = () => {
                     }`}
                   >
                     <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                    <span className="text-xs font-bold">Cold-Settled Purity</span>
+                    <span className="text-xs font-bold">Automatic 10% in Cart</span>
                   </div>
 
                   <div

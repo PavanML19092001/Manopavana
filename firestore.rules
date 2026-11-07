@@ -28,16 +28,10 @@ service cloud.firestore {
       allow read, write: if true;
     }
 
-    // Global promotional campaigns (First 25 Kitchens global state)
-    match /campaigns/{campaignId} {
-      allow read: if true;
-      allow write: if true;
-    }
-
     // Customer profile & persistent cart
     match /customers/{userId} {
-      allow read: if true;
-      allow write: if isOwner(userId) || isAdmin() || isSignedIn() || true;
+      allow read: if isSignedIn();
+      allow write: if isOwner(userId) || isAdmin() || isSignedIn();
     }
 
     // Orders collection
