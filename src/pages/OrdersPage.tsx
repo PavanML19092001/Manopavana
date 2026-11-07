@@ -278,8 +278,13 @@ export const OrdersPage = () => {
                   </span>
                   <a
                     href={
-                      activeOrder.courier?.toLowerCase().includes("ekart") ||
-                      activeOrder.trackingNumber.startsWith("FMP")
+                      activeOrder.courier?.toLowerCase().includes("shadowfax") ||
+                      activeOrder.trackingNumber.startsWith("SF")
+                        ? `https://tracker.shadowfax.in/?order_id=${encodeURIComponent(
+                            activeOrder.trackingNumber
+                          )}`
+                        : activeOrder.courier?.toLowerCase().includes("ekart") ||
+                          activeOrder.trackingNumber.startsWith("FMP")
                         ? `https://ekartlogistics.com/shipmenttrack/${encodeURIComponent(
                             activeOrder.trackingNumber
                           )}`
@@ -289,11 +294,19 @@ export const OrdersPage = () => {
                     }
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="px-3 py-1.5 rounded-lg text-xs font-bold bg-[#E08F35]/15 text-[#5E3210] dark:text-amber-200 hover:bg-[#E08F35]/25 flex items-center gap-1 transition-colors"
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 transition-colors ${
+                      activeOrder.courier?.toLowerCase().includes("shadowfax") ||
+                      activeOrder.trackingNumber.startsWith("SF")
+                        ? "bg-emerald-500/15 text-emerald-800 dark:text-emerald-300 hover:bg-emerald-500/25"
+                        : "bg-[#E08F35]/15 text-[#5E3210] dark:text-amber-200 hover:bg-[#E08F35]/25"
+                    }`}
                   >
                     <span>
-                      {activeOrder.courier?.toLowerCase().includes("ekart") ||
-                      activeOrder.trackingNumber.startsWith("FMP")
+                      {activeOrder.courier?.toLowerCase().includes("shadowfax") ||
+                      activeOrder.trackingNumber.startsWith("SF")
+                        ? "Track on Shadowfax 360"
+                        : activeOrder.courier?.toLowerCase().includes("ekart") ||
+                          activeOrder.trackingNumber.startsWith("FMP")
                         ? "Track on Ekart Logistics"
                         : "Track on Delhivery"}
                     </span>
@@ -810,8 +823,11 @@ export const OrdersPage = () => {
                           : isExpired
                           ? "Payment window expired after 10 mins"
                           : ord.trackingNumber
-                          ? ord.courier?.toLowerCase().includes("ekart") ||
-                            ord.trackingNumber.startsWith("FMP")
+                          ? ord.courier?.toLowerCase().includes("shadowfax") ||
+                            ord.trackingNumber.startsWith("SF")
+                            ? `Shadowfax 360 AWB #${ord.trackingNumber}`
+                            : ord.courier?.toLowerCase().includes("ekart") ||
+                              ord.trackingNumber.startsWith("FMP")
                             ? `Ekart Logistics AWB #${ord.trackingNumber}`
                             : `Delhivery AWB #${ord.trackingNumber}`
                           : "Preparing your shipment"}

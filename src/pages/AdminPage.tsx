@@ -79,8 +79,8 @@ export const AdminPage: React.FC = () => {
   const [customAwb, setCustomAwb] = useState<Record<string, string>>({});
   const [copiedAddress, setCopiedAddress] = useState<Record<string, boolean>>({});
 
-  // Ekart Logistics State
-  const [carrierChoice, setCarrierChoice] = useState<Record<string, "delhivery" | "ekart">>({});
+  // Carrier Choice & Logistics State
+  const [carrierChoice, setCarrierChoice] = useState<Record<string, "delhivery" | "ekart" | "shadowfax">>({});
   const [manifestingEkart, setManifestingEkart] = useState<Record<string, boolean>>({});
   const [ekartManifestError, setEkartManifestError] = useState<Record<string, string>>({});
   const [customEkartAwb, setCustomEkartAwb] = useState<Record<string, string>>({});
@@ -97,6 +97,31 @@ export const AdminPage: React.FC = () => {
     latencyMs?: number;
     accountStatus?: string;
     walletBalance?: string;
+    message?: string;
+  } | null>(null);
+
+  // Shadowfax 360 Logistics State
+  const [manifestingShadowfax, setManifestingShadowfax] = useState<Record<string, boolean>>({});
+  const [shadowfaxManifestError, setShadowfaxManifestError] = useState<Record<string, string>>({});
+  const [customShadowfaxAwb, setCustomShadowfaxAwb] = useState<Record<string, string>>({});
+  const [checkingShadowfaxPincode, setCheckingShadowfaxPincode] = useState<Record<string, boolean>>({});
+  const [shadowfaxPincodeStatus, setShadowfaxPincodeStatus] = useState<Record<string, any>>({});
+  const [pingingShadowfax, setPingingShadowfax] = useState(false);
+  const [shadowfaxPingResult, setShadowfaxPingResult] = useState<{
+    status: string;
+    authenticated: boolean;
+    tokenMasked?: string;
+    carrier?: string;
+    clientName?: string;
+    clientId?: string;
+    contactPerson?: string;
+    contactPhone?: string;
+    warehouse?: string;
+    originPincode?: string;
+    serviceMode?: string;
+    portalUrl?: string;
+    trackerUrl?: string;
+    latencyMs?: number;
     message?: string;
   } | null>(null);
 
@@ -639,6 +664,160 @@ export const AdminPage: React.FC = () => {
     });
     setCustomEkartAwb((p) => ({ ...p, [orderRef]: "" }));
     showToast(`Saved Ekart AWB #${awb}`);
+  };
+
+  // Shadowfax 360 Logistics Handlers
+  const handlePingShadowfax = async () => {
+    setPingingShadowfax(true);
+    setShadowfaxPingResult(null);
+    try {
+      const res = await fetch("/api?action=shadowfax_test_connection");
+      const data = await res.json();
+      setShadowfaxPingResult(data);
+      if (data.status === "SUCCESS") {
+        showToast("Shadowfax 360 API authenticated and live!");
+      } else {
+        showToast(`Shadowfax: ${data.message || "Connection returned code " + res.status}`);
+      }
+    } catch {
+      setShadowfaxPingResult({
+        status: "ERROR",
+        authenticated: false,
+        carrier: "Shadowfax 360",
+        message: "Network error connecting to Shadowfax API",
+      });
+      showToast("Error testing Shadowfax API connection");
+    } finally {
+      setPingingShadowfax(false);
+    }
+  };
+
+  const handleCheckShadowfaxPincode = async (orderRef: string, pincode?: string) => {
+    if (!pincode) {
+      showToast("No valid pincode provided");
+      return;
+    }
+    setCheckingShadowfaxPincode((p) => ({ ...p, [orderRef]: true }));
+    try {
+      const res = await fetch(
+        `/api?action=shadowfax_check_pincode&pincode=${encodeURIComponent(pincode)}`
+      );
+      const data = await res.json();
+      if (data.status === "SUCCESS") {
+        setShadowfaxPincodeStatus((p) => ({
+          ...p,
+          [orderRef]: {
+            serviceable: data.serviceable,
+            cod: data.cod,
+            prepaid: data.prepaid,
+            expectedDays: data.expectedDays,
+            message: data.message,
+          },
+        }));
+        showToast(
+          `Shadowfax Pincode ${pincode}: ${
+            data.serviceable ? `Deliverable (${data.expectedDays})` : "Unserviceable"
+          }`
+        );
+      }
+    } catch {
+      showToast("Error checking Shadowfax pincode");
+    } finally {
+      setCheckingShadowfaxPincode((p) => ({ ...p, [orderRef]: false }));
+    }
+  };
+
+  const handleManifestShadowfax = async (order: Order) => {
+    setManifestingShadowfax((p) => ({ ...p, [order.orderRef]: true }));
+    setShadowfaxManifestError((p) => ({ ...p, [order.orderRef]: "" }));
+
+    const addr = order.shippingAddress || ({} as any);
+    const items = order.items || [];
+    const totalGrams =
+      items.reduce((acc: number, item: any) => {
+        const titleAndVariant = `${item?.title || ""} ${item?.variant || ""}`.toLowerCase();
+        const isLarge =
+          titleAndVariant.includes("5l") ||
+          titleAndVariant.includes("can") ||
+          titleAndVariant.includes("5 l") ||
+          titleAndVariant.includes("5000ml");
+        const gramsPerUnit = isLarge ? 5000 : 1000;
+        return acc + gramsPerUnit * (Number(item?.quantity) || 1);
+      }, 0) || 1000;
+
+    const fullStreetAddress = [
+      addr.addressLine1?.trim(),
+      addr.landmark?.trim() ? `Near ${addr.landmark.trim()}` : "",
+      addr.district || addr.city,
+    ]
+      .filter(Boolean)
+      .join(", ");
+
+    try {
+      const res = await fetch("/api?action=shadowfax_create_shipment", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          orderRef: order.orderRef,
+          customerName: addr.fullName?.trim() || "Customer",
+          phone: (addr.phone || "").replace(/\D/g, "").slice(-10),
+          address: fullStreetAddress,
+          pincode: (addr.pincode || "560058").replace(/\D/g, "").slice(0, 6),
+          city: addr.city || addr.district || "Bengaluru",
+          state: addr.state || "Karnataka",
+          paymentMode: order.paymentMethod === "cod" ? "COD" : "Prepaid",
+          totalAmount: order.total || 0,
+          weightGrams: totalGrams,
+          productsDesc:
+            items.map((i: any) => `${i.title} (${i.variant})`).join(", ") ||
+            "Wood-pressed Cooking Oil Bottles",
+          quantity: items.reduce(
+            (acc: number, i: any) => acc + (Number(i?.quantity) || 1),
+            0
+          ),
+        }),
+      });
+
+      const data = await res.json();
+      if (data.status === "SUCCESS" && data.waybill) {
+        await updateOrderDetails(order.orderRef, {
+          trackingNumber: data.waybill,
+          courier: "Shadowfax 360",
+          orderStatus: "Packed",
+        });
+        showToast(`Shadowfax Shipment Manifested! AWB: #${data.waybill}`);
+      } else {
+        const errMsg = data.message || "Failed to manifest shipment with Shadowfax";
+        setShadowfaxManifestError((p) => ({
+          ...p,
+          [order.orderRef]: errMsg,
+        }));
+        showToast(`Shadowfax: ${errMsg}`);
+      }
+    } catch {
+      setShadowfaxManifestError((p) => ({
+        ...p,
+        [order.orderRef]: "Network error connecting to Shadowfax API",
+      }));
+      showToast("Error contacting Shadowfax API");
+    } finally {
+      setManifestingShadowfax((p) => ({ ...p, [order.orderRef]: false }));
+    }
+  };
+
+  const handleSaveCustomShadowfaxAwb = async (orderRef: string) => {
+    const awb = (customShadowfaxAwb[orderRef] || "").trim();
+    if (!awb) {
+      showToast("Please enter a valid Shadowfax AWB (e.g. SF...)");
+      return;
+    }
+    await updateOrderDetails(orderRef, {
+      trackingNumber: awb,
+      courier: "Shadowfax 360",
+      orderStatus: "Packed",
+    });
+    setCustomShadowfaxAwb((p) => ({ ...p, [orderRef]: "" }));
+    showToast(`Saved Shadowfax AWB #${awb}`);
   };
 
   // Reset manifest to allow re-manifesting or switching carrier to Delhivery
@@ -1412,6 +1591,24 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                 </span>
               </button>
 
+              <button
+                type="button"
+                onClick={handlePingShadowfax}
+                disabled={pingingShadowfax}
+                className="px-3.5 py-2 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-800 dark:text-emerald-200 border border-emerald-500/30 text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs"
+              >
+                <Activity
+                  className={`w-3.5 h-3.5 text-emerald-600 ${
+                    pingingShadowfax ? "animate-spin" : ""
+                  }`}
+                />
+                <span>
+                  {pingingShadowfax
+                    ? "Testing Shadowfax..."
+                    : "Ping Shadowfax API"}
+                </span>
+              </button>
+
               <a
                 href="https://one.delhivery.com"
                 target="_blank"
@@ -1439,6 +1636,16 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                 className="px-3.5 py-2 rounded-xl bg-sky-100 dark:bg-sky-950/40 hover:bg-sky-200 dark:hover:bg-sky-900/60 text-sky-900 dark:text-sky-200 text-xs font-bold flex items-center gap-1.5 transition-all shadow-2xs border border-sky-500/20"
               >
                 <span>Ekart Portal</span>
+                <ExternalLink className="w-3.5 h-3.5 opacity-60" />
+              </a>
+
+              <a
+                href="https://erp.shadowfax.in"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-3.5 py-2 rounded-xl bg-emerald-100 dark:bg-emerald-950/40 hover:bg-emerald-200 dark:hover:bg-emerald-900/60 text-emerald-900 dark:text-emerald-200 text-xs font-bold flex items-center gap-1.5 transition-all shadow-2xs border border-emerald-500/20"
+              >
+                <span>Shadowfax 360</span>
                 <ExternalLink className="w-3.5 h-3.5 opacity-60" />
               </a>
             </div>
@@ -1502,6 +1709,42 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                 </button>
                 <span className="px-2.5 py-1 rounded bg-emerald-500/20 text-emerald-800 dark:text-emerald-300 font-mono text-[11px] font-bold border border-emerald-500/30">
                   {ekartPingResult.accountStatus || "Account Verified & Active"}
+                </span>
+              </div>
+            </div>
+          )}
+
+          {shadowfaxPingResult && (
+            <div
+              className={`p-3.5 rounded-2xl border text-xs flex flex-wrap items-center justify-between gap-3 ${
+                shadowfaxPingResult.authenticated
+                  ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-900 dark:text-emerald-200"
+                  : "bg-red-500/10 border-red-500/30 text-red-800 dark:text-red-300"
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <Truck className="w-4 h-4 shrink-0 text-emerald-600" />
+                <div>
+                  <span className="font-bold">
+                    Shadowfax 360: {shadowfaxPingResult.message}
+                  </span>
+                  <span className="block text-[11px] opacity-80 font-mono">
+                    Token: {shadowfaxPingResult.tokenMasked} • Warehouse: {shadowfaxPingResult.warehouse} ({shadowfaxPingResult.originPincode}) • Mode: {shadowfaxPingResult.serviceMode} • Latency: {shadowfaxPingResult.latencyMs}ms
+                  </span>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <a
+                  href="https://erp.shadowfax.in"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-2.5 py-1 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-[11px] flex items-center gap-1 transition-colors"
+                >
+                  <span>Recharge / Dashboard</span>
+                  <ExternalLink className="w-2.5 h-2.5" />
+                </a>
+                <span className="px-2.5 py-1 rounded bg-emerald-500/20 text-emerald-800 dark:text-emerald-300 font-mono text-[11px] font-bold border border-emerald-500/30">
+                  Client #30046 Connected
                 </span>
               </div>
             </div>
@@ -2136,6 +2379,23 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                                   <Package className="w-3 h-3 text-sky-200" />
                                   <span>Ekart Logistics</span>
                                 </button>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setCarrierChoice((p) => ({
+                                      ...p,
+                                      [ord.orderRef]: "shadowfax",
+                                    }))
+                                  }
+                                  className={`px-2.5 py-1 rounded-md transition-all cursor-pointer flex items-center gap-1 ${
+                                    carrierChoice[ord.orderRef] === "shadowfax"
+                                      ? "bg-[#008040] text-white shadow-xs"
+                                      : "text-stone-600 dark:text-stone-400 hover:text-stone-900"
+                                  }`}
+                                >
+                                  <Truck className="w-3 h-3 text-lime-300" />
+                                  <span>Shadowfax 360</span>
+                                </button>
                               </div>
                             </div>
 
@@ -2170,30 +2430,57 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                                     {checkingPincode[ord.orderRef] ? "Checking..." : `Verify Delhivery Pin`}
                                   </button>
                                 )
-                              ) : ekartPincodeStatus[ord.orderRef] ? (
+                              ) : carrierChoice[ord.orderRef] === "ekart" ? (
+                                ekartPincodeStatus[ord.orderRef] ? (
+                                  <span
+                                    className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                                      ekartPincodeStatus[ord.orderRef].serviceable
+                                        ? "bg-sky-500/15 text-sky-700 dark:text-sky-300 border border-sky-500/30"
+                                        : "bg-red-500/15 text-red-600 border border-red-500/30"
+                                    }`}
+                                  >
+                                    {ekartPincodeStatus[ord.orderRef].serviceable
+                                      ? `Ekart Serviceable (${ekartPincodeStatus[ord.orderRef].expectedDays})`
+                                      : "Ekart Unserviceable"}
+                                  </span>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleCheckEkartPincode(ord.orderRef, addr.pincode)}
+                                    disabled={checkingEkartPincode[ord.orderRef]}
+                                    className={`text-[10px] font-bold px-2 py-1 rounded-lg border transition-colors cursor-pointer ${
+                                      isDark
+                                        ? "bg-[#1C120B] border-[#3D2514] text-sky-400 hover:bg-[#28180E]"
+                                        : "bg-white border-[#DDD1BE] text-sky-700 hover:bg-[#FAF6EE]"
+                                    }`}
+                                  >
+                                    {checkingEkartPincode[ord.orderRef] ? "Checking..." : `Verify Ekart Pin`}
+                                  </button>
+                                )
+                              ) : shadowfaxPincodeStatus[ord.orderRef] ? (
                                 <span
                                   className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                                    ekartPincodeStatus[ord.orderRef].serviceable
-                                      ? "bg-sky-500/15 text-sky-700 dark:text-sky-300 border border-sky-500/30"
+                                    shadowfaxPincodeStatus[ord.orderRef].serviceable
+                                      ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30"
                                       : "bg-red-500/15 text-red-600 border border-red-500/30"
                                   }`}
                                 >
-                                  {ekartPincodeStatus[ord.orderRef].serviceable
-                                    ? `Ekart Serviceable (${ekartPincodeStatus[ord.orderRef].expectedDays})`
-                                    : "Ekart Unserviceable"}
+                                  {shadowfaxPincodeStatus[ord.orderRef].serviceable
+                                    ? `Shadowfax Serviceable (${shadowfaxPincodeStatus[ord.orderRef].expectedDays})`
+                                    : "Shadowfax Unserviceable"}
                                 </span>
                               ) : (
                                 <button
                                   type="button"
-                                  onClick={() => handleCheckEkartPincode(ord.orderRef, addr.pincode)}
-                                  disabled={checkingEkartPincode[ord.orderRef]}
+                                  onClick={() => handleCheckShadowfaxPincode(ord.orderRef, addr.pincode)}
+                                  disabled={checkingShadowfaxPincode[ord.orderRef]}
                                   className={`text-[10px] font-bold px-2 py-1 rounded-lg border transition-colors cursor-pointer ${
                                     isDark
-                                      ? "bg-[#1C120B] border-[#3D2514] text-sky-400 hover:bg-[#28180E]"
-                                      : "bg-white border-[#DDD1BE] text-sky-700 hover:bg-[#FAF6EE]"
+                                      ? "bg-[#1C120B] border-[#3D2514] text-emerald-400 hover:bg-[#28180E]"
+                                      : "bg-white border-[#DDD1BE] text-emerald-700 hover:bg-[#FAF6EE]"
                                   }`}
                                 >
-                                  {checkingEkartPincode[ord.orderRef] ? "Checking..." : `Verify Ekart Pin`}
+                                  {checkingShadowfaxPincode[ord.orderRef] ? "Checking..." : `Verify Shadowfax Pin`}
                                 </button>
                               )}
                             </div>
@@ -2241,7 +2528,12 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                                   <span className="text-[10px] font-bold text-emerald-600 flex items-center gap-1">
                                     <CheckCircle2 className="w-3 h-3 text-emerald-600" />
                                     Shipment Booked (
-                                    {ord.courier || (ord.trackingNumber.startsWith("FMP") ? "Ekart Logistics" : "Delhivery Express")})
+                                    {ord.courier ||
+                                      (ord.trackingNumber.startsWith("SF")
+                                        ? "Shadowfax 360"
+                                        : ord.trackingNumber.startsWith("FMP")
+                                        ? "Ekart Logistics"
+                                        : "Delhivery Express")})
                                   </span>
                                   <span
                                     className={`font-mono text-xs font-bold ${
@@ -2253,8 +2545,72 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                                 </div>
 
                                 <div className="flex items-center gap-2">
-                                  {ord.courier?.toLowerCase().includes("ekart") ||
-                                  ord.trackingNumber.startsWith("FMP") ? (
+                                  {ord.courier?.toLowerCase().includes("shadowfax") ||
+                                  ord.trackingNumber.startsWith("SF") ? (
+                                    <>
+                                      <a
+                                        href={`/api?action=shadowfax_packing_slip&waybill=${encodeURIComponent(
+                                          ord.trackingNumber || ""
+                                        )}&orderRef=${encodeURIComponent(
+                                          ord.orderRef || ""
+                                        )}&name=${encodeURIComponent(
+                                          addr.fullName || "Customer"
+                                        )}&phone=${encodeURIComponent(
+                                          addr.phone || ""
+                                        )}&address=${encodeURIComponent(
+                                          `${addr.addressLine1 || ""}${
+                                            addr.landmark ? `, Near ${addr.landmark}` : ""
+                                          }`
+                                        )}&city=${encodeURIComponent(
+                                          addr.district || addr.city || "Bengaluru"
+                                        )}&state=${encodeURIComponent(
+                                          addr.state || "Karnataka"
+                                        )}&pincode=${encodeURIComponent(
+                                          addr.pincode || ""
+                                        )}&amount=${encodeURIComponent(
+                                          ord.total || 0
+                                        )}&payment=${encodeURIComponent(
+                                          ord.paymentMethod || "Prepaid"
+                                        )}`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className={`px-2.5 py-1 rounded-lg border font-bold text-[11px] flex items-center gap-1 transition-colors ${
+                                          isDark
+                                            ? "bg-[#1E130B] border-[#3D2514] text-[#FAF4EA] hover:bg-[#2A1A0F]"
+                                            : "bg-[#FAF6EE] border-[#DDD1BE] text-[#1F120A] hover:bg-[#EFE8DC]"
+                                        }`}
+                                        title="Print Shadowfax Shipping Label"
+                                      >
+                                        <Printer className="w-2.5 h-2.5 text-emerald-600" />
+                                        <span>Print Label</span>
+                                      </a>
+                                      <a
+                                        href={`https://tracker.shadowfax.in/?order_id=${encodeURIComponent(
+                                          ord.trackingNumber
+                                        )}`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] flex items-center gap-1 transition-colors"
+                                      >
+                                        <span>Track Shadowfax</span>
+                                        <ExternalLink className="w-2.5 h-2.5" />
+                                      </a>
+                                      <a
+                                        href="https://erp.shadowfax.in"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className={`px-2.5 py-1 rounded-lg border font-bold text-[11px] flex items-center gap-1 transition-colors ${
+                                          isDark
+                                            ? "bg-[#1E130B] border-[#3D2514] text-[#FAF4EA] hover:bg-[#2A1A0F]"
+                                            : "bg-[#FAF6EE] border-[#DDD1BE] text-[#1F120A] hover:bg-[#EFE8DC]"
+                                        }`}
+                                      >
+                                        <span>Shadowfax 360</span>
+                                        <ExternalLink className="w-2.5 h-2.5 opacity-60" />
+                                      </a>
+                                    </>
+                                  ) : ord.courier?.toLowerCase().includes("ekart") ||
+                                    ord.trackingNumber.startsWith("FMP") ? (
                                     <>
                                       <a
                                         href={`/api?action=ekart_packing_slip&waybill=${encodeURIComponent(
@@ -2351,10 +2707,10 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                                     type="button"
                                     onClick={() => handleResetManifest(ord.orderRef)}
                                     className="px-2.5 py-1 rounded-lg border border-amber-500/40 bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-400 font-bold text-[11px] flex items-center gap-1 transition-colors cursor-pointer ml-auto"
-                                    title="Reset shipment to re-manifest or switch to Delhivery"
+                                    title="Reset shipment to re-manifest or switch courier"
                                   >
                                     <RotateCcw className="w-2.5 h-2.5" />
-                                    <span>Reset / Switch to Delhivery</span>
+                                    <span>Reset / Switch Courier</span>
                                   </button>
                                 </div>
                               </div>
@@ -2368,6 +2724,88 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                                   ? "Payment Incomplete — Awaiting Customer Settlement"
                                   : "Order Cancelled — Shipment Booking Disabled"}
                               </span>
+                            </div>
+                          ) : (carrierChoice[ord.orderRef] || "delhivery") === "shadowfax" ? (
+                            /* Shadowfax 360 Manifest Section */
+                            <div className="space-y-2">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => handleManifestShadowfax(ord)}
+                                  disabled={manifestingShadowfax[ord.orderRef]}
+                                  className="px-3 py-1.5 rounded-lg bg-[#008040] hover:bg-[#006030] disabled:opacity-50 text-white font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
+                                >
+                                  <Truck className="w-3.5 h-3.5 text-lime-300" />
+                                  <span>
+                                    {manifestingShadowfax[ord.orderRef]
+                                      ? "Generating Shadowfax AWB..."
+                                      : "⚡ 1-Click Shadowfax Manifest"}
+                                  </span>
+                                </button>
+
+                                <div className="flex items-center gap-1.5 flex-1 min-w-[200px]">
+                                  <input
+                                    type="text"
+                                    placeholder="Or paste Shadowfax AWB (e.g. SF...)..."
+                                    value={customShadowfaxAwb[ord.orderRef] || ""}
+                                    onChange={(e) =>
+                                      setCustomShadowfaxAwb((p) => ({
+                                        ...p,
+                                        [ord.orderRef]: e.target.value,
+                                      }))
+                                    }
+                                    className={`flex-1 px-2.5 py-1 text-xs rounded-lg font-mono focus:outline-none focus:ring-1 focus:ring-emerald-500 ${
+                                      isDark
+                                        ? "bg-[#140D07] border border-[#362114] text-[#FAF4EA] placeholder-[#8A7665]"
+                                        : "bg-white border border-[#DDD1BE] text-[#1F120A] placeholder-[#8A7665]"
+                                    }`}
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => handleSaveCustomShadowfaxAwb(ord.orderRef)}
+                                    className="px-2.5 py-1 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white text-[11px] font-bold cursor-pointer transition-colors shrink-0"
+                                  >
+                                    Save Shadowfax AWB
+                                  </button>
+                                </div>
+                              </div>
+
+                              {shadowfaxManifestError[ord.orderRef] && (
+                                <div className="p-2.5 rounded-lg bg-red-500/10 border border-red-500/20 text-red-700 dark:text-red-300 text-[11px] space-y-2">
+                                  <div className="flex items-center gap-1 font-bold">
+                                    <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                                    <span>Shadowfax Manifest Notice:</span>
+                                  </div>
+                                  <p className="opacity-90">{shadowfaxManifestError[ord.orderRef]}</p>
+                                  <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-red-500/20">
+                                    <a
+                                      href="https://erp.shadowfax.in"
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="px-2.5 py-1 rounded-md bg-[#008040] hover:bg-[#006030] text-white font-bold text-[10px] flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
+                                    >
+                                      <ExternalLink className="w-3 h-3" />
+                                      <span>Recharge in Shadowfax 360 Dashboard</span>
+                                    </a>
+                                    <button
+                                      type="button"
+                                      onClick={() => setCarrierChoice((p) => ({ ...p, [ord.orderRef]: "delhivery" }))}
+                                      className="px-2.5 py-1 rounded-md bg-[#5E3210] hover:bg-[#43230A] text-white font-bold text-[10px] flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
+                                    >
+                                      <Truck className="w-3 h-3 text-amber-300" />
+                                      <span>Switch to Delhivery Express</span>
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => setCarrierChoice((p) => ({ ...p, [ord.orderRef]: "ekart" }))}
+                                      className="px-2.5 py-1 rounded-md bg-sky-600 hover:bg-sky-700 text-white font-bold text-[10px] flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
+                                    >
+                                      <Package className="w-3 h-3 text-sky-200" />
+                                      <span>Switch to Ekart</span>
+                                    </button>
+                                  </div>
+                                </div>
+                              )}
                             </div>
                           ) : (carrierChoice[ord.orderRef] || "delhivery") === "ekart" ? (
                             /* Ekart Logistics Manifest Section */

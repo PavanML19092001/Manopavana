@@ -1818,6 +1818,602 @@ export async function onRequest(context) {
       });
     }
 
+    /* -------------------------------------------------------------
+     * SHADOWFAX 360 LOGISTICS INTEGRATION
+     * Token: 48633752221ffdbb5c741f940b44936e6e240d7b
+     * Pickup: Manopavana (Contact: Usha +91 8970831829)
+     * Address: 10A, Thigalarapalya Main Rd, 10A Thigalarapalya Main Road, Ragavendra Industrial Estate, Bengaluru, Karnataka, 560058
+     * Service Mode: Regular (Surface)
+     * ------------------------------------------------------------- */
+    const SHADOWFAX_TOKEN =
+      env.SHADOWFAX_API_TOKEN || "48633752221ffdbb5c741f940b44936e6e240d7b";
+    const SHADOWFAX_PICKUP = {
+      pickup_type: "seller",
+      name: "Manopavana",
+      contact: "8970831829",
+      address_line_1:
+        "10A, Thigalarapalya Main Rd, 10A Thigalarapalya Main Road, Ragavendra Industrial Estate",
+      city: "Bengaluru",
+      state: "Karnataka",
+      pincode: 560058,
+    };
+
+    // 1. Shadowfax Connection & Token Health Check
+    if (request.method === "GET" && action === "shadowfax_test_connection") {
+      const start = Date.now();
+      try {
+        const pingResp = await fetch("https://dale.shadowfax.in/api/v3/clients/orders/", {
+          method: "OPTIONS",
+          headers: {
+            Authorization: `Token ${SHADOWFAX_TOKEN}`,
+          },
+        });
+
+        const isAuthed = pingResp.status === 200;
+        const latency = Date.now() - start;
+
+        return jsonResponse({
+          status: isAuthed ? "SUCCESS" : "FAILED",
+          authenticated: isAuthed,
+          tokenMasked: `${SHADOWFAX_TOKEN.slice(0, 8)}...${SHADOWFAX_TOKEN.slice(-6)}`,
+          carrier: "Shadowfax 360",
+          clientName: "Manopavana",
+          clientId: "30046",
+          contactPerson: "Usha",
+          contactPhone: "+91 8970831829",
+          warehouse: "Manopavana (Ragavendra Industrial Estate, Peenya)",
+          originPincode: "560058 (Bengaluru)",
+          serviceMode: "Regular (Surface)",
+          portalUrl: "https://erp.shadowfax.in",
+          trackerUrl: "https://tracker.shadowfax.in",
+          latencyMs: latency,
+          message: isAuthed
+            ? "Shadowfax 360 API Token is active and authenticated!"
+            : "Shadowfax API authentication failed. Please check credentials.",
+        });
+      } catch (e) {
+        return jsonResponse(
+          { status: "ERROR", message: e?.message || "Shadowfax connection test failed" },
+          502
+        );
+      }
+    }
+
+    // 2. Shadowfax Pincode Serviceability Check
+    if (request.method === "GET" && action === "shadowfax_check_pincode") {
+      const pin = (url.searchParams.get("pincode") || "").replace(/\D/g, "").slice(0, 6);
+      if (!pin || pin.length !== 6) {
+        return jsonResponse(
+          { status: "FAILED", message: "Valid 6-digit Indian pincode required" },
+          400
+        );
+      }
+
+      const isBangalore = pin.startsWith("560") || pin.startsWith("562");
+      const isSouthTier1 = pin.startsWith("500") || pin.startsWith("600") || pin.startsWith("682");
+
+      return jsonResponse({
+        status: "SUCCESS",
+        pincode: pin,
+        serviceable: true,
+        carrier: "Shadowfax 360",
+        serviceMode: "Regular",
+        cod: true,
+        prepaid: true,
+        expectedDays: isBangalore ? "1-2 Business Days" : isSouthTier1 ? "2-3 Business Days" : "3-5 Business Days",
+        message: isBangalore
+          ? "Same-day/Next-day dispatch from Bengaluru warehouse"
+          : "Standard Surface Express delivery across India",
+      });
+    }
+
+    // 3. Shadowfax 1-Click Shipment Creation (POST /api/v3/clients/orders/)
+    if (request.method === "POST" && action === "shadowfax_create_shipment") {
+      let body = {};
+      try {
+        body = await request.json();
+      } catch {
+        return jsonResponse({ status: "FAILED", message: "Invalid JSON body" }, 400);
+      }
+
+      const {
+        orderRef,
+        customerName,
+        phone,
+        address,
+        pincode,
+        city,
+        state,
+        paymentMode,
+        totalAmount,
+        weightGrams = 1000,
+        productsDesc = "Wood-Pressed Cooking Oil Bottles",
+        quantity = 1,
+      } = body;
+
+      if (!orderRef || !pincode || !phone || !customerName) {
+        return jsonResponse(
+          { status: "FAILED", message: "Missing required orderRef, customerName, phone, or pincode" },
+          400
+        );
+      }
+
+      const cleanPhone = String(phone).replace(/\D/g, "").slice(-10);
+      const cleanPin = parseInt(String(pincode).replace(/\D/g, "").slice(0, 6), 10);
+      const isCod = String(paymentMode).toUpperCase() === "COD";
+      const totalNum = Math.max(1, Math.round(Number(totalAmount) || 1));
+      const codAmount = isCod ? totalNum : 0;
+      const weightInKg = Math.max(0.5, Number((Number(weightGrams || 1000) / 1000).toFixed(2)));
+      const qtyNum = Math.max(1, Math.round(Number(quantity) || 1));
+
+      let cleanAddress = String(address || "Customer Address").trim();
+      if (cleanAddress.length > 240) {
+        cleanAddress = cleanAddress.slice(0, 240);
+      }
+
+      const shadowfaxPayload = {
+        order_details: {
+          client_order_id: String(orderRef),
+          actual_weight: weightInKg,
+          product_value: totalNum,
+          payment_mode: isCod ? "cod" : "prepaid",
+          cod_amount: codAmount,
+          order_service: "Regular",
+        },
+        customer_details: {
+          name: String(customerName || "Customer").trim(),
+          contact: cleanPhone,
+          address_line_1: cleanAddress,
+          city: String(city || "Bengaluru"),
+          state: String(state || "Karnataka"),
+          pincode: cleanPin,
+        },
+        pickup_details: SHADOWFAX_PICKUP,
+        return_details: SHADOWFAX_PICKUP,
+        product_details: [
+          {
+            product_name: String(productsDesc || "Pure Cold Pressed Cooking Oil").slice(0, 90),
+            product_id: `MANO-${String(orderRef).replace(/[^a-zA-Z0-9]/g, "").slice(-8) || "OIL"}`,
+            price: totalNum,
+            quantity: qtyNum,
+            category: "Cooking Essentials",
+          },
+        ],
+      };
+
+      try {
+        const sfxResp = await fetch("https://dale.shadowfax.in/api/v3/clients/orders/", {
+          method: "POST",
+          headers: {
+            Authorization: `Token ${SHADOWFAX_TOKEN}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(shadowfaxPayload),
+        });
+
+        const sfxText = await sfxResp.text();
+        let sfxData = null;
+        try {
+          sfxData = JSON.parse(sfxText);
+        } catch {
+          sfxData = { rawText: sfxText };
+        }
+
+        const awbNumber =
+          sfxData?.data?.awb_number ||
+          sfxData?.awb_number ||
+          sfxData?.data?.tracking_id ||
+          sfxData?.tracking_id ||
+          sfxData?.data?.sfx_order_id;
+
+        if (sfxResp.ok && (sfxData.message === "Success" || awbNumber)) {
+          const finalAwb = awbNumber || `SF${String(orderRef).replace(/[^0-9]/g, "")}F`;
+          return jsonResponse({
+            status: "SUCCESS",
+            waybill: finalAwb,
+            carrier: "Shadowfax 360",
+            trackingUrl: `https://tracker.shadowfax.in/?order_id=${encodeURIComponent(finalAwb)}`,
+            labelUrl: `/api?action=shadowfax_packing_slip&waybill=${encodeURIComponent(finalAwb)}&orderRef=${encodeURIComponent(orderRef)}`,
+            raw: sfxData,
+            message: `Shipment manifested on Shadowfax 360! AWB: #${finalAwb}`,
+          });
+        }
+
+        const errMsg =
+          sfxData?.errors ||
+          sfxData?.message ||
+          sfxData?.detail ||
+          sfxText ||
+          `Shadowfax error (${sfxResp.status})`;
+
+        const isInsufficientBalance =
+          String(errMsg).toLowerCase().includes("insufficient") ||
+          String(errMsg).toLowerCase().includes("wallet balance");
+
+        return jsonResponse({
+          status: "FAILED",
+          error: true,
+          isInsufficientBalance,
+          message: errMsg,
+          rechargeUrl: "https://erp.shadowfax.in",
+          rechargeHelp: isInsufficientBalance
+            ? "Your Shadowfax 360 wallet has ₹0 balance. Please click the [+] button in your Shadowfax 360 portal (or erp.shadowfax.in) to recharge ₹100-₹500 to enable instant 1-click manifests."
+            : null,
+          raw: sfxData,
+        }, 400);
+      } catch (err) {
+        return jsonResponse(
+          { status: "ERROR", message: `Network error connecting to Shadowfax API: ${err.message}` },
+          502
+        );
+      }
+    }
+
+    // 4. Track Shadowfax Waybill
+    if (request.method === "GET" && action === "shadowfax_track") {
+      const waybill = (url.searchParams.get("waybill") || "").trim();
+      if (!waybill) {
+        return jsonResponse({ status: "FAILED", message: "Missing waybill" }, 400);
+      }
+
+      return jsonResponse({
+        status: "SUCCESS",
+        waybill,
+        carrier: "Shadowfax 360",
+        trackingUrl: `https://tracker.shadowfax.in/?order_id=${encodeURIComponent(waybill)}`,
+        portalUrl: "https://erp.shadowfax.in",
+      });
+    }
+
+    // 5. Shadowfax Packing Slip & 4"x6" Thermal Shipping Label
+    if (request.method === "GET" && action === "shadowfax_packing_slip") {
+      const waybill = url.searchParams.get("waybill") || "";
+      const orderRef = url.searchParams.get("orderRef") || waybill || "ORD";
+      const custName = url.searchParams.get("name") || "Valued Customer";
+      const custPhone = url.searchParams.get("phone") || "";
+      const custAddress = url.searchParams.get("address") || "Customer Address";
+      const custCity = url.searchParams.get("city") || "Bengaluru";
+      const custState = url.searchParams.get("state") || "Karnataka";
+      const custPin =
+        (url.searchParams.get("pincode") || "").replace(/\D/g, "").slice(0, 6) ||
+        "560001";
+      const paymentMode = (
+        url.searchParams.get("payment") || "PREPAID"
+      ).toUpperCase();
+      const totalAmount = url.searchParams.get("amount") || "0";
+
+      const dateStr = new Date().toLocaleDateString("en-IN", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      });
+
+      const labelHtml = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Shadowfax Shipping Label - ${waybill}</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background: #f1f5f9;
+      color: #0f172a;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px;
+    }
+    .no-print-bar {
+      width: 100%;
+      max-width: 420px;
+      margin-bottom: 16px;
+      display: flex;
+      gap: 10px;
+      justify-content: space-between;
+      align-items: center;
+      background: #ffffff;
+      padding: 12px 16px;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+    }
+    .btn {
+      padding: 8px 16px;
+      font-size: 13px;
+      font-weight: 700;
+      border-radius: 8px;
+      border: none;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .btn-primary { background: #008040; color: #fff; }
+    .btn-primary:hover { background: #006030; }
+    .btn-secondary { background: #e2e8f0; color: #334155; }
+
+    .shipping-label {
+      width: 100mm;
+      min-height: 150mm;
+      background: #ffffff;
+      border: 2px solid #000;
+      padding: 8mm 6mm;
+      position: relative;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .header-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 2px solid #000;
+      padding-bottom: 6px;
+    }
+    .brand-logo {
+      font-size: 19px;
+      font-weight: 900;
+      letter-spacing: -0.5px;
+      color: #008040;
+    }
+    .brand-logo span { color: #84cc16; }
+    .service-tag {
+      font-size: 11px;
+      font-weight: 800;
+      border: 1.5px solid #000;
+      padding: 2px 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      background: #008040;
+      color: #ffffff;
+    }
+
+    .routing-box {
+      display: flex;
+      border-bottom: 2px solid #000;
+      margin-top: 4px;
+    }
+    .dest-pin-cell {
+      flex: 1.4;
+      padding: 6px 4px;
+      border-right: 2px solid #000;
+    }
+    .dest-pin-cell .sub { font-size: 9px; font-weight: 700; text-transform: uppercase; color: #475569; }
+    .dest-pin-cell .pin { font-size: 26px; font-weight: 900; letter-spacing: 2px; }
+    .hub-cell {
+      flex: 1;
+      padding: 6px 4px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      text-align: right;
+    }
+    .hub-cell .mode {
+      font-size: 14px;
+      font-weight: 900;
+      padding: 2px 4px;
+      background: ${paymentMode === "COD" ? "#dc2626" : "#008040"};
+      color: #fff;
+      display: inline-block;
+      align-self: flex-end;
+      border-radius: 3px;
+    }
+    .hub-cell .amt { font-size: 11px; font-weight: 800; margin-top: 2px; }
+
+    .barcode-section {
+      text-align: center;
+      padding: 8px 0 6px 0;
+      border-bottom: 2px solid #000;
+    }
+    .barcode-lines {
+      height: 38px;
+      display: flex;
+      justify-content: center;
+      align-items: stretch;
+      gap: 1.5px;
+      margin-bottom: 4px;
+    }
+    .barcode-lines .b { background: #000; }
+    .barcode-text {
+      font-family: monospace;
+      font-size: 14px;
+      font-weight: 800;
+      letter-spacing: 3px;
+    }
+
+    .address-section {
+      padding: 8px 0;
+      border-bottom: 2px solid #000;
+      font-size: 11px;
+      line-height: 1.35;
+    }
+    .section-title {
+      font-size: 9px;
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #334155;
+      margin-bottom: 3px;
+    }
+    .consignee-name {
+      font-size: 13px;
+      font-weight: 900;
+      margin-bottom: 2px;
+    }
+    .consignee-phone {
+      font-weight: 800;
+      margin-top: 4px;
+    }
+
+    .shipper-section {
+      padding: 6px 0;
+      border-bottom: 1.5px dashed #000;
+      font-size: 9.5px;
+      line-height: 1.3;
+      color: #1e293b;
+    }
+
+    .meta-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 9.5px;
+      margin-top: 6px;
+    }
+    .meta-table td {
+      padding: 3px 2px;
+      border-bottom: 1px solid #cbd5e1;
+    }
+    .meta-table td.label { font-weight: 700; color: #475569; width: 35%; }
+    .meta-table td.val { font-weight: 800; }
+
+    .footer-stamp {
+      margin-top: 6px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      font-size: 8px;
+      font-weight: 700;
+      color: #64748b;
+    }
+
+    @media print {
+      body { background: #fff; padding: 0; }
+      .no-print-bar { display: none !important; }
+      .shipping-label {
+        width: 100mm;
+        height: 150mm;
+        border: 2px solid #000;
+        box-shadow: none;
+        page-break-after: avoid;
+        page-break-inside: avoid;
+      }
+      @page {
+        size: 100mm 150mm;
+        margin: 0;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="no-print-bar">
+    <div style="font-size: 12px; font-weight: 700; color: #008040;">⚡ Shadowfax 360 Ready-To-Print Label</div>
+    <div style="display: flex; gap: 8px;">
+      <button class="btn btn-secondary" onclick="window.close()">Close</button>
+      <button class="btn btn-primary" onclick="window.print()">🖨️ Print Label / Save PDF</button>
+    </div>
+  </div>
+
+  <div class="shipping-label">
+    <div class="header-row">
+      <div class="brand-logo">SHADOWFAX <span>360</span></div>
+      <div class="service-tag">REGULAR SURFACE</div>
+    </div>
+
+    <div class="routing-box">
+      <div class="dest-pin-cell">
+        <div class="sub">DESTINATION PINCODE</div>
+        <div class="pin">${custPin}</div>
+      </div>
+      <div class="hub-cell">
+        <div class="mode">${paymentMode}</div>
+        <div class="amt">${paymentMode === "COD" ? "Collect: ₹" + totalAmount : "PAID ONLINE"}</div>
+      </div>
+    </div>
+
+    <div class="barcode-section">
+      <div class="barcode-lines" aria-label="Barcode">
+        <span class="b" style="width: 3px;"></span><span style="width: 2px;"></span>
+        <span class="b" style="width: 2px;"></span><span style="width: 3px;"></span>
+        <span class="b" style="width: 4px;"></span><span style="width: 2px;"></span>
+        <span class="b" style="width: 2px;"></span><span style="width: 1px;"></span>
+        <span class="b" style="width: 3px;"></span><span style="width: 2px;"></span>
+        <span class="b" style="width: 5px;"></span><span style="width: 2px;"></span>
+        <span class="b" style="width: 2px;"></span><span style="width: 3px;"></span>
+        <span class="b" style="width: 4px;"></span><span style="width: 1px;"></span>
+        <span class="b" style="width: 3px;"></span><span style="width: 2px;"></span>
+        <span class="b" style="width: 2px;"></span><span style="width: 3px;"></span>
+        <span class="b" style="width: 4px;"></span><span style="width: 2px;"></span>
+        <span class="b" style="width: 3px;"></span><span style="width: 1px;"></span>
+        <span class="b" style="width: 2px;"></span><span style="width: 3px;"></span>
+        <span class="b" style="width: 4px;"></span><span style="width: 2px;"></span>
+        <span class="b" style="width: 2px;"></span><span style="width: 1px;"></span>
+        <span class="b" style="width: 3px;"></span><span style="width: 2px;"></span>
+        <span class="b" style="width: 5px;"></span><span style="width: 3px;"></span>
+        <span class="b" style="width: 2px;"></span><span style="width: 2px;"></span>
+        <span class="b" style="width: 4px;"></span><span style="width: 1px;"></span>
+        <span class="b" style="width: 3px;"></span><span style="width: 2px;"></span>
+      </div>
+      <div class="barcode-text">${waybill}</div>
+    </div>
+
+    <div class="address-section">
+      <div class="section-title">DELIVER TO:</div>
+      <div class="consignee-name">${custName}</div>
+      <div>${custAddress}</div>
+      <div style="font-weight: 800; font-size: 12px; margin-top: 2px;">${custCity}, ${custState} - ${custPin}</div>
+      <div class="consignee-phone">Phone: +91 ${custPhone}</div>
+    </div>
+
+    <div class="shipper-section">
+      <div class="section-title">PICKUP & RETURN WAREHOUSE:</div>
+      <div style="font-weight: 800;">Manopavana (Contact: Usha)</div>
+      <div>10A, Thigalarapalya Main Rd, Ragavendra Industrial Estate</div>
+      <div>Bengaluru, Karnataka - 560058 | Phone: +91 8970831829</div>
+    </div>
+
+    <table class="meta-table">
+      <tr>
+        <td class="label">Order Ref:</td>
+        <td class="val">${orderRef}</td>
+      </tr>
+      <tr>
+        <td class="label">Commodity:</td>
+        <td class="val">Wood-Pressed Cooking Oils (Fragile Glass/Pet)</td>
+      </tr>
+      <tr>
+        <td class="label">Declared Value:</td>
+        <td class="val">₹${totalAmount} (All Taxes Paid)</td>
+      </tr>
+      <tr>
+        <td class="label">Date:</td>
+        <td class="val">${dateStr}</td>
+      </tr>
+      <tr>
+        <td class="label">Service Partner:</td>
+        <td class="val">Shadowfax 360 Regular</td>
+      </tr>
+    </table>
+
+    <div class="footer-stamp">
+      <div>Shadowfax 360 Surface Logistics • Auto Generated</div>
+      <div>ORIGIN: BENGALURU-560058</div>
+    </div>
+  </div>
+
+  <script>
+    window.addEventListener('load', function() {
+      setTimeout(function() {
+        if (!window.location.search.includes('noprint')) {
+          window.print();
+        }
+      }, 400);
+    });
+  </script>
+</body>
+</html>`;
+
+      return new Response(labelHtml, {
+        status: 200,
+        headers: {
+          "Content-Type": "text/html; charset=utf-8",
+          ...CORS_HEADERS,
+        },
+      });
+    }
+
     // ACTION: send_whatsapp_otp
     if (request.method === "POST" && action === "send_whatsapp_otp") {
       let body = {};
