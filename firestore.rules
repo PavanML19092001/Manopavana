@@ -58,6 +58,12 @@ service cloud.firestore {
       allow read: if true;
       allow write: if true;
     }
+
+    // First 25 Kitchens Campaign tracking
+    match /campaigns/{campaignId} {
+      allow read: if true;
+      allow write: if true;
+    }
   }
 }
 

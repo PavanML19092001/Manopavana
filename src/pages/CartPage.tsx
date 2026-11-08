@@ -403,7 +403,19 @@ export const CartPage: React.FC = () => {
                     </span>
                   </div>
                 )}
-                <div
+
+
+                {discount > 0 && (
+                  <div className="flex items-center justify-between text-emerald-800 dark:text-emerald-300 font-bold">
+                    <span className="flex items-center gap-1">
+                      <Sparkles className="w-3.5 h-3.5 text-[#E0B04A]" />
+                      <span>{isSaleActive() ? "10% Diwali Savings" : "10% Order Discount"}</span>
+                    </span>
+                    <span className="font-bold">-₹{discount}</span>
+                  </div>
+                )}
+
+                                <div
                   className={`flex items-center justify-between ${
                     isDark ? "text-[#FAF3E0]" : "text-[#14291D]"
                   }`}
@@ -417,16 +429,6 @@ export const CartPage: React.FC = () => {
                     ₹{subtotal}
                   </span>
                 </div>
-
-                {discount > 0 && (
-                  <div className="flex items-center justify-between text-emerald-800 dark:text-emerald-300 font-bold">
-                    <span className="flex items-center gap-1">
-                      <Sparkles className="w-3.5 h-3.5 text-[#E0B04A]" />
-                      <span>{isSaleActive() ? "10% Diwali Savings" : "10% Order Discount"}</span>
-                    </span>
-                    <span className="font-bold">-₹{discount}</span>
-                  </div>
-                )}
 
                 <div
                   className={`flex items-center justify-between ${

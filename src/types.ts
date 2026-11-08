@@ -78,7 +78,7 @@ export interface Product {
 }
 
 export interface ComboProduct {
-  id: "combo-3l" | "combo-1.5l";
+  id: "combo-3l" | "combo-1.5l" | "combo-1l" | string;
   name: string;
   heading: string;
   volumeLabel: string;
@@ -99,7 +99,7 @@ export interface CartItem {
   isCombo?: boolean;
   title: string;
   subtitle: string;
-  variant: BottleVolume | "3L Trio" | "1.5L Trio";
+  variant: BottleVolume | "3L Trio" | "1.5L Trio" | "1L Duo" | string;
   price: number;
   regularPrice: number;
   quantity: number;
@@ -396,4 +396,27 @@ export interface StoreCMSConfig {
   faqs?: FAQItem[];
 
   [key: string]: any;
+}
+
+export interface First25CampaignData {
+  campaignId: "first25kitchens";
+  maxSlots: number;
+  claimedSlots: number;
+  isActive: boolean;
+  enrolledCustomerUids: string[];
+  updatedAt: string;
+}
+
+export type DiscountStage = "order1" | "order2" | "order3plus" | "expired";
+
+export interface CustomerDiscountTier {
+  percent: number;
+  label: string;
+  badge: string;
+  isEligible: boolean;
+  stage: DiscountStage;
+  claimedSlots: number;
+  maxSlots: number;
+  isEnrolled: boolean;
+  ordersPlacedCount: number;
 }

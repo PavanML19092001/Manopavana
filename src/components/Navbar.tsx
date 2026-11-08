@@ -6,7 +6,6 @@ import {
   QrCode,
   User,
   ShieldAlert,
-  Sparkles,
   Search,
   X,
   Plus,
@@ -201,29 +200,6 @@ export const Navbar: React.FC = () => {
             : "bg-gradient-to-b from-[#1F3D2B] via-[#1B0F08] to-[#140C07] text-[#FAF3E0] border-b border-[#E0B04A]/30 shadow-2xl backdrop-blur-md"
         }`}
     >
-      {/* COMPACT TOP ANNOUNCEMENT TICKER */}
-      <div
-        className={`py-1 px-3 text-[11px] font-bold border-b tracking-wide flex items-center justify-between box-border transition-colors ${isLight
-            ? "bg-[#4D2811] text-[#FFE8BD] border-[#653517]"
-            : isDark
-              ? "bg-[#0A0503] text-[#F3D17A] border-[#2A160C]"
-              : "bg-[#0D0603] text-[#F3D17A] border-[#3D2212]"
-          }`}
-      >
-        <div className="flex items-center gap-1.5 truncate flex-1 justify-center sm:justify-start">
-          <Sparkles className="w-3.5 h-3.5 text-[#E0B04A] shrink-0 animate-pulse" />
-          <span className="truncate">{cmsConfig.announcementTicker}</span>
-          <button
-            onClick={() => openLoyaltyQuiz()}
-            className="hidden md:inline-flex items-center gap-1 ml-2 text-[10px] bg-[#E0B04A] text-[#14291D] font-black px-2 py-0.5 rounded-full hover:bg-amber-300 transition-colors cursor-pointer"
-          >
-            Scan Bottle for 10% Off →
-          </button>
-        </div>
-
-
-      </div>
-
       {/* STREAMLINED 2-ROW MOBILE HEADER (md:hidden) - FLIPKART STYLE */}
       <div className="md:hidden w-full max-w-full overflow-x-clip flex flex-col box-border">
         {/* ROW 1: BRAND CLUSTER (LOGO + NAME + TAGLINE) + LOCATION SELECTOR */}

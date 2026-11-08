@@ -127,6 +127,10 @@
     "/settings/{settingId}": {
       "schema": { "$ref": "#/entities/StoreConfig" },
       "description": "Store configuration and dynamic pricing"
+    },
+    "/campaigns/{campaignId}": {
+      "schema": { "$ref": "#/entities/StoreConfig" },
+      "description": "First 25 Kitchens campaign slot and cohort tracker"
     }
   }
 }

@@ -30,7 +30,7 @@ import {
   FieldValue,
 } from "firebase/firestore";
 import firebaseConfig from "../firebase-applet-config.json";
-import { CustomerReview, Order, StoreCMSConfig } from "./types";
+import { CustomerReview, Order, StoreCMSConfig, First25CampaignData } from "./types";
 
 // Initialize Firebase safely with provisioned Database ID and auto-detect long polling
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
@@ -784,6 +784,10 @@ export async function saveOrderToFirestore(order: Order, userUid?: string): Prom
         },
         { merge: true }
       ).catch(() => {});
+
+      syncFirst25CampaignOrder(uid, order.orderRef).catch((e) =>
+        console.warn("First25 auto-enroll notice:", e)
+      );
     }
 
     return true;
@@ -1068,3 +1072,123 @@ export async function fetchAllOrdersOnce(): Promise<Order[]> {
     return [];
   }
 }
+
+/**
+ * Synchronize First 25 Kitchens Campaign membership and order counts in Firestore.
+ * Everything is persisted directly in Firestore (zero reliance on localStorage).
+ */
+export async function syncFirst25CampaignOrder(customerUid: string, orderRef: string): Promise<void> {
+  if (!customerUid) return;
+  try {
+    const campaignDocRef = doc(db, "campaigns", "first25kitchens");
+    const campaignSnap = await getDoc(campaignDocRef);
+    let claimedSlots = 0;
+    let enrolledCustomerUids: string[] = [];
+
+    if (campaignSnap.exists()) {
+      const data = campaignSnap.data();
+      claimedSlots = Number(data.claimedSlots) || 0;
+      enrolledCustomerUids = Array.isArray(data.enrolledCustomerUids) ? data.enrolledCustomerUids : [];
+    }
+
+    const customerRef = doc(db, "customers", customerUid);
+    const customerSnap = await getDoc(customerRef);
+    const customerData = customerSnap.exists() ? customerSnap.data() : {};
+    const existingOrdersCount = Number(customerData.successfulOrdersCount || customerData.totalOrders || 0);
+    const isAlreadyEnrolled =
+      enrolledCustomerUids.includes(customerUid) || Boolean(customerData.isFirst25KitchensMember);
+
+    // If customer is not yet enrolled and slots remain under 25:
+    if (!isAlreadyEnrolled && claimedSlots < 25 && existingOrdersCount === 0) {
+      const nextSlots = claimedSlots + 1;
+      await setDoc(
+        campaignDocRef,
+        {
+          campaignId: "first25kitchens",
+          maxSlots: 25,
+          claimedSlots: nextSlots,
+          isActive: nextSlots < 25,
+          enrolledCustomerUids: arrayUnion(customerUid),
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true }
+      );
+
+      await setDoc(
+        customerRef,
+        {
+          isFirst25KitchensMember: true,
+          first25OrderRef: orderRef,
+          first25SlotNumber: nextSlots,
+          successfulOrdersCount: increment(1),
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true }
+      );
+    } else {
+      // Returning customer or post-campaign customer: increment verified orders count
+      await setDoc(
+        customerRef,
+        {
+          successfulOrdersCount: increment(1),
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true }
+      );
+    }
+  } catch (err) {
+    console.warn("First25 campaign sync notice:", err);
+  }
+}
+
+/**
+ * Real-time listener for the First 25 Kitchens campaign status in Firestore.
+ */
+export function subscribeFirst25Campaign(
+  callback: (campaign: First25CampaignData) => void
+): () => void {
+  try {
+    const campaignDocRef = doc(db, "campaigns", "first25kitchens");
+    return onSnapshot(
+      campaignDocRef,
+      (snap) => {
+        if (snap.exists()) {
+          const d = snap.data();
+          const claimed = Number(d.claimedSlots) || 0;
+          const max = Number(d.maxSlots) || 25;
+          callback({
+            campaignId: "first25kitchens",
+            maxSlots: max,
+            claimedSlots: claimed,
+            isActive: d.isActive !== false && claimed < max,
+            enrolledCustomerUids: Array.isArray(d.enrolledCustomerUids) ? d.enrolledCustomerUids : [],
+            updatedAt: d.updatedAt ? String(d.updatedAt) : new Date().toISOString(),
+          });
+        } else {
+          // Initialize document in Firestore if not present
+          const initData: First25CampaignData = {
+            campaignId: "first25kitchens",
+            maxSlots: 25,
+            claimedSlots: 0,
+            isActive: true,
+            enrolledCustomerUids: [],
+            updatedAt: new Date().toISOString(),
+          };
+          setDoc(campaignDocRef, {
+            ...initData,
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp(),
+          }).catch(() => {});
+          callback(initData);
+        }
+      },
+      (err) => {
+        handleFirestoreError(err, OperationType.GET, "campaigns/first25kitchens");
+      }
+    );
+  } catch (err) {
+    handleFirestoreError(err, OperationType.GET, "campaigns/first25kitchens");
+    return () => {};
+  }
+}
+
