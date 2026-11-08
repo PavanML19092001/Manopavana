@@ -86,6 +86,11 @@ export const StorefrontCMSPanel: React.FC<{ isDark: boolean }> = ({ isDark }) =>
   const [fallbackImageUrl, setFallbackImageUrl] = useState(cmsConfig?.heroFallbackImage || MEDIA_ASSETS.heroFallbackImage);
   const [ambientAudioTrack, setAmbientAudioTrack] = useState(cmsConfig?.ambientAudioTrack || MEDIA_ASSETS.ambientAudioTrack);
   const [comboBannerImage, setComboBannerImage] = useState(cmsConfig?.comboBannerImage || MEDIA_ASSETS.comboBanner);
+  const [mainBannerImageUrl, setMainBannerImageUrl] = useState(cmsConfig?.mainBannerImageUrl || "");
+  const [mainBannerVideoUrl, setMainBannerVideoUrl] = useState(cmsConfig?.mainBannerVideoUrl || "");
+  const [mainBannerMediaType, setMainBannerMediaType] = useState<"image" | "video">(
+    cmsConfig?.mainBannerMediaType || "image"
+  );
   const [highlightsInput, setHighlightsInput] = useState(
     (cmsConfig?.heroHighlights || BUSINESS_CONFIG.HERO_HIGHLIGHTS).join(", ")
   );
@@ -381,6 +386,9 @@ export const StorefrontCMSPanel: React.FC<{ isDark: boolean }> = ({ isDark }) =>
       brandLogoUrl: logoUrl,
       chekkuVideoUrl: videoUrl,
       heroFallbackImage: fallbackImageUrl,
+      mainBannerImageUrl,
+      mainBannerVideoUrl,
+      mainBannerMediaType,
       ambientAudioTrack,
       comboBannerImage,
       heroHighlights: parsedHighlights.length > 0 ? parsedHighlights : prev.heroHighlights,
@@ -501,15 +509,15 @@ export const StorefrontCMSPanel: React.FC<{ isDark: boolean }> = ({ isDark }) =>
   return (
     <div
       className={`rounded-2xl border p-6 shadow-sm space-y-5 ${
-        isDark ? "bg-[#1C120B] border-[#362114]" : "bg-white border-[#E8DEC8]"
+        isDark ? "bg-[#14291D] border-[#1F3D2B]" : "bg-white border-[#F2E8CC]"
       }`}
     >
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b pb-3 border-stone-200 dark:border-stone-800">
         <div className="flex items-center gap-2">
-          <Settings className="w-5 h-5 text-[#E08F35]" />
+          <Settings className="w-5 h-5 text-[#E0B04A]" />
           <div>
             <h2 className="text-base font-bold font-serif">Master Storefront CMS (Every Text & Image)</h2>
-            <p className="text-[11px] text-[#6A523E] dark:text-[#C4B29E]">
+            <p className="text-[11px] text-[#6A523E] dark:text-[#3F4F45]">
               Edit all content, products, combos, media & prices with live ₹0 Firestore synchronization
             </p>
           </div>
@@ -541,9 +549,9 @@ export const StorefrontCMSPanel: React.FC<{ isDark: boolean }> = ({ isDark }) =>
             onClick={() => setActiveTab(tab.key as any)}
             className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
               activeTab === tab.key
-                ? "bg-[#5E3210] text-white shadow-sm"
+                ? "bg-[#1F3D2B] text-white shadow-sm"
                 : isDark
-                ? "bg-[#150D07] text-[#D8C8B8] hover:bg-[#24160E]"
+                ? "bg-[#14291D] text-[#E0B04A] hover:bg-[#24160E]"
                 : "bg-stone-100 text-[#5C4230] hover:bg-stone-200"
             }`}
           >
@@ -591,7 +599,7 @@ export const StorefrontCMSPanel: React.FC<{ isDark: boolean }> = ({ isDark }) =>
             <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 space-y-3.5">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b pb-2 border-amber-500/20">
                 <div className="flex items-center gap-2">
-                  <Sparkles className="w-4 h-4 text-[#E08F35]" />
+                  <Sparkles className="w-4 h-4 text-[#E0B04A]" />
                   <h4 className="font-bold text-xs sm:text-sm text-stone-900 dark:text-stone-100">
                     Occasion & Festive Celebratory Banner (ರಾಜ್ಯೋತ್ಸವ / ಹಬ್ಬದ ಬ್ಯಾನರ್)
                   </h4>
@@ -601,7 +609,7 @@ export const StorefrontCMSPanel: React.FC<{ isDark: boolean }> = ({ isDark }) =>
                     type="checkbox"
                     checked={festiveEnabled}
                     onChange={(e) => setFestiveEnabled(e.target.checked)}
-                    className="w-4 h-4 rounded text-[#E08F35] focus:ring-0 cursor-pointer"
+                    className="w-4 h-4 rounded text-[#E0B04A] focus:ring-0 cursor-pointer"
                   />
                   <span>Show Celebratory Banner on Website</span>
                 </label>
@@ -623,7 +631,7 @@ export const StorefrontCMSPanel: React.FC<{ isDark: boolean }> = ({ isDark }) =>
                       setFestiveBtnTextEnglish("Flat 10% OFF Above ₹1,000");
                       setFestiveBtnLink("/#catalog");
                     }}
-                    className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-amber-500/20 text-[#5E3210] dark:text-amber-200 border border-amber-500/30 hover:bg-amber-500/30 transition-colors cursor-pointer"
+                    className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-amber-500/20 text-[#1F3D2B] dark:text-amber-200 border border-amber-500/30 hover:bg-amber-500/30 transition-colors cursor-pointer"
                   >
                     ಕನ್ನಡ ರಾಜ್ಯೋತ್ಸವ (Rajyotsava)
                   </button>
@@ -637,7 +645,7 @@ export const StorefrontCMSPanel: React.FC<{ isDark: boolean }> = ({ isDark }) =>
                       setFestiveBtnTextEnglish("Flat 10% OFF Above ₹1,000");
                       setFestiveBtnLink("/#catalog");
                     }}
-                    className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-amber-500/20 text-[#5E3210] dark:text-amber-200 border border-amber-500/30 hover:bg-amber-500/30 transition-colors cursor-pointer"
+                    className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-amber-500/20 text-[#1F3D2B] dark:text-amber-200 border border-amber-500/30 hover:bg-amber-500/30 transition-colors cursor-pointer"
                   >
                     ದೀಪಾವಳಿ (Deepavali)
                   </button>
@@ -651,7 +659,7 @@ export const StorefrontCMSPanel: React.FC<{ isDark: boolean }> = ({ isDark }) =>
                       setFestiveBtnTextEnglish("Flat 10% OFF Above ₹1,000");
                       setFestiveBtnLink("/#catalog");
                     }}
-                    className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-amber-500/20 text-[#5E3210] dark:text-amber-200 border border-amber-500/30 hover:bg-amber-500/30 transition-colors cursor-pointer"
+                    className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-amber-500/20 text-[#1F3D2B] dark:text-amber-200 border border-amber-500/30 hover:bg-amber-500/30 transition-colors cursor-pointer"
                   >
                     ಮಕರ ಸಂಕ್ರಾಂತಿ (Sankranti)
                   </button>
@@ -665,7 +673,7 @@ export const StorefrontCMSPanel: React.FC<{ isDark: boolean }> = ({ isDark }) =>
                       setFestiveBtnTextEnglish("Flat 10% OFF Above ₹1,000");
                       setFestiveBtnLink("/#catalog");
                     }}
-                    className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-amber-500/20 text-[#5E3210] dark:text-amber-200 border border-amber-500/30 hover:bg-amber-500/30 transition-colors cursor-pointer"
+                    className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-amber-500/20 text-[#1F3D2B] dark:text-amber-200 border border-amber-500/30 hover:bg-amber-500/30 transition-colors cursor-pointer"
                   >
                     ಯುಗಾದಿ (Ugadi)
                   </button>
@@ -840,11 +848,94 @@ export const StorefrontCMSPanel: React.FC<{ isDark: boolean }> = ({ isDark }) =>
               />
             </div>
 
+            {/* Cloudflare Main Storefront Hero Banner Media */}
+            <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 space-y-3.5">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b pb-2 border-emerald-500/20">
+                <div>
+                  <h4 className="font-bold text-xs sm:text-sm text-stone-900 dark:text-stone-100 flex items-center gap-1.5">
+                    <Sparkles className="w-4 h-4 text-[#E0B04A]" />
+                    Main Storefront Hero Banner (Cloudflare R2 / Stream)
+                  </h4>
+                  <p className="text-[11px] text-stone-600 dark:text-stone-300">
+                    Easily swap the full-width storefront banner image or video from Cloudflare anytime.
+                  </p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <label className="text-xs font-bold flex items-center gap-1.5 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="mainBannerMediaType"
+                      value="image"
+                      checked={mainBannerMediaType === "image"}
+                      onChange={() => setMainBannerMediaType("image")}
+                      className="text-[#E0B04A]"
+                    />
+                    <span>Image (Cloudflare R2)</span>
+                  </label>
+                  <label className="text-xs font-bold flex items-center gap-1.5 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="mainBannerMediaType"
+                      value="video"
+                      checked={mainBannerMediaType === "video"}
+                      onChange={() => setMainBannerMediaType("video")}
+                      className="text-[#E0B04A]"
+                    />
+                    <span>Video (Cloudflare Stream/MP4)</span>
+                  </label>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block font-semibold mb-1 text-xs">
+                    Cloudflare R2 Banner Image URL
+                  </label>
+                  <input
+                    type="text"
+                    value={mainBannerImageUrl}
+                    onChange={(e) => setMainBannerImageUrl(e.target.value)}
+                    placeholder="e.g. https://pub-9e18bb265ecf4224ae1230cf913745ca.r2.dev/banner.jpg"
+                    className="w-full px-3 py-2 rounded-xl border border-stone-300 dark:border-stone-700 bg-transparent text-xs"
+                  />
+                  <span className="text-[10px] text-stone-500 block mt-1">
+                    Leave blank to use default festive Diwali artwork
+                  </span>
+                  {mainBannerImageUrl && (
+                    <div className="mt-2 rounded-lg overflow-hidden border border-stone-300 max-h-32 bg-stone-100 flex items-center justify-center">
+                      <img src={mainBannerImageUrl} alt="Banner Preview" className="w-full h-auto max-h-32 object-contain" />
+                    </div>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block font-semibold mb-1 text-xs">
+                    Cloudflare Stream / MP4 Video URL
+                  </label>
+                  <input
+                    type="text"
+                    value={mainBannerVideoUrl}
+                    onChange={(e) => setMainBannerVideoUrl(e.target.value)}
+                    placeholder="e.g. https://pub-9e18bb265ecf4224ae1230cf913745ca.r2.dev/banner.mp4"
+                    className="w-full px-3 py-2 rounded-xl border border-stone-300 dark:border-stone-700 bg-transparent text-xs"
+                  />
+                  <span className="text-[10px] text-stone-500 block mt-1">
+                    Plays in seamless loop & autoplay when Video mode is selected
+                  </span>
+                  {mainBannerVideoUrl && (
+                    <div className="mt-2 rounded-lg overflow-hidden border border-stone-300 max-h-32 bg-black flex items-center justify-center">
+                      <video src={mainBannerVideoUrl} autoPlay loop muted playsInline className="w-full h-auto max-h-32 object-contain" />
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
             {/* Delivery Thresholds & Shipping Policy Engine */}
             <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 space-y-4">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b pb-2.5 border-amber-500/20">
                 <div className="flex items-center gap-2">
-                  <Truck className="w-4 h-4 text-[#E08F35]" />
+                  <Truck className="w-4 h-4 text-[#E0B04A]" />
                   <div>
                     <h4 className="font-bold text-xs sm:text-sm text-stone-900 dark:text-stone-100">
                       Shipping, Delivery Rules & Thresholds (Pan-India Policy)
@@ -875,9 +966,9 @@ export const StorefrontCMSPanel: React.FC<{ isDark: boolean }> = ({ isDark }) =>
                       }
                     }}
                     disabled={isSavingShipping}
-                    className="px-3.5 py-1.5 rounded-xl text-[10px] font-bold bg-[#E08F35] hover:bg-amber-400 text-[#140D09] flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs disabled:opacity-50"
+                    className="px-3.5 py-1.5 rounded-xl text-[10px] font-bold bg-[#E0B04A] hover:bg-amber-400 text-[#14291D] flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs disabled:opacity-50"
                   >
-                    <Save className={`w-3 h-3 text-[#140D09] ${isSavingShipping ? "animate-spin" : ""}`} />
+                    <Save className={`w-3 h-3 text-[#14291D] ${isSavingShipping ? "animate-spin" : ""}`} />
                     <span>{isSavingShipping ? "Saving to Cloud..." : "Save Shipping Rules"}</span>
                   </button>
                   <button
@@ -893,7 +984,7 @@ export const StorefrontCMSPanel: React.FC<{ isDark: boolean }> = ({ isDark }) =>
                       await saveShippingRulesToFirestore(800, 70);
                       showToast("Reset shipping rules to defaults: ₹800 threshold / ₹70 standard fee!");
                     }}
-                    className="px-3 py-1.5 rounded-xl text-[10px] font-bold bg-[#5E3210] hover:bg-[#43230A] text-white flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
+                    className="px-3 py-1.5 rounded-xl text-[10px] font-bold bg-[#1F3D2B] hover:bg-[#1F3D2B] text-white flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
                   >
                     <RefreshCw className="w-3 h-3 text-amber-300" />
                     <span>Reset to Defaults (₹800 / ₹70)</span>
@@ -912,8 +1003,8 @@ export const StorefrontCMSPanel: React.FC<{ isDark: boolean }> = ({ isDark }) =>
                     </p>
                   </div>
                 </div>
-                <div className="p-2.5 rounded-xl bg-amber-500/15 border border-amber-500/20 text-[#5E3210] dark:text-amber-200 flex items-start gap-2">
-                  <ShieldCheck className="w-4 h-4 text-[#E08F35] shrink-0 mt-0.5" />
+                <div className="p-2.5 rounded-xl bg-amber-500/15 border border-amber-500/20 text-[#1F3D2B] dark:text-amber-200 flex items-start gap-2">
+                  <ShieldCheck className="w-4 h-4 text-[#E0B04A] shrink-0 mt-0.5" />
                   <div>
                     <span className="font-bold">Standard Delivery Fee:</span>
                     <p className="text-[10px] opacity-90">
@@ -969,7 +1060,7 @@ export const StorefrontCMSPanel: React.FC<{ isDark: boolean }> = ({ isDark }) =>
                   onClick={() => setSelectedOilProduct(p.id as any)}
                   className={`px-3 py-1.5 rounded-lg font-bold text-xs cursor-pointer ${
                     selectedOilProduct === p.id
-                      ? "bg-[#5E3210] text-white"
+                      ? "bg-[#1F3D2B] text-white"
                       : "bg-stone-100 dark:bg-stone-800 text-stone-700 dark:text-stone-300"
                   }`}
                 >
@@ -1170,7 +1261,7 @@ export const StorefrontCMSPanel: React.FC<{ isDark: boolean }> = ({ isDark }) =>
                   onClick={() => setSelectedComboId(c.id as any)}
                   className={`px-3 py-1.5 rounded-lg font-bold text-xs cursor-pointer ${
                     selectedComboId === c.id
-                      ? "bg-[#5E3210] text-white"
+                      ? "bg-[#1F3D2B] text-white"
                       : "bg-stone-100 dark:bg-stone-800 text-stone-700 dark:text-stone-300"
                   }`}
                 >
@@ -1263,7 +1354,7 @@ export const StorefrontCMSPanel: React.FC<{ isDark: boolean }> = ({ isDark }) =>
             <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
                 <span className="text-xs font-bold text-stone-900 dark:text-stone-100 flex items-center gap-1.5">
-                  <Tag className="w-3.5 h-3.5 text-[#E08F35]" />
+                  <Tag className="w-3.5 h-3.5 text-[#E0B04A]" />
                   Base Retail Price Policy: Groundnut ₹399 • Coconut ₹489 • Sesame ₹499
                 </span>
                 <p className="text-[10px] text-stone-500 mt-0.5">
@@ -1295,7 +1386,7 @@ export const StorefrontCMSPanel: React.FC<{ isDark: boolean }> = ({ isDark }) =>
                   });
                   showToast("Restored official base prices: Groundnut ₹399, Coconut ₹489, Sesame ₹499!");
                 }}
-                className="px-3 py-1.5 rounded-xl bg-[#5E3210] hover:bg-[#43230A] text-white text-[10px] font-bold flex items-center gap-1.5 transition-colors cursor-pointer self-start sm:self-auto shrink-0 shadow-xs"
+                className="px-3 py-1.5 rounded-xl bg-[#1F3D2B] hover:bg-[#1F3D2B] text-white text-[10px] font-bold flex items-center gap-1.5 transition-colors cursor-pointer self-start sm:self-auto shrink-0 shadow-xs"
               >
                 <RefreshCw className="w-3 h-3 text-amber-300" />
                 <span>Reset to Standard Base Rates</span>
@@ -1752,7 +1843,7 @@ export const StorefrontCMSPanel: React.FC<{ isDark: boolean }> = ({ isDark }) =>
               <button
                 type="button"
                 onClick={addNewFaq}
-                className="px-3 py-1.5 rounded-xl bg-[#5E3210] hover:bg-[#43230A] text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer"
+                className="px-3 py-1.5 rounded-xl bg-[#1F3D2B] hover:bg-[#1F3D2B] text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer"
               >
                 <Plus className="w-3.5 h-3.5" />
                 <span>Add Question</span>
@@ -1766,7 +1857,7 @@ export const StorefrontCMSPanel: React.FC<{ isDark: boolean }> = ({ isDark }) =>
                   className="p-3.5 rounded-xl border border-stone-200 dark:border-stone-800 bg-stone-50/50 dark:bg-black/20 space-y-2 relative group"
                 >
                   <div className="flex items-center justify-between">
-                    <span className="font-bold text-xs text-[#E08F35]">FAQ #{idx + 1}</span>
+                    <span className="font-bold text-xs text-[#E0B04A]">FAQ #{idx + 1}</span>
                     <button
                       type="button"
                       onClick={() => deleteFaq(idx)}
@@ -1925,7 +2016,7 @@ export const StorefrontCMSPanel: React.FC<{ isDark: boolean }> = ({ isDark }) =>
             <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
                 <span className="text-xs font-bold text-stone-900 dark:text-stone-100 flex items-center gap-1.5">
-                  <FileText className="w-3.5 h-3.5 text-[#E08F35]" />
+                  <FileText className="w-3.5 h-3.5 text-[#E0B04A]" />
                   Storefront Legal & Shipping Policies
                 </span>
                 <p className="text-[10px] text-stone-500 mt-0.5">
@@ -1943,7 +2034,7 @@ export const StorefrontCMSPanel: React.FC<{ isDark: boolean }> = ({ isDark }) =>
                   });
                   showToast("Restored all policies to official defaults (including ₹800 / ₹70 shipping rules)!");
                 }}
-                className="px-3 py-1.5 rounded-xl bg-[#5E3210] hover:bg-[#43230A] text-white text-[10px] font-bold flex items-center gap-1.5 transition-colors cursor-pointer self-start sm:self-auto shrink-0 shadow-xs"
+                className="px-3 py-1.5 rounded-xl bg-[#1F3D2B] hover:bg-[#1F3D2B] text-white text-[10px] font-bold flex items-center gap-1.5 transition-colors cursor-pointer self-start sm:self-auto shrink-0 shadow-xs"
               >
                 <RefreshCw className="w-3 h-3 text-amber-300" />
                 <span>Reset Policies to Defaults</span>
@@ -1961,7 +2052,7 @@ export const StorefrontCMSPanel: React.FC<{ isDark: boolean }> = ({ isDark }) =>
                 className="p-3.5 rounded-xl border border-stone-200 dark:border-stone-800 space-y-2 bg-stone-50/50 dark:bg-black/20"
               >
                 <div className="flex items-center gap-2">
-                  <FileText className="w-4 h-4 text-[#E08F35]" />
+                  <FileText className="w-4 h-4 text-[#E0B04A]" />
                   <span className="font-bold text-xs">{p.label}</span>
                 </div>
                 <div>
@@ -1991,7 +2082,7 @@ export const StorefrontCMSPanel: React.FC<{ isDark: boolean }> = ({ isDark }) =>
         <div className="pt-3 sticky bottom-4 z-20">
           <button
             type="submit"
-            className="w-full py-4 rounded-xl bg-[#5E3210] hover:bg-[#43230A] text-white font-black text-sm shadow-xl hover:shadow-2xl transition-all flex items-center justify-center gap-2.5 cursor-pointer"
+            className="w-full py-4 rounded-xl bg-[#1F3D2B] hover:bg-[#1F3D2B] text-white font-black text-sm shadow-xl hover:shadow-2xl transition-all flex items-center justify-center gap-2.5 cursor-pointer"
           >
             <Save className="w-5 h-5 text-amber-300" />
             <span>Save All Storefront Changes (Live Firestore Sync)</span>

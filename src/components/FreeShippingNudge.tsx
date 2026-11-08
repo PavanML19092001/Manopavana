@@ -29,13 +29,13 @@ export const FreeShippingNudge: React.FC = () => {
   return (
     <aside
       aria-label="Free Delivery Progress Bar"
-      className="fixed bottom-[72px] md:bottom-6 left-1/2 -translate-x-1/2 md:left-6 md:translate-x-0 z-40 w-[94%] max-w-md md:w-96 animate-fade-in pointer-events-auto"
+      className="fixed bottom-[72px] md:bottom-6 left-1/2 -translate-x-1/2 md:left-6 md:translate-x-0 z-40 w-[94%] max-w-md md:w-96 animate-slide-up pointer-events-auto"
     >
       <div
         className={`p-3 rounded-2xl shadow-2xl border backdrop-blur-md transition-all ${
           isDark
-            ? "bg-[#1C120B]/95 border-[#4A301E] text-[#FAF4EA]"
-            : "bg-white/95 border-[#E5DAC8] text-[#1F120A]"
+            ? "bg-[#14291D]/95 border-[#2D5A3F] text-[#FAF3E0]"
+            : "bg-white/95 border-[#E5DAC8] text-[#14291D]"
         }`}
       >
         <div className="flex items-center justify-between gap-3 text-xs mb-2">
@@ -44,7 +44,7 @@ export const FreeShippingNudge: React.FC = () => {
               className={`p-1.5 rounded-xl shrink-0 ${
                 isUnlocked
                   ? "bg-emerald-500/20 text-emerald-500"
-                  : "bg-amber-500/20 text-[#E08F35]"
+                  : "bg-amber-500/20 text-[#E0B04A]"
               }`}
             >
               {isUnlocked ? (
@@ -60,7 +60,7 @@ export const FreeShippingNudge: React.FC = () => {
                 </span>
               ) : (
                 <span>
-                  Add <strong className="text-[#E08F35]">₹{freeShippingShortfall}</strong> more (or 2nd bottle) for{" "}
+                  Add <strong className="text-[#E0B04A]">₹{freeShippingShortfall}</strong> more (or 2nd bottle) for{" "}
                   <strong>FREE Delivery</strong>
                 </span>
               )}
@@ -69,7 +69,7 @@ export const FreeShippingNudge: React.FC = () => {
 
           <Link
             to="/cart"
-            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#5E3210] hover:bg-[#43230A] text-white font-bold text-[11px] shrink-0 transition-colors shadow-xs"
+            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#1F3D2B] hover:bg-[#1F3D2B] text-white font-bold text-[11px] shrink-0 transition-colors shadow-xs btn-press"
           >
             <span>View Bag</span>
             <ArrowRight className="w-3 h-3 text-amber-300" />
@@ -79,14 +79,14 @@ export const FreeShippingNudge: React.FC = () => {
         {/* Progress Track */}
         <div
           className={`w-full h-1.5 rounded-full overflow-hidden ${
-            isDark ? "bg-[#140D07]" : "bg-stone-200"
+            isDark ? "bg-[#14291D]" : "bg-stone-200"
           }`}
         >
           <div
             className={`h-full transition-all duration-500 rounded-full ${
               isUnlocked
                 ? "bg-emerald-500"
-                : "bg-gradient-to-r from-[#E08F35] to-[#B87C24]"
+                : "bg-gradient-to-r from-[#E0B04A] to-[#B87C24]"
             }`}
             style={{ width: `${freeShippingProgress}%` }}
           />

@@ -195,10 +195,10 @@ export const ProfilePage = () => {
     return (
       <div
         className={`w-full min-h-[70vh] flex items-center justify-center p-6 ${
-          isDark ? "bg-[#140D09]" : "bg-[#FAF7F2]"
+          isDark ? "bg-[#14291D]" : "bg-[#FAF3E0]"
         }`}
       >
-        <div className="w-10 h-10 border-3 border-[#D49A37] border-t-transparent rounded-full animate-spin" />
+        <div className="w-10 h-10 border-3 border-[#E0B04A] border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
@@ -207,15 +207,15 @@ export const ProfilePage = () => {
     return (
       <div
         className={`w-full min-h-[70vh] flex items-center justify-center p-6 ${
-          isDark ? "bg-[#140D09] text-[#FAF4EA]" : "bg-[#FAF7F2] text-[#24140A]"
+          isDark ? "bg-[#14291D] text-[#FAF3E0]" : "bg-[#FAF3E0] text-[#14291D]"
         }`}
       >
         <div
           className={`max-w-md w-full p-8 rounded-3xl border text-center space-y-5 shadow-xl ${
-            isDark ? "bg-[#1C120B] border-[#362114]" : "bg-white border-[#E8DEC8]"
+            isDark ? "bg-[#14291D] border-[#1F3D2B]" : "bg-white border-[#F2E8CC]"
           }`}
         >
-          <div className="w-16 h-16 mx-auto rounded-full bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-[#E08F35]">
+          <div className="w-16 h-16 mx-auto rounded-full bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-[#E0B04A]">
             <User className="w-8 h-8" />
           </div>
           <div className="space-y-2">
@@ -227,7 +227,7 @@ export const ProfilePage = () => {
           <button
             type="button"
             onClick={() => setLoginModalOpen(true)}
-            className="w-full py-3 rounded-xl bg-[#5E3210] hover:bg-[#43230A] text-white font-bold text-xs shadow-md transition-all cursor-pointer"
+            className="w-full py-3 rounded-xl bg-[#1F3D2B] hover:bg-[#1F3D2B] text-white font-bold text-xs shadow-md transition-all cursor-pointer"
           >
             Sign In with Google
           </button>
@@ -245,7 +245,7 @@ export const ProfilePage = () => {
   return (
     <div
       className={`w-full min-h-[calc(100vh-80px)] py-6 sm:py-10 transition-colors ${
-        isDark ? "bg-[#140D09] text-[#FAF4EA]" : "bg-[#F1F3F6] text-[#212121]"
+        isDark ? "bg-[#14291D] text-[#FAF3E0]" : "bg-[#F1F3F6] text-[#212121]"
       }`}
     >
       <div className="max-w-6xl mx-auto px-4 sm:px-6">
@@ -255,10 +255,10 @@ export const ProfilePage = () => {
             {/* User Greeting Card */}
             <div
               className={`p-4 rounded-2xl border shadow-xs flex items-center gap-3.5 ${
-                isDark ? "bg-[#1C120B] border-[#362114]" : "bg-white border-stone-200"
+                isDark ? "bg-[#14291D] border-[#1F3D2B]" : "bg-white border-stone-200"
               }`}
             >
-              <div className="w-12 h-12 rounded-full bg-[#E08F35]/20 border border-[#E08F35]/40 flex items-center justify-center text-[#E08F35] font-black text-base shrink-0">
+              <div className="w-12 h-12 rounded-full bg-[#E0B04A]/20 border border-[#E0B04A]/40 flex items-center justify-center text-[#E0B04A] font-black text-base shrink-0">
                 {effectiveDisplayName.charAt(0).toUpperCase()}
               </div>
               <div className="min-w-0 flex-1">
@@ -279,7 +279,7 @@ export const ProfilePage = () => {
             <div
               className={`rounded-2xl border shadow-xs overflow-hidden divide-y ${
                 isDark
-                  ? "bg-[#1C120B] border-[#362114] divide-[#2D1B10]"
+                  ? "bg-[#14291D] border-[#1F3D2B] divide-[#14291D]"
                   : "bg-white border-stone-200 divide-stone-100"
               }`}
             >
@@ -321,7 +321,7 @@ export const ProfilePage = () => {
                   className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-bold text-stone-700 dark:text-stone-300 hover:bg-stone-50 dark:hover:bg-stone-800 transition-all"
                 >
                   <div className="flex items-center gap-2.5">
-                    <Package className="w-4 h-4 text-[#E08F35]" />
+                    <Package className="w-4 h-4 text-[#E0B04A]" />
                     <span>My Orders</span>
                   </div>
                   <ChevronRight className="w-4 h-4 opacity-70" />
@@ -371,7 +371,7 @@ export const ProfilePage = () => {
             {activeTab === "profile" && (
               <div
                 className={`p-6 sm:p-8 rounded-2xl border shadow-xs space-y-8 ${
-                  isDark ? "bg-[#1C120B] border-[#362114]" : "bg-white border-stone-200"
+                  isDark ? "bg-[#14291D] border-[#1F3D2B]" : "bg-white border-stone-200"
                 }`}
               >
                 {/* Personal Information (Name & Gender) */}
@@ -571,7 +571,7 @@ export const ProfilePage = () => {
             {activeTab === "addresses" && (
               <div
                 className={`p-6 sm:p-8 rounded-2xl border shadow-xs space-y-6 ${
-                  isDark ? "bg-[#1C120B] border-[#362114]" : "bg-white border-stone-200"
+                  isDark ? "bg-[#14291D] border-[#1F3D2B]" : "bg-white border-stone-200"
                 }`}
               >
                 <div className="flex items-center justify-between border-b pb-4 border-stone-200 dark:border-stone-800">
@@ -823,7 +823,7 @@ export const ProfilePage = () => {
             {activeTab === "faqs" && (
               <div
                 className={`p-6 sm:p-8 rounded-2xl border shadow-xs space-y-6 ${
-                  isDark ? "bg-[#1C120B] border-[#362114]" : "bg-white border-stone-200"
+                  isDark ? "bg-[#14291D] border-[#1F3D2B]" : "bg-white border-stone-200"
                 }`}
               >
                 <h3 className="text-base font-bold font-serif text-stone-900 dark:text-stone-100 border-b pb-3 border-stone-200 dark:border-stone-800">

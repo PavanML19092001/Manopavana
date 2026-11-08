@@ -1,4 +1,8 @@
-import { CampaignTier } from "../types";
+export type CampaignTier =
+  | "NEW_CUSTOMER_30"
+  | "COHORT_ORDER_2_20"
+  | "COHORT_ORDER_3_10"
+  | "STANDARD_PRICE_0";
 
 /**
  * MANOPAVANA — FIRST 25 KITCHENS CAMPAIGN PRICING UTILITY

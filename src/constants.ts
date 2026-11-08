@@ -3,12 +3,15 @@ import videoStudioBg from "./assets/products/video-studio-bg.jpg";
 import groundnutLight from "./assets/products/groundnut-light.png";
 import groundnutDark from "./assets/products/groundnut-dark.png";
 import groundnutStudio from "./assets/products/groundnut-studio.jpg";
+import groundnutWhite from "./assets/products/groundnut-white.jpg";
 import coconutLight from "./assets/products/coconut-light.png";
 import coconutDark from "./assets/products/coconut-dark.png";
 import coconutStudio from "./assets/products/coconut-studio.jpg";
+import coconutWhite from "./assets/products/coconut-white.jpg";
 import sesameLight from "./assets/products/sesame-light.png";
 import sesameDark from "./assets/products/sesame-dark.png";
 import sesameStudio from "./assets/products/sesame-studio.jpg";
+import sesameWhite from "./assets/products/sesame-white.jpg";
 
 export const BUSINESS_CONFIG = {
   BRAND_NAME: "MANOPAVANA",
@@ -86,21 +89,24 @@ export const MEDIA_ASSETS = {
   sesameShots: Array.from({ length: 11 }, (_, i) => `https://pub-9e18bb265ecf4224ae1230cf913745ca.r2.dev/sesame-${i + 1}.png`),
 };
 
-export const THEMED_PRODUCT_IMAGES: Record<string, { light: string; dark: string; studio: string }> = {
+export const THEMED_PRODUCT_IMAGES: Record<string, { light: string; dark: string; studio: string; white: string }> = {
   groundnut: {
     light: groundnutLight,
     dark: groundnutDark,
     studio: groundnutStudio,
+    white: groundnutWhite,
   },
   coconut: {
     light: coconutLight,
     dark: coconutDark,
     studio: coconutStudio,
+    white: coconutWhite,
   },
   sesame: {
     light: sesameLight,
     dark: sesameDark,
     studio: sesameStudio,
+    white: sesameWhite,
   },
 };
 

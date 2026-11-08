@@ -67,17 +67,17 @@ export class ErrorBoundary extends React.Component<
   render() {
     if (this.state.hasError) {
       return (
-        <div className="min-h-[60vh] flex items-center justify-center p-6 bg-[#FAF6F0] text-[#24140A] text-center">
-          <div className="max-w-md w-full p-8 bg-white rounded-3xl shadow-xl border border-[#D49A37]/40 space-y-5">
-            <div className="w-12 h-12 mx-auto rounded-full bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-[#E08F35]">
+        <div className="min-h-[60vh] flex items-center justify-center p-6 bg-[#FAF3E0] text-[#14291D] text-center">
+          <div className="max-w-md w-full p-8 bg-white rounded-3xl shadow-xl border border-[#E0B04A]/40 space-y-5">
+            <div className="w-12 h-12 mx-auto rounded-full bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-[#E0B04A]">
               <RefreshCw className="w-6 h-6" />
             </div>
 
             <div className="space-y-1.5">
-              <h2 className="text-lg font-bold font-serif text-[#5E3210]">
+              <h2 className="text-lg font-bold font-serif text-[#1F3D2B]">
                 Something interrupted this view
               </h2>
-              <p className="text-xs text-[#7A5E48]">
+              <p className="text-xs text-[#3F4F45]">
                 A data format error occurred while rendering this section.
               </p>
               {this.state.error?.message && (
@@ -94,7 +94,7 @@ export class ErrorBoundary extends React.Component<
                   this.setState({ hasError: false, error: null });
                   window.location.reload();
                 }}
-                className="w-full py-2.5 rounded-xl bg-[#5E3210] text-white text-xs font-bold hover:bg-[#43230A] transition-colors cursor-pointer shadow-md flex items-center justify-center gap-1.5"
+                className="w-full py-2.5 rounded-xl bg-[#1F3D2B] text-white text-xs font-bold hover:bg-[#1F3D2B] transition-colors cursor-pointer shadow-md flex items-center justify-center gap-1.5"
               >
                 <RefreshCw className="w-3.5 h-3.5" />
                 <span>Try Refreshing View</span>
@@ -263,27 +263,27 @@ export default function App() {
       <div
         className={`w-full max-w-full overflow-x-hidden min-h-screen flex flex-col font-['Outfit',sans-serif] box-border transition-colors duration-200 ${
           themeMode === "dark"
-            ? "bg-[#140D09] text-[#FDF6EC]"
+            ? "bg-[#14291D] text-[#FAF3E0]"
             : themeMode === "light"
-            ? "bg-[#FAF7F2] text-[#24140A]"
-            : "bg-[#FAF6F0] text-[#24140A]"
+            ? "bg-[#FAF3E0] text-[#14291D]"
+            : "bg-[#FAF3E0] text-[#14291D]"
         }`}
       >
         <ScrollToTop />
 
         {/* Global Admin Navigation Bar to prevent ever getting trapped */}
-        <header className="bg-[#2D1B10] text-[#FDF6EC] px-4 py-2.5 text-xs flex items-center justify-between border-b border-[#D49A37]/40 sticky top-0 z-50 shadow-md">
+        <header className="bg-[#14291D] text-[#FAF3E0] px-4 py-2.5 text-xs flex items-center justify-between border-b border-[#E0B04A]/40 sticky top-0 z-50 shadow-md">
           <div className="flex items-center gap-2">
             <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
             <span className="font-bold text-amber-200">MANOPAVANA Master Admin Portal</span>
-            <span className="text-[#C4B29E] hidden md:inline">({currentUser?.email})</span>
+            <span className="text-[#3F4F45] hidden md:inline">({currentUser?.email})</span>
           </div>
 
           <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={() => togglePreviewStorefront(true)}
-              className="px-3 py-1.5 rounded-xl bg-[#E08F35] hover:bg-[#c97a26] text-[#1F120A] text-xs font-bold transition-all cursor-pointer flex items-center gap-1 shadow"
+              className="px-3 py-1.5 rounded-xl bg-[#E0B04A] hover:bg-[#C8962E] text-[#14291D] text-xs font-bold transition-all cursor-pointer flex items-center gap-1 shadow"
             >
               <Home className="w-3.5 h-3.5" />
               <span>Preview Storefront</span>
@@ -312,8 +312,8 @@ export default function App() {
 
         {/* Floating Global Toast Notification */}
         {toastMessage && (
-          <div className="fixed top-20 right-5 z-50 flex items-center gap-2.5 px-4 py-3 rounded-2xl bg-[#1C110B]/95 text-[#FDF6EC] text-xs font-semibold shadow-2xl border border-[#D49A37]/50 backdrop-blur-md animate-bounce">
-            <Sparkles className="w-4 h-4 text-[#F5BC51] shrink-0" />
+          <div className="fixed top-20 right-5 z-50 flex items-center gap-2.5 px-4 py-3 rounded-2xl bg-[#14291D]/95 text-[#FAF3E0] text-xs font-semibold shadow-2xl border border-[#E0B04A]/50 backdrop-blur-md animate-bounce">
+            <Sparkles className="w-4 h-4 text-[#F3D17A] shrink-0" />
             <span>{toastMessage}</span>
           </div>
         )}
@@ -325,28 +325,28 @@ export default function App() {
     <div
       className={`w-full max-w-full overflow-x-hidden min-h-screen flex flex-col font-['Outfit',sans-serif] box-border transition-colors duration-200 ${
         themeMode === "dark"
-          ? "bg-[#140D09] text-[#FDF6EC]"
+          ? "bg-[#14291D] text-[#FAF3E0]"
           : themeMode === "light"
-          ? "bg-[#FAF7F2] text-[#24140A]"
-          : "bg-[#FAF6F0] text-[#24140A]"
+          ? "bg-[#FAF3E0] text-[#14291D]"
+          : "bg-[#FAF3E0] text-[#14291D]"
       }`}
     >
       <ScrollToTop />
 
       {/* Admin Customer Storefront Preview Sticky Top Bar */}
       {isStoreAdmin && isPreviewStorefront && (
-        <div className="bg-[#2D1B10] text-[#FDF6EC] px-4 py-2.5 text-xs flex items-center justify-between border-b border-[#D49A37]/40 sticky top-0 z-50 shadow-md">
+        <div className="bg-[#14291D] text-[#FAF3E0] px-4 py-2.5 text-xs flex items-center justify-between border-b border-[#E0B04A]/40 sticky top-0 z-50 shadow-md">
           <div className="flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
             <span className="font-bold">Storefront Customer Preview</span>
-            <span className="text-[#C4B29E] hidden md:inline">
+            <span className="text-[#3F4F45] hidden md:inline">
               (Viewing storefront as customer • Logged in as {currentUser?.email})
             </span>
           </div>
           <button
             type="button"
             onClick={() => togglePreviewStorefront(false)}
-            className="px-3.5 py-1.5 rounded-xl bg-[#E08F35] hover:bg-[#c97a26] text-[#1F120A] text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow"
+            className="px-3.5 py-1.5 rounded-xl bg-[#E0B04A] hover:bg-[#C8962E] text-[#14291D] text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow"
           >
             <span>⚙️ Return to Master CMS</span>
           </button>
@@ -395,8 +395,8 @@ export default function App() {
 
       {/* Floating Global Toast Notification */}
       {toastMessage && (
-        <div className="fixed top-20 right-5 z-50 flex items-center gap-2.5 px-4 py-3 rounded-2xl bg-[#1C110B]/95 text-[#FDF6EC] text-xs font-semibold shadow-2xl border border-[#D49A37]/50 backdrop-blur-md animate-bounce">
-          <Sparkles className="w-4 h-4 text-[#F5BC51] shrink-0" />
+        <div className="fixed top-20 right-5 z-50 flex items-center gap-2.5 px-4 py-3 rounded-2xl bg-[#14291D]/95 text-[#FAF3E0] text-xs font-semibold shadow-2xl border border-[#E0B04A]/50 backdrop-blur-md animate-bounce">
+          <Sparkles className="w-4 h-4 text-[#F3D17A] shrink-0" />
           <span>{toastMessage}</span>
         </div>
       )}

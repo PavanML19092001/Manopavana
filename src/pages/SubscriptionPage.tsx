@@ -190,8 +190,8 @@ const ComboBottleVisual: React.FC<{
     <div
       className={`relative h-44 w-full rounded-2xl overflow-hidden p-3 flex flex-col justify-between border transition-colors ${
         isDark
-          ? "bg-[#1E1108] border-[#3E2413]"
-          : "bg-[#F7EFE3] border-[#DFCAB0]"
+          ? "bg-[#14291D] border-[#3E2413]"
+          : "bg-[#F2E8CC] border-[#DFCAB0]"
       }`}
     >
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(224,143,53,0.18)_0%,transparent_70%)] pointer-events-none" />
@@ -218,7 +218,7 @@ const ComboBottleVisual: React.FC<{
                   className={`mt-1 text-[10px] font-black px-1.5 py-0.5 rounded shadow-2xs ${
                     isDark
                       ? "bg-amber-500/30 text-amber-200 border border-amber-500/30"
-                      : "bg-[#43230A] text-white"
+                      : "bg-[#1F3D2B] text-white"
                   }`}
                 >
                   {b.count}x 1L
@@ -227,7 +227,7 @@ const ComboBottleVisual: React.FC<{
             );
           })
         ) : (
-          <div className="flex items-center justify-center text-xs font-bold text-[#43230A] dark:text-stone-300">
+          <div className="flex items-center justify-center text-xs font-bold text-[#1F3D2B] dark:text-stone-300">
             Select bottles
           </div>
         )}
@@ -315,7 +315,7 @@ const InteractiveCalendarPicker: React.FC<{
   return (
     <div
       className={`rounded-3xl border p-5 sm:p-7 space-y-6 shadow-sm transition-all ${
-        isDark ? "bg-[#1C120B] border-[#362114]" : "bg-white border-[#D6C2A4]"
+        isDark ? "bg-[#14291D] border-[#1F3D2B]" : "bg-white border-[#E0B04A]"
       }`}
     >
       {/* Quick Presets */}
@@ -326,10 +326,10 @@ const InteractiveCalendarPicker: React.FC<{
       >
         <span
           className={`text-xs font-black flex items-center gap-1.5 ${
-            isDark ? "text-amber-200" : "text-[#1A0E07]"
+            isDark ? "text-amber-200" : "text-[#14291D]"
           }`}
         >
-          <CalendarDays className="w-3.5 h-3.5 text-[#E08F35]" />
+          <CalendarDays className="w-3.5 h-3.5 text-[#E0B04A]" />
           <span>Quick Select:</span>
         </span>
         <button
@@ -337,8 +337,8 @@ const InteractiveCalendarPicker: React.FC<{
           onClick={() => applyPreset(2)}
           className={`px-3.5 py-1.5 rounded-xl text-xs font-black border transition-colors cursor-pointer ${
             isDark
-              ? "border-[#4A2914] bg-[#25150C] text-[#E0D4C0] hover:bg-[#341F12]"
-              : "border-[#C9B293] bg-[#F7EFE3] text-[#1A0E07] hover:bg-[#EBDDC8]"
+              ? "border-[#4A2914] bg-[#1F3D2B] text-[#E0D4C0] hover:bg-[#341F12]"
+              : "border-[#C9B293] bg-[#F2E8CC] text-[#14291D] hover:bg-[#EBDDC8]"
           }`}
         >
           Earliest Available (In 2 Days)
@@ -353,8 +353,8 @@ const InteractiveCalendarPicker: React.FC<{
           }}
           className={`px-3.5 py-1.5 rounded-xl text-xs font-black border transition-colors cursor-pointer ${
             isDark
-              ? "border-[#4A2914] bg-[#25150C] text-[#E0D4C0] hover:bg-[#341F12]"
-              : "border-[#C9B293] bg-[#F7EFE3] text-[#1A0E07] hover:bg-[#EBDDC8]"
+              ? "border-[#4A2914] bg-[#1F3D2B] text-[#E0D4C0] hover:bg-[#341F12]"
+              : "border-[#C9B293] bg-[#F2E8CC] text-[#14291D] hover:bg-[#EBDDC8]"
           }`}
         >
           1st of Next Month
@@ -369,8 +369,8 @@ const InteractiveCalendarPicker: React.FC<{
           }}
           className={`px-3.5 py-1.5 rounded-xl text-xs font-black border transition-colors cursor-pointer ${
             isDark
-              ? "border-[#4A2914] bg-[#25150C] text-[#E0D4C0] hover:bg-[#341F12]"
-              : "border-[#C9B293] bg-[#F7EFE3] text-[#1A0E07] hover:bg-[#EBDDC8]"
+              ? "border-[#4A2914] bg-[#1F3D2B] text-[#E0D4C0] hover:bg-[#341F12]"
+              : "border-[#C9B293] bg-[#F2E8CC] text-[#14291D] hover:bg-[#EBDDC8]"
           }`}
         >
           15th of Next Month
@@ -382,14 +382,14 @@ const InteractiveCalendarPicker: React.FC<{
         <div>
           <h3
             className={`text-lg sm:text-xl font-black font-serif ${
-              isDark ? "text-[#FAF4EA]" : "text-[#110702]"
+              isDark ? "text-[#FAF3E0]" : "text-[#14291D]"
             }`}
           >
             {monthNames[viewedMonth]} {viewedYear}
           </h3>
           <p
             className={`text-xs font-bold ${
-              isDark ? "text-[#CBB5A1]" : "text-[#4A260F]"
+              isDark ? "text-[#CBB5A1]" : "text-[#1F3D2B]"
             }`}
           >
             Select your preferred recurring delivery day of the month
@@ -405,7 +405,7 @@ const InteractiveCalendarPicker: React.FC<{
               canGoPrev
                 ? isDark
                   ? "border-[#442817] bg-[#22130A] text-amber-200 hover:bg-[#321C0F] cursor-pointer"
-                  : "border-[#C9B293] bg-[#F7EFE3] text-[#110702] hover:bg-[#EBDDC8] cursor-pointer font-black"
+                  : "border-[#C9B293] bg-[#F2E8CC] text-[#14291D] hover:bg-[#EBDDC8] cursor-pointer font-black"
                 : "border-transparent text-stone-300 dark:text-stone-700 cursor-not-allowed opacity-40"
             }`}
             title="Previous Month"
@@ -420,7 +420,7 @@ const InteractiveCalendarPicker: React.FC<{
               canGoNext
                 ? isDark
                   ? "border-[#442817] bg-[#22130A] text-amber-200 hover:bg-[#321C0F] cursor-pointer"
-                  : "border-[#C9B293] bg-[#F7EFE3] text-[#110702] hover:bg-[#EBDDC8] cursor-pointer font-black"
+                  : "border-[#C9B293] bg-[#F2E8CC] text-[#14291D] hover:bg-[#EBDDC8] cursor-pointer font-black"
                 : "border-transparent text-stone-300 dark:text-stone-700 cursor-not-allowed opacity-40"
             }`}
             title="Next Month"
@@ -473,12 +473,12 @@ const InteractiveCalendarPicker: React.FC<{
                 onClick={() => onSelectDate(thisDate)}
                 className={`relative h-10 sm:h-12 rounded-xl sm:rounded-2xl flex flex-col items-center justify-center transition-all ${
                   isSelected
-                    ? "bg-[#43230A] text-white font-black shadow-lg ring-3 ring-[#D4892E] scale-105 cursor-pointer z-10"
+                    ? "bg-[#1F3D2B] text-white font-black shadow-lg ring-3 ring-[#D4892E] scale-105 cursor-pointer z-10"
                     : isPastOrTooSoon
-                    ? "text-[#A8988B] cursor-not-allowed bg-[#F3ECE1] border border-[#E4DACD]"
+                    ? "text-[#A8988B] cursor-not-allowed bg-[#F2E8CC] border border-[#E4DACD]"
                     : isDark
-                    ? "bg-[#25150C] text-[#FAF4EA] hover:bg-[#362114] hover:text-amber-200 cursor-pointer font-bold border border-[#3E2313]"
-                    : "bg-[#FDF9F2] border-2 border-[#D8C4A8] text-[#110702] font-black hover:bg-[#F3E7D3] cursor-pointer shadow-2xs"
+                    ? "bg-[#1F3D2B] text-[#FAF3E0] hover:bg-[#1F3D2B] hover:text-amber-200 cursor-pointer font-bold border border-[#3E2313]"
+                    : "bg-[#FDF9F2] border-2 border-[#D8C4A8] text-[#14291D] font-black hover:bg-[#F3E7D3] cursor-pointer shadow-2xs"
                 }`}
               >
                 <span className="text-sm sm:text-base font-black">{dayNum}</span>
@@ -498,12 +498,12 @@ const InteractiveCalendarPicker: React.FC<{
       <div
         className={`p-4 rounded-2xl border flex items-center justify-between gap-3 text-xs ${
           isDark
-            ? "bg-[#25150C] border-[#3E2313] text-[#FAF4EA]"
-            : "bg-[#F7EFE3] border-[#C9B293] text-[#110702]"
+            ? "bg-[#1F3D2B] border-[#3E2313] text-[#FAF3E0]"
+            : "bg-[#F2E8CC] border-[#C9B293] text-[#14291D]"
         }`}
       >
         <div className="flex items-center gap-2">
-          <CalendarDays className="w-4 h-4 text-[#C8751B] shrink-0" />
+          <CalendarDays className="w-4 h-4 text-[#E0B04A] shrink-0" />
           <span className="font-bold">
             Scheduled recurring dispatch:{" "}
             <strong className="font-black text-[#6B340B] dark:text-amber-300 text-sm">
@@ -1030,7 +1030,7 @@ export const SubscriptionPage: React.FC = () => {
   return (
     <div
       className={`w-full min-h-[calc(100vh-80px)] py-6 sm:py-10 transition-colors ${
-        isDark ? "bg-[#140D09] text-[#FAF4EA]" : "bg-[#FAF7F2] text-[#110702]"
+        isDark ? "bg-[#14291D] text-[#FAF3E0]" : "bg-[#FAF3E0] text-[#14291D]"
       }`}
     >
       <div className="max-w-6xl mx-auto px-4 sm:px-6 space-y-8">
@@ -1038,8 +1038,8 @@ export const SubscriptionPage: React.FC = () => {
         <div
           className={`relative overflow-hidden rounded-3xl p-5 sm:p-7 border shadow-sm transition-colors ${
             isDark
-              ? "bg-gradient-to-r from-[#1E1108] via-[#2A150A] to-[#1E1108] border-[#3E2413] text-[#FAF4EA]"
-              : "bg-gradient-to-r from-[#F6EEDF] via-[#EFE2CC] to-[#F6EEDF] border-[#D6C2A4] text-[#110702]"
+              ? "bg-gradient-to-r from-[#14291D] via-[#2A150A] to-[#14291D] border-[#3E2413] text-[#FAF3E0]"
+              : "bg-gradient-to-r from-[#F6EEDF] via-[#EFE2CC] to-[#F6EEDF] border-[#E0B04A] text-[#14291D]"
           }`}
         >
           <div className="relative z-10 flex items-center gap-3.5 sm:gap-4 min-w-0">
@@ -1065,7 +1065,7 @@ export const SubscriptionPage: React.FC = () => {
               </h1>
               <p
                 className={`text-xs sm:text-sm font-bold mt-0.5 truncate ${
-                  isDark ? "text-amber-100/90" : "text-[#4A260F]"
+                  isDark ? "text-amber-100/90" : "text-[#1F3D2B]"
                 }`}
               >
                 Authentic 100% Marachekku Oils • Freshly Pressed & Delivered Directly to Your Doorstep Every Month
@@ -1078,12 +1078,12 @@ export const SubscriptionPage: React.FC = () => {
         {activeSub && activeSub.status !== "cancelled" && (
           <div
             className={`p-6 sm:p-8 rounded-3xl border shadow-lg space-y-6 ${
-              isDark ? "bg-[#1C120B] border-[#362114]" : "bg-white border-[#D6C2A4]"
+              isDark ? "bg-[#14291D] border-[#1F3D2B]" : "bg-white border-[#E0B04A]"
             }`}
           >
             <div
               className={`flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-4 ${
-                isDark ? "border-[#2D1B10]" : "border-[#E8DAC2]"
+                isDark ? "border-[#14291D]" : "border-[#E8DAC2]"
               }`}
             >
               <div>
@@ -1102,7 +1102,7 @@ export const SubscriptionPage: React.FC = () => {
                   />
                   <h2
                     className={`text-xl font-black font-serif ${
-                      isDark ? "text-[#FAF4EA]" : "text-[#110702]"
+                      isDark ? "text-[#FAF3E0]" : "text-[#14291D]"
                     }`}
                   >
                     {activeSub.comboName}
@@ -1130,7 +1130,7 @@ export const SubscriptionPage: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setIsEditingCombo(true)}
-                  className="px-4 py-2 rounded-xl text-xs font-black bg-[#43230A] hover:bg-[#2E1807] text-white flex items-center gap-1.5 cursor-pointer shadow-md transition-all hover:scale-105"
+                  className="px-4 py-2 rounded-xl text-xs font-black bg-[#1F3D2B] hover:bg-[#2E1807] text-white flex items-center gap-1.5 cursor-pointer shadow-md transition-all hover:scale-105"
                 >
                   <Edit3 className="w-3.5 h-3.5 text-amber-300" />
                   <span>Edit Monthly Combo</span>
@@ -1142,7 +1142,7 @@ export const SubscriptionPage: React.FC = () => {
                     activeSub.status === "active"
                       ? isDark
                         ? "bg-amber-500/20 text-amber-200 hover:bg-amber-500/30"
-                        : "bg-amber-100 text-[#43230A] hover:bg-amber-200 border-2 border-amber-400"
+                        : "bg-amber-100 text-[#1F3D2B] hover:bg-amber-200 border-2 border-amber-400"
                       : isDark
                       ? "bg-emerald-500/20 text-emerald-200 hover:bg-emerald-500/30"
                       : "bg-emerald-100 text-emerald-950 hover:bg-emerald-200 border-2 border-emerald-400"
@@ -1174,17 +1174,17 @@ export const SubscriptionPage: React.FC = () => {
               <div
                 className={`p-4 rounded-2xl border space-y-1 ${
                   isDark
-                    ? "bg-[#25150C] border-[#3E2313]"
-                    : "bg-[#F7EFE3] border-[#D6C2A4]"
+                    ? "bg-[#1F3D2B] border-[#3E2313]"
+                    : "bg-[#F2E8CC] border-[#E0B04A]"
                 }`}
               >
-                <span className={isDark ? "text-amber-200 font-bold block" : "text-[#4A260F] font-black block"}>
+                <span className={isDark ? "text-amber-200 font-bold block" : "text-[#1F3D2B] font-black block"}>
                   Delivery Schedule
                 </span>
-                <p className="font-black text-sm text-[#110702] dark:text-[#FAF4EA]">
+                <p className="font-black text-sm text-[#14291D] dark:text-[#FAF3E0]">
                   {getOrdinalSuffix(activeSub.deliveryDay)} of Every Month
                 </p>
-                <p className="text-xs font-bold text-[#4A260F] dark:text-[#CBB5A1]">
+                <p className="text-xs font-bold text-[#1F3D2B] dark:text-[#CBB5A1]">
                   Next Dispatch:{" "}
                   <span className="font-black text-emerald-800 dark:text-emerald-400">{activeSub.nextDispatchDate}</span>
                 </p>
@@ -1193,17 +1193,17 @@ export const SubscriptionPage: React.FC = () => {
               <div
                 className={`p-4 rounded-2xl border space-y-1 ${
                   isDark
-                    ? "bg-[#25150C] border-[#3E2313]"
-                    : "bg-[#F7EFE3] border-[#D6C2A4]"
+                    ? "bg-[#1F3D2B] border-[#3E2313]"
+                    : "bg-[#F2E8CC] border-[#E0B04A]"
                 }`}
               >
-                <span className={isDark ? "text-amber-200 font-bold block" : "text-[#4A260F] font-black block"}>
+                <span className={isDark ? "text-amber-200 font-bold block" : "text-[#1F3D2B] font-black block"}>
                   Payment Mode
                 </span>
-                <p className="font-black text-sm text-[#110702] dark:text-[#FAF4EA] uppercase">
+                <p className="font-black text-sm text-[#14291D] dark:text-[#FAF3E0] uppercase">
                   {activeSub.duration === "annual" ? "Annual Prepaid (12 Months)" : "Monthly Online Paid"}
                 </p>
-                <p className="text-xs font-bold text-[#4A260F] dark:text-[#CBB5A1]">
+                <p className="text-xs font-bold text-[#1F3D2B] dark:text-[#CBB5A1]">
                   Online Paid • Zero delivery fees across India
                 </p>
               </div>
@@ -1211,11 +1211,11 @@ export const SubscriptionPage: React.FC = () => {
               <div
                 className={`p-4 rounded-2xl border space-y-1 ${
                   isDark
-                    ? "bg-[#25150C] border-[#3E2313]"
-                    : "bg-[#F7EFE3] border-[#D6C2A4]"
+                    ? "bg-[#1F3D2B] border-[#3E2313]"
+                    : "bg-[#F2E8CC] border-[#E0B04A]"
                 }`}
               >
-                <span className={isDark ? "text-amber-200 font-bold block" : "text-[#4A260F] font-black block"}>
+                <span className={isDark ? "text-amber-200 font-bold block" : "text-[#1F3D2B] font-black block"}>
                   Locked Monthly Price
                 </span>
                 <p className="font-black text-base text-[#6B340B] dark:text-amber-300 font-serif">
@@ -1237,14 +1237,14 @@ export const SubscriptionPage: React.FC = () => {
             >
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-[#43230A] text-white flex items-center justify-center shrink-0">
+                  <div className="w-9 h-9 rounded-xl bg-[#1F3D2B] text-white flex items-center justify-center shrink-0">
                     <Truck className="w-5 h-5 text-amber-300" />
                   </div>
                   <div>
-                    <h4 className="font-black text-sm sm:text-base text-[#110702] dark:text-[#FAF4EA]">
+                    <h4 className="font-black text-sm sm:text-base text-[#14291D] dark:text-[#FAF3E0]">
                       Delhivery Express Fulfillment & Tracking
                     </h4>
-                    <p className="text-xs font-bold text-[#4A260F] dark:text-[#CBB5A1]">
+                    <p className="text-xs font-bold text-[#1F3D2B] dark:text-[#CBB5A1]">
                       Carrier: Delhivery B2C Surface • Dispatched fresh from Peenya 2nd Stage, Bangalore
                     </p>
                   </div>
@@ -1254,7 +1254,7 @@ export const SubscriptionPage: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => navigate("/orders")}
-                    className="px-3.5 py-1.5 rounded-xl text-xs font-black bg-[#43230A] hover:bg-[#2E1807] text-white flex items-center gap-1.5 shadow-sm cursor-pointer"
+                    className="px-3.5 py-1.5 rounded-xl text-xs font-black bg-[#1F3D2B] hover:bg-[#2E1807] text-white flex items-center gap-1.5 shadow-sm cursor-pointer"
                   >
                     <Package className="w-3.5 h-3.5 text-amber-300" />
                     <span>View in My Orders</span>
@@ -1264,7 +1264,7 @@ export const SubscriptionPage: React.FC = () => {
                       href={`https://www.delhivery.com/track/package/${activeSub.delhiveryWaybill}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="px-3.5 py-1.5 rounded-xl text-xs font-black bg-white dark:bg-stone-800 border-2 border-[#43230A] text-[#43230A] dark:text-amber-200 flex items-center gap-1.5 cursor-pointer shadow-sm hover:bg-[#FAF7F2]"
+                      className="px-3.5 py-1.5 rounded-xl text-xs font-black bg-white dark:bg-stone-800 border-2 border-[#1F3D2B] text-[#1F3D2B] dark:text-amber-200 flex items-center gap-1.5 cursor-pointer shadow-sm hover:bg-[#FAF3E0]"
                     >
                       <ExternalLink className="w-3.5 h-3.5" />
                       <span>Track AWB #{activeSub.delhiveryWaybill.slice(-6)}</span>
@@ -1279,28 +1279,28 @@ export const SubscriptionPage: React.FC = () => {
                   <span className="text-[10px] font-black text-amber-800 dark:text-amber-300 uppercase">
                     1. Auto Booking
                   </span>
-                  <p className="font-black text-[#110702] dark:text-[#FAF4EA]">Scheduled 3 Days Prior</p>
-                  <p className="text-[11px] text-[#4A260F] dark:text-[#CBB5A1] font-medium">1-Click renewal sent</p>
+                  <p className="font-black text-[#14291D] dark:text-[#FAF3E0]">Scheduled 3 Days Prior</p>
+                  <p className="text-[11px] text-[#1F3D2B] dark:text-[#CBB5A1] font-medium">1-Click renewal sent</p>
                 </div>
                 <div className="p-2.5 rounded-xl bg-white dark:bg-[#24150C] border border-[#DECDB3] dark:border-[#3E2413] space-y-0.5">
                   <span className="text-[10px] font-black text-amber-800 dark:text-amber-300 uppercase">
                     2. Fresh Churning
                   </span>
-                  <p className="font-black text-[#110702] dark:text-[#FAF4EA]">Peenya 2nd Stage</p>
-                  <p className="text-[11px] text-[#4A260F] dark:text-[#CBB5A1] font-medium">Marachekku cold-press</p>
+                  <p className="font-black text-[#14291D] dark:text-[#FAF3E0]">Peenya 2nd Stage</p>
+                  <p className="text-[11px] text-[#1F3D2B] dark:text-[#CBB5A1] font-medium">Marachekku cold-press</p>
                 </div>
                 <div className="p-2.5 rounded-xl bg-white dark:bg-[#24150C] border border-[#DECDB3] dark:border-[#3E2413] space-y-0.5">
                   <span className="text-[10px] font-black text-amber-800 dark:text-amber-300 uppercase">
                     3. Delhivery Pickup
                   </span>
-                  <p className="font-black text-[#110702] dark:text-[#FAF4EA]">AWB Manifested</p>
-                  <p className="text-[11px] text-[#4A260F] dark:text-[#CBB5A1] font-medium">Real-time GPS tracking</p>
+                  <p className="font-black text-[#14291D] dark:text-[#FAF3E0]">AWB Manifested</p>
+                  <p className="text-[11px] text-[#1F3D2B] dark:text-[#CBB5A1] font-medium">Real-time GPS tracking</p>
                 </div>
                 <div className="p-2.5 rounded-xl bg-white dark:bg-[#24150C] border border-[#DECDB3] dark:border-[#3E2413] space-y-0.5">
                   <span className="text-[10px] font-black text-emerald-800 dark:text-emerald-400 uppercase">
                     4. Doorstep Arrival
                   </span>
-                  <p className="font-black text-[#110702] dark:text-[#FAF4EA]">{getOrdinalSuffix(activeSub.deliveryDay)} of Month</p>
+                  <p className="font-black text-[#14291D] dark:text-[#FAF3E0]">{getOrdinalSuffix(activeSub.deliveryDay)} of Month</p>
                   <p className="text-[11px] text-emerald-800 dark:text-emerald-400 font-bold">Free Pan-India Delivery</p>
                 </div>
               </div>
@@ -1313,21 +1313,21 @@ export const SubscriptionPage: React.FC = () => {
           <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4">
             <div
               className={`w-full max-w-2xl rounded-3xl p-6 sm:p-8 space-y-6 border shadow-2xl overflow-y-auto max-h-[90vh] ${
-                isDark ? "bg-[#1C120B] text-[#FAF4EA] border-[#362114]" : "bg-white text-[#110702] border-[#D6C2A4]"
+                isDark ? "bg-[#14291D] text-[#FAF3E0] border-[#1F3D2B]" : "bg-white text-[#14291D] border-[#E0B04A]"
               }`}
             >
               <div
                 className={`flex items-center justify-between border-b pb-3 ${
-                  isDark ? "border-[#2D1B10]" : "border-[#E8DAC2]"
+                  isDark ? "border-[#14291D]" : "border-[#E8DAC2]"
                 }`}
               >
                 <div className="flex items-center gap-2">
-                  <Edit3 className="w-5 h-5 text-[#C8751B]" />
+                  <Edit3 className="w-5 h-5 text-[#E0B04A]" />
                   <div>
-                    <h3 className="font-black font-serif text-lg text-[#110702] dark:text-[#FAF4EA]">
+                    <h3 className="font-black font-serif text-lg text-[#14291D] dark:text-[#FAF3E0]">
                       Edit Your Monthly Oil Combo
                     </h3>
-                    <p className="text-xs text-[#4A260F] dark:text-[#D8C8B8] font-bold">
+                    <p className="text-xs text-[#1F3D2B] dark:text-[#E0B04A] font-bold">
                       Changes update directly in Firestore for your next monthly delivery cycle.
                     </p>
                   </div>
@@ -1348,10 +1348,10 @@ export const SubscriptionPage: React.FC = () => {
                   onClick={() => setEditComboMode("preset")}
                   className={`flex-1 py-2.5 rounded-xl font-black text-xs border transition-all cursor-pointer ${
                     editComboMode === "preset"
-                      ? "bg-[#43230A] text-white border-[#43230A] shadow-md"
+                      ? "bg-[#1F3D2B] text-white border-[#1F3D2B] shadow-md"
                       : isDark
-                      ? "border-[#442817] text-[#D8C8B8] bg-[#22130A]"
-                      : "border-[#C9B293] text-[#110702] bg-[#F7EFE3]"
+                      ? "border-[#442817] text-[#E0B04A] bg-[#22130A]"
+                      : "border-[#C9B293] text-[#14291D] bg-[#F2E8CC]"
                   }`}
                 >
                   Choose Curated Combo
@@ -1361,10 +1361,10 @@ export const SubscriptionPage: React.FC = () => {
                   onClick={() => setEditComboMode("custom")}
                   className={`flex-1 py-2.5 rounded-xl font-black text-xs border transition-all cursor-pointer ${
                     editComboMode === "custom"
-                      ? "bg-[#43230A] text-white border-[#43230A] shadow-md"
+                      ? "bg-[#1F3D2B] text-white border-[#1F3D2B] shadow-md"
                       : isDark
-                      ? "border-[#442817] text-[#D8C8B8] bg-[#22130A]"
-                      : "border-[#C9B293] text-[#110702] bg-[#F7EFE3]"
+                      ? "border-[#442817] text-[#E0B04A] bg-[#22130A]"
+                      : "border-[#C9B293] text-[#14291D] bg-[#F2E8CC]"
                   }`}
                 >
                   Build Custom Box
@@ -1381,17 +1381,17 @@ export const SubscriptionPage: React.FC = () => {
                         onClick={() => setEditSelectedPresetId(combo.id)}
                         className={`p-4 rounded-2xl border-2 transition-all cursor-pointer flex items-center justify-between ${
                           isSelected
-                            ? "bg-amber-500/10 border-[#C8751B] ring-2 ring-[#C8751B]/30"
+                            ? "bg-amber-500/10 border-[#E0B04A] ring-2 ring-[#E0B04A]/30"
                             : isDark
-                            ? "border-[#2D1B10] bg-[#25150C]"
-                            : "border-[#D6C2A4] bg-[#FDF9F2]"
+                            ? "border-[#14291D] bg-[#1F3D2B]"
+                            : "border-[#E0B04A] bg-[#FDF9F2]"
                         }`}
                       >
                         <div>
-                          <h4 className="font-black text-sm text-[#110702] dark:text-[#FAF4EA]">
+                          <h4 className="font-black text-sm text-[#14291D] dark:text-[#FAF3E0]">
                             {combo.name}
                           </h4>
-                          <p className="text-xs text-[#4A260F] dark:text-[#D8C8B8] font-bold">
+                          <p className="text-xs text-[#1F3D2B] dark:text-[#E0B04A] font-bold">
                             {combo.items.join(" + ")}
                           </p>
                         </div>
@@ -1409,7 +1409,7 @@ export const SubscriptionPage: React.FC = () => {
                 </div>
               ) : (
                 <div className="space-y-4">
-                  <p className="text-xs text-[#4A260F] dark:text-[#D8C8B8] font-bold">
+                  <p className="text-xs text-[#1F3D2B] dark:text-[#E0B04A] font-bold">
                     Adjust the number of 1L bottles for your next monthly delivery (minimum 2 bottles):
                   </p>
                   {(["groundnut", "coconut", "sesame"] as const).map((oilKey) => {
@@ -1420,12 +1420,12 @@ export const SubscriptionPage: React.FC = () => {
                         key={oilKey}
                         className={`p-3.5 rounded-2xl border-2 flex items-center justify-between ${
                           isDark
-                            ? "bg-[#25150C] border-[#3E2313]"
-                            : "bg-[#FDF9F2] border-[#D6C2A4]"
+                            ? "bg-[#1F3D2B] border-[#3E2313]"
+                            : "bg-[#FDF9F2] border-[#E0B04A]"
                         }`}
                       >
                         <div>
-                          <h5 className="font-black text-sm text-[#110702] dark:text-[#FAF4EA]">
+                          <h5 className="font-black text-sm text-[#14291D] dark:text-[#FAF3E0]">
                             {rate.name}
                           </h5>
                           <span className="text-xs text-[#6B340B] dark:text-amber-400 font-black">
@@ -1445,13 +1445,13 @@ export const SubscriptionPage: React.FC = () => {
                             }
                             className={`w-8 h-8 rounded-lg flex items-center justify-center font-black cursor-pointer border ${
                               isDark
-                                ? "bg-[#362114] text-stone-200 border-[#4E2E1A]"
-                                : "bg-[#EDE2CF] text-[#110702] border-[#C9B293]"
+                                ? "bg-[#1F3D2B] text-stone-200 border-[#4E2E1A]"
+                                : "bg-[#EDE2CF] text-[#14291D] border-[#C9B293]"
                             }`}
                           >
                             <Minus className="w-3.5 h-3.5 stroke-[3]" />
                           </button>
-                          <span className="w-6 text-center font-black text-base text-[#110702] dark:text-[#FAF4EA]">
+                          <span className="w-6 text-center font-black text-base text-[#14291D] dark:text-[#FAF3E0]">
                             {count}
                           </span>
                           <button
@@ -1462,7 +1462,7 @@ export const SubscriptionPage: React.FC = () => {
                                 [oilKey]: p[oilKey] + 1,
                               }))
                             }
-                            className="w-8 h-8 rounded-lg bg-[#43230A] hover:bg-[#2E1807] text-white flex items-center justify-center font-bold cursor-pointer"
+                            className="w-8 h-8 rounded-lg bg-[#1F3D2B] hover:bg-[#2E1807] text-white flex items-center justify-center font-bold cursor-pointer"
                           >
                             <Plus className="w-3.5 h-3.5 stroke-[3]" />
                           </button>
@@ -1475,7 +1475,7 @@ export const SubscriptionPage: React.FC = () => {
 
               <div
                 className={`pt-4 border-t flex items-center justify-end gap-3 ${
-                  isDark ? "border-[#2D1B10]" : "border-[#E8DAC2]"
+                  isDark ? "border-[#14291D]" : "border-[#E8DAC2]"
                 }`}
               >
                 <button
@@ -1483,8 +1483,8 @@ export const SubscriptionPage: React.FC = () => {
                   onClick={() => setIsEditingCombo(false)}
                   className={`px-4 py-2.5 rounded-xl border text-xs font-black cursor-pointer ${
                     isDark
-                      ? "border-[#442817] text-[#D8C8B8]"
-                      : "border-[#C9B293] text-[#110702]"
+                      ? "border-[#442817] text-[#E0B04A]"
+                      : "border-[#C9B293] text-[#14291D]"
                   }`}
                 >
                   Cancel
@@ -1493,7 +1493,7 @@ export const SubscriptionPage: React.FC = () => {
                   type="button"
                   disabled={isSavingEdit}
                   onClick={handleSaveComboEdit}
-                  className="px-6 py-2.5 rounded-xl bg-[#43230A] hover:bg-[#2E1807] text-white text-xs font-black shadow-md flex items-center gap-2 cursor-pointer"
+                  className="px-6 py-2.5 rounded-xl bg-[#1F3D2B] hover:bg-[#2E1807] text-white text-xs font-black shadow-md flex items-center gap-2 cursor-pointer"
                 >
                   <Check className="w-4 h-4 text-amber-300 stroke-[3]" />
                   <span>{isSavingEdit ? "Saving in Firestore..." : "Save Updated Combo"}</span>
@@ -1507,10 +1507,10 @@ export const SubscriptionPage: React.FC = () => {
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <span className="w-7 h-7 rounded-full bg-[#43230A] text-amber-200 flex items-center justify-center font-black text-sm">
+              <span className="w-7 h-7 rounded-full bg-[#1F3D2B] text-amber-200 flex items-center justify-center font-black text-sm">
                 1
               </span>
-              <h2 className="text-xl sm:text-2xl font-black font-serif text-[#110702] dark:text-[#FAF4EA]">
+              <h2 className="text-xl sm:text-2xl font-black font-serif text-[#14291D] dark:text-[#FAF3E0]">
                 Step 1: Choose Subscription Plan & Discount
               </h2>
             </div>
@@ -1528,11 +1528,11 @@ export const SubscriptionPage: React.FC = () => {
           {showDelhiveryGuide && (
             <div
               className={`p-4 sm:p-5 rounded-2xl border-2 space-y-2 text-xs ${
-                isDark ? "bg-[#1E120A] border-amber-500/30 text-[#FAF4EA]" : "bg-[#F7EFE3] border-[#C9B293] text-[#110702]"
+                isDark ? "bg-[#1E120A] border-amber-500/30 text-[#FAF3E0]" : "bg-[#F2E8CC] border-[#C9B293] text-[#14291D]"
               }`}
             >
               <h4 className="font-black text-sm text-[#241105] dark:text-amber-300 flex items-center gap-2">
-                <Truck className="w-4 h-4 text-[#C8751B]" />
+                <Truck className="w-4 h-4 text-[#E0B04A]" />
                 <span>End-to-End Subscription Booking to Delhivery Delivery:</span>
               </h4>
               <ol className="list-decimal pl-5 space-y-1 font-bold leading-relaxed">
@@ -1555,10 +1555,10 @@ export const SubscriptionPage: React.FC = () => {
               }}
               className={`p-5 rounded-3xl border-3 transition-all cursor-pointer flex flex-col justify-between space-y-3 ${
                 duration === "monthly" && !hasVipPass
-                  ? "bg-[#FDF9F2] border-[#43230A] ring-3 ring-[#43230A]/20 shadow-lg"
+                  ? "bg-[#FDF9F2] border-[#1F3D2B] ring-3 ring-[#1F3D2B]/20 shadow-lg"
                   : isDark
-                  ? "bg-[#1C120B] border-[#362114] hover:border-amber-500/40"
-                  : "bg-white border-[#D6C2A4] hover:border-[#43230A]"
+                  ? "bg-[#14291D] border-[#1F3D2B] hover:border-amber-500/40"
+                  : "bg-white border-[#E0B04A] hover:border-[#1F3D2B]"
               }`}
             >
               <div className="space-y-2">
@@ -1570,22 +1570,22 @@ export const SubscriptionPage: React.FC = () => {
                     Monthly Plan
                   </span>
                 </div>
-                <h3 className="font-black text-base sm:text-lg font-serif text-[#110702] dark:text-[#FAF4EA]">
+                <h3 className="font-black text-base sm:text-lg font-serif text-[#14291D] dark:text-[#FAF3E0]">
                   1-Month Next Delivery
                 </h3>
-                <p className="text-xs text-[#3D1E08] dark:text-[#D8C8B8] font-bold leading-relaxed">
+                <p className="text-xs text-[#3D1E08] dark:text-[#E0B04A] font-bold leading-relaxed">
                   Pay online for your first month now. Enjoy a locked <strong>5% discount</strong> with zero long-term lock-in. Edit or pause anytime!
                 </p>
               </div>
 
-              <div className="pt-2 border-t border-[#E8DAC2] dark:border-[#362114] flex items-center justify-between">
+              <div className="pt-2 border-t border-[#E8DAC2] dark:border-[#1F3D2B] flex items-center justify-between">
                 <span className="text-xs font-black text-emerald-800 dark:text-emerald-400">
                   ✓ Zero Lock-in
                 </span>
                 <div
                   className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
                     duration === "monthly" && !hasVipPass
-                      ? "border-[#43230A] bg-[#43230A]"
+                      ? "border-[#1F3D2B] bg-[#1F3D2B]"
                       : "border-stone-400"
                   }`}
                 >
@@ -1604,10 +1604,10 @@ export const SubscriptionPage: React.FC = () => {
               }}
               className={`p-5 rounded-3xl border-3 transition-all cursor-pointer flex flex-col justify-between space-y-3 ${
                 duration === "annual" && !hasVipPass
-                  ? "bg-[#FDF9F2] border-[#43230A] ring-3 ring-[#43230A]/20 shadow-lg"
+                  ? "bg-[#FDF9F2] border-[#1F3D2B] ring-3 ring-[#1F3D2B]/20 shadow-lg"
                   : isDark
-                  ? "bg-[#1C120B] border-[#362114] hover:border-amber-500/40"
-                  : "bg-white border-[#D6C2A4] hover:border-[#43230A]"
+                  ? "bg-[#14291D] border-[#1F3D2B] hover:border-amber-500/40"
+                  : "bg-white border-[#E0B04A] hover:border-[#1F3D2B]"
               }`}
             >
               <div className="space-y-2">
@@ -1619,22 +1619,22 @@ export const SubscriptionPage: React.FC = () => {
                     Full Year Value
                   </span>
                 </div>
-                <h3 className="font-black text-base sm:text-lg font-serif text-[#110702] dark:text-[#FAF4EA]">
+                <h3 className="font-black text-base sm:text-lg font-serif text-[#14291D] dark:text-[#FAF3E0]">
                   Complete Year (12 Months)
                 </h3>
-                <p className="text-xs text-[#3D1E08] dark:text-[#D8C8B8] font-bold leading-relaxed">
+                <p className="text-xs text-[#3D1E08] dark:text-[#E0B04A] font-bold leading-relaxed">
                   Prepay for 1 full year online (12 cycles). Lock in a guaranteed <strong>10% discount</strong> against market price inflation.
                 </p>
               </div>
 
-              <div className="pt-2 border-t border-[#E8DAC2] dark:border-[#362114] flex items-center justify-between">
+              <div className="pt-2 border-t border-[#E8DAC2] dark:border-[#1F3D2B] flex items-center justify-between">
                 <span className="text-xs font-black text-emerald-800 dark:text-emerald-400">
                   ✓ 12 Cycles Prepaid
                 </span>
                 <div
                   className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
                     duration === "annual" && !hasVipPass
-                      ? "border-[#43230A] bg-[#43230A]"
+                      ? "border-[#1F3D2B] bg-[#1F3D2B]"
                       : "border-stone-400"
                   }`}
                 >
@@ -1652,8 +1652,8 @@ export const SubscriptionPage: React.FC = () => {
                 hasVipPass
                   ? "bg-[#FDF6EA] border-[#B46912] ring-3 ring-[#B46912]/30 shadow-xl"
                   : isDark
-                  ? "bg-[#1E140C] border-[#5E3210] hover:border-[#B46912]"
-                  : "bg-[#FFFDF9] border-[#C9B293] hover:border-[#B46912]"
+                  ? "bg-[#1E140C] border-[#1F3D2B] hover:border-[#B46912]"
+                  : "bg-[#FAF3E0] border-[#C9B293] hover:border-[#B46912]"
               }`}
             >
               <div className="absolute top-0 right-0 bg-[#B46912] text-white font-black text-[10px] uppercase px-3 py-0.5 rounded-bl-xl shadow-xs">
@@ -1662,19 +1662,19 @@ export const SubscriptionPage: React.FC = () => {
 
               <div className="space-y-2">
                 <div className="flex items-center gap-2">
-                  <div className="w-7 h-7 rounded-lg bg-[#43230A] text-amber-300 flex items-center justify-center shrink-0">
+                  <div className="w-7 h-7 rounded-lg bg-[#1F3D2B] text-amber-300 flex items-center justify-center shrink-0">
                     <Crown className="w-4 h-4" />
                   </div>
-                  <span className="px-2.5 py-0.5 rounded-full text-xs font-black bg-[#43230A] text-amber-200">
+                  <span className="px-2.5 py-0.5 rounded-full text-xs font-black bg-[#1F3D2B] text-amber-200">
                     15% OFF
                   </span>
                 </div>
 
-                <h3 className="font-black text-base sm:text-lg font-serif text-[#110702] dark:text-[#FAF4EA]">
+                <h3 className="font-black text-base sm:text-lg font-serif text-[#14291D] dark:text-[#FAF3E0]">
                   VIP Club Pass (+₹{VIP_PASS_FEE})
                 </h3>
 
-                <p className="text-xs text-[#3D1E08] dark:text-[#D8C8B8] font-bold leading-relaxed">
+                <p className="text-xs text-[#3D1E08] dark:text-[#E0B04A] font-bold leading-relaxed">
                   Add <strong>₹{VIP_PASS_FEE}</strong> subscription fee to unlock the highest <strong>15% VIP discount</strong> on every bottle. Pays for itself on your first box!
                 </p>
               </div>
@@ -1686,7 +1686,7 @@ export const SubscriptionPage: React.FC = () => {
                 <div
                   className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all ${
                     hasVipPass
-                      ? "bg-[#43230A] border-[#43230A] text-amber-300"
+                      ? "bg-[#1F3D2B] border-[#1F3D2B] text-amber-300"
                       : "border-stone-400 bg-white dark:bg-stone-800"
                   }`}
                 >
@@ -1701,10 +1701,10 @@ export const SubscriptionPage: React.FC = () => {
         <div className="space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <div className="flex items-center gap-2">
-              <span className="w-7 h-7 rounded-full bg-[#43230A] text-amber-200 flex items-center justify-center font-black text-sm">
+              <span className="w-7 h-7 rounded-full bg-[#1F3D2B] text-amber-200 flex items-center justify-center font-black text-sm">
                 2
               </span>
-              <h2 className="text-xl sm:text-2xl font-black font-serif text-[#110702] dark:text-[#FAF4EA]">
+              <h2 className="text-xl sm:text-2xl font-black font-serif text-[#14291D] dark:text-[#FAF3E0]">
                 Step 2: Choose Your Monthly Combo or Build Custom Box
               </h2>
             </div>
@@ -1716,7 +1716,7 @@ export const SubscriptionPage: React.FC = () => {
           {/* Mode Switcher */}
           <div
             className={`flex items-center gap-3 p-1.5 rounded-2xl border-2 max-w-md ${
-              isDark ? "bg-[#1E120A] border-[#362114]" : "bg-[#F7EFE3] border-[#D6C2A4]"
+              isDark ? "bg-[#1E120A] border-[#1F3D2B]" : "bg-[#F2E8CC] border-[#E0B04A]"
             }`}
           >
             <button
@@ -1724,10 +1724,10 @@ export const SubscriptionPage: React.FC = () => {
               onClick={() => setComboMode("preset")}
               className={`flex-1 py-2.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
                 comboMode === "preset"
-                  ? "bg-[#43230A] text-white shadow-md"
+                  ? "bg-[#1F3D2B] text-white shadow-md"
                   : isDark
-                  ? "text-[#D8C8B8] hover:text-white"
-                  : "text-[#110702] hover:text-[#43230A]"
+                  ? "text-[#E0B04A] hover:text-white"
+                  : "text-[#14291D] hover:text-[#1F3D2B]"
               }`}
             >
               Curated Popular Combos
@@ -1737,10 +1737,10 @@ export const SubscriptionPage: React.FC = () => {
               onClick={() => setComboMode("custom")}
               className={`flex-1 py-2.5 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
                 comboMode === "custom"
-                  ? "bg-[#43230A] text-white shadow-md"
+                  ? "bg-[#1F3D2B] text-white shadow-md"
                   : isDark
-                  ? "text-[#D8C8B8] hover:text-white"
-                  : "text-[#110702] hover:text-[#43230A]"
+                  ? "text-[#E0B04A] hover:text-white"
+                  : "text-[#14291D] hover:text-[#1F3D2B]"
               }`}
             >
               <Sliders className="w-3.5 h-3.5 text-amber-300" />
@@ -1759,14 +1759,14 @@ export const SubscriptionPage: React.FC = () => {
                     onClick={() => setSelectedPresetId(combo.id)}
                     className={`relative p-5 rounded-3xl border-3 transition-all cursor-pointer flex flex-col justify-between ${
                       isSelected
-                        ? "bg-[#FDF9F2] border-[#43230A] ring-3 ring-[#43230A]/20 shadow-xl"
+                        ? "bg-[#FDF9F2] border-[#1F3D2B] ring-3 ring-[#1F3D2B]/20 shadow-xl"
                         : isDark
-                        ? "bg-[#1C120B] border-[#362114] hover:border-amber-500/30"
-                        : "bg-white border-[#D6C2A4] hover:border-[#43230A]"
+                        ? "bg-[#14291D] border-[#1F3D2B] hover:border-amber-500/30"
+                        : "bg-white border-[#E0B04A] hover:border-[#1F3D2B]"
                     }`}
                   >
                     {combo.badge && (
-                      <span className="absolute -top-3 right-5 px-3 py-0.5 rounded-full bg-[#43230A] text-amber-200 font-black text-[10px] uppercase shadow-xs">
+                      <span className="absolute -top-3 right-5 px-3 py-0.5 rounded-full bg-[#1F3D2B] text-amber-200 font-black text-[10px] uppercase shadow-xs">
                         {combo.badge}
                       </span>
                     )}
@@ -1775,28 +1775,28 @@ export const SubscriptionPage: React.FC = () => {
                       <ComboBottleVisual combo={combo} isDark={isDark} />
 
                       <div>
-                        <h3 className="font-black text-base sm:text-lg font-serif text-[#110702] dark:text-[#FAF4EA]">
+                        <h3 className="font-black text-base sm:text-lg font-serif text-[#14291D] dark:text-[#FAF3E0]">
                           {combo.name}
                         </h3>
                         <p className="text-xs text-[#6B340B] dark:text-amber-400 font-black mt-0.5">
                           {combo.kannadaName}
                         </p>
-                        <p className="text-xs text-[#3D1E08] dark:text-[#D8C8B8] mt-1 leading-relaxed font-bold">
+                        <p className="text-xs text-[#3D1E08] dark:text-[#E0B04A] mt-1 leading-relaxed font-bold">
                           {combo.description}
                         </p>
                       </div>
 
                       <div
                         className={`pt-2 border-t space-y-1 ${
-                          isDark ? "border-[#2D1B10]" : "border-[#E8DAC2]"
+                          isDark ? "border-[#14291D]" : "border-[#E8DAC2]"
                         }`}
                       >
                         {combo.items.map((it, idx) => (
                           <div
                             key={idx}
-                            className="flex items-center gap-1.5 text-xs text-[#110702] dark:text-[#E0D4C0] font-black"
+                            className="flex items-center gap-1.5 text-xs text-[#14291D] dark:text-[#E0D4C0] font-black"
                           >
-                            <Droplet className="w-3.5 h-3.5 text-[#C8751B]" />
+                            <Droplet className="w-3.5 h-3.5 text-[#E0B04A]" />
                             <span>{it}</span>
                           </div>
                         ))}
@@ -1805,7 +1805,7 @@ export const SubscriptionPage: React.FC = () => {
 
                     <div
                       className={`pt-4 border-t flex items-center justify-between mt-4 ${
-                        isDark ? "border-[#2D1B10]" : "border-[#E8DAC2]"
+                        isDark ? "border-[#14291D]" : "border-[#E8DAC2]"
                       }`}
                     >
                       <div>
@@ -1829,28 +1829,28 @@ export const SubscriptionPage: React.FC = () => {
             /* Render Mode: Interactive Custom Combo Builder */
             <div
               className={`p-6 sm:p-8 rounded-3xl border-3 shadow-lg space-y-6 ${
-                isDark ? "bg-[#1C120B] border-[#362114]" : "bg-white border-[#D6C2A4]"
+                isDark ? "bg-[#14291D] border-[#1F3D2B]" : "bg-white border-[#E0B04A]"
               }`}
             >
               <div
                 className={`flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-4 ${
-                  isDark ? "border-[#2D1B10]" : "border-[#E8DAC2]"
+                  isDark ? "border-[#14291D]" : "border-[#E8DAC2]"
                 }`}
               >
                 <div>
-                  <h3 className="text-lg sm:text-xl font-black font-serif text-[#110702] dark:text-[#FAF4EA]">
+                  <h3 className="text-lg sm:text-xl font-black font-serif text-[#14291D] dark:text-[#FAF3E0]">
                     Configure Your Monthly Cooking Oil Box
                   </h3>
-                  <p className="text-xs text-[#3D1E08] dark:text-[#D8C8B8] mt-0.5 font-bold">
+                  <p className="text-xs text-[#3D1E08] dark:text-[#E0B04A] mt-0.5 font-bold">
                     Choose any combination of our 1L bottles. Prices reflect your active {discountPercent}% discount!
                   </p>
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <span className="text-xs font-black text-[#110702] dark:text-[#FAF4EA]">
+                  <span className="text-xs font-black text-[#14291D] dark:text-[#FAF3E0]">
                     Total Volume:
                   </span>
-                  <span className="px-3.5 py-1.5 rounded-xl bg-[#43230A] text-amber-200 font-black text-sm">
+                  <span className="px-3.5 py-1.5 rounded-xl bg-[#1F3D2B] text-amber-200 font-black text-sm">
                     {customCounts.groundnut + customCounts.coconut + customCounts.sesame} Litres
                   </span>
                 </div>
@@ -1870,17 +1870,17 @@ export const SubscriptionPage: React.FC = () => {
                     <div
                       key={oilKey}
                       className={`p-4 rounded-2xl border-2 space-y-3 ${
-                        isDark ? "bg-[#25150C] border-[#3E2313]" : "bg-[#FDF9F2] border-[#D6C2A4]"
+                        isDark ? "bg-[#1F3D2B] border-[#3E2313]" : "bg-[#FDF9F2] border-[#E0B04A]"
                       }`}
                     >
                       <div>
-                        <h4 className="font-black text-base text-[#110702] dark:text-[#FAF4EA]">
+                        <h4 className="font-black text-base text-[#14291D] dark:text-[#FAF3E0]">
                           {rate.name}
                         </h4>
                         <span className="text-xs text-[#6B340B] dark:text-amber-400 font-black block">
                           {rate.kannadaName}
                         </span>
-                        <p className="text-xs text-[#3D1E08] dark:text-[#D8C8B8] mt-1 line-clamp-2 font-bold">
+                        <p className="text-xs text-[#3D1E08] dark:text-[#E0B04A] mt-1 line-clamp-2 font-bold">
                           {rate.description}
                         </p>
                       </div>
@@ -1911,12 +1911,12 @@ export const SubscriptionPage: React.FC = () => {
                               }))
                             }
                             className={`w-9 h-9 rounded-xl flex items-center justify-center font-black cursor-pointer border ${
-                              isDark ? "bg-[#362114] text-stone-200 border-[#4E2E1A]" : "bg-[#EDE2CF] text-[#110702] border-[#C9B293]"
+                              isDark ? "bg-[#1F3D2B] text-stone-200 border-[#4E2E1A]" : "bg-[#EDE2CF] text-[#14291D] border-[#C9B293]"
                             }`}
                           >
                             <Minus className="w-4 h-4 stroke-[3]" />
                           </button>
-                          <span className="w-7 text-center font-black text-base text-[#110702] dark:text-amber-100">
+                          <span className="w-7 text-center font-black text-base text-[#14291D] dark:text-amber-100">
                             {count}
                           </span>
                           <button
@@ -1927,7 +1927,7 @@ export const SubscriptionPage: React.FC = () => {
                                 [oilKey]: p[oilKey] + 1,
                               }))
                             }
-                            className="w-9 h-9 rounded-xl bg-[#43230A] hover:bg-[#2E1807] text-white flex items-center justify-center font-black cursor-pointer"
+                            className="w-9 h-9 rounded-xl bg-[#1F3D2B] hover:bg-[#2E1807] text-white flex items-center justify-center font-black cursor-pointer"
                           >
                             <Plus className="w-4 h-4 stroke-[3]" />
                           </button>
@@ -1941,11 +1941,11 @@ export const SubscriptionPage: React.FC = () => {
               {/* Custom Box Summary Footer */}
               <div
                 className={`p-4 rounded-2xl border-2 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs ${
-                  isDark ? "bg-[#25150C] border-[#3E2313]" : "bg-[#F7EFE3] border-[#D6C2A4]"
+                  isDark ? "bg-[#1F3D2B] border-[#3E2313]" : "bg-[#F2E8CC] border-[#E0B04A]"
                 }`}
               >
                 <div>
-                  <span className="font-black text-[#110702] dark:text-[#FAF4EA]">
+                  <span className="font-black text-[#14291D] dark:text-[#FAF3E0]">
                     Your Custom Monthly Box:{" "}
                   </span>
                   <span className="text-[#6B340B] dark:text-amber-300 font-black">
@@ -1972,14 +1972,14 @@ export const SubscriptionPage: React.FC = () => {
         {/* STEP 3: INTERACTIVE CALENDAR DELIVERY DATE */}
         <div className="space-y-4">
           <div className="flex items-center gap-2">
-            <span className="w-7 h-7 rounded-full bg-[#43230A] text-amber-200 flex items-center justify-center font-black text-sm">
+            <span className="w-7 h-7 rounded-full bg-[#1F3D2B] text-amber-200 flex items-center justify-center font-black text-sm">
               3
             </span>
-            <h2 className="text-xl sm:text-2xl font-black font-serif text-[#110702] dark:text-[#FAF4EA]">
+            <h2 className="text-xl sm:text-2xl font-black font-serif text-[#14291D] dark:text-[#FAF3E0]">
               Step 3: Select Recurring Delivery Day on Calendar
             </h2>
           </div>
-          <p className="text-xs text-[#3D1E08] dark:text-[#D8C8B8] font-bold">
+          <p className="text-xs text-[#3D1E08] dark:text-[#E0B04A] font-bold">
             Choose the day your oil will be delivered. Your fresh batch will automatically arrive on this exact day every month.
           </p>
 
@@ -1993,28 +1993,28 @@ export const SubscriptionPage: React.FC = () => {
         {/* STEP 4: ONLINE PAYMENT & DELHIVERY BOOKING SUMMARY */}
         <div
           className={`p-6 sm:p-8 rounded-3xl border-3 shadow-xl space-y-6 ${
-            isDark ? "bg-[#1C120B] border-[#362114]" : "bg-white border-[#D6C2A4]"
+            isDark ? "bg-[#14291D] border-[#1F3D2B]" : "bg-white border-[#E0B04A]"
           }`}
         >
           <div
             className={`flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-4 ${
-              isDark ? "border-[#2D1B10]" : "border-[#E8DAC2]"
+              isDark ? "border-[#14291D]" : "border-[#E8DAC2]"
             }`}
           >
             <div>
               <span className="text-xs font-black text-[#6B340B] dark:text-amber-300 block">
                 Subscription Booking Summary:
               </span>
-              <h3 className="text-xl sm:text-2xl font-black font-serif text-[#110702] dark:text-[#FAF4EA] mt-0.5">
+              <h3 className="text-xl sm:text-2xl font-black font-serif text-[#14291D] dark:text-[#FAF3E0] mt-0.5">
                 {chosenCombo.name}
               </h3>
-              <p className="text-xs text-[#3D1E08] dark:text-[#D8C8B8] font-bold">
+              <p className="text-xs text-[#3D1E08] dark:text-[#E0B04A] font-bold">
                 Recurring Delivery: Every month on the <strong>{getOrdinalSuffix(deliveryDay)}</strong>
               </p>
             </div>
 
             <div className="text-left sm:text-right">
-              <span className="text-xs text-[#4A260F] dark:text-stone-400 block font-bold">
+              <span className="text-xs text-[#1F3D2B] dark:text-stone-400 block font-bold">
                 Total Payable Online Today:
               </span>
               <span className="text-3xl font-black font-serif text-[#6B340B] dark:text-amber-300">
@@ -2031,14 +2031,14 @@ export const SubscriptionPage: React.FC = () => {
           {/* Pricing Breakdown */}
           <div
             className={`p-4 rounded-2xl border-2 space-y-2 text-xs font-bold ${
-              isDark ? "bg-[#25150C] border-[#3E2313]" : "bg-[#FDF9F2] border-[#D6C2A4]"
+              isDark ? "bg-[#1F3D2B] border-[#3E2313]" : "bg-[#FDF9F2] border-[#E0B04A]"
             }`}
           >
-            <div className="flex justify-between items-center text-[#110702] dark:text-[#D8C8B8]">
+            <div className="flex justify-between items-center text-[#14291D] dark:text-[#E0B04A]">
               <span>
                 Oil Pack ({duration === "annual" ? "12 Months Prepaid" : "1 Month"} at {discountPercent}% off):
               </span>
-              <strong className="text-[#110702] dark:text-[#FAF4EA]">₹{oilAmount}</strong>
+              <strong className="text-[#14291D] dark:text-[#FAF3E0]">₹{oilAmount}</strong>
             </div>
 
             {hasVipPass && (
@@ -2055,7 +2055,7 @@ export const SubscriptionPage: React.FC = () => {
 
             <div
               className={`pt-2 border-t flex justify-between items-center text-sm font-black ${
-                isDark ? "border-[#3E2313] text-[#FAF4EA]" : "border-[#E8DAC2] text-[#110702]"
+                isDark ? "border-[#3E2313] text-[#FAF3E0]" : "border-[#E8DAC2] text-[#14291D]"
               }`}
             >
               <span>Total Online Payment:</span>
@@ -2069,11 +2069,11 @@ export const SubscriptionPage: React.FC = () => {
           <div
             className={`p-4 rounded-2xl border-2 flex items-center gap-3 text-xs ${
               isDark
-                ? "bg-[#1E140C] border-amber-500/20 text-[#FAF4EA]"
-                : "bg-[#FDF9F2] border-[#D6C2A4] text-[#110702]"
+                ? "bg-[#1E140C] border-amber-500/20 text-[#FAF3E0]"
+                : "bg-[#FDF9F2] border-[#E0B04A] text-[#14291D]"
             }`}
           >
-            <Bell className="w-5 h-5 text-[#C8751B] shrink-0" />
+            <Bell className="w-5 h-5 text-[#E0B04A] shrink-0" />
             <span className="font-bold leading-relaxed">
               <strong>Automated Renewal Reminder:</strong> You will receive an automated notification 3 days before your delivery on the {getOrdinalSuffix(deliveryDay)} of each month. All subsequent renewals happen automatically online with 1-click approval. Zero manual WhatsApp messages needed!
             </span>
@@ -2081,7 +2081,7 @@ export const SubscriptionPage: React.FC = () => {
 
           {/* Online Checkout Button */}
           <div className="pt-2 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div className="flex items-center gap-2 text-xs font-bold text-[#4A260F] dark:text-stone-400">
+            <div className="flex items-center gap-2 text-xs font-bold text-[#1F3D2B] dark:text-stone-400">
               <Lock className="w-4 h-4 text-emerald-700" />
               <span>256-bit Bank-grade Online Payment Gateway • Instant Confirmation</span>
             </div>
@@ -2090,7 +2090,7 @@ export const SubscriptionPage: React.FC = () => {
               type="button"
               disabled={isSubmitting}
               onClick={handleSubscribeOnline}
-              className="px-8 py-4 rounded-2xl bg-[#43230A] hover:bg-[#2E1807] text-white font-black text-sm shadow-xl transition-all hover:scale-105 cursor-pointer flex items-center justify-center gap-2"
+              className="px-8 py-4 rounded-2xl bg-[#1F3D2B] hover:bg-[#2E1807] text-white font-black text-sm shadow-xl transition-all hover:scale-105 cursor-pointer flex items-center justify-center gap-2"
             >
               <CreditCard className="w-5 h-5 text-amber-300" />
               <span>
@@ -2107,12 +2107,12 @@ export const SubscriptionPage: React.FC = () => {
           <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4">
             <div
               className={`w-full max-w-lg rounded-3xl p-6 sm:p-8 space-y-5 border-2 shadow-2xl animate-fade-in ${
-                isDark ? "bg-[#1C120B] text-[#FAF4EA] border-[#362114]" : "bg-white text-[#110702] border-[#D6C2A4]"
+                isDark ? "bg-[#14291D] text-[#FAF3E0] border-[#1F3D2B]" : "bg-white text-[#14291D] border-[#E0B04A]"
               }`}
             >
               <div
                 className={`flex items-center justify-between border-b pb-3 ${
-                  isDark ? "border-[#2D1B10]" : "border-[#E8DAC2]"
+                  isDark ? "border-[#14291D]" : "border-[#E8DAC2]"
                 }`}
               >
                 <div className="flex items-center gap-2.5">
@@ -2120,7 +2120,7 @@ export const SubscriptionPage: React.FC = () => {
                     <CheckCircle2 className="w-6 h-6 stroke-[2.5]" />
                   </div>
                   <div>
-                    <h3 className="font-black font-serif text-lg text-[#110702] dark:text-[#FAF4EA]">
+                    <h3 className="font-black font-serif text-lg text-[#14291D] dark:text-[#FAF3E0]">
                       Subscription Booking Confirmed!
                     </h3>
                     <p className="text-xs text-emerald-800 dark:text-emerald-400 font-black">
@@ -2140,31 +2140,31 @@ export const SubscriptionPage: React.FC = () => {
               <div className="space-y-3 text-xs">
                 <div
                   className={`p-4 rounded-2xl border-2 space-y-2 ${
-                    isDark ? "bg-[#25150C] border-[#3E2313]" : "bg-[#FDF9F2] border-[#D6C2A4]"
+                    isDark ? "bg-[#1F3D2B] border-[#3E2313]" : "bg-[#FDF9F2] border-[#E0B04A]"
                   }`}
                 >
                   <div className="flex justify-between items-center">
-                    <span className="font-bold text-[#4A260F] dark:text-[#D8C8B8]">Plan Type:</span>
-                    <strong className="text-[#110702] dark:text-[#FAF4EA] font-black">{subSuccessModal.duration}</strong>
+                    <span className="font-bold text-[#1F3D2B] dark:text-[#E0B04A]">Plan Type:</span>
+                    <strong className="text-[#14291D] dark:text-[#FAF3E0] font-black">{subSuccessModal.duration}</strong>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="font-bold text-[#4A260F] dark:text-[#D8C8B8]">Selected Combo:</span>
-                    <strong className="text-[#110702] dark:text-[#FAF4EA] font-black">{subSuccessModal.comboName}</strong>
+                    <span className="font-bold text-[#1F3D2B] dark:text-[#E0B04A]">Selected Combo:</span>
+                    <strong className="text-[#14291D] dark:text-[#FAF3E0] font-black">{subSuccessModal.comboName}</strong>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="font-bold text-[#4A260F] dark:text-[#D8C8B8]">Recurring Date:</span>
+                    <span className="font-bold text-[#1F3D2B] dark:text-[#E0B04A]">Recurring Date:</span>
                     <strong className="text-[#6B340B] dark:text-amber-300 font-black">
                       {subSuccessModal.dayStr} of Every Month
                     </strong>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="font-bold text-[#4A260F] dark:text-[#D8C8B8]">Delhivery Waybill AWB:</span>
+                    <span className="font-bold text-[#1F3D2B] dark:text-[#E0B04A]">Delhivery Waybill AWB:</span>
                     <strong className="text-emerald-800 dark:text-emerald-400 font-black">
                       {subSuccessModal.waybill}
                     </strong>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="font-bold text-[#4A260F] dark:text-[#D8C8B8]">Amount Paid Online:</span>
+                    <span className="font-bold text-[#1F3D2B] dark:text-[#E0B04A]">Amount Paid Online:</span>
                     <strong className="text-base font-black text-emerald-800 dark:text-emerald-400">
                       ₹{subSuccessModal.amount}
                     </strong>
@@ -2173,11 +2173,11 @@ export const SubscriptionPage: React.FC = () => {
 
                 <div
                   className={`p-3.5 rounded-2xl border-2 flex items-start gap-2.5 ${
-                    isDark ? "bg-[#1E140C] border-amber-500/20" : "bg-[#F7EFE3] border-[#C9B293]"
+                    isDark ? "bg-[#1E140C] border-amber-500/20" : "bg-[#F2E8CC] border-[#C9B293]"
                   }`}
                 >
-                  <Truck className="w-4 h-4 text-[#C8751B] shrink-0 mt-0.5" />
-                  <p className="text-xs text-[#110702] dark:text-[#D8C8B8] font-bold leading-relaxed">
+                  <Truck className="w-4 h-4 text-[#E0B04A] shrink-0 mt-0.5" />
+                  <p className="text-xs text-[#14291D] dark:text-[#E0B04A] font-bold leading-relaxed">
                     Delhivery pickup scheduled! Your fresh batch of Marachekku oil will be pressed at Peenya 2nd Stage, Bangalore, and delivered directly to your doorstep with live tracking available in your account.
                   </p>
                 </div>
@@ -2190,14 +2190,14 @@ export const SubscriptionPage: React.FC = () => {
                     setSubSuccessModal(null);
                     navigate("/orders");
                   }}
-                  className="w-full py-3 rounded-xl bg-[#43230A] hover:bg-[#2E1807] text-white font-black text-xs shadow-md cursor-pointer text-center"
+                  className="w-full py-3 rounded-xl bg-[#1F3D2B] hover:bg-[#2E1807] text-white font-black text-xs shadow-md cursor-pointer text-center"
                 >
                   Track in My Orders
                 </button>
                 <button
                   type="button"
                   onClick={() => setSubSuccessModal(null)}
-                  className="w-full py-3 rounded-xl border-2 border-[#43230A] text-[#43230A] dark:text-white font-black text-xs cursor-pointer text-center hover:bg-[#FAF7F2]"
+                  className="w-full py-3 rounded-xl border-2 border-[#1F3D2B] text-[#1F3D2B] dark:text-white font-black text-xs cursor-pointer text-center hover:bg-[#FAF3E0]"
                 >
                   Subscription Dashboard
                 </button>

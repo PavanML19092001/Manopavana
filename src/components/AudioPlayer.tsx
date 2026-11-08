@@ -55,8 +55,8 @@ export const AudioPlayer: React.FC = () => {
         <div
           className={`max-w-[270px] sm:max-w-xs p-3 rounded-2xl border shadow-2xl animate-in slide-in-from-bottom-2 fade-in duration-300 relative ${
             isDark
-              ? "bg-[#1F120A] text-[#FAF4EA] border-[#E08F35]/40 shadow-black/60"
-              : "bg-white text-[#1F120A] border-[#E8DEC8] shadow-amber-900/15"
+              ? "bg-[#14291D] text-[#FAF3E0] border-[#E0B04A]/40 shadow-black/60"
+              : "bg-white text-[#14291D] border-[#F2E8CC] shadow-amber-900/15"
           }`}
         >
           <button
@@ -78,7 +78,7 @@ export const AudioPlayer: React.FC = () => {
                 <button
                   type="button"
                   onClick={handleAcceptPrompt}
-                  className="px-2.5 py-1 rounded-lg bg-[#5E3210] hover:bg-[#43230A] text-white text-[10px] font-bold flex items-center gap-1 shadow-xs cursor-pointer"
+                  className="px-2.5 py-1 rounded-lg bg-[#1F3D2B] hover:bg-[#1F3D2B] text-white text-[10px] font-bold flex items-center gap-1 shadow-xs cursor-pointer"
                 >
                   <Play className="w-3 h-3 fill-white" />
                   <span>Play Beats</span>
@@ -101,21 +101,21 @@ export const AudioPlayer: React.FC = () => {
         type="button"
         onClick={toggleAudio}
         aria-label={isPlayingAudio ? "Mute Ambience Sound" : "Play Ambience Sound"}
-        className={`flex items-center gap-2 px-3 py-2 sm:px-4 sm:py-2.5 rounded-full shadow-xl transition-all duration-300 border cursor-pointer ${
+        className={`flex items-center gap-2 px-3 py-2 sm:px-4 sm:py-2.5 rounded-full shadow-xl transition-all duration-300 border cursor-pointer btn-press ${
           isPlayingAudio
-            ? "bg-[#3D2514] text-[#F3E7D3] border-[#D4A373]/60 ring-2 ring-[#D4A373]/30 scale-105"
+            ? "bg-[#1F3D2B] text-[#F3E7D3] border-[#E0B04A]/60 ring-2 ring-[#E0B04A]/30 scale-105"
             : isDark
-            ? "bg-[#1C120B]/95 text-[#FAF4EA] border-[#362114] hover:border-[#E08F35] backdrop-blur-md"
-            : "bg-white/95 text-[#1F120A] border-[#E8DEC8] hover:border-[#D4A373] hover:shadow-2xl backdrop-blur-md"
+            ? "bg-[#14291D]/95 text-[#FAF3E0] border-[#1F3D2B] hover:border-[#E0B04A] backdrop-blur-md"
+            : "bg-white/95 text-[#14291D] border-[#F2E8CC] hover:border-[#E0B04A] hover:shadow-2xl backdrop-blur-md"
         }`}
       >
         <span
           className={`relative flex items-center justify-center w-6 h-6 rounded-full ${
-            isPlayingAudio ? "bg-[#E08F35]/25 text-[#E08F35]" : "bg-stone-200 dark:bg-stone-800 text-stone-500"
+            isPlayingAudio ? "bg-[#E0B04A]/25 text-[#E0B04A]" : "bg-stone-200 dark:bg-stone-800 text-stone-500"
           }`}
         >
           {isPlayingAudio ? (
-            <Volume2 className="w-3.5 h-3.5 text-[#E08F35] animate-pulse" />
+            <Volume2 className="w-3.5 h-3.5 text-[#E0B04A] animate-pulse" />
           ) : (
             <VolumeX className="w-3.5 h-3.5 text-stone-500 dark:text-stone-400" />
           )}
@@ -128,9 +128,9 @@ export const AudioPlayer: React.FC = () => {
             </span>
             {isPlayingAudio && (
               <span className="flex items-end gap-0.5 h-3">
-                <span className="w-0.5 h-full bg-[#E08F35] animate-[bounce_0.8s_infinite]" />
-                <span className="w-0.5 h-2 bg-[#E08F35] animate-[bounce_0.6s_infinite_0.2s]" />
-                <span className="w-0.5 h-3 bg-[#E08F35] animate-[bounce_0.9s_infinite_0.4s]" />
+                <span className="w-0.5 h-full bg-[#E0B04A] animate-[bounce_0.8s_infinite]" />
+                <span className="w-0.5 h-2 bg-[#E0B04A] animate-[bounce_0.6s_infinite_0.2s]" />
+                <span className="w-0.5 h-3 bg-[#E0B04A] animate-[bounce_0.9s_infinite_0.4s]" />
               </span>
             )}
           </div>
@@ -140,7 +140,7 @@ export const AudioPlayer: React.FC = () => {
         </div>
 
         {isPlayingAudio && (
-          <Sparkles className="w-3 h-3 text-[#E08F35] opacity-80 animate-spin hidden sm:inline" />
+          <Sparkles className="w-3 h-3 text-[#E0B04A] opacity-80 animate-spin hidden sm:inline" />
         )}
       </button>
     </div>

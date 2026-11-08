@@ -144,7 +144,7 @@ export const WhatsAppQrModal: React.FC<WhatsAppQrModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
-      <div className="relative w-full max-w-lg bg-white dark:bg-[#1A1009] rounded-3xl shadow-2xl border border-[#E8DFC8] dark:border-[#3B2516] overflow-hidden text-[#1F120A] dark:text-[#FAF4EA]">
+      <div className="relative w-full max-w-lg bg-white dark:bg-[#1A1009] rounded-3xl shadow-2xl border border-[#E8DFC8] dark:border-[#3B2516] overflow-hidden text-[#14291D] dark:text-[#FAF3E0]">
         {/* Top Header */}
         <div className="flex items-center justify-between p-5 border-b border-stone-200 dark:border-stone-800">
           <div className="flex items-center gap-3">
@@ -200,7 +200,7 @@ export const WhatsAppQrModal: React.FC<WhatsAppQrModalProps> = ({
               </div>
 
               {/* Instant Test OTP Section */}
-              <div className="p-4 rounded-2xl bg-stone-50 dark:bg-[#120A06] border border-stone-200 dark:border-[#3A2417] space-y-3">
+              <div className="p-4 rounded-2xl bg-stone-50 dark:bg-[#14291D] border border-stone-200 dark:border-[#1F3D2B] space-y-3">
                 <div className="flex items-center gap-2">
                   <Send className="w-4 h-4 text-emerald-600" />
                   <span className="text-xs font-bold">Verify Live Delivery (Test OTP)</span>
@@ -263,7 +263,7 @@ export const WhatsAppQrModal: React.FC<WhatsAppQrModalProps> = ({
               </div>
 
               {/* QR Image Box */}
-              <div className="flex flex-col items-center justify-center p-6 bg-stone-50 dark:bg-[#120A06] rounded-2xl border border-stone-200 dark:border-[#3A2417]">
+              <div className="flex flex-col items-center justify-center p-6 bg-stone-50 dark:bg-[#14291D] rounded-2xl border border-stone-200 dark:border-[#1F3D2B]">
                 {qrImage ? (
                   <div className="p-3 bg-white rounded-2xl shadow-lg border-2 border-emerald-500">
                     <img

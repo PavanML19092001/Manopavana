@@ -159,6 +159,10 @@ export interface Order {
   discount: number;
   shippingFee: number;
   total: number;
+  regularSubtotal?: number;
+  discountAmount?: number;
+  netAmount?: number;
+  discountLabel?: string;
   paymentMethod: "online" | "phonepe" | "cod";
   paymentMode?: "ONLINE" | "PHONEPE" | "PHONEPE_PAID" | "COD" | string;
   paymentStatus: "PENDING" | "COMPLETED" | "FAILED" | "PHONEPE_PAID" | string;
@@ -308,6 +312,9 @@ export interface StoreCMSConfig {
   heroCtaSecondaryText?: string;
   chekkuVideoUrl: string;
   heroFallbackImage?: string;
+  mainBannerImageUrl?: string;
+  mainBannerVideoUrl?: string;
+  mainBannerMediaType?: "image" | "video";
   ambientAudioTrack?: string;
   comboBannerImage?: string;
   founderName?: string;

@@ -15,8 +15,9 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({ order, isOpen, onClo
   if (!isOpen) return null;
 
   const gstRate = 0.05;
-  const taxableValue = Math.round((order.subtotal - (order.discount || 0)) / (1 + gstRate));
-  const totalGst = (order.subtotal - (order.discount || 0)) - taxableValue;
+  const discountVal = order.discountAmount || order.discount || 0;
+  const taxableValue = Math.round((order.subtotal - discountVal) / (1 + gstRate));
+  const totalGst = (order.subtotal - discountVal) - taxableValue;
   const isBangalore = Boolean(
     order.shippingAddress?.isBangalore ||
     order.shippingAddress?.pincode?.startsWith("560") ||
@@ -227,7 +228,7 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({ order, isOpen, onClo
             <button
               type="button"
               onClick={handlePrint}
-              className="px-4 py-2 rounded-xl bg-[#5E3210] hover:bg-[#43230A] text-white font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer shadow-sm"
+              className="px-4 py-2 rounded-xl bg-[#1F3D2B] hover:bg-[#1F3D2B] text-white font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer shadow-sm"
             >
               <Printer className="w-3.5 h-3.5 text-amber-300" />
               <span>Print / Save 1-Page PDF</span>
@@ -332,13 +333,19 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({ order, isOpen, onClo
                     <span>₹{igst}</span>
                   </div>
                 )}
+                {discountVal > 0 && (
+                  <div className="totals-row" style={{ color: "#1F3D2B", fontWeight: "bold" }}>
+                    <span>Discount ({order.discountLabel || "Festive/Promo"}):</span>
+                    <span>-₹{discountVal}</span>
+                  </div>
+                )}
                 <div className="totals-row">
                   <span>Shipping:</span>
                   <span>{order.shippingFee === 0 ? "FREE" : `₹${order.shippingFee}`}</span>
                 </div>
                 <div className="totals-row grand-total">
                   <span>Grand Total:</span>
-                  <span style={{ color: "#E08F35" }}>₹{order.total}</span>
+                  <span style={{ color: "#14291D" }}>₹{order.total}</span>
                 </div>
               </div>
             </div>

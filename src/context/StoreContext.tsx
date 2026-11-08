@@ -24,6 +24,9 @@ import {
   FAQS,
   LEGAL_POLICIES,
 } from "../constants";
+import combo1lImg from "../assets/diwali/combo_1l.jpg";
+import combo500mlImg from "../assets/diwali/combo_500ml.jpg";
+import { isSaleActive, getSalePrice } from "../utils/salePricing";
 import {
   auth,
   db,
@@ -61,7 +64,10 @@ interface StoreContextType {
   clearCart: () => void;
   cartCount: number;
   subtotal: number;
+  regularSubtotal: number;
   discount: number;
+  discountAmount: number;
+  netAmount: number;
   shippingFee: number;
   total: number;
   freeShippingProgress: number;
@@ -191,6 +197,9 @@ const DEFAULT_CMS_CONFIG: StoreCMSConfig = {
 
   chekkuVideoUrl: MEDIA_ASSETS.heroVideo,
   heroFallbackImage: MEDIA_ASSETS.heroFallbackImage,
+  mainBannerImageUrl: "",
+  mainBannerVideoUrl: "",
+  mainBannerMediaType: "image" as const,
   ambientAudioTrack: MEDIA_ASSETS.ambientAudioTrack,
   comboBannerImage: MEDIA_ASSETS.comboBanner,
   founderName: BUSINESS_CONFIG.FOUNDER_NAME,
@@ -1425,20 +1434,33 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       ];
     }
 
+    const regSubtotal =
+      target?.regularSubtotal ||
+      itemsToUse.reduce((acc, c) => acc + (c.regularPrice || c.price) * c.quantity, 0);
     const finalSubtotal =
       target?.subtotal && target.subtotal > 0
         ? target.subtotal
         : itemsToUse.reduce((acc, c) => acc + c.price * c.quantity, 0);
+    const saleDiff = Math.max(0, regSubtotal - finalSubtotal);
     const finalDiscount =
       target?.discount ??
-      (loyalty.isActive && finalSubtotal >= 1000 ? Math.round((finalSubtotal * loyalty.discountPercent) / 100) : 0);
+      (isSaleActive() && saleDiff > 0
+        ? saleDiff
+        : loyalty.isActive
+        ? Math.round((finalSubtotal * loyalty.discountPercent) / 100)
+        : finalSubtotal >= 1000
+        ? Math.round((finalSubtotal * 10) / 100)
+        : 0);
+    const payableItems = isSaleActive() && saleDiff > 0 ? finalSubtotal : finalSubtotal - finalDiscount;
     const finalShipping =
       target?.shippingFee ??
-      (finalSubtotal - finalDiscount >= cmsConfig.freeShippingThreshold ? 0 : cmsConfig.standardShippingFee);
+      (payableItems >= cmsConfig.freeShippingThreshold || itemsToUse.reduce((a, c) => a + c.quantity, 0) >= 2
+        ? 0
+        : cmsConfig.standardShippingFee);
     const finalTotal =
       target?.total && target.total > 0
         ? target.total
-        : finalSubtotal - finalDiscount + finalShipping;
+        : payableItems + finalShipping;
 
     const finalShippingAddress: Address = {
       ...address,
@@ -1470,6 +1492,10 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       items: itemsToUse,
       subtotal: finalSubtotal,
       discount: finalDiscount,
+      regularSubtotal: regSubtotal,
+      discountAmount: finalDiscount,
+      netAmount: payableItems,
+      discountLabel: isSaleActive() ? "10% Diwali Festive Discount" : finalDiscount > 0 ? "10% Order Discount" : undefined,
       shippingFee: finalShipping,
       total: finalTotal,
       paymentMethod: "cod",
@@ -1773,7 +1799,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           heading: overrides?.heading || c.heading,
           volumeLabel: overrides?.volumeLabel || c.volumeLabel,
           description: overrides?.description || c.description,
-          image: overrides?.image || c.image,
+          image: overrides?.image || combo1lImg || c.image,
           bullets: parsedBullets.length > 0 ? parsedBullets : c.bullets,
           regularPrice: reg,
           loyaltyPrice: loyVal,
@@ -1792,7 +1818,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           heading: overrides?.heading || c.heading,
           volumeLabel: overrides?.volumeLabel || c.volumeLabel,
           description: overrides?.description || c.description,
-          image: overrides?.image || c.image,
+          image: overrides?.image || combo500mlImg || c.image,
           bullets: parsedBullets.length > 0 ? parsedBullets : c.bullets,
           regularPrice: reg,
           loyaltyPrice: loyVal,
@@ -1809,22 +1835,12 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     "terms" | "shipping" | "returns" | "privacy" | null
   >(null);
 
-  const [themeMode, setThemeModeState] = useState<"blend" | "light" | "dark">(() => {
-    try {
-      const saved = localStorage.getItem("manopavana_theme_mode");
-      if (saved === "blend" || saved === "light" || saved === "dark") {
-        return saved;
-      }
-      return "blend";
-    } catch {
-      return "blend";
-    }
-  });
+  const [themeMode, setThemeModeState] = useState<"blend" | "light" | "dark">("light");
 
-  const setThemeMode = (mode: "blend" | "light" | "dark") => {
-    setThemeModeState(mode);
+  const setThemeMode = (_mode: "blend" | "light" | "dark") => {
+    setThemeModeState("light");
     try {
-      localStorage.setItem("manopavana_theme_mode", mode);
+      localStorage.setItem("manopavana_theme_mode", "light");
     } catch {}
   };
 
@@ -1933,19 +1949,40 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return cart.reduce((acc, curr) => acc + curr.quantity, 0);
   }, [cart]);
 
+  const regularSubtotal = useMemo(() => {
+    return cart.reduce(
+      (acc, curr) => acc + (curr.regularPrice || curr.price) * curr.quantity,
+      0
+    );
+  }, [cart]);
+
   const subtotal = useMemo(() => {
     return cart.reduce((acc, curr) => acc + curr.price * curr.quantity, 0);
   }, [cart]);
 
   const discount = useMemo(() => {
-    // 10% discount automatically applies to all orders of ₹1,000 or above
+    const saleDiff = Math.max(0, regularSubtotal - subtotal);
+    if (isSaleActive() && saleDiff > 0) {
+      return saleDiff;
+    }
     if (subtotal >= 1000) {
       return Math.round((subtotal * 10) / 100);
     }
+    if (loyalty.isActive) {
+      return Math.round((subtotal * loyalty.discountPercent) / 100);
+    }
     return 0;
-  }, [subtotal]);
+  }, [regularSubtotal, subtotal, loyalty.isActive, loyalty.discountPercent]);
 
-  const discountedSubtotal = subtotal - discount;
+  const discountedSubtotal = useMemo(() => {
+    if (isSaleActive() && regularSubtotal > subtotal) {
+      return subtotal;
+    }
+    return subtotal - discount;
+  }, [regularSubtotal, subtotal, discount]);
+
+  const discountAmount = discount;
+  const netAmount = discountedSubtotal;
 
   // Free delivery rule: Orders >= ₹800 OR 2+ bottles unlock Free Doorstep Delivery; single bottles under ₹800 incur ₹70 standard fee
   const isFreeShippingQualified = useMemo(() => {
@@ -1986,7 +2023,10 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         clearCart,
         cartCount,
         subtotal,
+        regularSubtotal,
         discount,
+        discountAmount,
+        netAmount,
         shippingFee,
         total,
         freeShippingProgress,

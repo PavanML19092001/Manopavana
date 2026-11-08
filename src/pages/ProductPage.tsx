@@ -20,6 +20,11 @@ import {
 } from "lucide-react";
 import { useStore } from "../context/StoreContext";
 import { BottleVolume } from "../types";
+import combo1lImg from "../assets/diwali/combo_1l.jpg";
+import combo500mlImg from "../assets/diwali/combo_500ml.jpg";
+import { THEMED_PRODUCT_IMAGES } from "../constants";
+import { FESTIVE_CONFIG, isFestiveActive } from "../config/festiveConfig";
+import { getSalePrice, getSaleSavings, isSaleActive, getSaleDeadlineLabel } from "../utils/salePricing";
 
 export const ProductPage = () => {
   const { id } = useParams<Record<string, string | undefined>>();
@@ -32,6 +37,7 @@ export const ProductPage = () => {
     openLoyaltyQuiz,
     loyalty,
     products,
+    combos,
     reviews,
     themeMode,
     currentUser,
@@ -42,6 +48,7 @@ export const ProductPage = () => {
 
   const isDark = themeMode === "dark";
 
+  const comboMatch = combos.find((c) => c.id === id);
   const product = products.find((p) => p.id === id) || products[0];
 
   const [selectedVolume, setSelectedVolume] = useState<BottleVolume>("1L");
@@ -58,9 +65,12 @@ export const ProductPage = () => {
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
 
-  const price = product.prices[selectedVolume];
+  const regularPrice = product.prices[selectedVolume];
+  const price = getSalePrice(regularPrice);
   const mrp = product.mrp[selectedVolume];
   const inStock = product.inStock[selectedVolume];
+  const savings = getSaleSavings(regularPrice);
+  const isSale = isSaleActive();
   const discountAmount = Math.max(0, mrp - price);
   const discountPercent = mrp > 0 ? Math.round((discountAmount / mrp) * 100) : 0;
 
@@ -112,7 +122,7 @@ export const ProductPage = () => {
         subtitle: `Marachekku Pure • ${selectedVolume}`,
         variant: selectedVolume,
         price,
-        regularPrice: mrp,
+        regularPrice,
         image: product.images[selectedImageIndex] || product.images[0],
       },
       1
@@ -143,7 +153,7 @@ export const ProductPage = () => {
         subtitle: `Marachekku Pure • ${selectedVolume}`,
         variant: selectedVolume,
         price,
-        regularPrice: mrp,
+        regularPrice,
         image: product.images[selectedImageIndex] || product.images[0],
       },
       currentQuantity > 0 ? currentQuantity : 1
@@ -177,6 +187,66 @@ export const ProductPage = () => {
     }
   };
 
+  // Helper to ensure shared image file always has an opaque white background (never transparent / black in WhatsApp or OS share)
+  const getWhiteBackgroundShareFile = async (
+    imgSrc: string,
+    filename: string
+  ): Promise<File | null> => {
+    try {
+      const resp = await fetch(imgSrc);
+      if (!resp.ok) return null;
+      const blob = await resp.blob();
+
+      // If it's already a JPEG, it is by definition opaque with solid white background
+      if (blob.type === "image/jpeg") {
+        return new File([blob], `${filename}.jpg`, { type: "image/jpeg" });
+      }
+
+      // Convert PNG or any alpha image to a solid white background JPEG using HTML5 canvas
+      return new Promise<File | null>((resolve) => {
+        const img = new Image();
+        img.crossOrigin = "anonymous";
+        img.onload = () => {
+          try {
+            const canvas = document.createElement("canvas");
+            canvas.width = img.naturalWidth || 800;
+            canvas.height = img.naturalHeight || 800;
+            const ctx = canvas.getContext("2d");
+            if (!ctx) {
+              resolve(new File([blob], `${filename}.jpg`, { type: "image/jpeg" }));
+              return;
+            }
+            // Fill with pure white background
+            ctx.fillStyle = "#FFFFFF";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            // Draw bottle image on top of white background
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            canvas.toBlob(
+              (jpegBlob) => {
+                if (jpegBlob) {
+                  resolve(new File([jpegBlob], `${filename}.jpg`, { type: "image/jpeg" }));
+                } else {
+                  resolve(new File([blob], `${filename}.jpg`, { type: "image/jpeg" }));
+                }
+              },
+              "image/jpeg",
+              0.95
+            );
+          } catch {
+            resolve(new File([blob], `${filename}.jpg`, { type: "image/jpeg" }));
+          }
+        };
+        img.onerror = () => {
+          resolve(new File([blob], `${filename}.jpg`, { type: "image/jpeg" }));
+        };
+        img.src = URL.createObjectURL(blob);
+      });
+    } catch (e) {
+      console.warn("Could not create white background share file:", e);
+      return null;
+    }
+  };
+
   // FLIPKART STYLE SHARE HANDLER - SENDS CLEAN LINK WITH RICH PREVIEW CARD
   const handleShare = async () => {
     const shareUrl = window.location.href;
@@ -185,21 +255,23 @@ export const ProductPage = () => {
     const shareText = `Check out *${product.name}* (100% Marachekku Wood-Pressed Oil) from MANOPAVANA Bengaluru:\nPrice: ₹${price} (${selectedVolume})`;
     const shareTextWithUrl = `${shareText}\n${shareUrl}`;
 
-    // Try Web Share API with image file if supported
+    // Try Web Share API with white-background image file if supported
     if (navigator.share) {
       try {
         let fileShared = false;
         try {
-          // Use optimized studio photo for direct image sharing (< 100KB)
-          const studioImgPath = `/images/products/${product.id}-studio.jpg`;
-          const resp = await fetch(studioImgPath);
-          if (resp.ok) {
-            const blob = await resp.blob();
-            const file = new File([blob], `${product.id}-wood-pressed-oil.jpg`, {
-              type: "image/jpeg",
-            });
+          // Use guaranteed white-background image for sharing
+          const whiteImgPath =
+            THEMED_PRODUCT_IMAGES[product.id]?.white ||
+            `/images/products/${product.id}-white.jpg`;
 
-            // Level 2 Web Share API with both image file and clickable link
+          const file = await getWhiteBackgroundShareFile(
+            whiteImgPath,
+            `${product.id}-pure-wood-pressed-oil`
+          );
+
+          if (file) {
+            // Level 2 Web Share API with both white-background image file and clickable link
             const fullPayload: any = {
               title: shareTitle,
               text: shareText,
@@ -273,19 +345,19 @@ export const ProductPage = () => {
 
   React.useEffect(() => {
     document.title = `${product.name} - MANOPAVANA Artisanal Oils`;
-    // Update OpenGraph image to optimized lightweight studio photo for WhatsApp preview
-    const studioImgUrl = `${window.location.origin}/images/products/${product.id}-studio.jpg`;
+    // Update OpenGraph image to solid white background image for WhatsApp/social preview cards
+    const whiteImgUrl = THEMED_PRODUCT_IMAGES[product.id]?.white || `${window.location.origin}/images/products/${product.id}-white.jpg`;
     const ogImage = document.querySelector('meta[property="og:image"]');
     if (ogImage) {
-      ogImage.setAttribute("content", studioImgUrl);
+      ogImage.setAttribute("content", whiteImgUrl);
     }
     const ogSecureImage = document.querySelector('meta[property="og:image:secure_url"]');
     if (ogSecureImage) {
-      ogSecureImage.setAttribute("content", studioImgUrl);
+      ogSecureImage.setAttribute("content", whiteImgUrl);
     }
     const twitterImage = document.querySelector('meta[name="twitter:image"]');
     if (twitterImage) {
-      twitterImage.setAttribute("content", studioImgUrl);
+      twitterImage.setAttribute("content", whiteImgUrl);
     }
     const ogTitle = document.querySelector('meta[property="og:title"]');
     if (ogTitle) {
@@ -296,7 +368,7 @@ export const ProductPage = () => {
   return (
     <div
       className={`w-full min-h-[calc(100vh-80px)] pb-36 pt-3 transition-colors box-border ${
-        isDark ? "bg-[#140D09] text-[#FAF4EA]" : "bg-[#FAF6F0] text-[#23150C]"
+        isDark ? "bg-[#14291D] text-[#FAF3E0]" : "bg-[#FAF3E0] text-[#14291D]"
       }`}
     >
       {/* Breadcrumb Navigation */}
@@ -304,16 +376,16 @@ export const ProductPage = () => {
         <Link
           to="/"
           className={`flex items-center gap-1 transition-colors ${
-            isDark ? "text-[#D6C4B0] hover:text-white" : "text-[#7A5E48] hover:text-[#23150C]"
+            isDark ? "text-[#E0B04A] hover:text-white" : "text-[#3F4F45] hover:text-[#14291D]"
           }`}
         >
           <ArrowLeft className="w-3.5 h-3.5" />
           <span>Back to All Oils</span>
         </Link>
         <ChevronRight className={`w-3 h-3 ${isDark ? "text-[#5A3E2C]" : "text-[#C8BAA8]"}`} />
-        <span className={isDark ? "text-[#A8907E]" : "text-[#8C7A6B]"}>Artisanal Wood-Pressed</span>
+        <span className={isDark ? "text-[#3F4F45]" : "text-[#3F4F45]"}>Artisanal Wood-Pressed</span>
         <ChevronRight className={`w-3 h-3 ${isDark ? "text-[#5A3E2C]" : "text-[#C8BAA8]"}`} />
-        <span className={`font-bold truncate max-w-[160px] sm:max-w-none ${isDark ? "text-[#FAF4EA]" : "text-[#23150C]"}`}>
+        <span className={`font-bold truncate max-w-[160px] sm:max-w-none ${isDark ? "text-[#FAF3E0]" : "text-[#14291D]"}`}>
           {product.name}
         </span>
       </div>
@@ -325,19 +397,19 @@ export const ProductPage = () => {
         <section
           aria-label="Product Information"
           className={`p-5 sm:p-6 rounded-3xl border shadow-xs transition-colors ${
-            isDark ? "bg-[#1C120B] border-[#362114]" : "bg-white border-[#E8DEC8]"
+            isDark ? "bg-[#14291D] border-[#1F3D2B]" : "bg-white border-[#F2E8CC]"
           }`}
         >
           <div className="flex items-start justify-between gap-4">
             <div className="space-y-1.5 flex-1 min-w-0">
-              <div className="flex items-center gap-2 text-xs text-[#C8751B] font-semibold">
+              <div className="flex items-center gap-2 text-xs text-[#E0B04A] font-semibold">
                 <span className="font-bold">{product.kannadaName}</span>
                 <span className="text-[10px] opacity-75">• 100% Traditional Marachekku</span>
               </div>
 
               <h1
                 className={`text-2xl sm:text-3xl lg:text-4xl font-black font-serif leading-tight ${
-                  isDark ? "text-[#FAF4EA]" : "text-[#23150C]"
+                  isDark ? "text-[#FAF3E0]" : "text-[#14291D]"
                 }`}
               >
                 {product.name}
@@ -351,7 +423,7 @@ export const ProductPage = () => {
                       <span>{averageRating}</span>
                       <Star className="w-3 h-3 fill-white text-white" />
                     </div>
-                    <span className={`text-xs ${isDark ? "text-[#A8907E]" : "text-[#7A5E48]"}`}>
+                    <span className={`text-xs ${isDark ? "text-[#3F4F45]" : "text-[#3F4F45]"}`}>
                       {productReviews.length} {productReviews.length === 1 ? "Customer Review" : "Customer Reviews"}
                     </span>
                   </>
@@ -361,7 +433,7 @@ export const ProductPage = () => {
                       <span>0.0</span>
                       <Star className="w-3 h-3 text-stone-400" />
                     </div>
-                    <span className={`text-xs ${isDark ? "text-[#A8907E]" : "text-[#7A5E48]"}`}>
+                    <span className={`text-xs ${isDark ? "text-[#3F4F45]" : "text-[#3F4F45]"}`}>
                       0 Ratings & 0 Reviews
                     </span>
                   </>
@@ -370,7 +442,7 @@ export const ProductPage = () => {
 
               <p
                 className={`text-xs sm:text-sm leading-relaxed pt-1 ${
-                  isDark ? "text-[#D6C4B0]" : "text-[#5C402D]"
+                  isDark ? "text-[#E0B04A]" : "text-[#3F4F45]"
                 }`}
               >
                 {product.shortDescription}
@@ -385,14 +457,14 @@ export const ProductPage = () => {
                 aria-label="Share product with image and link"
                 className={`w-11 h-11 rounded-full border-2 flex items-center justify-center transition-all cursor-pointer shadow-md active:scale-95 hover:scale-105 ${
                   isDark
-                    ? "bg-[#25150C] border-[#E08F35] text-[#F5BC51] hover:bg-[#3D2517]"
-                    : "bg-white border-[#E08F35] text-[#5E3210] hover:bg-[#FAF6EE]"
+                    ? "bg-[#1F3D2B] border-[#E0B04A] text-[#F3D17A] hover:bg-[#1F3D2B]"
+                    : "bg-white border-[#E0B04A] text-[#1F3D2B] hover:bg-[#FAF3E0]"
                 }`}
                 title="Share this product"
               >
-                <Share2 className="w-5 h-5 text-[#E08F35]" />
+                <Share2 className="w-5 h-5 text-[#E0B04A]" />
               </button>
-              <span className={`text-[10px] font-bold mt-1 ${isDark ? "text-[#D6C4B0]" : "text-[#7A5E48]"}`}>
+              <span className={`text-[10px] font-bold mt-1 ${isDark ? "text-[#E0B04A]" : "text-[#3F4F45]"}`}>
                 Share
               </span>
             </div>
@@ -406,13 +478,13 @@ export const ProductPage = () => {
         <section
           aria-label="Product Images"
           className={`p-4 sm:p-6 rounded-3xl border shadow-xs space-y-4 transition-colors ${
-            isDark ? "bg-[#1C120B] border-[#362114]" : "bg-white border-[#E8DEC8]"
+            isDark ? "bg-[#14291D] border-[#1F3D2B]" : "bg-white border-[#F2E8CC]"
           }`}
         >
           {/* Main Angle Image Display */}
           <div
             className={`relative aspect-square max-h-[480px] w-full rounded-2xl border flex items-center justify-center p-6 shadow-inner overflow-hidden group transition-colors ${
-              isDark ? "bg-[#140D07] border-[#2E1A0F]" : "bg-[#FAF7F2] border-[#E8DEC8]"
+              isDark ? "bg-[#14291D] border-[#2E1A0F]" : "bg-[#FAF3E0] border-[#F2E8CC]"
             }`}
           >
             <img
@@ -426,10 +498,10 @@ export const ProductPage = () => {
           <div className="space-y-1.5">
             <div
               className={`flex items-center justify-between text-xs ${
-                isDark ? "text-[#D6C4B0]" : "text-[#7A5E48]"
+                isDark ? "text-[#E0B04A]" : "text-[#3F4F45]"
               }`}
             >
-              <span className={`font-bold ${isDark ? "text-[#FAF4EA]" : "text-[#5A381E]"}`}>
+              <span className={`font-bold ${isDark ? "text-[#FAF3E0]" : "text-[#3F4F45]"}`}>
                 Multi-Angle Studio Gallery ({product.images.length} Shots):
               </span>
               <span className="text-[11px]">Select photo to inspect</span>
@@ -443,13 +515,13 @@ export const ProductPage = () => {
                     type="button"
                     onClick={() => setSelectedImageIndex(index)}
                     className={`relative w-16 h-16 rounded-xl shrink-0 p-1 border-2 transition-all cursor-pointer ${
-                      isDark ? "bg-[#140D07]" : "bg-[#FAF7F2]"
+                      isDark ? "bg-[#14291D]" : "bg-[#FAF3E0]"
                     } ${
                       isSelected
-                        ? "border-[#E08F35] ring-2 ring-[#E08F35]/40 scale-105"
+                        ? "border-[#E0B04A] ring-2 ring-[#E0B04A]/40 scale-105"
                         : isDark
-                        ? "border-[#2E1A0F] hover:border-[#D49A37] opacity-75 hover:opacity-100"
-                        : "border-[#E8DEC8] hover:border-[#D49A37] opacity-75 hover:opacity-100"
+                        ? "border-[#2E1A0F] hover:border-[#E0B04A] opacity-75 hover:opacity-100"
+                        : "border-[#F2E8CC] hover:border-[#E0B04A] opacity-75 hover:opacity-100"
                     }`}
                   >
                     <img
@@ -471,37 +543,50 @@ export const ProductPage = () => {
         <section
           aria-label="Product Pricing and Variants"
           className={`p-5 sm:p-6 rounded-3xl border shadow-xs space-y-5 transition-colors ${
-            isDark ? "bg-[#1C120B] border-[#362114]" : "bg-white border-[#E8DEC8]"
+            isDark ? "bg-[#14291D] border-[#1F3D2B]" : "bg-white border-[#F2E8CC]"
           }`}
         >
           {/* Price display with MRP & Savings */}
           <div className="space-y-1">
             <div className="flex items-baseline gap-3 flex-wrap">
-              <span className={`text-3xl sm:text-4xl font-black font-serif ${isDark ? "text-[#FAF4EA]" : "text-[#23150C]"}`}>
+              <span className={`text-3xl sm:text-4xl font-black font-serif ${isDark ? "text-[#FAF3E0]" : "text-[#14291D]"}`}>
                 ₹{price}
               </span>
-              {mrp > price && (
-                <span className="text-base sm:text-lg line-through text-stone-400 font-semibold">
+              {isSale && savings > 0 ? (
+                <span className="text-base sm:text-lg line-through text-[#4A5A50] font-semibold">
+                  ₹{regularPrice}
+                </span>
+              ) : mrp > price && (
+                <span className="text-base sm:text-lg line-through text-[#4A5A50] font-semibold">
                   ₹{mrp}
                 </span>
               )}
-              {discountPercent > 0 && (
-                <span className="text-xs font-black text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-md">
+              {isSale && savings > 0 ? (
+                <span className="text-xs font-black text-[#14291D] bg-[#E0B04A] border border-[#F3D17A] px-2.5 py-0.5 rounded-md shadow-2xs">
+                  10% OFF
+                </span>
+              ) : discountPercent > 0 && (
+                <span className="text-xs font-black text-emerald-800 bg-emerald-100 border border-emerald-300 px-2.5 py-0.5 rounded-md">
                   {discountPercent}% OFF (Save ₹{discountAmount})
                 </span>
               )}
-              <span className="text-xs font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md">
+              <span className="text-xs font-semibold text-emerald-800 dark:text-emerald-300 bg-emerald-100/60 dark:bg-emerald-950/40 px-2 py-0.5 rounded-md">
                 Inclusive of GST
               </span>
             </div>
-            <p className={`text-xs ${isDark ? "text-[#A8907E]" : "text-[#7A5E48]"}`}>
-              Direct artisan price. Free delivery across India unlocked on orders above ₹500.
+            {isSale && savings > 0 && (
+              <p className="text-xs font-bold text-[#14291D] dark:text-[#F3D17A] pt-0.5">
+                You save ₹{savings} • {getSaleDeadlineLabel()}
+              </p>
+            )}
+            <p className={`text-xs ${isDark ? "text-[#FAF3E0]/70" : "text-[#3F4F45]"}`}>
+              Direct artisan price. Free delivery across India unlocked on orders above ₹800 (or any 2+ bottles).
             </p>
           </div>
 
           {/* VARIANTS OPTION ONLY (MIDDLE BUTTONS REMOVED AS REQUESTED) */}
-          <div className={`pt-4 border-t space-y-2.5 ${isDark ? "border-[#2D1B10]" : "border-[#EFE8DC]"}`}>
-            <label className={`block text-xs font-bold uppercase tracking-wider ${isDark ? "text-[#FAF4EA]" : "text-[#3D2514]"}`}>
+          <div className={`pt-4 border-t space-y-2.5 ${isDark ? "border-[#14291D]" : "border-[#F2E8CC]"}`}>
+            <label className={`block text-xs font-bold uppercase tracking-wider ${isDark ? "text-[#FAF3E0]" : "text-[#1F3D2B]"}`}>
               Select Variant (Bottle Size):
             </label>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -511,29 +596,29 @@ export const ProductPage = () => {
                 className={`p-4 rounded-2xl border-2 text-left transition-all cursor-pointer ${
                   selectedVolume === "1L"
                     ? isDark
-                      ? "bg-amber-950/40 border-[#E08F35] ring-2 ring-[#E08F35]/30 text-white shadow-md"
-                      : "bg-amber-50/90 border-[#E08F35] ring-2 ring-[#E08F35]/30 text-[#23150C] shadow-md"
+                      ? "bg-amber-950/40 border-[#E0B04A] ring-2 ring-[#E0B04A]/30 text-white shadow-md"
+                      : "bg-amber-50/90 border-[#E0B04A] ring-2 ring-[#E0B04A]/30 text-[#14291D] shadow-md"
                     : isDark
-                    ? "bg-[#140D07] border-[#2E1A0F] text-[#D6C4B0] hover:border-[#D49A37]"
-                    : "bg-[#FAF7F2] border-[#E8DEC8] text-[#5C402D] hover:border-[#DDD1BE]"
+                    ? "bg-[#14291D] border-[#2E1A0F] text-[#E0B04A] hover:border-[#E0B04A]"
+                    : "bg-[#FAF3E0] border-[#F2E8CC] text-[#3F4F45] hover:border-[#F2E8CC]"
                 }`}
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <span
                       className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 ${
-                        selectedVolume === "1L" ? "border-[#E08F35] bg-[#E08F35]" : "border-stone-400"
+                        selectedVolume === "1L" ? "border-[#E0B04A] bg-[#E0B04A]" : "border-stone-400"
                       }`}
                     >
                       {selectedVolume === "1L" && <span className="w-1.5 h-1.5 rounded-full bg-white" />}
                     </span>
                     <span className="font-bold text-sm sm:text-base">1 Litre Bottle</span>
                   </div>
-                  <span className="font-black text-base text-[#C8751B]">
+                  <span className="font-black text-base text-[#E0B04A]">
                     ₹{product.prices["1L"]}
                   </span>
                 </div>
-                <span className={`text-[11px] mt-1 pl-6 block ${isDark ? "text-[#A8907E]" : "text-[#7A5E48]"}`}>
+                <span className={`text-[11px] mt-1 pl-6 block ${isDark ? "text-[#3F4F45]" : "text-[#3F4F45]"}`}>
                   Best value for daily cooking & frying
                 </span>
               </button>
@@ -544,29 +629,29 @@ export const ProductPage = () => {
                 className={`p-4 rounded-2xl border-2 text-left transition-all cursor-pointer ${
                   selectedVolume === "500ml"
                     ? isDark
-                      ? "bg-amber-950/40 border-[#E08F35] ring-2 ring-[#E08F35]/30 text-white shadow-md"
-                      : "bg-amber-50/90 border-[#E08F35] ring-2 ring-[#E08F35]/30 text-[#23150C] shadow-md"
+                      ? "bg-amber-950/40 border-[#E0B04A] ring-2 ring-[#E0B04A]/30 text-white shadow-md"
+                      : "bg-amber-50/90 border-[#E0B04A] ring-2 ring-[#E0B04A]/30 text-[#14291D] shadow-md"
                     : isDark
-                    ? "bg-[#140D07] border-[#2E1A0F] text-[#D6C4B0] hover:border-[#D49A37]"
-                    : "bg-[#FAF7F2] border-[#E8DEC8] text-[#5C402D] hover:border-[#DDD1BE]"
+                    ? "bg-[#14291D] border-[#2E1A0F] text-[#E0B04A] hover:border-[#E0B04A]"
+                    : "bg-[#FAF3E0] border-[#F2E8CC] text-[#3F4F45] hover:border-[#F2E8CC]"
                 }`}
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <span
                       className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 ${
-                        selectedVolume === "500ml" ? "border-[#E08F35] bg-[#E08F35]" : "border-stone-400"
+                        selectedVolume === "500ml" ? "border-[#E0B04A] bg-[#E0B04A]" : "border-stone-400"
                       }`}
                     >
                       {selectedVolume === "500ml" && <span className="w-1.5 h-1.5 rounded-full bg-white" />}
                     </span>
                     <span className="font-bold text-sm sm:text-base">500 ml Bottle</span>
                   </div>
-                  <span className="font-black text-base text-[#C8751B]">
+                  <span className="font-black text-base text-[#E0B04A]">
                     ₹{product.prices["500ml"]}
                   </span>
                 </div>
-                <span className={`text-[11px] mt-1 pl-6 block ${isDark ? "text-[#A8907E]" : "text-[#7A5E48]"}`}>
+                <span className={`text-[11px] mt-1 pl-6 block ${isDark ? "text-[#3F4F45]" : "text-[#3F4F45]"}`}>
                   Compact bottle for smaller kitchen needs
                 </span>
               </button>
@@ -577,17 +662,17 @@ export const ProductPage = () => {
         {/* Bottle QR Loyalty Banner */}
         <section
           aria-label="Loyalty Discount"
-          className="p-4 sm:p-5 rounded-3xl bg-[#3D2514] text-white flex flex-col sm:flex-row items-center justify-between gap-4 shadow-lg border border-[#5A3820]"
+          className="p-4 sm:p-5 rounded-3xl bg-[#1F3D2B] text-white flex flex-col sm:flex-row items-center justify-between gap-4 shadow-lg border border-[#5A3820]"
         >
           <div className="flex items-center gap-3.5">
-            <span className="p-2.5 rounded-2xl bg-[#E08F35]/20 text-[#E08F35] shrink-0">
-              <QrCode className="w-6 h-6 text-[#E08F35]" />
+            <span className="p-2.5 rounded-2xl bg-[#E0B04A]/20 text-[#E0B04A] shrink-0">
+              <QrCode className="w-6 h-6 text-[#E0B04A]" />
             </span>
             <div>
               <h4 className="text-sm font-bold text-amber-200">
                 Already own this bottle?
               </h4>
-              <p className="text-xs text-[#D6C4B0] mt-0.5">
+              <p className="text-xs text-[#E0B04A] mt-0.5">
                 Scan your front label security tagline to unlock 10% repeat order discount for 7 days!
               </p>
             </div>
@@ -595,7 +680,7 @@ export const ProductPage = () => {
           <button
             type="button"
             onClick={() => openLoyaltyQuiz(product)}
-            className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-[#E08F35] text-[#29170C] font-black text-xs shrink-0 hover:bg-[#F59E0B] transition-colors cursor-pointer shadow-md text-center"
+            className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-[#E0B04A] text-[#14291D] font-black text-xs shrink-0 hover:bg-[#F59E0B] transition-colors cursor-pointer shadow-md text-center"
           >
             Scan & Save 10%
           </button>
@@ -605,34 +690,34 @@ export const ProductPage = () => {
         <section
           aria-label="Cooking Profile"
           className={`rounded-3xl border p-5 sm:p-6 space-y-3 transition-colors ${
-            isDark ? "bg-[#1C120B] border-[#362114]" : "bg-white border-[#E8DEC8]"
+            isDark ? "bg-[#14291D] border-[#1F3D2B]" : "bg-white border-[#F2E8CC]"
           }`}
         >
-          <h3 className={`text-base font-bold font-serif ${isDark ? "text-[#FAF4EA]" : "text-[#23150C]"}`}>
+          <h3 className={`text-base font-bold font-serif ${isDark ? "text-[#FAF3E0]" : "text-[#14291D]"}`}>
             Culinary Usage & Cooking Profile
           </h3>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
-            <div className={`p-3.5 rounded-2xl ${isDark ? "bg-[#140D07]" : "bg-[#FAF7F2]"}`}>
-              <span className={`block text-[10px] uppercase font-bold ${isDark ? "text-[#A8907E]" : "text-[#7A5E48]"}`}>
+            <div className={`p-3.5 rounded-2xl ${isDark ? "bg-[#14291D]" : "bg-[#FAF3E0]"}`}>
+              <span className={`block text-[10px] uppercase font-bold ${isDark ? "text-[#3F4F45]" : "text-[#3F4F45]"}`}>
                 Smoke Point
               </span>
-              <span className={`font-bold mt-1 block ${isDark ? "text-[#FAF4EA]" : "text-[#23150C]"}`}>
+              <span className={`font-bold mt-1 block ${isDark ? "text-[#FAF3E0]" : "text-[#14291D]"}`}>
                 {cookingProfile.smokePoint}
               </span>
             </div>
-            <div className={`p-3.5 rounded-2xl ${isDark ? "bg-[#140D07]" : "bg-[#FAF7F2]"}`}>
-              <span className={`block text-[10px] uppercase font-bold ${isDark ? "text-[#A8907E]" : "text-[#7A5E48]"}`}>
+            <div className={`p-3.5 rounded-2xl ${isDark ? "bg-[#14291D]" : "bg-[#FAF3E0]"}`}>
+              <span className={`block text-[10px] uppercase font-bold ${isDark ? "text-[#3F4F45]" : "text-[#3F4F45]"}`}>
                 Best Culinary Style
               </span>
-              <span className={`font-bold mt-1 block ${isDark ? "text-[#FAF4EA]" : "text-[#23150C]"}`}>
+              <span className={`font-bold mt-1 block ${isDark ? "text-[#FAF3E0]" : "text-[#14291D]"}`}>
                 {cookingProfile.bestStyle}
               </span>
             </div>
-            <div className={`p-3.5 rounded-2xl ${isDark ? "bg-[#140D07]" : "bg-[#FAF7F2]"}`}>
-              <span className={`block text-[10px] uppercase font-bold ${isDark ? "text-[#A8907E]" : "text-[#7A5E48]"}`}>
+            <div className={`p-3.5 rounded-2xl ${isDark ? "bg-[#14291D]" : "bg-[#FAF3E0]"}`}>
+              <span className={`block text-[10px] uppercase font-bold ${isDark ? "text-[#3F4F45]" : "text-[#3F4F45]"}`}>
                 Natural Aroma
               </span>
-              <span className={`font-bold mt-1 block ${isDark ? "text-[#FAF4EA]" : "text-[#23150C]"}`}>
+              <span className={`font-bold mt-1 block ${isDark ? "text-[#FAF3E0]" : "text-[#14291D]"}`}>
                 {cookingProfile.aroma}
               </span>
             </div>
@@ -643,58 +728,58 @@ export const ProductPage = () => {
         <section
           aria-label="Quality Specifications"
           className={`rounded-3xl border p-5 sm:p-6 space-y-3.5 transition-colors ${
-            isDark ? "bg-[#1C120B] border-[#362114]" : "bg-white border-[#E8DEC8]"
+            isDark ? "bg-[#14291D] border-[#1F3D2B]" : "bg-white border-[#F2E8CC]"
           }`}
         >
-          <h3 className={`text-base font-bold font-serif ${isDark ? "text-[#FAF4EA]" : "text-[#23150C]"}`}>
+          <h3 className={`text-base font-bold font-serif ${isDark ? "text-[#FAF3E0]" : "text-[#14291D]"}`}>
             Extraction & Quality Specifications
           </h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-xs">
-            <div className={`p-3 rounded-2xl ${isDark ? "bg-[#140D07]" : "bg-[#FAF7F2]"}`}>
-              <span className={`block text-[10px] uppercase font-bold ${isDark ? "text-[#A8907E]" : "text-[#7A5E48]"}`}>
+            <div className={`p-3 rounded-2xl ${isDark ? "bg-[#14291D]" : "bg-[#FAF3E0]"}`}>
+              <span className={`block text-[10px] uppercase font-bold ${isDark ? "text-[#3F4F45]" : "text-[#3F4F45]"}`}>
                 Extraction Method
               </span>
-              <span className={`font-semibold mt-0.5 block ${isDark ? "text-[#FAF4EA]" : "text-[#23150C]"}`}>
+              <span className={`font-semibold mt-0.5 block ${isDark ? "text-[#FAF3E0]" : "text-[#14291D]"}`}>
                 {product.specs.extraction}
               </span>
             </div>
-            <div className={`p-3 rounded-2xl ${isDark ? "bg-[#140D07]" : "bg-[#FAF7F2]"}`}>
-              <span className={`block text-[10px] uppercase font-bold ${isDark ? "text-[#A8907E]" : "text-[#7A5E48]"}`}>
+            <div className={`p-3 rounded-2xl ${isDark ? "bg-[#14291D]" : "bg-[#FAF3E0]"}`}>
+              <span className={`block text-[10px] uppercase font-bold ${isDark ? "text-[#3F4F45]" : "text-[#3F4F45]"}`}>
                 Processing
               </span>
-              <span className={`font-semibold mt-0.5 block ${isDark ? "text-[#FAF4EA]" : "text-[#23150C]"}`}>
+              <span className={`font-semibold mt-0.5 block ${isDark ? "text-[#FAF3E0]" : "text-[#14291D]"}`}>
                 {product.specs.processing}
               </span>
             </div>
-            <div className={`p-3 rounded-2xl ${isDark ? "bg-[#140D07]" : "bg-[#FAF7F2]"}`}>
-              <span className={`block text-[10px] uppercase font-bold ${isDark ? "text-[#A8907E]" : "text-[#7A5E48]"}`}>
+            <div className={`p-3 rounded-2xl ${isDark ? "bg-[#14291D]" : "bg-[#FAF3E0]"}`}>
+              <span className={`block text-[10px] uppercase font-bold ${isDark ? "text-[#3F4F45]" : "text-[#3F4F45]"}`}>
                 Facility
               </span>
-              <span className={`font-semibold mt-0.5 block ${isDark ? "text-[#FAF4EA]" : "text-[#23150C]"}`}>
+              <span className={`font-semibold mt-0.5 block ${isDark ? "text-[#FAF3E0]" : "text-[#14291D]"}`}>
                 {product.specs.facility}
               </span>
             </div>
-            <div className={`p-3 rounded-2xl ${isDark ? "bg-[#140D07]" : "bg-[#FAF7F2]"}`}>
-              <span className={`block text-[10px] uppercase font-bold ${isDark ? "text-[#A8907E]" : "text-[#7A5E48]"}`}>
+            <div className={`p-3 rounded-2xl ${isDark ? "bg-[#14291D]" : "bg-[#FAF3E0]"}`}>
+              <span className={`block text-[10px] uppercase font-bold ${isDark ? "text-[#3F4F45]" : "text-[#3F4F45]"}`}>
                 Container
               </span>
-              <span className={`font-semibold mt-0.5 block ${isDark ? "text-[#FAF4EA]" : "text-[#23150C]"}`}>
+              <span className={`font-semibold mt-0.5 block ${isDark ? "text-[#FAF3E0]" : "text-[#14291D]"}`}>
                 {product.specs.container}
               </span>
             </div>
-            <div className={`p-3 rounded-2xl ${isDark ? "bg-[#140D07]" : "bg-[#FAF7F2]"}`}>
-              <span className={`block text-[10px] uppercase font-bold ${isDark ? "text-[#A8907E]" : "text-[#7A5E48]"}`}>
+            <div className={`p-3 rounded-2xl ${isDark ? "bg-[#14291D]" : "bg-[#FAF3E0]"}`}>
+              <span className={`block text-[10px] uppercase font-bold ${isDark ? "text-[#3F4F45]" : "text-[#3F4F45]"}`}>
                 Best For
               </span>
-              <span className={`font-semibold mt-0.5 block ${isDark ? "text-[#FAF4EA]" : "text-[#23150C]"}`}>
+              <span className={`font-semibold mt-0.5 block ${isDark ? "text-[#FAF3E0]" : "text-[#14291D]"}`}>
                 {product.specs.bestFor}
               </span>
             </div>
-            <div className={`p-3 rounded-2xl ${isDark ? "bg-[#140D07]" : "bg-[#FAF7F2]"}`}>
-              <span className={`block text-[10px] uppercase font-bold ${isDark ? "text-[#A8907E]" : "text-[#7A5E48]"}`}>
+            <div className={`p-3 rounded-2xl ${isDark ? "bg-[#14291D]" : "bg-[#FAF3E0]"}`}>
+              <span className={`block text-[10px] uppercase font-bold ${isDark ? "text-[#3F4F45]" : "text-[#3F4F45]"}`}>
                 Shelf Life
               </span>
-              <span className={`font-semibold mt-0.5 block ${isDark ? "text-[#FAF4EA]" : "text-[#23150C]"}`}>
+              <span className={`font-semibold mt-0.5 block ${isDark ? "text-[#FAF3E0]" : "text-[#14291D]"}`}>
                 {product.specs.shelfLife}
               </span>
             </div>
@@ -714,66 +799,66 @@ export const ProductPage = () => {
         <section
           aria-label="Nutritional Matrix"
           className={`rounded-3xl border p-5 sm:p-6 space-y-3.5 transition-colors ${
-            isDark ? "bg-[#1C120B] border-[#362114]" : "bg-white border-[#E8DEC8]"
+            isDark ? "bg-[#14291D] border-[#1F3D2B]" : "bg-white border-[#F2E8CC]"
           }`}
         >
-          <h3 className={`text-base font-bold font-serif ${isDark ? "text-[#FAF4EA]" : "text-[#23150C]"}`}>
+          <h3 className={`text-base font-bold font-serif ${isDark ? "text-[#FAF3E0]" : "text-[#14291D]"}`}>
             Nutritional Matrix (per 100g serving)
           </h3>
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
-              <tbody className={`divide-y ${isDark ? "divide-[#2D1B10]" : "divide-[#EFE8DC]"}`}>
+              <tbody className={`divide-y ${isDark ? "divide-[#14291D]" : "divide-[#F2E8CC]"}`}>
                 <tr>
-                  <td className={`py-2.5 ${isDark ? "text-[#D6C4B0]" : "text-[#5C402D]"}`}>Energy</td>
-                  <td className={`py-2.5 font-bold text-right ${isDark ? "text-[#FAF4EA]" : "text-[#23150C]"}`}>
+                  <td className={`py-2.5 ${isDark ? "text-[#E0B04A]" : "text-[#3F4F45]"}`}>Energy</td>
+                  <td className={`py-2.5 font-bold text-right ${isDark ? "text-[#FAF3E0]" : "text-[#14291D]"}`}>
                     {product.nutrition.energy}
                   </td>
                 </tr>
                 <tr>
-                  <td className={`py-2.5 ${isDark ? "text-[#D6C4B0]" : "text-[#5C402D]"}`}>Total Fat</td>
-                  <td className={`py-2.5 font-bold text-right ${isDark ? "text-[#FAF4EA]" : "text-[#23150C]"}`}>
+                  <td className={`py-2.5 ${isDark ? "text-[#E0B04A]" : "text-[#3F4F45]"}`}>Total Fat</td>
+                  <td className={`py-2.5 font-bold text-right ${isDark ? "text-[#FAF3E0]" : "text-[#14291D]"}`}>
                     {product.nutrition.totalFat}
                   </td>
                 </tr>
                 <tr>
-                  <td className={`py-2.5 ${isDark ? "text-[#D6C4B0]" : "text-[#5C402D]"}`}>Saturated Fat</td>
-                  <td className={`py-2.5 font-bold text-right ${isDark ? "text-[#FAF4EA]" : "text-[#23150C]"}`}>
+                  <td className={`py-2.5 ${isDark ? "text-[#E0B04A]" : "text-[#3F4F45]"}`}>Saturated Fat</td>
+                  <td className={`py-2.5 font-bold text-right ${isDark ? "text-[#FAF3E0]" : "text-[#14291D]"}`}>
                     {product.nutrition.saturatedFat}
                   </td>
                 </tr>
                 <tr>
-                  <td className={`py-2.5 ${isDark ? "text-[#D6C4B0]" : "text-[#5C402D]"}`}>Mono Unsaturated Fat</td>
-                  <td className={`py-2.5 font-bold text-right ${isDark ? "text-[#FAF4EA]" : "text-[#23150C]"}`}>
+                  <td className={`py-2.5 ${isDark ? "text-[#E0B04A]" : "text-[#3F4F45]"}`}>Mono Unsaturated Fat</td>
+                  <td className={`py-2.5 font-bold text-right ${isDark ? "text-[#FAF3E0]" : "text-[#14291D]"}`}>
                     {product.nutrition.monoUnsaturatedFat}
                   </td>
                 </tr>
                 <tr>
-                  <td className={`py-2.5 ${isDark ? "text-[#D6C4B0]" : "text-[#5C402D]"}`}>Poly Unsaturated Fat</td>
-                  <td className={`py-2.5 font-bold text-right ${isDark ? "text-[#FAF4EA]" : "text-[#23150C]"}`}>
+                  <td className={`py-2.5 ${isDark ? "text-[#E0B04A]" : "text-[#3F4F45]"}`}>Poly Unsaturated Fat</td>
+                  <td className={`py-2.5 font-bold text-right ${isDark ? "text-[#FAF3E0]" : "text-[#14291D]"}`}>
                     {product.nutrition.polyUnsaturatedFat}
                   </td>
                 </tr>
                 <tr>
-                  <td className={`py-2.5 ${isDark ? "text-[#D6C4B0]" : "text-[#5C402D]"}`}>Trans Fat</td>
-                  <td className={`py-2.5 font-bold text-right ${isDark ? "text-[#FAF4EA]" : "text-[#23150C]"}`}>
+                  <td className={`py-2.5 ${isDark ? "text-[#E0B04A]" : "text-[#3F4F45]"}`}>Trans Fat</td>
+                  <td className={`py-2.5 font-bold text-right ${isDark ? "text-[#FAF3E0]" : "text-[#14291D]"}`}>
                     {product.nutrition.transFat}
                   </td>
                 </tr>
                 <tr>
-                  <td className={`py-2.5 ${isDark ? "text-[#D6C4B0]" : "text-[#5C402D]"}`}>Cholesterol</td>
-                  <td className={`py-2.5 font-bold text-right ${isDark ? "text-[#FAF4EA]" : "text-[#23150C]"}`}>
+                  <td className={`py-2.5 ${isDark ? "text-[#E0B04A]" : "text-[#3F4F45]"}`}>Cholesterol</td>
+                  <td className={`py-2.5 font-bold text-right ${isDark ? "text-[#FAF3E0]" : "text-[#14291D]"}`}>
                     {product.nutrition.cholesterol}
                   </td>
                 </tr>
                 <tr>
-                  <td className={`py-2.5 ${isDark ? "text-[#D6C4B0]" : "text-[#5C402D]"}`}>Protein & Total Sugar</td>
-                  <td className={`py-2.5 font-bold text-right ${isDark ? "text-[#FAF4EA]" : "text-[#23150C]"}`}>
+                  <td className={`py-2.5 ${isDark ? "text-[#E0B04A]" : "text-[#3F4F45]"}`}>Protein & Total Sugar</td>
+                  <td className={`py-2.5 font-bold text-right ${isDark ? "text-[#FAF3E0]" : "text-[#14291D]"}`}>
                     0.0 gm
                   </td>
                 </tr>
                 <tr>
-                  <td className={`py-2.5 ${isDark ? "text-[#D6C4B0]" : "text-[#5C402D]"}`}>Moisture / Total Ash</td>
-                  <td className={`py-2.5 font-bold text-right ${isDark ? "text-[#FAF4EA]" : "text-[#23150C]"}`}>
+                  <td className={`py-2.5 ${isDark ? "text-[#E0B04A]" : "text-[#3F4F45]"}`}>Moisture / Total Ash</td>
+                  <td className={`py-2.5 font-bold text-right ${isDark ? "text-[#FAF3E0]" : "text-[#14291D]"}`}>
                     {product.nutrition.moisture}
                   </td>
                 </tr>
@@ -788,7 +873,7 @@ export const ProductPage = () => {
         <section
           aria-label="Customer Reviews"
           className={`rounded-3xl border p-5 sm:p-6 space-y-4 transition-colors ${
-            isDark ? "bg-[#1C120B] border-[#362114]" : "bg-white border-[#E8DEC8]"
+            isDark ? "bg-[#14291D] border-[#1F3D2B]" : "bg-white border-[#F2E8CC]"
           }`}
         >
           <div className="flex items-center justify-between border-b pb-3 border-stone-200 dark:border-stone-800">
@@ -807,7 +892,7 @@ export const ProductPage = () => {
                   setIsWritingReview(!isWritingReview);
                 }
               }}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#5E3210] hover:bg-[#43230A] text-white text-xs font-bold transition-all cursor-pointer shadow-xs"
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#1F3D2B] hover:bg-[#1F3D2B] text-white text-xs font-bold transition-all cursor-pointer shadow-xs"
             >
               <MessageSquarePlus className="w-3.5 h-3.5 text-amber-300" />
               <span>{isWritingReview ? "Close Form" : "Rate Product"}</span>
@@ -821,7 +906,7 @@ export const ProductPage = () => {
               className="p-4 sm:p-5 rounded-2xl bg-amber-500/10 border border-amber-500/30 space-y-3.5 text-xs"
             >
               <div>
-                <label className="block font-bold mb-1 text-stone-900 dark:text-[#FAF4EA]">
+                <label className="block font-bold mb-1 text-stone-900 dark:text-[#FAF3E0]">
                   Select Your Star Rating:
                 </label>
                 <div className="flex items-center gap-1.5">
@@ -848,7 +933,7 @@ export const ProductPage = () => {
               </div>
 
               <div>
-                <label className="block font-bold mb-1 text-stone-900 dark:text-[#FAF4EA]">
+                <label className="block font-bold mb-1 text-stone-900 dark:text-[#FAF3E0]">
                   Your Name (Optional):
                 </label>
                 <input
@@ -856,12 +941,12 @@ export const ProductPage = () => {
                   value={reviewerNameInput}
                   onChange={(e) => setReviewerNameInput(e.target.value)}
                   placeholder={currentUser?.displayName || "e.g. Ramesh Kumar"}
-                  className="w-full p-2.5 rounded-xl border border-stone-300 dark:border-stone-700 bg-white dark:bg-[#120A06] text-stone-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#E08F35]/40 text-xs"
+                  className="w-full p-2.5 rounded-xl border border-stone-300 dark:border-stone-700 bg-white dark:bg-[#14291D] text-stone-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#E0B04A]/40 text-xs"
                 />
               </div>
 
               <div>
-                <label className="block font-bold mb-1 text-stone-900 dark:text-[#FAF4EA]">
+                <label className="block font-bold mb-1 text-stone-900 dark:text-[#FAF3E0]">
                   Your Cooking Experience / Feedback:
                 </label>
                 <textarea
@@ -870,7 +955,7 @@ export const ProductPage = () => {
                   value={commentInput}
                   onChange={(e) => setCommentInput(e.target.value)}
                   placeholder="Share how this wood-pressed oil tasted in your cooking, aroma, or health routine..."
-                  className="w-full p-3 rounded-xl border border-stone-300 dark:border-stone-700 bg-white dark:bg-[#120A06] text-stone-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#E08F35]/40 text-xs"
+                  className="w-full p-3 rounded-xl border border-stone-300 dark:border-stone-700 bg-white dark:bg-[#14291D] text-stone-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#E0B04A]/40 text-xs"
                 />
               </div>
 
@@ -885,7 +970,7 @@ export const ProductPage = () => {
                 <button
                   type="submit"
                   disabled={isSubmittingReview || !commentInput.trim()}
-                  className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-[#5E3210] hover:bg-[#43230A] text-white font-bold cursor-pointer transition-all disabled:opacity-50"
+                  className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-[#1F3D2B] hover:bg-[#1F3D2B] text-white font-bold cursor-pointer transition-all disabled:opacity-50"
                 >
                   <Send className="w-3.5 h-3.5 text-amber-300" />
                   <span>{isSubmittingReview ? "Posting..." : "Submit Review"}</span>
@@ -903,10 +988,10 @@ export const ProductPage = () => {
               {productReviews.map((rev) => (
                 <div
                   key={rev.id}
-                  className="p-4 rounded-2xl bg-stone-50 dark:bg-[#140D07] border border-stone-200 dark:border-[#362114] space-y-1.5 text-xs"
+                  className="p-4 rounded-2xl bg-stone-50 dark:bg-[#14291D] border border-stone-200 dark:border-[#1F3D2B] space-y-1.5 text-xs"
                 >
                   <div className="flex items-center justify-between">
-                    <span className="font-bold text-stone-900 dark:text-[#FAF4EA]">
+                    <span className="font-bold text-stone-900 dark:text-[#FAF3E0]">
                       {rev.name}
                     </span>
                     <div className="flex text-amber-500">
@@ -930,24 +1015,33 @@ export const ProductPage = () => {
       <div
         className={`fixed bottom-0 inset-x-0 z-40 backdrop-blur-xl border-t px-4 py-3 shadow-[0_-8px_30px_rgba(0,0,0,0.25)] transition-colors ${
           isDark
-            ? "bg-[#140C07]/95 border-[#3D2517] text-[#FAF4EA]"
-            : "bg-white/95 border-[#E5DACB] text-[#23150C]"
+            ? "bg-[#140C07]/95 border-[#1F3D2B] text-[#FAF3E0]"
+            : "bg-white/95 border-[#E5DACB] text-[#14291D]"
         }`}
         style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
       >
         <div className="max-w-5xl mx-auto flex items-center justify-between gap-3 sm:gap-4">
           {/* Price & Variant Snapshot */}
           <div className="min-w-0 pr-2">
-            <div className={`text-[10px] sm:text-xs font-bold uppercase tracking-wider truncate ${isDark ? "text-[#A8907E]" : "text-[#7A5E48]"}`}>
+            <div className={`text-[10px] sm:text-xs font-bold uppercase tracking-wider truncate ${isDark ? "text-[#3F4F45]" : "text-[#3F4F45]"}`}>
               {product.name} ({selectedVolume})
             </div>
             <div className="flex items-baseline gap-2">
-              <span className={`text-xl sm:text-2xl font-black font-serif ${isDark ? "text-[#FAF4EA]" : "text-[#23150C]"}`}>
+              <span className={`text-xl sm:text-2xl font-black font-serif ${isDark ? "text-[#FAF3E0]" : "text-[#14291D]"}`}>
                 ₹{price}
               </span>
-              {mrp > price && (
-                <span className="text-xs line-through text-stone-400 font-semibold hidden xs:inline">
+              {isSale && savings > 0 ? (
+                <span className="text-xs line-through text-[#4A5A50] font-semibold hidden xs:inline">
+                  ₹{regularPrice}
+                </span>
+              ) : mrp > price && (
+                <span className="text-xs line-through text-[#4A5A50] font-semibold hidden xs:inline">
                   ₹{mrp}
+                </span>
+              )}
+              {isSale && savings > 0 && (
+                <span className="text-[10px] font-bold text-[#14291D] bg-[#E0B04A] px-1.5 py-0.5 rounded shadow-2xs">
+                  10% OFF
                 </span>
               )}
             </div>
@@ -962,19 +1056,19 @@ export const ProductPage = () => {
                 onClick={handleAddToCart}
                 className={`py-3 px-4 sm:px-6 rounded-xl border-2 font-black text-xs sm:text-sm transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm active:scale-95 ${
                   isDark
-                    ? "bg-[#25150C] border-[#E08F35] text-[#F5BC51] hover:bg-[#3D2517]"
-                    : "bg-white border-[#5E3210] text-[#5E3210] hover:bg-[#FAF6EE]"
+                    ? "bg-[#1F3D2B] border-[#E0B04A] text-[#F3D17A] hover:bg-[#1F3D2B]"
+                    : "bg-white border-[#1F3D2B] text-[#1F3D2B] hover:bg-[#FAF3E0]"
                 }`}
               >
-                <ShoppingBag className="w-4 h-4 text-[#E08F35]" />
+                <ShoppingBag className="w-4 h-4 text-[#E0B04A]" />
                 <span>Add to Bag</span>
               </button>
             ) : (
               <div
                 className={`flex items-center justify-between p-1 rounded-xl border-2 shadow-xs ${
                   isDark
-                    ? "bg-[#140D07] border-[#E08F35]"
-                    : "bg-[#FAF6EE] border-[#C8751B]"
+                    ? "bg-[#14291D] border-[#E0B04A]"
+                    : "bg-[#FAF3E0] border-[#E0B04A]"
                 }`}
               >
                 <button
@@ -982,24 +1076,24 @@ export const ProductPage = () => {
                   onClick={handleDecrement}
                   className={`w-8 h-8 rounded-lg flex items-center justify-center font-black active:scale-95 transition-all cursor-pointer border ${
                     isDark
-                      ? "bg-[#25150C] border-[#5A3820] text-[#F5BC51] hover:bg-[#3D2517]"
+                      ? "bg-[#1F3D2B] border-[#5A3820] text-[#F3D17A] hover:bg-[#1F3D2B]"
                       : "bg-white border-[#D8C7B5] text-[#7A4B1A] hover:bg-[#F3EBE0]"
                   }`}
                   aria-label="Decrease quantity"
                 >
-                  <Minus className="w-4 h-4 stroke-[3] text-[#E08F35]" />
+                  <Minus className="w-4 h-4 stroke-[3] text-[#E0B04A]" />
                 </button>
-                <span className={`font-black text-xs sm:text-sm px-2.5 select-none ${isDark ? "text-[#FAF4EA]" : "text-[#23150C]"}`}>
+                <span className={`font-black text-xs sm:text-sm px-2.5 select-none ${isDark ? "text-[#FAF3E0]" : "text-[#14291D]"}`}>
                   {currentQuantity} in Bag
                 </span>
                 <button
                   type="button"
                   disabled={!inStock}
                   onClick={handleIncrement}
-                  className="w-8 h-8 rounded-lg bg-[#E08F35] hover:bg-[#F5BC51] text-[#140D09] border border-[#F5BC51] flex items-center justify-center font-black active:scale-95 transition-all cursor-pointer shadow-xs"
+                  className="w-8 h-8 rounded-lg bg-[#E0B04A] hover:bg-[#F3D17A] text-[#14291D] border border-[#F3D17A] flex items-center justify-center font-black active:scale-95 transition-all cursor-pointer shadow-xs"
                   aria-label="Increase quantity"
                 >
-                  <Plus className="w-4 h-4 stroke-[3] text-[#140D09]" />
+                  <Plus className="w-4 h-4 stroke-[3] text-[#14291D]" />
                 </button>
               </div>
             )}
@@ -1008,9 +1102,9 @@ export const ProductPage = () => {
               type="button"
               disabled={!inStock}
               onClick={handleBuyNow}
-              className="py-3 px-5 sm:px-7 rounded-xl bg-gradient-to-r from-[#D49A37] via-[#F5BC51] to-[#B87C24] text-[#140D09] hover:brightness-110 font-black text-xs sm:text-sm shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
+              className="py-3 px-5 sm:px-7 rounded-xl bg-gradient-to-r from-[#E0B04A] via-[#F3D17A] to-[#B87C24] text-[#14291D] hover:brightness-110 font-black text-xs sm:text-sm shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
             >
-              <Zap className="w-4 h-4 fill-[#140D09]" />
+              <Zap className="w-4 h-4 fill-[#14291D]" />
               <span>Buy Now</span>
             </button>
           </div>
@@ -1028,12 +1122,12 @@ export const ProductPage = () => {
         >
           <div
             className={`w-full max-w-sm rounded-3xl border shadow-2xl p-5 space-y-4 animate-scale-up ${
-              isDark ? "bg-[#1C120B] border-[#4A301E] text-[#FAF4EA]" : "bg-white border-[#E8DEC8] text-[#23150C]"
+              isDark ? "bg-[#14291D] border-[#2D5A3F] text-[#FAF3E0]" : "bg-white border-[#F2E8CC] text-[#14291D]"
             }`}
           >
             <div className="flex items-center justify-between border-b pb-3 border-stone-200 dark:border-stone-800">
               <div className="flex items-center gap-2">
-                <Share2 className="w-4 h-4 text-[#E08F35]" />
+                <Share2 className="w-4 h-4 text-[#E0B04A]" />
                 <h3 className="font-bold font-serif text-sm">Share this Product</h3>
               </div>
               <button
@@ -1048,13 +1142,13 @@ export const ProductPage = () => {
             {/* Product Snapshot Card */}
             <div className="flex items-center gap-3 p-3 rounded-2xl bg-amber-500/10 border border-amber-500/20">
               <img
-                src={activeImageUrl}
+                src={THEMED_PRODUCT_IMAGES[product.id]?.white || THEMED_PRODUCT_IMAGES[product.id]?.light || activeImageUrl}
                 alt={product.name}
                 className="w-14 h-14 object-contain rounded-xl bg-white p-1 border border-amber-200 shrink-0"
               />
               <div className="min-w-0">
                 <p className="font-bold text-xs truncate">{product.name}</p>
-                <p className="text-[11px] text-[#C8751B] font-semibold">{product.kannadaName}</p>
+                <p className="text-[11px] text-[#E0B04A] font-semibold">{product.kannadaName}</p>
                 <p className="text-xs font-black mt-0.5">₹{price} ({selectedVolume})</p>
               </div>
             </div>
@@ -1081,11 +1175,11 @@ export const ProductPage = () => {
                   copiedLink
                     ? "bg-emerald-500 text-white border-emerald-500"
                     : isDark
-                    ? "bg-[#25150C] border-[#5A3820] text-[#FAF4EA] hover:bg-[#3D2517]"
-                    : "bg-[#FAF7F2] border-[#D8C7B5] text-[#23150C] hover:bg-[#EFE8DC]"
+                    ? "bg-[#1F3D2B] border-[#5A3820] text-[#FAF3E0] hover:bg-[#1F3D2B]"
+                    : "bg-[#FAF3E0] border-[#D8C7B5] text-[#14291D] hover:bg-[#F2E8CC]"
                 }`}
               >
-                {copiedLink ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4 text-[#E08F35]" />}
+                {copiedLink ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4 text-[#E0B04A]" />}
                 <span>{copiedLink ? "Link Copied to Clipboard!" : "Copy Product Link"}</span>
               </button>
             </div>

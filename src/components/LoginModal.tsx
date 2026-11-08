@@ -63,18 +63,18 @@ export const LoginModal: React.FC = () => {
       aria-labelledby="login-modal-title"
       className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in"
     >
-      <div className="relative w-full max-w-md bg-gradient-to-b from-[#24160F] to-[#140D09] text-[#FDF6EC] rounded-3xl shadow-[0_25px_60px_rgba(0,0,0,0.95)] border border-[#4A301E] overflow-hidden flex flex-col">
+      <div className="relative w-full max-w-md bg-gradient-to-b from-[#24160F] to-[#14291D] text-[#FAF3E0] rounded-3xl shadow-[0_25px_60px_rgba(0,0,0,0.95)] border border-[#2D5A3F] overflow-hidden flex flex-col animate-modal-pop">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4.5 bg-[#120A06] border-b border-[#3A2417]">
+        <div className="flex items-center justify-between px-6 py-4.5 bg-[#14291D] border-b border-[#1F3D2B]">
           <div className="flex items-center gap-3">
-            <span className="p-2 rounded-2xl bg-[#D49A37]/20 text-[#F5BC51]">
-              <User className="w-5 h-5 text-[#F5BC51]" />
+            <span className="p-2 rounded-2xl bg-[#E0B04A]/20 text-[#F3D17A]">
+              <User className="w-5 h-5 text-[#F3D17A]" />
             </span>
             <div>
-              <h2 id="login-modal-title" className="text-base font-bold font-serif text-[#FFD885]">
+              <h2 id="login-modal-title" className="text-base font-bold font-serif text-[#F3D17A]">
                 {currentUser ? "Customer Account" : "Sign In to MANOPAVANA"}
               </h2>
-              <p className="text-[11px] text-[#A88D77]">
+              <p className="text-[11px] text-[#3F4F45]">
                 {currentUser
                   ? "Manage your profile & order history"
                   : "1-Click Sign-in with Google"}
@@ -84,7 +84,7 @@ export const LoginModal: React.FC = () => {
           <button
             onClick={() => setLoginModalOpen(false)}
             aria-label="Close modal"
-            className="p-1.5 text-[#A88D77] hover:text-[#FDF6EC] hover:bg-[#2C1D14] rounded-full transition-colors cursor-pointer"
+            className="p-1.5 text-[#3F4F45] hover:text-[#FAF3E0] hover:bg-[#2C1D14] rounded-full transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
@@ -94,31 +94,31 @@ export const LoginModal: React.FC = () => {
         <div className="p-6 space-y-5">
           {currentUser ? (
             /* Logged in state */
-            <div className="space-y-4 text-xs text-[#D6BEAA]">
-              <div className="p-4 rounded-2xl bg-[#1C110B] border border-[#4A301E] space-y-3">
+            <div className="space-y-4 text-xs text-[#E0B04A]">
+              <div className="p-4 rounded-2xl bg-[#14291D] border border-[#2D5A3F] space-y-3">
                 <div className="flex items-center gap-3">
                   {currentUser.photoURL ? (
                     <img
                       src={currentUser.photoURL}
                       alt={currentUser.displayName || "User"}
-                      className="w-11 h-11 rounded-full border-2 border-[#D49A37] object-cover"
+                      className="w-11 h-11 rounded-full border-2 border-[#E0B04A] object-cover"
                     />
                   ) : (
-                    <div className="w-11 h-11 rounded-full bg-[#D49A37]/20 text-[#F5BC51] border border-[#D49A37]/40 flex items-center justify-center font-bold text-base">
+                    <div className="w-11 h-11 rounded-full bg-[#E0B04A]/20 text-[#F3D17A] border border-[#E0B04A]/40 flex items-center justify-center font-bold text-base">
                       {currentUser.displayName ? currentUser.displayName[0].toUpperCase() : "U"}
                     </div>
                   )}
                   <div>
-                    <p className="font-bold text-[#FDF6EC] text-sm">
+                    <p className="font-bold text-[#FAF3E0] text-sm">
                       {currentUser.displayName || "Customer"}
                     </p>
-                    <p className="text-[11px] text-[#A88D77] font-mono">
+                    <p className="text-[11px] text-[#3F4F45] font-mono">
                       {currentUser.email || "Verified Account"}
                     </p>
                   </div>
                 </div>
 
-                <div className="pt-2 border-t border-[#2D1B10] flex items-center gap-2 text-emerald-400 font-semibold text-[11px]">
+                <div className="pt-2 border-t border-[#14291D] flex items-center gap-2 text-emerald-400 font-semibold text-[11px]">
                   <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
                   <span>Google Account Verified • Order History Synced</span>
                 </div>
@@ -136,7 +136,7 @@ export const LoginModal: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setLoginModalOpen(false)}
-                  className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#D49A37] to-[#B87C24] text-[#140D09] font-bold transition-colors cursor-pointer shadow-md"
+                  className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#E0B04A] to-[#B87C24] text-[#14291D] font-bold transition-colors cursor-pointer shadow-md"
                 >
                   Done
                 </button>
@@ -145,14 +145,14 @@ export const LoginModal: React.FC = () => {
           ) : (
             /* Sign in form */
             <div className="space-y-4">
-              <div className="p-4 rounded-2xl bg-[#1C110B] border border-[#4A301E] space-y-2 text-center">
-                <div className="w-12 h-12 mx-auto rounded-2xl bg-[#D49A37]/15 border border-[#D49A37]/30 flex items-center justify-center text-[#F5BC51]">
+              <div className="p-4 rounded-2xl bg-[#14291D] border border-[#2D5A3F] space-y-2 text-center">
+                <div className="w-12 h-12 mx-auto rounded-2xl bg-[#E0B04A]/15 border border-[#E0B04A]/30 flex items-center justify-center text-[#F3D17A]">
                   <Sparkles className="w-6 h-6" />
                 </div>
-                <h3 className="font-serif font-bold text-sm text-[#FDF6EC] pt-1">
+                <h3 className="font-serif font-bold text-sm text-[#FAF3E0] pt-1">
                   Pure Wood-Pressed Oils, Direct to Your Doorstep
                 </h3>
-                <p className="text-[11px] text-[#A88D77] leading-relaxed">
+                <p className="text-[11px] text-[#3F4F45] leading-relaxed">
                   Sign in with your Google account to track your orders, save delivery addresses, and enjoy seamless shopping.
                 </p>
               </div>
@@ -197,7 +197,7 @@ export const LoginModal: React.FC = () => {
                 <span>{loading ? "Signing in..." : "Continue with Google"}</span>
               </button>
 
-              <div className="pt-2 flex items-center justify-center gap-1.5 text-[11px] text-[#A88D77]">
+              <div className="pt-2 flex items-center justify-center gap-1.5 text-[11px] text-[#3F4F45]">
                 <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
                 <span>100% Secure • Instant 1-Click Access</span>
               </div>

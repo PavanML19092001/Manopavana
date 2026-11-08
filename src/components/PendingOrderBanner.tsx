@@ -191,7 +191,7 @@ export const PendingOrderBanner: React.FC = () => {
   return (
     <aside
       aria-label="Pending Online Payment Notification"
-      className="bg-gradient-to-r from-[#3D2514] via-[#5E3210] to-[#3D2514] border-b-2 border-amber-400/80 text-white shadow-xl sticky top-0 z-40 transition-all animate-fade-in"
+      className="bg-gradient-to-r from-[#1F3D2B] via-[#1F3D2B] to-[#1F3D2B] border-b-2 border-amber-400/80 text-white shadow-xl sticky top-0 z-40 transition-all animate-fade-in"
     >
       <div className="max-w-7xl mx-auto px-4 py-2.5 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
         <div className="flex items-center gap-2.5 text-center sm:text-left">
@@ -218,7 +218,7 @@ export const PendingOrderBanner: React.FC = () => {
             type="button"
             disabled={isVerifying}
             onClick={handleVerifyOrResume}
-            className="flex-1 sm:flex-none px-3.5 py-1.5 rounded-lg bg-amber-400 hover:bg-amber-300 text-[#3D2514] font-black text-[11px] shadow-sm transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+            className="flex-1 sm:flex-none px-3.5 py-1.5 rounded-lg bg-amber-400 hover:bg-amber-300 text-[#1F3D2B] font-black text-[11px] shadow-sm transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${isVerifying ? "animate-spin" : ""}`} />
             <span>{isVerifying ? "Verifying..." : "Check Status / Resume"}</span>

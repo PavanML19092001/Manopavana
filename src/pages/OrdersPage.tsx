@@ -103,10 +103,10 @@ export const OrdersPage = () => {
     return (
       <div
         className={`w-full min-h-[70vh] flex items-center justify-center p-6 ${
-          isDark ? "bg-[#140D09]" : "bg-[#FAF7F2]"
+          isDark ? "bg-[#14291D]" : "bg-[#FAF3E0]"
         }`}
       >
-        <div className="w-10 h-10 border-3 border-[#D49A37] border-t-transparent rounded-full animate-spin" />
+        <div className="w-10 h-10 border-3 border-[#E0B04A] border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
@@ -115,15 +115,15 @@ export const OrdersPage = () => {
     return (
       <div
         className={`w-full min-h-[70vh] flex items-center justify-center p-6 ${
-          isDark ? "bg-[#140D09] text-[#FAF4EA]" : "bg-[#FAF7F2] text-[#24140A]"
+          isDark ? "bg-[#14291D] text-[#FAF3E0]" : "bg-[#FAF3E0] text-[#14291D]"
         }`}
       >
         <div
           className={`max-w-md w-full p-8 rounded-3xl border text-center space-y-5 shadow-xl ${
-            isDark ? "bg-[#1C120B] border-[#362114]" : "bg-white border-[#E8DEC8]"
+            isDark ? "bg-[#14291D] border-[#1F3D2B]" : "bg-white border-[#F2E8CC]"
           }`}
         >
-          <div className="w-16 h-16 mx-auto rounded-full bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-[#E08F35]">
+          <div className="w-16 h-16 mx-auto rounded-full bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-[#E0B04A]">
             <Package className="w-8 h-8" />
           </div>
           <div className="space-y-2">
@@ -135,7 +135,7 @@ export const OrdersPage = () => {
           <button
             type="button"
             onClick={() => setLoginModalOpen(true)}
-            className="w-full py-3 rounded-xl bg-[#5E3210] hover:bg-[#43230A] text-white font-bold text-xs shadow-md transition-all cursor-pointer"
+            className="w-full py-3 rounded-xl bg-[#1F3D2B] hover:bg-[#1F3D2B] text-white font-bold text-xs shadow-md transition-all cursor-pointer"
           >
             Sign In with Google
           </button>
@@ -175,7 +175,7 @@ export const OrdersPage = () => {
     return (
       <div
         className={`w-full min-h-[calc(100vh-80px)] py-6 sm:py-10 transition-colors ${
-          isDark ? "bg-[#140D09] text-[#FAF4EA]" : "bg-[#F1F3F6] text-[#212121]"
+          isDark ? "bg-[#14291D] text-[#FAF3E0]" : "bg-[#F1F3F6] text-[#212121]"
         }`}
       >
         <div className="max-w-6xl mx-auto px-4 sm:px-6 space-y-6">
@@ -199,17 +199,17 @@ export const OrdersPage = () => {
           {/* Flipkart Card 1: Delivery Address */}
           <div
             className={`p-5 sm:p-6 rounded-2xl border shadow-xs space-y-3 ${
-              isDark ? "bg-[#1C120B] border-[#362114]" : "bg-white border-stone-200"
+              isDark ? "bg-[#14291D] border-[#1F3D2B]" : "bg-white border-stone-200"
             }`}
           >
             <div className="flex items-center justify-between border-b pb-3 border-stone-200 dark:border-stone-800">
               <div className="flex items-center gap-2">
-                <MapPin className="w-4 h-4 text-[#E08F35]" />
+                <MapPin className="w-4 h-4 text-[#E0B04A]" />
                 <h3 className="text-sm font-bold uppercase tracking-wider text-stone-500">
                   Delivery Address
                 </h3>
               </div>
-              <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-amber-500/10 text-[#E08F35]">
+              <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-amber-500/10 text-[#E0B04A]">
                 {addr.label || "Home"}
               </span>
             </div>
@@ -235,7 +235,7 @@ export const OrdersPage = () => {
           {/* Flipkart Card 2: Visual Order Stepper Tracker */}
           <div
             className={`p-5 sm:p-6 rounded-2xl border shadow-xs space-y-6 ${
-              isDark ? "bg-[#1C120B] border-[#362114]" : "bg-white border-stone-200"
+              isDark ? "bg-[#14291D] border-[#1F3D2B]" : "bg-white border-stone-200"
             }`}
           >
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b pb-4 border-stone-200 dark:border-stone-800">
@@ -298,7 +298,7 @@ export const OrdersPage = () => {
                       activeOrder.courier?.toLowerCase().includes("shadowfax") ||
                       activeOrder.trackingNumber.startsWith("SF")
                         ? "bg-emerald-500/15 text-emerald-800 dark:text-emerald-300 hover:bg-emerald-500/25"
-                        : "bg-[#E08F35]/15 text-[#5E3210] dark:text-amber-200 hover:bg-[#E08F35]/25"
+                        : "bg-[#E0B04A]/15 text-[#1F3D2B] dark:text-amber-200 hover:bg-[#E0B04A]/25"
                     }`}
                   >
                     <span>
@@ -335,7 +335,7 @@ export const OrdersPage = () => {
                       loadOrderToCartAndRetry(activeOrder);
                       navigate("/checkout");
                     }}
-                    className="px-4 py-2.5 rounded-xl bg-[#E08F35] hover:bg-[#c97a26] text-[#1F120A] font-bold text-xs shadow-md transition-all cursor-pointer flex items-center gap-1.5"
+                    className="px-4 py-2.5 rounded-xl bg-[#E0B04A] hover:bg-[#C8962E] text-[#14291D] font-bold text-xs shadow-md transition-all cursor-pointer flex items-center gap-1.5"
                   >
                     <RotateCcw className="w-3.5 h-3.5" />
                     <span>Retry Online Payment</span>
@@ -369,7 +369,7 @@ export const OrdersPage = () => {
                     loadOrderToCartAndRetry(activeOrder);
                     navigate("/checkout");
                   }}
-                  className="px-4 py-2.5 rounded-xl bg-[#E08F35] hover:bg-[#c97a26] text-[#1F120A] font-bold text-xs shadow-md transition-all cursor-pointer"
+                  className="px-4 py-2.5 rounded-xl bg-[#E0B04A] hover:bg-[#C8962E] text-[#14291D] font-bold text-xs shadow-md transition-all cursor-pointer"
                 >
                   Re-order These Items
                 </button>
@@ -476,7 +476,7 @@ export const OrdersPage = () => {
           {/* Flipkart Card 3: Items in this Order */}
           <div
             className={`p-5 sm:p-6 rounded-2xl border shadow-xs space-y-4 ${
-              isDark ? "bg-[#1C120B] border-[#362114]" : "bg-white border-stone-200"
+              isDark ? "bg-[#14291D] border-[#1F3D2B]" : "bg-white border-stone-200"
             }`}
           >
             <h3 className="text-sm font-bold uppercase tracking-wider text-stone-500 border-b pb-3 border-stone-200 dark:border-stone-800">
@@ -514,40 +514,40 @@ export const OrdersPage = () => {
             {/* Price Details */}
             <div
               className={`p-5 sm:p-6 rounded-2xl border shadow-xs space-y-3 ${
-                isDark ? "bg-[#1C120B] border-[#362114]" : "bg-white border-stone-200"
+                isDark ? "bg-[#14291D] border-[#1F3D2B]" : "bg-white border-stone-200"
               }`}
             >
               <h3 className="text-sm font-bold uppercase tracking-wider text-stone-500 border-b pb-3 border-stone-200 dark:border-stone-800">
                 Price Details
               </h3>
-              <div className="text-xs space-y-2 text-stone-600 dark:text-stone-400">
+              <div className="text-xs space-y-2 text-[#2D4536] dark:text-[#E8DFD5]">
                 <div className="flex justify-between">
                   <span>List Price</span>
-                  <span className="font-medium text-stone-900 dark:text-stone-100">
-                    ₹{activeOrder.subtotal}
+                  <span className="font-semibold text-[#14291D] dark:text-[#FAF3E0]">
+                    ₹{activeOrder.regularSubtotal || activeOrder.subtotal}
                   </span>
                 </div>
-                {activeOrder.discount > 0 && (
-                  <div className="flex justify-between text-emerald-600">
-                    <span>Discount</span>
-                    <span className="font-bold">-₹{activeOrder.discount}</span>
+                {((activeOrder.discountAmount || activeOrder.discount || 0) > 0) && (
+                  <div className="flex justify-between text-[#1F3D2B] dark:text-[#F3D17A]">
+                    <span>Discount ({activeOrder.discountLabel || "Festive/Promo"})</span>
+                    <span className="font-bold">-₹{activeOrder.discountAmount || activeOrder.discount}</span>
                   </div>
                 )}
                 <div className="flex justify-between">
                   <span>Delivery Charges</span>
-                  <span className="font-medium text-stone-900 dark:text-stone-100">
+                  <span className="font-semibold text-[#14291D] dark:text-[#FAF3E0]">
                     {activeOrder.shippingFee === 0 ? "FREE" : `₹${activeOrder.shippingFee}`}
                   </span>
                 </div>
-                <div className="pt-2 border-t flex justify-between text-sm font-bold text-stone-900 dark:text-stone-100 border-stone-200 dark:border-stone-800">
+                <div className="pt-2 border-t flex justify-between text-sm font-bold text-[#14291D] dark:text-[#FAF3E0] border-stone-200 dark:border-stone-800">
                   <span>Total Amount</span>
-                  <span className="text-base font-serif text-[#C8751B] dark:text-amber-300">
+                  <span className="text-base font-serif text-[#14291D] dark:text-[#F3D17A]">
                     ₹{activeOrder.total}
                   </span>
                 </div>
-                <p className="text-[11px] text-stone-500 pt-1">
+                <p className="text-[11px] text-[#2D4536] dark:text-[#E8DFD5] pt-1">
                   Payment Mode:{" "}
-                  <span className="font-bold uppercase text-stone-700 dark:text-stone-300">
+                  <span className="font-bold uppercase text-[#14291D] dark:text-[#FAF3E0]">
                     {activeOrder.paymentMode || activeOrder.paymentMethod}
                   </span>
                 </p>
@@ -557,7 +557,7 @@ export const OrdersPage = () => {
             {/* Quick Actions & Help */}
             <div
               className={`p-5 sm:p-6 rounded-2xl border shadow-xs space-y-3 flex flex-col justify-between ${
-                isDark ? "bg-[#1C120B] border-[#362114]" : "bg-white border-stone-200"
+                isDark ? "bg-[#14291D] border-[#1F3D2B]" : "bg-white border-stone-200"
               }`}
             >
               <div>
@@ -574,7 +574,7 @@ export const OrdersPage = () => {
                     }}
                     className="w-full py-2.5 px-4 rounded-xl border border-stone-300 dark:border-stone-700 hover:bg-stone-50 dark:hover:bg-stone-800 text-xs font-bold flex items-center justify-center gap-2 cursor-pointer transition-colors"
                   >
-                    <FileText className="w-4 h-4 text-[#E08F35]" />
+                    <FileText className="w-4 h-4 text-[#E0B04A]" />
                     <span>Download Tax Invoice (PDF)</span>
                   </button>
 
@@ -640,7 +640,7 @@ export const OrdersPage = () => {
   return (
     <div
       className={`w-full min-h-[calc(100vh-80px)] py-6 sm:py-10 transition-colors ${
-        isDark ? "bg-[#140D09] text-[#FAF4EA]" : "bg-[#F1F3F6] text-[#212121]"
+        isDark ? "bg-[#14291D] text-[#FAF3E0]" : "bg-[#F1F3F6] text-[#212121]"
       }`}
     >
       <div className="max-w-6xl mx-auto px-4 sm:px-6 space-y-6">
@@ -663,7 +663,7 @@ export const OrdersPage = () => {
               placeholder="Search your orders here..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full h-10 pl-9 pr-3 text-xs rounded-xl border border-stone-300 dark:border-stone-700 bg-white dark:bg-stone-900 focus:outline-none focus:ring-2 focus:ring-[#E08F35]/30"
+              className="w-full h-10 pl-9 pr-3 text-xs rounded-xl border border-stone-300 dark:border-stone-700 bg-white dark:bg-stone-900 focus:outline-none focus:ring-2 focus:ring-[#E0B04A]/30"
             />
           </div>
         </div>
@@ -677,7 +677,7 @@ export const OrdersPage = () => {
               onClick={() => setStatusFilter(st)}
               className={`px-3 py-1.5 rounded-full text-xs font-bold capitalize transition-all cursor-pointer ${
                 statusFilter === st
-                  ? "bg-[#5E3210] text-white shadow-xs"
+                  ? "bg-[#1F3D2B] text-white shadow-xs"
                   : "bg-white dark:bg-stone-800 text-stone-600 dark:text-stone-300 border border-stone-200 dark:border-stone-700"
               }`}
             >
@@ -690,7 +690,7 @@ export const OrdersPage = () => {
         {filteredOrders.length === 0 ? (
           <div
             className={`p-12 text-center rounded-3xl border space-y-3 ${
-              isDark ? "bg-[#1C120B] border-[#362114]" : "bg-white border-stone-200"
+              isDark ? "bg-[#14291D] border-[#1F3D2B]" : "bg-white border-stone-200"
             }`}
           >
             <Package className="w-12 h-12 mx-auto text-stone-300 dark:text-stone-700" />
@@ -702,7 +702,7 @@ export const OrdersPage = () => {
             </p>
             <Link
               to="/"
-              className="inline-block mt-2 px-5 py-2.5 rounded-xl bg-[#E08F35] text-[#1F120A] font-bold text-xs shadow-md transition-all hover:scale-105"
+              className="inline-block mt-2 px-5 py-2.5 rounded-xl bg-[#E0B04A] text-[#14291D] font-bold text-xs shadow-md transition-all hover:scale-105"
             >
               Explore Wood-Pressed Oils
             </Link>
@@ -723,8 +723,8 @@ export const OrdersPage = () => {
                   onClick={() => navigate(`/orders/${ord.orderRef}`)}
                   className={`p-4 sm:p-5 rounded-2xl border shadow-xs transition-all hover:shadow-md cursor-pointer flex flex-col md:flex-row md:items-center justify-between gap-4 ${
                     isDark
-                      ? "bg-[#1C120B] border-[#362114] hover:border-amber-500/40"
-                      : "bg-white border-stone-200 hover:border-[#E08F35]/50"
+                      ? "bg-[#14291D] border-[#1F3D2B] hover:border-amber-500/40"
+                      : "bg-white border-stone-200 hover:border-[#E0B04A]/50"
                   }`}
                 >
                   {/* Left: Product Thumbnail & Title */}

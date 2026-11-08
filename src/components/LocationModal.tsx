@@ -133,8 +133,8 @@ export const LocationModal: React.FC = () => {
 
           const customIcon = L.divIcon({
             className: "custom-leaflet-marker",
-            html: `<div style="background-color:#E08F35; width:30px; height:30px; border-radius:50%; border:3px solid #FFF; box-shadow:0 4px 12px rgba(0,0,0,0.45); display:flex; align-items:center; justify-content:center;">
-                    <div style="background:#5E3210; width:10px; height:10px; border-radius:50%;"></div>
+            html: `<div style="background-color:#E0B04A; width:30px; height:30px; border-radius:50%; border:3px solid #FFF; box-shadow:0 4px 12px rgba(0,0,0,0.45); display:flex; align-items:center; justify-content:center;">
+                    <div style="background:#1F3D2B; width:10px; height:10px; border-radius:50%;"></div>
                   </div>`,
             iconSize: [30, 30],
             iconAnchor: [15, 15],
@@ -367,20 +367,20 @@ export const LocationModal: React.FC = () => {
       role="dialog"
       aria-modal="true"
       aria-labelledby="location-modal-title"
-      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-black/85 backdrop-blur-md animate-fade-in"
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-black/60 backdrop-blur-sm animate-fade-in"
     >
-      <div className="relative w-full max-w-3xl bg-gradient-to-b from-[#24160F] to-[#140D09] text-[#FDF6EC] rounded-3xl shadow-[0_25px_60px_rgba(0,0,0,0.95)] border border-[#4A301E] overflow-hidden flex flex-col max-h-[94vh]">
+      <div className="relative w-full max-w-3xl bg-[#FAF3E0] text-[#14291D] rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.25)] border-2 border-[#E0B04A]/50 overflow-hidden flex flex-col max-h-[94vh] animate-modal-pop">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 bg-[#120A06] border-b border-[#3A2417] shrink-0">
+        <div className="flex items-center justify-between px-6 py-4 bg-[#F2E8CC] border-b border-[#E0B04A]/30 shrink-0">
           <div className="flex items-center gap-3">
-            <span className="p-2.5 rounded-2xl bg-[#D49A37]/20 text-[#F5BC51]">
-              <MapPin className="w-5 h-5 text-[#F5BC51]" />
+            <span className="p-2.5 rounded-2xl bg-[#E0B04A]/30 text-[#14291D]">
+              <MapPin className="w-5 h-5 text-[#14291D]" />
             </span>
             <div>
-              <h2 id="location-modal-title" className="text-lg font-bold font-serif text-[#FFD885]">
+              <h2 id="location-modal-title" className="text-lg font-bold font-serif text-[#14291D]">
                 Choose Delivery Destination
               </h2>
-              <p className="text-xs text-[#A88D77]">
+              <p className="text-xs text-[#2D4536] font-medium">
                 Search landmark, drag the pin, or click 1-Click GPS
               </p>
             </div>
@@ -388,27 +388,27 @@ export const LocationModal: React.FC = () => {
           <button
             onClick={() => setLocationModalOpen(false)}
             aria-label="Close delivery destination modal"
-            className="p-2 text-[#A88D77] hover:text-[#FDF6EC] hover:bg-[#2C1D14] rounded-full transition-colors cursor-pointer"
+            className="p-2 text-[#2D4536] hover:text-[#14291D] hover:bg-[#E0B04A]/25 rounded-full transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Content Body */}
-        <div className="overflow-y-auto p-5 sm:p-6 space-y-5">
+        <div className="overflow-y-auto p-5 sm:p-6 space-y-5 bg-[#FAF3E0]">
           {/* Saved Addresses Section (Strictly Authenticated) */}
           {currentUser && savedAddresses && savedAddresses.length > 0 && (
             <div className="space-y-2.5">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-[#FFD885] flex items-center gap-1.5">
-                  <MapPin className="w-3.5 h-3.5 text-[#F5BC51]" />
+                <span className="text-xs font-bold text-[#14291D] flex items-center gap-1.5">
+                  <MapPin className="w-3.5 h-3.5 text-[#C8962E]" />
                   <span>Saved Delivery Locations</span>
                 </span>
                 {editingAddressId && (
                   <button
                     type="button"
                     onClick={() => setEditingAddressId(null)}
-                    className="text-[11px] text-[#A88D77] hover:underline cursor-pointer"
+                    className="text-[11px] text-[#2D4536] hover:text-[#14291D] font-bold hover:underline cursor-pointer"
                   >
                     Cancel Editing
                   </button>
@@ -423,18 +423,18 @@ export const LocationModal: React.FC = () => {
                       key={addr.id}
                       className={`p-3 rounded-xl border text-xs transition-all relative ${
                         isEditing
-                          ? "bg-amber-950/60 border-[#F5BC51] ring-1 ring-[#F5BC51]"
+                          ? "bg-[#F2E8CC] border-[#E0B04A] ring-2 ring-[#E0B04A]"
                           : isCurrent
-                          ? "bg-[#1C110B] border-[#D49A37]/50"
-                          : "bg-[#120A06] border-[#3A2417] hover:border-[#5A3822]"
+                          ? "bg-white border-[#E0B04A] shadow-xs"
+                          : "bg-white/80 border-[#E0B04A]/30 hover:border-[#E0B04A]"
                       }`}
                     >
                       <div className="flex items-center justify-between mb-1">
                         <span className="flex items-center gap-1.5">
-                          <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-[#D49A37]/20 text-[#F5BC51]">
+                          <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-[#E0B04A]/25 text-[#14291D] border border-[#E0B04A]/40">
                             {addr.label}
                           </span>
-                          <span className="font-bold text-[#FDF6EC] truncate max-w-[110px]">
+                          <span className="font-bold text-[#14291D] truncate max-w-[110px]">
                             {addr.fullName || "Customer"}
                           </span>
                         </span>
@@ -459,7 +459,7 @@ export const LocationModal: React.FC = () => {
                                 markerRef.current?.setLatLng([addr.lat!, addr.lng!]);
                               }
                             }}
-                            className="p-1 rounded-md text-[#F5BC51] hover:bg-[#D49A37]/20 cursor-pointer transition-colors"
+                            className="p-1 rounded-md text-[#14291D] hover:bg-[#E0B04A]/30 cursor-pointer transition-colors"
                           >
                             <Edit2 className="w-3.5 h-3.5" />
                           </button>
@@ -470,17 +470,17 @@ export const LocationModal: React.FC = () => {
                               if (window.confirm(`Delete "${addr.label}" address?`)) {
                                 deleteSavedAddress(addr.id);
                                 if (editingAddressId === addr.id) {
-                                  setEditingAddressId(null);
+                                   setEditingAddressId(null);
                                 }
                               }
                             }}
-                            className="p-1 rounded-md text-red-400 hover:bg-red-950/40 cursor-pointer transition-colors"
+                            className="p-1 rounded-md text-red-600 hover:bg-red-100 cursor-pointer transition-colors"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>
                         </div>
                       </div>
-                      <p className="text-[11px] text-[#A88D77] line-clamp-1 mb-1.5">
+                      <p className="text-[11px] text-[#2D4536] line-clamp-1 mb-1.5">
                         {addr.addressLine1}, {addr.district || addr.city} - {addr.pincode}
                       </p>
                       <button
@@ -502,7 +502,7 @@ export const LocationModal: React.FC = () => {
                           }
                           setLocationModalOpen(false);
                         }}
-                        className="w-full py-1 rounded-lg bg-[#2C1D14] hover:bg-[#3D281C] text-[10px] font-bold text-[#F5BC51] transition-colors cursor-pointer"
+                        className="w-full py-1.5 rounded-lg bg-[#F2E8CC] hover:bg-[#E0B04A] text-[11px] font-bold text-[#14291D] border border-[#E0B04A]/40 transition-colors cursor-pointer"
                       >
                         {isCurrent ? "✓ Currently Active" : "Deliver to This Location"}
                       </button>
@@ -515,15 +515,15 @@ export const LocationModal: React.FC = () => {
 
           {/* In-Place Editing Banner */}
           {editingAddressId && (
-            <div className="flex items-center justify-between p-3 rounded-2xl bg-amber-950/40 border border-[#F5BC51]/50 text-xs text-amber-200">
+            <div className="flex items-center justify-between p-3 rounded-2xl bg-[#F2E8CC] border border-[#E0B04A] text-xs text-[#14291D]">
               <div className="flex items-center gap-2">
-                <Edit2 className="w-4 h-4 text-[#F5BC51]" />
+                <Edit2 className="w-4 h-4 text-[#C8962E]" />
                 <span className="font-bold">Editing "{addressLabel}" Address In-Place</span>
               </div>
               <button
                 type="button"
                 onClick={() => setEditingAddressId(null)}
-                className="text-[11px] text-[#A88D77] hover:text-[#FDF6EC] underline cursor-pointer"
+                className="text-[11px] text-[#2D4536] hover:text-[#14291D] font-bold underline cursor-pointer"
               >
                 Cancel
               </button>
@@ -531,14 +531,14 @@ export const LocationModal: React.FC = () => {
           )}
 
           {/* Geolocation Quick Trigger */}
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 p-3.5 bg-[#1C110B] border border-[#4A301E] rounded-2xl shadow-inner">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 p-3.5 bg-white border border-[#E0B04A]/40 rounded-2xl shadow-xs">
             <div className="flex items-center gap-2.5">
-              <Navigation className="w-5 h-5 text-[#F5BC51] shrink-0" />
+              <Navigation className="w-5 h-5 text-[#C8962E] shrink-0" />
               <div>
-                <p className="text-xs font-semibold text-[#FDF6EC]">
+                <p className="text-xs font-bold text-[#14291D]">
                   Automatic GPS Pinpoint
                 </p>
-                <p className="text-[11px] text-[#A88D77]">
+                <p className="text-[11px] text-[#2D4536]">
                   Detect current device location to instantly place map pin
                 </p>
               </div>
@@ -547,7 +547,7 @@ export const LocationModal: React.FC = () => {
               type="button"
               onClick={handleUseGPS}
               disabled={isLocating}
-              className="px-4 py-2.5 text-xs font-semibold text-[#140D09] bg-gradient-to-r from-[#D49A37] to-[#B87C24] hover:brightness-110 disabled:opacity-50 rounded-xl shadow-md transition-all flex items-center justify-center gap-2 shrink-0 cursor-pointer"
+              className="px-4 py-2 text-xs font-bold text-[#14291D] bg-[#E0B04A] hover:bg-[#F3D17A] disabled:opacity-50 rounded-xl shadow-xs border border-[#C8962E]/30 transition-all flex items-center justify-center gap-2 shrink-0 cursor-pointer"
             >
               {isLocating ? (
                 <>
@@ -562,34 +562,34 @@ export const LocationModal: React.FC = () => {
 
           {/* Direct Address Search Input Bar */}
           <div className="relative space-y-1.5 z-20">
-            <label className="block text-xs font-semibold text-[#D6BEAA]">
+            <label className="block text-xs font-bold text-[#14291D]">
               Search Area, Landmark, or Street:
             </label>
             <div className="relative flex items-center">
-              <Search className="absolute left-3.5 w-4 h-4 text-[#A88D77]" />
+              <Search className="absolute left-3.5 w-4 h-4 text-[#2D4536]" />
               <input
                 type="text"
                 placeholder="e.g. Peenya 2nd Stage, Indiranagar, Hassan, MG Road..."
                 value={searchQuery}
                 onChange={(e) => handleSearchQueryChange(e.target.value)}
-                className="w-full pl-10 pr-10 py-2.5 text-xs sm:text-sm bg-[#120A06] border border-[#4A301E] rounded-xl focus:outline-none focus:border-[#D49A37] focus:ring-1 focus:ring-[#D49A37]/50 text-[#FDF6EC] placeholder-[#7A6150]"
+                className="w-full pl-10 pr-10 py-2.5 text-xs sm:text-sm bg-white border border-[#E0B04A]/50 rounded-xl focus:outline-none focus:border-[#E0B04A] focus:ring-1 focus:ring-[#E0B04A] text-[#14291D] placeholder-[#5C6E63] shadow-xs"
               />
               {isSearching && (
-                <Loader2 className="absolute right-3.5 w-4 h-4 text-[#F5BC51] animate-spin" />
+                <Loader2 className="absolute right-3.5 w-4 h-4 text-[#C8962E] animate-spin" />
               )}
             </div>
 
             {/* Search Results Dropdown */}
             {searchResults.length > 0 && (
-              <ul className="absolute left-0 right-0 top-full mt-1.5 bg-[#1C110B] border border-[#4A301E] rounded-2xl shadow-2xl max-h-56 overflow-y-auto divide-y divide-[#2C1D14] z-50">
+              <ul className="absolute left-0 right-0 top-full mt-1.5 bg-white border border-[#E0B04A]/50 rounded-2xl shadow-xl max-h-56 overflow-y-auto divide-y divide-[#F2E8CC] z-50">
                 {searchResults.map((item, idx) => (
                   <li
                     key={idx}
                     onClick={() => handleSelectSearchResult(item)}
-                    className="p-3 text-xs hover:bg-[#2C1D14] cursor-pointer flex items-start gap-2.5 text-[#FDF6EC] transition-colors"
+                    className="p-3 text-xs hover:bg-[#FAF3E0] cursor-pointer flex items-start gap-2.5 text-[#14291D] transition-colors"
                   >
-                    <MapPin className="w-4 h-4 text-[#F5BC51] shrink-0 mt-0.5" />
-                    <span className="line-clamp-2 text-stone-200">
+                    <MapPin className="w-4 h-4 text-[#C8962E] shrink-0 mt-0.5" />
+                    <span className="line-clamp-2 text-[#14291D] font-medium">
                       {item.display_name}
                     </span>
                   </li>
@@ -600,33 +600,33 @@ export const LocationModal: React.FC = () => {
 
           {/* Leaflet Map Preview (Spacious Container) */}
           <div className="space-y-1.5">
-            <div className="flex items-center justify-between text-xs text-[#A88D77]">
-              <span className="font-semibold text-[#D6BEAA] flex items-center gap-1.5">
-                <MapPin className="w-3.5 h-3.5 text-[#F5BC51]" />
+            <div className="flex items-center justify-between text-xs text-[#2D4536]">
+              <span className="font-bold text-[#14291D] flex items-center gap-1.5">
+                <MapPin className="w-3.5 h-3.5 text-[#C8962E]" />
                 Interactive Map (Click anywhere to set pin, or drag marker):
               </span>
-              <span className="text-[11px] text-[#A88D77] font-mono">
+              <span className="text-[11px] text-[#2D4536] font-mono font-semibold">
                 {Number(coords?.[0] || 12.9716).toFixed(4)}, {Number(coords?.[1] || 77.5946).toFixed(4)}
               </span>
             </div>
             {/* Enlarged map container from h-44 to h-80/h-96 for comfortable panning */}
             <div
               ref={mapContainerRef}
-              className="w-full h-80 sm:h-96 rounded-2xl border border-[#4A301E] overflow-hidden shadow-inner bg-[#140D09] touch-manipulation z-10"
+              className="w-full h-80 sm:h-96 rounded-2xl border border-[#E0B04A]/40 overflow-hidden shadow-inner bg-stone-100 touch-manipulation z-10"
             />
           </div>
 
           {/* Service Availability Badge */}
           <div
             className={`p-3.5 rounded-2xl border flex items-start gap-3 ${isBangalorePincode
-                ? "bg-emerald-950/40 border-emerald-800/40 text-emerald-200"
-                : "bg-amber-950/40 border-amber-800/40 text-amber-200"
+                ? "bg-emerald-50 border-emerald-300 text-emerald-950"
+                : "bg-amber-50 border-amber-300 text-amber-950"
               }`}
           >
             {isBangalorePincode ? (
-              <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
+              <CheckCircle2 className="w-5 h-5 text-emerald-700 shrink-0 mt-0.5" />
             ) : (
-              <AlertCircle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+              <AlertCircle className="w-5 h-5 text-amber-700 shrink-0 mt-0.5" />
             )}
             <div className="text-xs">
               <p className="font-bold">
@@ -634,7 +634,7 @@ export const LocationModal: React.FC = () => {
                   ? "Direct Doorstep Delivery Active (Bengaluru 560xxx)"
                   : "Pan-India Express Delivery Active via Delhivery Logistics"}
               </p>
-              <p className="text-[11px] opacity-90 mt-0.5">
+              <p className="text-[11px] text-[#2D4536] mt-0.5">
                 {isBangalorePincode
                   ? "Orders dispatched fresh from our Peenya facility within 24 to 72 hours. Free delivery unlocked at ₹500!"
                   : "Deliveries outside Bengaluru are fulfilled directly across India via Delhivery express courier with live website tracking."}
@@ -646,7 +646,7 @@ export const LocationModal: React.FC = () => {
           <form id="location-form" onSubmit={handleSave} className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
               <div>
-                <label className="block text-xs font-semibold text-[#D6BEAA] mb-1">
+                <label className="block text-xs font-bold text-[#14291D] mb-1">
                   Recipient Full Name *
                 </label>
                 <input
@@ -655,11 +655,11 @@ export const LocationModal: React.FC = () => {
                   placeholder="e.g. Manoj Kumar"
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
-                  className="w-full px-3.5 py-2.5 text-xs bg-[#120A06] border border-[#4A301E] rounded-xl focus:outline-none focus:border-[#D49A37] focus:ring-1 focus:ring-[#D49A37]/50 text-[#FDF6EC] placeholder-[#7A6150]"
+                  className="w-full px-3.5 py-2.5 text-xs bg-white border border-[#E0B04A]/50 rounded-xl focus:outline-none focus:border-[#E0B04A] focus:ring-1 focus:ring-[#E0B04A] text-[#14291D] placeholder-[#5C6E63] shadow-xs"
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-[#D6BEAA] mb-1">
+                <label className="block text-xs font-bold text-[#14291D] mb-1">
                   WhatsApp Number (10 digits) *
                 </label>
                 <input
@@ -670,11 +670,11 @@ export const LocationModal: React.FC = () => {
                   placeholder="e.g. 9180301917"
                   value={phone}
                   onChange={(e) => setPhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
-                  className="w-full px-3.5 py-2.5 text-xs bg-[#120A06] border border-[#4A301E] rounded-xl focus:outline-none focus:border-[#D49A37] focus:ring-1 focus:ring-[#D49A37]/50 text-[#FDF6EC] placeholder-[#7A6150]"
+                  className="w-full px-3.5 py-2.5 text-xs bg-white border border-[#E0B04A]/50 rounded-xl focus:outline-none focus:border-[#E0B04A] focus:ring-1 focus:ring-[#E0B04A] text-[#14291D] placeholder-[#5C6E63] shadow-xs"
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-[#D6BEAA] mb-1">
+                <label className="block text-xs font-bold text-[#14291D] mb-1">
                   Email Address *
                 </label>
                 <input
@@ -683,13 +683,13 @@ export const LocationModal: React.FC = () => {
                   placeholder="e.g. customer@example.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full px-3.5 py-2.5 text-xs bg-[#120A06] border border-[#4A301E] rounded-xl focus:outline-none focus:border-[#D49A37] focus:ring-1 focus:ring-[#D49A37]/50 text-[#FDF6EC] placeholder-[#7A6150]"
+                  className="w-full px-3.5 py-2.5 text-xs bg-white border border-[#E0B04A]/50 rounded-xl focus:outline-none focus:border-[#E0B04A] focus:ring-1 focus:ring-[#E0B04A] text-[#14291D] placeholder-[#5C6E63] shadow-xs"
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-[#D6BEAA] mb-1">
+              <label className="block text-xs font-bold text-[#14291D] mb-1">
                 Primary Street Delivery Address *
               </label>
               <input
@@ -698,22 +698,22 @@ export const LocationModal: React.FC = () => {
                 value={addressLine1}
                 onChange={(e) => setAddressLine1(e.target.value)}
                 required
-                className="w-full px-3.5 py-2.5 text-xs bg-[#120A06] border border-[#4A301E] rounded-xl focus:outline-none focus:border-[#D49A37] focus:ring-1 focus:ring-[#D49A37]/50 text-[#FDF6EC] placeholder-[#7A6150]"
+                className="w-full px-3.5 py-2.5 text-xs bg-white border border-[#E0B04A]/50 rounded-xl focus:outline-none focus:border-[#E0B04A] focus:ring-1 focus:ring-[#E0B04A] text-[#14291D] placeholder-[#5C6E63] shadow-xs"
               />
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
               <div>
-                <label className="block text-xs font-semibold text-[#D6BEAA] mb-1">
+                <label className="block text-xs font-bold text-[#14291D] mb-1">
                   State
                 </label>
                 <select
                   value={state}
                   onChange={(e) => handleStateChange(e.target.value)}
-                  className="w-full px-3.5 py-2.5 text-xs bg-[#120A06] border border-[#4A301E] rounded-xl focus:outline-none focus:border-[#D49A37] focus:ring-1 focus:ring-[#D49A37]/50 text-[#FDF6EC]"
+                  className="w-full px-3.5 py-2.5 text-xs bg-white border border-[#E0B04A]/50 rounded-xl focus:outline-none focus:border-[#E0B04A] focus:ring-1 focus:ring-[#E0B04A] text-[#14291D] shadow-xs"
                 >
                   {Object.keys(INDIAN_STATES_DISTRICTS).map((s) => (
-                    <option key={s} value={s} className="bg-[#140D09] text-[#FDF6EC]">
+                    <option key={s} value={s} className="bg-white text-[#14291D]">
                       {s}
                     </option>
                   ))}
@@ -721,21 +721,21 @@ export const LocationModal: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-[#D6BEAA] mb-1">
+                <label className="block text-xs font-bold text-[#14291D] mb-1">
                   District
                 </label>
                 <select
                   value={district}
                   onChange={(e) => setDistrict(e.target.value)}
-                  className="w-full px-3.5 py-2.5 text-xs bg-[#120A06] border border-[#4A301E] rounded-xl focus:outline-none focus:border-[#D49A37] focus:ring-1 focus:ring-[#D49A37]/50 text-[#FDF6EC]"
+                  className="w-full px-3.5 py-2.5 text-xs bg-white border border-[#E0B04A]/50 rounded-xl focus:outline-none focus:border-[#E0B04A] focus:ring-1 focus:ring-[#E0B04A] text-[#14291D] shadow-xs"
                 >
                   {!currentDistricts.includes(district) && district && (
-                    <option value={district} className="bg-[#140D09] text-[#FDF6EC]">
+                    <option value={district} className="bg-white text-[#14291D]">
                       {district}
                     </option>
                   )}
                   {currentDistricts.map((d) => (
-                    <option key={d} value={d} className="bg-[#140D09] text-[#FDF6EC]">
+                    <option key={d} value={d} className="bg-white text-[#14291D]">
                       {d}
                     </option>
                   ))}
@@ -743,7 +743,7 @@ export const LocationModal: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-[#D6BEAA] mb-1">
+                <label className="block text-xs font-bold text-[#14291D] mb-1">
                   Pincode
                 </label>
                 <input
@@ -753,13 +753,13 @@ export const LocationModal: React.FC = () => {
                   value={pincode}
                   onChange={(e) => setPincode(e.target.value)}
                   required
-                  className="w-full px-3.5 py-2.5 text-xs bg-[#120A06] border border-[#4A301E] rounded-xl focus:outline-none focus:border-[#D49A37] focus:ring-1 focus:ring-[#D49A37]/50 text-[#FDF6EC] placeholder-[#7A6150]"
+                  className="w-full px-3.5 py-2.5 text-xs bg-white border border-[#E0B04A]/50 rounded-xl focus:outline-none focus:border-[#E0B04A] focus:ring-1 focus:ring-[#E0B04A] text-[#14291D] placeholder-[#5C6E63] shadow-xs"
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-[#D6BEAA] mb-1">
+              <label className="block text-xs font-bold text-[#14291D] mb-1">
                 Landmark / Nearby Spot (Optional)
               </label>
               <input
@@ -767,30 +767,30 @@ export const LocationModal: React.FC = () => {
                 placeholder="e.g. Near Peenya 2nd Stage Water Tank"
                 value={landmark}
                 onChange={(e) => setLandmark(e.target.value)}
-                className="w-full px-3.5 py-2.5 text-xs bg-[#120A06] border border-[#4A301E] rounded-xl focus:outline-none focus:border-[#D49A37] focus:ring-1 focus:ring-[#D49A37]/50 text-[#FDF6EC] placeholder-[#7A6150]"
+                className="w-full px-3.5 py-2.5 text-xs bg-white border border-[#E0B04A]/50 rounded-xl focus:outline-none focus:border-[#E0B04A] focus:ring-1 focus:ring-[#E0B04A] text-[#14291D] placeholder-[#5C6E63] shadow-xs"
               />
             </div>
           </form>
         </div>
 
         {/* Footer Actions */}
-        <div className="flex items-center justify-between px-6 py-4 bg-[#120A06] border-t border-[#3A2417] shrink-0">
-          <div className="flex items-center gap-2 text-xs text-[#A88D77]">
-            <Building2 className="w-4 h-4 text-[#F5BC51]" />
+        <div className="flex items-center justify-between px-6 py-4 bg-[#F2E8CC] border-t border-[#E0B04A]/30 shrink-0">
+          <div className="flex items-center gap-2 text-xs text-[#2D4536] font-medium">
+            <Building2 className="w-4 h-4 text-[#C8962E]" />
             <span>Peenya 2nd Stage Dispatch Center</span>
           </div>
           <div className="flex items-center gap-2.5">
             <button
               type="button"
               onClick={() => setLocationModalOpen(false)}
-              className="px-4 py-2 text-xs font-medium text-[#A88D77] hover:text-[#FDF6EC] rounded-xl cursor-pointer"
+              className="px-4 py-2 text-xs font-bold text-[#2D4536] hover:text-[#14291D] rounded-xl cursor-pointer"
             >
               Cancel
             </button>
             <button
               type="submit"
               form="location-form"
-              className="px-5 py-2.5 text-xs font-bold font-serif uppercase tracking-wider text-[#140D09] bg-gradient-to-r from-[#D49A37] via-[#F5BC51] to-[#BF7E16] hover:brightness-110 rounded-xl shadow-[0_4px_20px_rgba(212,154,55,0.35)] border border-[#FFD885] transition-all cursor-pointer"
+              className="px-5 py-2.5 text-xs font-black font-serif uppercase tracking-wider text-[#14291D] bg-[#E0B04A] hover:bg-[#F3D17A] rounded-xl shadow-md border border-[#C8962E] transition-all cursor-pointer"
             >
               Save Address & Sync Store
             </button>

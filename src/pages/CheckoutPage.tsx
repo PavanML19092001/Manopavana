@@ -28,6 +28,7 @@ import {
   BUSINESS_CONFIG,
   PHONEPE_CONFIG,
 } from "../constants";
+import { isSaleActive } from "../utils/salePricing";
 import { Order } from "../types";
 import { updateFirestoreOrderStatus, getOrderFromFirestore, extractCleanPhone, db } from "../firebase";
 import { doc, getDoc } from "firebase/firestore";
@@ -68,12 +69,22 @@ export const CheckoutPage: React.FC = () => {
   const isBuyNowMode = searchParams.get("mode") === "buynow" && buyNowItem !== null;
   const checkoutItems = isBuyNowMode && buyNowItem ? [buyNowItem] : cart;
 
+  const checkoutRegularSubtotal = checkoutItems.reduce(
+    (acc, curr) => acc + (curr.regularPrice || curr.price) * curr.quantity,
+    0
+  );
   const checkoutSubtotal = checkoutItems.reduce((acc, curr) => acc + curr.price * curr.quantity, 0);
+  const saleDiff = Math.max(0, checkoutRegularSubtotal - checkoutSubtotal);
   const checkoutDiscount =
-    checkoutSubtotal >= 1000
+    isSaleActive() && saleDiff > 0
+      ? saleDiff
+      : checkoutSubtotal >= 1000
       ? Math.round((checkoutSubtotal * 10) / 100)
+      : loyalty.isActive
+      ? Math.round((checkoutSubtotal * loyalty.discountPercent) / 100)
       : 0;
-  const checkoutDiscountedSubtotal = checkoutSubtotal - checkoutDiscount;
+  const checkoutDiscountedSubtotal =
+    isSaleActive() && saleDiff > 0 ? checkoutSubtotal : checkoutSubtotal - checkoutDiscount;
   const checkoutBottleCount = checkoutItems.reduce((acc, curr) => acc + curr.quantity, 0);
   const freeThreshold = cmsConfig?.freeShippingThreshold || BUSINESS_CONFIG.FREE_SHIPPING_THRESHOLD;
   const standardFee = cmsConfig?.standardShippingFee || BUSINESS_CONFIG.STANDARD_SHIPPING_FEE;
@@ -336,8 +347,8 @@ export const CheckoutPage: React.FC = () => {
 
           const customIcon = L.divIcon({
             className: "checkout-leaflet-marker",
-            html: `<div style="background-color:#5E3210; width:30px; height:30px; border-radius:50%; border:3px solid #FFF; box-shadow:0 4px 12px rgba(0,0,0,0.4); display:flex; align-items:center; justify-content:center;">
-                    <div style="background:#E08F35; width:12px; height:12px; border-radius:50%;"></div>
+            html: `<div style="background-color:#1F3D2B; width:30px; height:30px; border-radius:50%; border:3px solid #FFF; box-shadow:0 4px 12px rgba(0,0,0,0.4); display:flex; align-items:center; justify-content:center;">
+                    <div style="background:#E0B04A; width:12px; height:12px; border-radius:50%;"></div>
                   </div>`,
             iconSize: [30, 30],
             iconAnchor: [15, 15],
@@ -678,6 +689,10 @@ export const CheckoutPage: React.FC = () => {
           items: [...checkoutItems],
           subtotal: checkoutSubtotal,
           discount: checkoutDiscount,
+          regularSubtotal: checkoutRegularSubtotal,
+          discountAmount: checkoutDiscount,
+          netAmount: checkoutDiscountedSubtotal,
+          discountLabel: isSaleActive() ? "10% Diwali Festive Discount" : checkoutDiscount > 0 ? "10% Order Discount" : undefined,
           shippingFee: checkoutShippingFee,
           total: checkoutTotal,
           paymentMethod: "cod",
@@ -729,6 +744,10 @@ export const CheckoutPage: React.FC = () => {
         items: [...checkoutItems],
         subtotal: checkoutSubtotal,
         discount: checkoutDiscount,
+        regularSubtotal: checkoutRegularSubtotal,
+        discountAmount: checkoutDiscount,
+        netAmount: checkoutDiscountedSubtotal,
+        discountLabel: isSaleActive() ? "10% Diwali Festive Discount" : checkoutDiscount > 0 ? "10% Order Discount" : undefined,
         shippingFee: checkoutShippingFee,
         total: checkoutTotal,
         paymentMethod: "phonepe",
@@ -805,18 +824,18 @@ export const CheckoutPage: React.FC = () => {
 
   return (
     <div
-      className={`w-full min-h-[calc(100vh-80px)] py-8 transition-colors box-border ${isDark ? "bg-[#140D09] text-[#FAF4EA]" : "bg-[#FAF6F0] text-[#23150C]"
+      className={`w-full min-h-[calc(100vh-80px)] py-8 transition-colors box-border ${isDark ? "bg-[#14291D] text-[#FAF3E0]" : "bg-[#FAF3E0] text-[#14291D]"
         }`}
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
         <div>
           <h1
-            className={`text-2xl sm:text-3xl font-extrabold font-serif ${isDark ? "text-[#FAF4EA]" : "text-[#23150C]"
+            className={`text-2xl sm:text-3xl font-extrabold font-serif ${isDark ? "text-[#FAF3E0]" : "text-[#14291D]"
               }`}
           >
             Checkout & Dispatch Order
           </h1>
-          <p className={`text-xs ${isDark ? "text-[#D6C4B0]" : "text-[#5C402D]"}`}>
+          <p className={`text-xs ${isDark ? "text-[#E0B04A]" : "text-[#3F4F45]"}`}>
             Pinpoint delivery coordinates and choose payment method
           </p>
         </div>
@@ -826,15 +845,15 @@ export const CheckoutPage: React.FC = () => {
           <div
             className={`p-4 sm:p-5 rounded-2xl border-2 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 text-xs shadow-md transition-colors ${
               isDark
-                ? "bg-[#25150C] border-[#E08F35] text-[#FAF4EA]"
-                : "bg-amber-50/95 border-[#D49A37] text-[#24140A]"
+                ? "bg-[#1F3D2B] border-[#E0B04A] text-[#FAF3E0]"
+                : "bg-amber-50/95 border-[#E0B04A] text-[#14291D]"
             }`}
           >
             <div className="flex items-center gap-3">
               <div
                 className={`w-10 h-10 rounded-xl border flex items-center justify-center shrink-0 ${
                   isDark
-                    ? "bg-[#E08F35]/20 border-[#E08F35]/40 text-[#E08F35]"
+                    ? "bg-[#E0B04A]/20 border-[#E0B04A]/40 text-[#E0B04A]"
                     : "bg-amber-100 border-amber-300 text-amber-900"
                 }`}
               >
@@ -843,14 +862,14 @@ export const CheckoutPage: React.FC = () => {
               <div>
                 <p
                   className={`font-black text-sm sm:text-base ${
-                    isDark ? "text-[#FAF4EA]" : "text-[#24140A]"
+                    isDark ? "text-[#FAF3E0]" : "text-[#14291D]"
                   }`}
                 >
                   Sign In Required to Place Order
                 </p>
                 <p
                   className={`mt-0.5 text-xs font-semibold leading-relaxed ${
-                    isDark ? "text-[#D6C4B0]" : "text-[#5C381E]"
+                    isDark ? "text-[#E0B04A]" : "text-[#5C381E]"
                   }`}
                 >
                   Guests cannot place or track orders. Please sign in or create an account to complete your purchase and track delivery.
@@ -860,7 +879,7 @@ export const CheckoutPage: React.FC = () => {
             <button
               type="button"
               onClick={() => setLoginModalOpen(true)}
-              className="px-5 py-2.5 rounded-xl bg-[#5E3210] hover:bg-[#43230A] text-white font-black text-xs shrink-0 flex items-center gap-2 cursor-pointer shadow-md transition-all hover:scale-105"
+              className="px-5 py-2.5 rounded-xl bg-[#1F3D2B] hover:bg-[#1F3D2B] text-white font-black text-xs shrink-0 flex items-center gap-2 cursor-pointer shadow-md transition-all hover:scale-105"
             >
               <LogIn className="w-4 h-4 text-amber-300" />
               <span>Sign In / Register</span>
@@ -893,17 +912,17 @@ export const CheckoutPage: React.FC = () => {
           {/* Left Column: Delivery Address & Map Geocoding */}
           <div className="lg:col-span-7 space-y-6">
             <div
-              className={`rounded-2xl border p-6 shadow-2xs space-y-4 ${isDark ? "bg-[#1C120B] border-[#362114]" : "bg-white border-[#E8DEC8]"
+              className={`rounded-2xl border p-6 shadow-2xs space-y-4 ${isDark ? "bg-[#14291D] border-[#1F3D2B]" : "bg-white border-[#F2E8CC]"
                 }`}
             >
               <div
-                className={`flex items-center justify-between border-b pb-3 ${isDark ? "border-[#2D1B10]" : "border-[#EFE8DC]"
+                className={`flex items-center justify-between border-b pb-3 ${isDark ? "border-[#14291D]" : "border-[#F2E8CC]"
                   }`}
               >
                 <div className="flex items-center gap-2">
-                  <MapPin className="w-4 h-4 text-[#E08F35]" />
+                  <MapPin className="w-4 h-4 text-[#E0B04A]" />
                   <h2
-                    className={`text-base font-bold font-serif ${isDark ? "text-[#FAF4EA]" : "text-[#23150C]"
+                    className={`text-base font-bold font-serif ${isDark ? "text-[#FAF3E0]" : "text-[#14291D]"
                       }`}
                   >
                     Shipping Address
@@ -912,7 +931,7 @@ export const CheckoutPage: React.FC = () => {
                 <button
                   type="button"
                   onClick={handleGPSDetect}
-                  className={`text-xs font-semibold flex items-center gap-1 cursor-pointer ${isDark ? "text-amber-300 hover:text-amber-200" : "text-[#5E3210] hover:text-[#E08F35]"
+                  className={`text-xs font-semibold flex items-center gap-1 cursor-pointer ${isDark ? "text-amber-300 hover:text-amber-200" : "text-[#1F3D2B] hover:text-[#E0B04A]"
                     }`}
                 >
                   <Navigation className="w-3.5 h-3.5" />
@@ -923,7 +942,7 @@ export const CheckoutPage: React.FC = () => {
               {/* Saved Address Cards (Strictly Authenticated) */}
               {currentUser && savedAddresses && savedAddresses.length > 0 && (
                 <div className="space-y-3 pb-2">
-                  <label className={`block text-xs font-bold ${isDark ? "text-[#FAF4EA]" : "text-[#3D2514]"}`}>
+                  <label className={`block text-xs font-bold ${isDark ? "text-[#FAF3E0]" : "text-[#1F3D2B]"}`}>
                     Select Saved Delivery Address
                   </label>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -954,16 +973,16 @@ export const CheckoutPage: React.FC = () => {
                           }}
                           className={`p-3.5 rounded-xl border text-xs cursor-pointer transition-all relative ${isSelected
                               ? isDark
-                                ? "bg-amber-950/40 border-[#E08F35] ring-2 ring-[#E08F35]/40"
-                                : "bg-amber-50/80 border-[#E08F35] ring-2 ring-[#E08F35]/40"
+                                ? "bg-amber-950/40 border-[#E0B04A] ring-2 ring-[#E0B04A]/40"
+                                : "bg-amber-50/80 border-[#E0B04A] ring-2 ring-[#E0B04A]/40"
                               : isDark
-                                ? "bg-[#150D07] border-[#362114] hover:border-[#4D2E1A]"
-                                : "bg-[#FAF7F2] border-[#E8DEC8] hover:border-[#DDD1BE]"
+                                ? "bg-[#14291D] border-[#1F3D2B] hover:border-[#2D5A3F]"
+                                : "bg-[#FAF3E0] border-[#F2E8CC] hover:border-[#F2E8CC]"
                             }`}
                         >
                           <div className="flex items-center justify-between font-bold mb-1">
                             <span className="flex items-center gap-1.5">
-                              <span className="px-2 py-0.5 rounded text-[10px] bg-[#E08F35]/20 text-[#E08F35]">
+                              <span className="px-2 py-0.5 rounded text-[10px] bg-[#E0B04A]/20 text-[#E0B04A]">
                                 {addr.label}
                               </span>
                               <span className="truncate max-w-[110px]">{addr.fullName}</span>
@@ -1013,7 +1032,7 @@ export const CheckoutPage: React.FC = () => {
                               </button>
                             </div>
                           </div>
-                          <span className="font-mono text-[11px] text-[#A88D77] block mb-1">{addr.phone}</span>
+                          <span className="font-mono text-[11px] text-[#3F4F45] block mb-1">{addr.phone}</span>
                           <p className="text-[11px] text-stone-500 line-clamp-2">
                             {addr.addressLine1}, {addr.district || addr.city} - {addr.pincode}
                           </p>
@@ -1030,10 +1049,10 @@ export const CheckoutPage: React.FC = () => {
                         setLandmark("");
                       }}
                       className={`p-3.5 rounded-xl border-2 border-dashed flex items-center justify-center gap-2 cursor-pointer text-xs font-bold transition-all ${isAddingNewAddress && !editingAddressId
-                          ? "border-[#E08F35] bg-amber-500/10 text-[#E08F35]"
+                          ? "border-[#E0B04A] bg-amber-500/10 text-[#E0B04A]"
                           : isDark
-                            ? "border-[#362114] text-[#A88D77] hover:border-[#E08F35]"
-                            : "border-[#DDD1BE] text-[#7A5E48] hover:border-[#E08F35]"
+                            ? "border-[#1F3D2B] text-[#3F4F45] hover:border-[#E0B04A]"
+                            : "border-[#F2E8CC] text-[#3F4F45] hover:border-[#E0B04A]"
                         }`}
                     >
                       <span>+ Deliver to a Different Address</span>
@@ -1069,7 +1088,7 @@ export const CheckoutPage: React.FC = () => {
 
                   {/* Address Label Selector */}
                   <div>
-                    <label className={`block text-xs font-semibold mb-1.5 ${isDark ? "text-[#FAF4EA]" : "text-[#3D2514]"}`}>
+                    <label className={`block text-xs font-semibold mb-1.5 ${isDark ? "text-[#FAF3E0]" : "text-[#1F3D2B]"}`}>
                       Address Label
                     </label>
                     <div className="flex gap-2">
@@ -1079,10 +1098,10 @@ export const CheckoutPage: React.FC = () => {
                           type="button"
                           onClick={() => setAddressLabel(lbl)}
                           className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${addressLabel === lbl
-                              ? "bg-[#5E3210] text-white shadow-xs"
+                              ? "bg-[#1F3D2B] text-white shadow-xs"
                               : isDark
-                                ? "bg-[#150D07] border border-[#362114] text-[#A88D77]"
-                                : "bg-[#FAF7F2] border border-[#DDD1BE] text-[#5C402D]"
+                                ? "bg-[#14291D] border border-[#1F3D2B] text-[#3F4F45]"
+                                : "bg-[#FAF3E0] border border-[#F2E8CC] text-[#3F4F45]"
                             }`}
                         >
                           {lbl}
@@ -1095,7 +1114,7 @@ export const CheckoutPage: React.FC = () => {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label
-                        className={`block text-xs font-semibold mb-1 ${isDark ? "text-[#FAF4EA]" : "text-[#3D2514]"
+                        className={`block text-xs font-semibold mb-1 ${isDark ? "text-[#FAF3E0]" : "text-[#1F3D2B]"
                           }`}
                       >
                         Recipient Name *
@@ -1106,9 +1125,9 @@ export const CheckoutPage: React.FC = () => {
                         placeholder="e.g. Manoj Kumar"
                         value={fullName}
                         onChange={(e) => setFullName(e.target.value)}
-                        className={`w-full px-3.5 py-2.5 text-xs rounded-xl focus:outline-none focus:ring-2 focus:ring-[#E08F35]/40 ${isDark
-                            ? "bg-[#150D07] border border-[#362114] text-[#FAF4EA] placeholder-[#8C7A6B]"
-                            : "bg-[#FAF7F2] border border-[#DDD1BE] text-[#23150C] placeholder-[#8C7A6B]"
+                        className={`w-full px-3.5 py-2.5 text-xs rounded-xl focus:outline-none focus:ring-2 focus:ring-[#E0B04A]/40 ${isDark
+                            ? "bg-[#14291D] border border-[#1F3D2B] text-[#FAF3E0] placeholder-[#3F4F45]"
+                            : "bg-[#FAF3E0] border border-[#F2E8CC] text-[#14291D] placeholder-[#3F4F45]"
                           }`}
                       />
                     </div>
@@ -1116,7 +1135,7 @@ export const CheckoutPage: React.FC = () => {
                     <div>
                       <div className="flex items-center justify-between mb-1">
                         <label
-                          className={`block text-xs font-semibold ${isDark ? "text-[#FAF4EA]" : "text-[#3D2514]"}`}
+                          className={`block text-xs font-semibold ${isDark ? "text-[#FAF3E0]" : "text-[#1F3D2B]"}`}
                         >
                           Delivery Mobile Number *
                         </label>
@@ -1125,7 +1144,7 @@ export const CheckoutPage: React.FC = () => {
                         </span>
                       </div>
                       <div className="relative flex items-center">
-                        <span className={`absolute left-3 text-xs font-bold font-mono ${isDark ? "text-[#D49A37]" : "text-[#7A4B1A]"}`}>
+                        <span className={`absolute left-3 text-xs font-bold font-mono ${isDark ? "text-[#E0B04A]" : "text-[#7A4B1A]"}`}>
                           +91
                         </span>
                         <input
@@ -1146,8 +1165,8 @@ export const CheckoutPage: React.FC = () => {
                             phoneErrorHighlight
                               ? "bg-red-500/10 border-2 border-red-500 text-red-700 dark:text-red-200 ring-2 ring-red-500/40"
                               : isDark
-                              ? "bg-[#150D07] border border-[#362114] text-[#FAF4EA] placeholder-[#8C7A6B] focus:ring-[#E08F35]/40"
-                              : "bg-[#FAF7F2] border border-[#DDD1BE] text-[#23150C] placeholder-[#8C7A6B] focus:ring-[#E08F35]/40"
+                              ? "bg-[#14291D] border border-[#1F3D2B] text-[#FAF3E0] placeholder-[#3F4F45] focus:ring-[#E0B04A]/40"
+                              : "bg-[#FAF3E0] border border-[#F2E8CC] text-[#14291D] placeholder-[#3F4F45] focus:ring-[#E0B04A]/40"
                           }`}
                         />
                       </div>
@@ -1161,7 +1180,7 @@ export const CheckoutPage: React.FC = () => {
 
                   <div>
                     <label
-                      className={`block text-xs font-semibold mb-1 ${isDark ? "text-[#FAF4EA]" : "text-[#3D2514]"
+                      className={`block text-xs font-semibold mb-1 ${isDark ? "text-[#FAF3E0]" : "text-[#1F3D2B]"
                         }`}
                     >
                       Flat / House / Street Address *
@@ -1172,9 +1191,9 @@ export const CheckoutPage: React.FC = () => {
                       placeholder="e.g. 118, Raghavendra Layout, Thigalarapalya"
                       value={addressLine1}
                       onChange={(e) => setAddressLine1(e.target.value)}
-                      className={`w-full px-3.5 py-2.5 text-xs rounded-xl focus:outline-none focus:ring-2 focus:ring-[#E08F35]/40 ${isDark
-                          ? "bg-[#150D07] border border-[#362114] text-[#FAF4EA] placeholder-[#8C7A6B]"
-                          : "bg-[#FAF7F2] border border-[#DDD1BE] text-[#23150C] placeholder-[#8C7A6B]"
+                      className={`w-full px-3.5 py-2.5 text-xs rounded-xl focus:outline-none focus:ring-2 focus:ring-[#E0B04A]/40 ${isDark
+                          ? "bg-[#14291D] border border-[#1F3D2B] text-[#FAF3E0] placeholder-[#3F4F45]"
+                          : "bg-[#FAF3E0] border border-[#F2E8CC] text-[#14291D] placeholder-[#3F4F45]"
                         }`}
                     />
                   </div>
@@ -1182,7 +1201,7 @@ export const CheckoutPage: React.FC = () => {
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div>
                       <label
-                        className={`block text-xs font-semibold mb-1 ${isDark ? "text-[#FAF4EA]" : "text-[#3D2514]"
+                        className={`block text-xs font-semibold mb-1 ${isDark ? "text-[#FAF3E0]" : "text-[#1F3D2B]"
                           }`}
                       >
                         State *
@@ -1190,9 +1209,9 @@ export const CheckoutPage: React.FC = () => {
                       <select
                         value={state}
                         onChange={(e) => handleStateChange(e.target.value)}
-                        className={`w-full px-3.5 py-2.5 text-xs rounded-xl focus:outline-none focus:ring-2 focus:ring-[#E08F35]/40 ${isDark
-                            ? "bg-[#150D07] border border-[#362114] text-[#FAF4EA]"
-                            : "bg-[#FAF7F2] border border-[#DDD1BE] text-[#23150C]"
+                        className={`w-full px-3.5 py-2.5 text-xs rounded-xl focus:outline-none focus:ring-2 focus:ring-[#E0B04A]/40 ${isDark
+                            ? "bg-[#14291D] border border-[#1F3D2B] text-[#FAF3E0]"
+                            : "bg-[#FAF3E0] border border-[#F2E8CC] text-[#14291D]"
                           }`}
                       >
                         {Object.keys(INDIAN_STATES_DISTRICTS).map((s) => (
@@ -1205,7 +1224,7 @@ export const CheckoutPage: React.FC = () => {
 
                     <div>
                       <label
-                        className={`block text-xs font-semibold mb-1 ${isDark ? "text-[#FAF4EA]" : "text-[#3D2514]"
+                        className={`block text-xs font-semibold mb-1 ${isDark ? "text-[#FAF3E0]" : "text-[#1F3D2B]"
                           }`}
                       >
                         District *
@@ -1213,9 +1232,9 @@ export const CheckoutPage: React.FC = () => {
                       <select
                         value={district}
                         onChange={(e) => setDistrict(e.target.value)}
-                        className={`w-full px-3.5 py-2.5 text-xs rounded-xl focus:outline-none focus:ring-2 focus:ring-[#E08F35]/40 ${isDark
-                            ? "bg-[#150D07] border border-[#362114] text-[#FAF4EA]"
-                            : "bg-[#FAF7F2] border border-[#DDD1BE] text-[#23150C]"
+                        className={`w-full px-3.5 py-2.5 text-xs rounded-xl focus:outline-none focus:ring-2 focus:ring-[#E0B04A]/40 ${isDark
+                            ? "bg-[#14291D] border border-[#1F3D2B] text-[#FAF3E0]"
+                            : "bg-[#FAF3E0] border border-[#F2E8CC] text-[#14291D]"
                           }`}
                       >
                         {!((INDIAN_STATES_DISTRICTS[state] || []).includes(district)) && district && (
@@ -1231,7 +1250,7 @@ export const CheckoutPage: React.FC = () => {
 
                     <div>
                       <label
-                        className={`block text-xs font-semibold mb-1 ${isDark ? "text-[#FAF4EA]" : "text-[#3D2514]"
+                        className={`block text-xs font-semibold mb-1 ${isDark ? "text-[#FAF3E0]" : "text-[#1F3D2B]"
                           }`}
                       >
                         Pincode * (560xxx for BLR)
@@ -1243,9 +1262,9 @@ export const CheckoutPage: React.FC = () => {
                         placeholder="560058"
                         value={pincode}
                         onChange={(e) => setPincode(e.target.value)}
-                        className={`w-full px-3.5 py-2.5 text-xs rounded-xl focus:outline-none focus:ring-2 focus:ring-[#E08F35]/40 ${isDark
-                            ? "bg-[#150D07] border border-[#362114] text-[#FAF4EA]"
-                            : "bg-[#FAF7F2] border border-[#DDD1BE] text-[#23150C]"
+                        className={`w-full px-3.5 py-2.5 text-xs rounded-xl focus:outline-none focus:ring-2 focus:ring-[#E0B04A]/40 ${isDark
+                            ? "bg-[#14291D] border border-[#1F3D2B] text-[#FAF3E0]"
+                            : "bg-[#FAF3E0] border border-[#F2E8CC] text-[#14291D]"
                           }`}
                       />
                     </div>
@@ -1253,7 +1272,7 @@ export const CheckoutPage: React.FC = () => {
 
                   <div>
                     <label
-                      className={`block text-xs font-semibold mb-1 ${isDark ? "text-[#FAF4EA]" : "text-[#3D2514]"
+                      className={`block text-xs font-semibold mb-1 ${isDark ? "text-[#FAF3E0]" : "text-[#1F3D2B]"
                         }`}
                     >
                       Landmark (Optional)
@@ -1263,9 +1282,9 @@ export const CheckoutPage: React.FC = () => {
                       placeholder="e.g. Near Peenya 2nd Stage Water Tank"
                       value={landmark}
                       onChange={(e) => setLandmark(e.target.value)}
-                      className={`w-full px-3.5 py-2.5 text-xs rounded-xl focus:outline-none focus:ring-2 focus:ring-[#E08F35]/40 ${isDark
-                          ? "bg-[#150D07] border border-[#362114] text-[#FAF4EA]"
-                          : "bg-[#FAF7F2] border border-[#DDD1BE] text-[#23150C]"
+                      className={`w-full px-3.5 py-2.5 text-xs rounded-xl focus:outline-none focus:ring-2 focus:ring-[#E0B04A]/40 ${isDark
+                          ? "bg-[#14291D] border border-[#1F3D2B] text-[#FAF3E0]"
+                          : "bg-[#FAF3E0] border border-[#F2E8CC] text-[#14291D]"
                         }`}
                     />
                   </div>
@@ -1312,7 +1331,7 @@ export const CheckoutPage: React.FC = () => {
                             setIsAddingNewAddress(false);
                           }}
                           className={`px-4 py-2.5 rounded-xl border text-xs font-semibold cursor-pointer ${
-                            isDark ? "border-[#362114] text-[#A88D77]" : "border-[#DDD1BE] text-[#5C402D]"
+                            isDark ? "border-[#1F3D2B] text-[#3F4F45]" : "border-[#F2E8CC] text-[#3F4F45]"
                           }`}
                         >
                           Cancel
@@ -1346,7 +1365,7 @@ export const CheckoutPage: React.FC = () => {
                             });
                             setIsAddingNewAddress(false);
                           }}
-                          className="flex-1 py-2.5 rounded-xl bg-[#5E3210] hover:bg-[#43230A] text-white font-bold text-xs shadow-md flex items-center justify-center gap-1.5 cursor-pointer"
+                          className="flex-1 py-2.5 rounded-xl bg-[#1F3D2B] hover:bg-[#1F3D2B] text-white font-bold text-xs shadow-md flex items-center justify-center gap-1.5 cursor-pointer"
                         >
                           <CheckCircle2 className="w-4 h-4 text-amber-300" />
                           <span>Save Address to Address Book</span>
@@ -1358,7 +1377,7 @@ export const CheckoutPage: React.FC = () => {
                               setIsAddingNewAddress(false);
                             }}
                             className={`px-4 py-2.5 rounded-xl border text-xs font-semibold cursor-pointer ${
-                              isDark ? "border-[#362114] text-[#A88D77]" : "border-[#DDD1BE] text-[#5C402D]"
+                              isDark ? "border-[#1F3D2B] text-[#3F4F45]" : "border-[#F2E8CC] text-[#3F4F45]"
                             }`}
                           >
                             Cancel
@@ -1372,7 +1391,7 @@ export const CheckoutPage: React.FC = () => {
 
               {/* Direct Address Search Input Bar on Checkout */}
               <div className="relative space-y-1.5 pt-3 border-t border-stone-200 dark:border-stone-800 z-30">
-                <label className={`block text-xs font-semibold ${isDark ? "text-[#FAF4EA]" : "text-[#3D2514]"}`}>
+                <label className={`block text-xs font-semibold ${isDark ? "text-[#FAF3E0]" : "text-[#1F3D2B]"}`}>
                   Search Area, Landmark, or Street on Map:
                 </label>
                 <div className="relative flex items-center">
@@ -1382,26 +1401,26 @@ export const CheckoutPage: React.FC = () => {
                     placeholder="e.g. Peenya 2nd Stage, Hassan, Indiranagar, MG Road..."
                     value={searchQuery}
                     onChange={(e) => handleSearchQueryChange(e.target.value)}
-                    className={`w-full pl-10 pr-10 py-2.5 text-xs rounded-xl focus:outline-none focus:ring-2 focus:ring-[#E08F35]/50 ${isDark
-                        ? "bg-[#150D07] border border-[#362114] text-[#FAF4EA] placeholder-[#8C7A6B]"
-                        : "bg-[#FAF7F2] border border-[#DDD1BE] text-[#23150C] placeholder-[#8C7A6B]"
+                    className={`w-full pl-10 pr-10 py-2.5 text-xs rounded-xl focus:outline-none focus:ring-2 focus:ring-[#E0B04A]/50 ${isDark
+                        ? "bg-[#14291D] border border-[#1F3D2B] text-[#FAF3E0] placeholder-[#3F4F45]"
+                        : "bg-[#FAF3E0] border border-[#F2E8CC] text-[#14291D] placeholder-[#3F4F45]"
                       }`}
                   />
                   {isSearching && (
-                    <Loader2 className="absolute right-3.5 w-4 h-4 text-[#E08F35] animate-spin" />
+                    <Loader2 className="absolute right-3.5 w-4 h-4 text-[#E0B04A] animate-spin" />
                   )}
                 </div>
 
                 {/* Autocomplete Results Dropdown */}
                 {searchResults.length > 0 && (
-                  <ul className="absolute left-0 right-0 top-full mt-1.5 bg-white dark:bg-[#1C110B] border border-stone-200 dark:border-[#4A301E] rounded-2xl shadow-2xl max-h-56 overflow-y-auto divide-y divide-stone-100 dark:divide-[#2C1D14] z-50">
+                  <ul className="absolute left-0 right-0 top-full mt-1.5 bg-white dark:bg-[#14291D] border border-stone-200 dark:border-[#2D5A3F] rounded-2xl shadow-2xl max-h-56 overflow-y-auto divide-y divide-stone-100 dark:divide-[#2C1D14] z-50">
                     {searchResults.map((item, idx) => (
                       <li
                         key={idx}
                         onClick={() => handleSelectSearchResult(item)}
                         className="p-3 text-xs hover:bg-amber-50 dark:hover:bg-[#2C1D14] cursor-pointer flex items-start gap-2.5 transition-colors"
                       >
-                        <MapPin className="w-4 h-4 text-[#E08F35] shrink-0 mt-0.5" />
+                        <MapPin className="w-4 h-4 text-[#E0B04A] shrink-0 mt-0.5" />
                         <span className="line-clamp-2 text-stone-700 dark:text-stone-200">
                           {item.display_name}
                         </span>
@@ -1419,16 +1438,16 @@ export const CheckoutPage: React.FC = () => {
                     ? mapErrorHighlight
                       ? "bg-red-500/15 border-red-500 ring-2 ring-red-500/50"
                       : isDark
-                      ? "bg-amber-950/40 border-[#E08F35]/60 text-amber-100"
-                      : "bg-amber-50/90 border-amber-300 text-[#5E3210]"
+                      ? "bg-amber-950/40 border-[#E0B04A]/60 text-amber-100"
+                      : "bg-amber-50/90 border-amber-300 text-[#1F3D2B]"
                     : "bg-emerald-500/10 border-emerald-500/30 text-emerald-800 dark:text-emerald-200"
                 }`}
               >
                 {!isPinConfirmed ? (
                   <div className="space-y-3">
                     <div className="flex items-start gap-2.5">
-                      <div className="p-2 rounded-xl bg-[#E08F35]/20 text-[#E08F35] shrink-0 mt-0.5">
-                        <Navigation className="w-4 h-4 animate-pulse text-[#E08F35]" />
+                      <div className="p-2 rounded-xl bg-[#E0B04A]/20 text-[#E0B04A] shrink-0 mt-0.5">
+                        <Navigation className="w-4 h-4 animate-pulse text-[#E0B04A]" />
                       </div>
                       <div className="flex-1">
                         <div className="flex flex-wrap items-center gap-2">
@@ -1450,7 +1469,7 @@ export const CheckoutPage: React.FC = () => {
                         type="button"
                         onClick={handleGPSDetect}
                         disabled={isLocating}
-                        className="px-3.5 py-2 rounded-xl bg-[#5E3210] hover:bg-[#43230A] text-white text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs disabled:opacity-50"
+                        className="px-3.5 py-2 rounded-xl bg-[#1F3D2B] hover:bg-[#1F3D2B] text-white text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs disabled:opacity-50"
                       >
                         <Navigation className="w-3.5 h-3.5 text-amber-300" />
                         <span>{isLocating ? "Detecting GPS..." : "Auto-Detect My GPS"}</span>
@@ -1503,10 +1522,10 @@ export const CheckoutPage: React.FC = () => {
               {/* Spacious Interactive OpenStreetMap Container */}
               <div className="space-y-1.5 pt-1">
                 <div
-                  className={`flex items-center justify-between text-xs ${isDark ? "text-[#D6C4B0]" : "text-[#5C402D]"
+                  className={`flex items-center justify-between text-xs ${isDark ? "text-[#E0B04A]" : "text-[#3F4F45]"
                     }`}
                 >
-                  <span className={`font-semibold ${isDark ? "text-[#FAF4EA]" : "text-[#3D2514]"}`}>
+                  <span className={`font-semibold ${isDark ? "text-[#FAF3E0]" : "text-[#1F3D2B]"}`}>
                     Interactive Map (Click anywhere to place pin, or drag marker):
                   </span>
                   <span className="text-[11px] font-mono">
@@ -1516,7 +1535,7 @@ export const CheckoutPage: React.FC = () => {
                 {/* Enlarged map container from h-36 to h-80/h-96 for comfortable interaction */}
                 <div
                   ref={mapContainerRef}
-                  className={`w-full h-80 sm:h-96 rounded-2xl border overflow-hidden shadow-inner touch-manipulation z-10 ${isDark ? "bg-[#140D07] border-[#362114]" : "bg-[#EFE9DF] border-[#E3D4C0]"
+                  className={`w-full h-80 sm:h-96 rounded-2xl border overflow-hidden shadow-inner touch-manipulation z-10 ${isDark ? "bg-[#14291D] border-[#1F3D2B]" : "bg-[#F2E8CC] border-[#E3D4C0]"
                     }`}
                 />
               </div>
@@ -1554,16 +1573,16 @@ export const CheckoutPage: React.FC = () => {
 
             {/* Payment Method Selector */}
             <div
-              className={`rounded-2xl border p-6 shadow-2xs space-y-4 ${isDark ? "bg-[#1C120B] border-[#362114]" : "bg-white border-[#E8DEC8]"
+              className={`rounded-2xl border p-6 shadow-2xs space-y-4 ${isDark ? "bg-[#14291D] border-[#1F3D2B]" : "bg-white border-[#F2E8CC]"
                 }`}
             >
               <div
-                className={`flex items-center gap-2 border-b pb-3 ${isDark ? "border-[#2D1B10]" : "border-[#EFE8DC]"
+                className={`flex items-center gap-2 border-b pb-3 ${isDark ? "border-[#14291D]" : "border-[#F2E8CC]"
                   }`}
               >
-                <CreditCard className="w-4 h-4 text-[#E08F35]" />
+                <CreditCard className="w-4 h-4 text-[#E0B04A]" />
                 <h2
-                  className={`text-base font-bold font-serif ${isDark ? "text-[#FAF4EA]" : "text-[#23150C]"
+                  className={`text-base font-bold font-serif ${isDark ? "text-[#FAF3E0]" : "text-[#14291D]"
                     }`}
                 >
                   Choose Payment Method
@@ -1575,11 +1594,11 @@ export const CheckoutPage: React.FC = () => {
                 <label
                   className={`p-4 rounded-xl border flex items-start justify-between cursor-pointer transition-all ${paymentMethod === "phonepe"
                       ? isDark
-                        ? "bg-amber-950/40 border-[#E08F35] ring-2 ring-[#E08F35]/30"
-                        : "bg-amber-50/70 border-[#E08F35] ring-2 ring-[#E08F35]/30"
+                        ? "bg-amber-950/40 border-[#E0B04A] ring-2 ring-[#E0B04A]/30"
+                        : "bg-amber-50/70 border-[#E0B04A] ring-2 ring-[#E0B04A]/30"
                       : isDark
-                        ? "border-[#362114] hover:border-[#4D2E1A]"
-                        : "border-[#E8DEC8] hover:border-[#DDD1BE]"
+                        ? "border-[#1F3D2B] hover:border-[#2D5A3F]"
+                        : "border-[#F2E8CC] hover:border-[#F2E8CC]"
                     }`}
                 >
                   <div className="flex items-start gap-3">
@@ -1588,35 +1607,35 @@ export const CheckoutPage: React.FC = () => {
                       name="payment"
                       checked={paymentMethod === "phonepe"}
                       onChange={() => setPaymentMethod("phonepe")}
-                      className="mt-1 accent-[#E08F35]"
+                      className="mt-1 accent-[#E0B04A]"
                     />
                     <div>
                       <span
-                        className={`text-xs font-bold block ${isDark ? "text-[#FAF4EA]" : "text-[#23150C]"
+                        className={`text-xs font-bold block ${isDark ? "text-[#FAF3E0]" : "text-[#14291D]"
                           }`}
                       >
                         Online Payment (UPI, PhonePe, GPay, Cards, NetBanking)
                       </span>
                       <span
-                        className={`text-[11px] block mt-0.5 ${isDark ? "text-[#D6C4B0]" : "text-[#5C402D]"
+                        className={`text-[11px] block mt-0.5 ${isDark ? "text-[#E0B04A]" : "text-[#3F4F45]"
                           }`}
                       >
                         Instant order confirmation & automated digital receipt
                       </span>
                     </div>
                   </div>
-                  <Zap className="w-4 h-4 text-[#E08F35] shrink-0" />
+                  <Zap className="w-4 h-4 text-[#E0B04A] shrink-0" />
                 </label>
 
                 {/* Option 2: Cash on Delivery */}
                 <label
                   className={`p-4 rounded-xl border flex flex-col cursor-pointer transition-all ${paymentMethod === "cod"
                       ? isDark
-                        ? "bg-amber-950/40 border-[#E08F35] ring-2 ring-[#E08F35]/30"
-                        : "bg-amber-50/70 border-[#E08F35] ring-2 ring-[#E08F35]/30"
+                        ? "bg-amber-950/40 border-[#E0B04A] ring-2 ring-[#E0B04A]/30"
+                        : "bg-amber-50/70 border-[#E0B04A] ring-2 ring-[#E0B04A]/30"
                       : isDark
-                        ? "border-[#362114] hover:border-[#4D2E1A]"
-                        : "border-[#E8DEC8] hover:border-[#DDD1BE]"
+                        ? "border-[#1F3D2B] hover:border-[#2D5A3F]"
+                        : "border-[#F2E8CC] hover:border-[#F2E8CC]"
                     }`}
                 >
                   <div className="flex items-start justify-between">
@@ -1626,17 +1645,17 @@ export const CheckoutPage: React.FC = () => {
                         name="payment"
                         checked={paymentMethod === "cod"}
                         onChange={() => setPaymentMethod("cod")}
-                        className="mt-1 accent-[#E08F35]"
+                        className="mt-1 accent-[#E0B04A]"
                       />
                       <div>
                         <span
-                          className={`text-xs font-bold block ${isDark ? "text-[#FAF4EA]" : "text-[#23150C]"
+                          className={`text-xs font-bold block ${isDark ? "text-[#FAF3E0]" : "text-[#14291D]"
                             }`}
                         >
                           Cash on Delivery (COD)
                         </span>
                         <span
-                          className={`text-[11px] block mt-0.5 ${isDark ? "text-[#D6C4B0]" : "text-[#5C402D]"
+                          className={`text-[11px] block mt-0.5 ${isDark ? "text-[#E0B04A]" : "text-[#3F4F45]"
                             }`}
                         >
                           Pay cash or UPI directly to our delivery executive at doorstep
@@ -1651,15 +1670,15 @@ export const CheckoutPage: React.FC = () => {
                     <div
                       className={`mt-3 p-4 rounded-2xl border-2 space-y-3 shadow-sm ${
                         isDark
-                          ? "bg-[#25150C] border-[#E08F35] text-[#FAF4EA]"
-                          : "bg-[#FFF9EE] border-[#C8751B] text-[#1F120A]"
+                          ? "bg-[#1F3D2B] border-[#E0B04A] text-[#FAF3E0]"
+                          : "bg-[#FFF9EE] border-[#E0B04A] text-[#14291D]"
                       }`}
                     >
                       <div className="flex items-center gap-2">
-                        <ShieldCheck className="w-4 h-4 text-[#E08F35] shrink-0" />
+                        <ShieldCheck className="w-4 h-4 text-[#E0B04A] shrink-0" />
                         <span
                           className={`font-black text-xs tracking-wide uppercase ${
-                            isDark ? "text-[#F5BC51]" : "text-[#7A4B1A]"
+                            isDark ? "text-[#F3D17A]" : "text-[#7A4B1A]"
                           }`}
                         >
                           Cash on Delivery Human Verification
@@ -1669,7 +1688,7 @@ export const CheckoutPage: React.FC = () => {
                       <div className="space-y-1.5">
                         <p
                           className={`text-xs font-bold ${
-                            isDark ? "text-[#FAF4EA]" : "text-[#23150C]"
+                            isDark ? "text-[#FAF3E0]" : "text-[#14291D]"
                           }`}
                         >
                           Please solve this simple math question to confirm your COD order:
@@ -1677,8 +1696,8 @@ export const CheckoutPage: React.FC = () => {
                         <div
                           className={`flex items-center justify-center p-3 rounded-xl border-2 text-center select-none ${
                             isDark
-                              ? "bg-[#140D07] border-[#E08F35]/70 text-[#F5BC51]"
-                              : "bg-white border-[#C8751B]/60 text-[#7A4B1A]"
+                              ? "bg-[#14291D] border-[#E0B04A]/70 text-[#F3D17A]"
+                              : "bg-white border-[#E0B04A]/60 text-[#7A4B1A]"
                           }`}
                         >
                           <span className="font-mono text-xl sm:text-2xl font-black tracking-widest">
@@ -1690,7 +1709,7 @@ export const CheckoutPage: React.FC = () => {
                       <div>
                         <label
                           className={`block text-[11px] font-bold mb-1 ${
-                            isDark ? "text-[#D6C4B0]" : "text-[#5C402D]"
+                            isDark ? "text-[#E0B04A]" : "text-[#3F4F45]"
                           }`}
                         >
                           Type the answer number here:
@@ -1703,10 +1722,10 @@ export const CheckoutPage: React.FC = () => {
                             setCodAnswerInput(e.target.value);
                             setCodError(null);
                           }}
-                          className={`w-full px-3.5 py-2.5 rounded-xl border-2 font-bold text-sm focus:outline-none focus:ring-2 focus:ring-[#E08F35] shadow-xs ${
+                          className={`w-full px-3.5 py-2.5 rounded-xl border-2 font-bold text-sm focus:outline-none focus:ring-2 focus:ring-[#E0B04A] shadow-xs ${
                             isDark
-                              ? "bg-[#140D07] border-[#5A3820] text-white placeholder-[#8C7A6B]"
-                              : "bg-white border-[#DDD1BE] text-[#1F120A] placeholder-[#8C7A6B]"
+                              ? "bg-[#14291D] border-[#5A3820] text-white placeholder-[#3F4F45]"
+                              : "bg-white border-[#F2E8CC] text-[#14291D] placeholder-[#3F4F45]"
                           }`}
                         />
                       </div>
@@ -1727,11 +1746,11 @@ export const CheckoutPage: React.FC = () => {
           {/* Right Column: Order Summary & Place Order Button */}
           <div className="lg:col-span-5 space-y-6">
             <div
-              className={`rounded-2xl border p-6 shadow-2xs space-y-4 ${isDark ? "bg-[#1C120B] border-[#362114]" : "bg-white border-[#E8DEC8]"
+              className={`rounded-2xl border p-6 shadow-2xs space-y-4 ${isDark ? "bg-[#14291D] border-[#1F3D2B]" : "bg-white border-[#F2E8CC]"
                 }`}
             >
               <h2
-                className={`text-base font-bold font-serif border-b pb-3 ${isDark ? "text-[#FAF4EA] border-[#2D1B10]" : "text-[#23150C] border-[#EFE8DC]"
+                className={`text-base font-bold font-serif border-b pb-3 ${isDark ? "text-[#FAF3E0] border-[#14291D]" : "text-[#14291D] border-[#F2E8CC]"
                   }`}
               >
                 Order Summary ({checkoutItems.length} {checkoutItems.length === 1 ? "item" : "items"})
@@ -1748,7 +1767,7 @@ export const CheckoutPage: React.FC = () => {
                         className="w-10 h-10 object-contain p-0.5 rounded-lg border bg-white/5 shrink-0"
                       />
                       <div>
-                        <p className={`font-bold ${isDark ? "text-[#FAF4EA]" : "text-[#23150C]"}`}>
+                        <p className={`font-bold ${isDark ? "text-[#FAF3E0]" : "text-[#14291D]"}`}>
                           {item.title}
                         </p>
                         <p className="text-[10px] text-stone-500">
@@ -1756,7 +1775,7 @@ export const CheckoutPage: React.FC = () => {
                         </p>
                       </div>
                     </div>
-                    <span className="font-extrabold text-[#E08F35]">
+                    <span className="font-extrabold text-[#E0B04A]">
                       ₹{item.price * item.quantity}
                     </span>
                   </div>
@@ -1764,24 +1783,32 @@ export const CheckoutPage: React.FC = () => {
               </div>
 
               {/* Price Breakdown */}
-              <div className="space-y-2 pt-3 border-t border-stone-200 dark:border-stone-800 text-xs">
-                <div className="flex justify-between text-stone-500">
+              <div className="space-y-2 pt-3 border-t border-[#E0B04A]/30 text-xs">
+                {checkoutRegularSubtotal > checkoutSubtotal && (
+                  <div className="flex justify-between text-[#3F4F45] dark:text-[#FAF3E0]/70">
+                    <span>Regular Subtotal:</span>
+                    <span className="line-through">₹{checkoutRegularSubtotal}</span>
+                  </div>
+                )}
+                <div className="flex justify-between text-[#14291D] dark:text-[#FAF3E0] font-medium">
                   <span>Items Subtotal:</span>
-                  <span>₹{checkoutSubtotal}</span>
+                  <span className="font-bold">₹{checkoutSubtotal}</span>
                 </div>
                 {checkoutDiscount > 0 && (
-                  <div className="flex justify-between text-emerald-600 font-bold">
-                    <span>10% Discount (Orders &gt; ₹1,000):</span>
+                  <div className="flex justify-between text-emerald-800 dark:text-emerald-300 font-bold">
+                    <span>{isSaleActive() ? "10% Diwali Festive Discount:" : "10% Order Discount:"}</span>
                     <span>-₹{checkoutDiscount}</span>
                   </div>
                 )}
-                <div className="flex justify-between text-stone-500">
+                <div className="flex justify-between text-[#3F4F45] dark:text-[#FAF3E0]/70">
                   <span>Doorstep Delivery:</span>
-                  <span>{checkoutShippingFee === 0 ? "FREE" : `₹${checkoutShippingFee}`}</span>
+                  <span className="font-semibold text-emerald-800 dark:text-emerald-300">
+                    {checkoutShippingFee === 0 ? "FREE" : `₹${checkoutShippingFee}`}
+                  </span>
                 </div>
-                <div className="flex justify-between font-bold text-base pt-2 border-t border-stone-200 dark:border-stone-800">
-                  <span className={isDark ? "text-[#FAF4EA]" : "text-[#23150C]"}>Total Amount:</span>
-                  <span className="text-[#E08F35]">₹{checkoutTotal}</span>
+                <div className="flex justify-between font-bold text-base pt-2 border-t border-[#E0B04A]/30">
+                  <span className={isDark ? "text-[#FAF3E0]" : "text-[#14291D]"}>Total Amount:</span>
+                  <span className="text-[#14291D] dark:text-[#F3D17A] font-black font-serif text-xl">₹{checkoutTotal}</span>
                 </div>
               </div>
 
@@ -1789,21 +1816,21 @@ export const CheckoutPage: React.FC = () => {
               <button
                 type="submit"
                 disabled={isProcessing}
-                className="w-full py-4 rounded-xl bg-gradient-to-r from-[#D49A37] via-[#F5BC51] to-[#BF7E16] text-[#140D09] font-serif font-black tracking-wider uppercase shadow-[0_4px_20px_rgba(212,154,55,0.35)] border border-[#FFD885] transition-all flex items-center justify-center gap-2 cursor-pointer hover:brightness-110 disabled:opacity-50 mt-4"
+                className="w-full py-4 rounded-xl bg-gradient-to-r from-[#E0B04A] via-[#F3D17A] to-[#BF7E16] text-[#14291D] font-serif font-black tracking-wider uppercase shadow-[0_4px_20px_rgba(212,154,55,0.35)] border border-[#F3D17A] transition-all flex items-center justify-center gap-2 cursor-pointer hover:brightness-110 disabled:opacity-50 mt-4"
               >
                 {isProcessing ? (
                   <>
-                    <RefreshCw className="w-4 h-4 animate-spin text-[#140D09]" />
+                    <RefreshCw className="w-4 h-4 animate-spin text-[#14291D]" />
                     <span>Processing Order...</span>
                   </>
                 ) : paymentMethod === "phonepe" ? (
                   <>
-                    <Lock className="w-4 h-4 text-[#140D09]" />
+                    <Lock className="w-4 h-4 text-[#14291D]" />
                     <span>Pay ₹{checkoutTotal} Online Securely</span>
                   </>
                 ) : (
                   <>
-                    <Banknote className="w-4 h-4 text-[#140D09]" />
+                    <Banknote className="w-4 h-4 text-[#14291D]" />
                     <span>Confirm Cash on Delivery (₹{checkoutTotal})</span>
                   </>
                 )}

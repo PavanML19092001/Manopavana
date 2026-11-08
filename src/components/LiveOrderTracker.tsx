@@ -168,13 +168,13 @@ export const LiveOrderTracker = ({
     <>
       <div
         className={`w-full rounded-3xl border shadow-sm overflow-hidden transition-colors ${
-          isDark ? "bg-[#1A1009] border-[#3B2516] text-[#FAF4EA]" : "bg-white border-[#E8DFC8] text-[#1F120A]"
+          isDark ? "bg-[#1A1009] border-[#3B2516] text-[#FAF3E0]" : "bg-white border-[#E8DFC8] text-[#14291D]"
         }`}
       >
         {/* 1. Top Order Summary Banner */}
         <div
           className={`p-6 border-b flex flex-col md:flex-row md:items-center justify-between gap-4 ${
-            isDark ? "bg-[#22150C] border-[#3B2516]" : "bg-[#FAF7F2] border-[#EFE8DC]"
+            isDark ? "bg-[#22150C] border-[#3B2516]" : "bg-[#FAF3E0] border-[#F2E8CC]"
           }`}
         >
           <div>
@@ -211,9 +211,9 @@ export const LiveOrderTracker = ({
               </span>
             </div>
 
-            <p className={`text-xs mt-1.5 ${isDark ? "text-[#D8C8B8]" : "text-[#6A523E]"}`}>
+            <p className={`text-xs mt-1.5 ${isDark ? "text-[#E0B04A]" : "text-[#6A523E]"}`}>
               Placed on {order.date} • Total Amount:{" "}
-              <span className="font-extrabold text-[#E08F35]">₹{order.total}</span>
+              <span className="font-extrabold text-[#E0B04A]">₹{order.total}</span>
             </p>
           </div>
 
@@ -237,11 +237,11 @@ export const LiveOrderTracker = ({
               href={`tel:${BUSINESS_CONFIG.PRIMARY_PHONE.replace(/\s+/g, "")}`}
               className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition-all ${
                 isDark
-                  ? "bg-[#1A1009] border-[#3B2516] text-[#FAF4EA] hover:bg-[#2A1A0F]"
-                  : "bg-white border-[#DDD1BE] text-[#1F120A] hover:bg-[#FAF6EE]"
+                  ? "bg-[#1A1009] border-[#3B2516] text-[#FAF3E0] hover:bg-[#2A1A0F]"
+                  : "bg-white border-[#F2E8CC] text-[#14291D] hover:bg-[#FAF3E0]"
               }`}
             >
-              <Phone className="w-3.5 h-3.5 text-[#E08F35]" />
+              <Phone className="w-3.5 h-3.5 text-[#E0B04A]" />
               <span>Call Facility</span>
             </a>
 
@@ -251,11 +251,11 @@ export const LiveOrderTracker = ({
                 onClick={() => setIsInvoiceOpen(true)}
                 className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
                   isDark
-                    ? "bg-[#1A1009] border-[#3B2516] text-[#FAF4EA] hover:bg-[#2A1A0F]"
-                    : "bg-white border-[#DDD1BE] text-[#1F120A] hover:bg-[#FAF6EE]"
+                    ? "bg-[#1A1009] border-[#3B2516] text-[#FAF3E0] hover:bg-[#2A1A0F]"
+                    : "bg-white border-[#F2E8CC] text-[#14291D] hover:bg-[#FAF3E0]"
                 }`}
               >
-                <FileText className="w-3.5 h-3.5 text-[#E08F35]" />
+                <FileText className="w-3.5 h-3.5 text-[#E0B04A]" />
                 <span>Download Invoice</span>
               </button>
             )}
@@ -266,7 +266,7 @@ export const LiveOrderTracker = ({
         {canModifyOrCancel && (
           <div className="px-6 py-3.5 bg-amber-500/10 border-b border-amber-500/20 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
             <div className="flex items-center gap-2 text-amber-800 dark:text-amber-300">
-              <Clock className="w-4 h-4 shrink-0 text-[#E08F35]" />
+              <Clock className="w-4 h-4 shrink-0 text-[#E0B04A]" />
               <span>
                 You can edit your delivery address or cancel this order any time before it leaves our facility.
               </span>
@@ -278,11 +278,11 @@ export const LiveOrderTracker = ({
                 onClick={() => setIsEditingAddress(true)}
                 className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border text-xs font-bold transition-colors cursor-pointer ${
                   isDark
-                    ? "border-[#3D2514] text-[#FAF4EA] hover:bg-[#2A1A0F]"
-                    : "border-[#DDD1BE] text-[#5C4230] hover:bg-[#FAF6EE]"
+                    ? "border-[#1F3D2B] text-[#FAF3E0] hover:bg-[#2A1A0F]"
+                    : "border-[#F2E8CC] text-[#5C4230] hover:bg-[#FAF3E0]"
                 }`}
               >
-                <Edit3 className="w-3.5 h-3.5 text-[#E08F35]" />
+                <Edit3 className="w-3.5 h-3.5 text-[#E0B04A]" />
                 <span>Edit Address</span>
               </button>
 
@@ -318,7 +318,7 @@ export const LiveOrderTracker = ({
           {isCancelled ? (
             <AlertTriangle className="w-4 h-4 shrink-0 text-red-600" />
           ) : (
-            <Calendar className="w-4 h-4 shrink-0 text-[#E08F35]" />
+            <Calendar className="w-4 h-4 shrink-0 text-[#E0B04A]" />
           )}
           <span>{getEstimatedDeliveryText()}</span>
         </div>
@@ -326,7 +326,7 @@ export const LiveOrderTracker = ({
         {/* 4. Live Status Section */}
         <div className="p-6 space-y-8">
           <div>
-            <h3 className={`text-xs font-bold uppercase tracking-wider mb-6 ${isDark ? "text-[#D8C8B8]" : "text-[#7A5E48]"}`}>
+            <h3 className={`text-xs font-bold uppercase tracking-wider mb-6 ${isDark ? "text-[#E0B04A]" : "text-[#3F4F45]"}`}>
               Delivery Milestones & Live Status
             </h3>
 
@@ -352,9 +352,9 @@ export const LiveOrderTracker = ({
                       <strong>Cash on Delivery (COD) Status:</strong> Cash collection has been completely voided. No payment is required.
                     </p>
                   ) : (
-                    <div className="space-y-1.5 bg-white dark:bg-[#140D07] p-3.5 rounded-xl border border-red-200 dark:border-red-900/40">
+                    <div className="space-y-1.5 bg-white dark:bg-[#14291D] p-3.5 rounded-xl border border-red-200 dark:border-red-900/40">
                       <div className="flex justify-between items-center font-bold">
-                        <span className="text-stone-900 dark:text-[#FAF4EA]">Online Refund Status:</span>
+                        <span className="text-stone-900 dark:text-[#FAF3E0]">Online Refund Status:</span>
                         <span className="text-emerald-600 dark:text-emerald-400">
                           {order.paymentStatus === "REFUND_INITIATED" ? "Refund Initiated" : "Processing Refund"}
                         </span>
@@ -385,11 +385,11 @@ export const LiveOrderTracker = ({
                   <div className="space-y-1">
                     <div className="flex flex-wrap items-center gap-2">
                       <h4 className="text-sm font-bold">Order Placed & Confirmed</h4>
-                      <span className={`text-[11px] ${isDark ? "text-[#A89482]" : "text-[#7A5E48]"}`}>
+                      <span className={`text-[11px] ${isDark ? "text-[#A89482]" : "text-[#3F4F45]"}`}>
                         {order.date}
                       </span>
                     </div>
-                    <p className={`text-xs ${isDark ? "text-[#D8C8B8]" : "text-[#5C4230]"}`}>
+                    <p className={`text-xs ${isDark ? "text-[#E0B04A]" : "text-[#5C4230]"}`}>
                       Order #{order.orderRef} placed with {isCod ? "Cash on Delivery" : "Online Payment"}. Items verified by store.
                     </p>
                   </div>
@@ -402,7 +402,7 @@ export const LiveOrderTracker = ({
                       currentStep >= 2
                         ? "bg-emerald-600 text-white shadow-sm ring-4 ring-emerald-500/20"
                         : currentStep === 1
-                        ? "bg-[#E08F35] text-white animate-pulse"
+                        ? "bg-[#E0B04A] text-white animate-pulse"
                         : "bg-stone-200 dark:bg-stone-800 text-stone-500"
                     }`}
                   >
@@ -421,7 +421,7 @@ export const LiveOrderTracker = ({
                         </span>
                       )}
                     </div>
-                    <p className={`text-xs ${isDark ? "text-[#D8C8B8]" : "text-[#5C4230]"}`}>
+                    <p className={`text-xs ${isDark ? "text-[#E0B04A]" : "text-[#5C4230]"}`}>
                       MANOPAVANA Packaging & Distribution Facility (Peenya 2nd Stage, Bangalore - 560058). Bottles inspected with leak-free seal and shatterproof protective barrier.
                     </p>
                   </div>
@@ -434,7 +434,7 @@ export const LiveOrderTracker = ({
                       currentStep >= 3
                         ? "bg-emerald-600 text-white shadow-sm ring-4 ring-emerald-500/20"
                         : currentStep === 2
-                        ? "bg-[#E08F35] text-white animate-pulse"
+                        ? "bg-[#E0B04A] text-white animate-pulse"
                         : "bg-stone-200 dark:bg-stone-800 text-stone-500"
                     }`}
                   >
@@ -454,10 +454,10 @@ export const LiveOrderTracker = ({
                       )}
                     </div>
 
-                    <p className={`text-xs ${isDark ? "text-[#D8C8B8]" : "text-[#5C4230]"}`}>
+                    <p className={`text-xs ${isDark ? "text-[#E0B04A]" : "text-[#5C4230]"}`}>
                       Carrier: <span className="font-semibold text-blue-600">Delhivery Express Surface</span>
                       {order.trackingNumber && (
-                        <span className="block mt-0.5 font-mono text-[11px] text-[#E08F35]">
+                        <span className="block mt-0.5 font-mono text-[11px] text-[#E0B04A]">
                           Delhivery Waybill / AWB: #{order.trackingNumber}
                         </span>
                       )}
@@ -467,19 +467,19 @@ export const LiveOrderTracker = ({
                     {order.trackingNumber && (
                       <div
                         className={`mt-3 p-3.5 rounded-2xl border text-xs space-y-2.5 ${
-                          isDark ? "bg-[#140D07] border-[#362114]" : "bg-[#FAF7F2] border-[#E8DEC8]"
+                          isDark ? "bg-[#14291D] border-[#1F3D2B]" : "bg-[#FAF3E0] border-[#F2E8CC]"
                         }`}
                       >
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2 font-bold text-xs">
-                            <Truck className="w-3.5 h-3.5 text-[#E08F35]" />
+                            <Truck className="w-3.5 h-3.5 text-[#E0B04A]" />
                             <span>Live Delhivery Checkpoints</span>
                           </div>
                           <button
                             type="button"
                             onClick={() => fetchDelhiveryTracking(order.trackingNumber!)}
                             disabled={delhiveryLoading}
-                            className="inline-flex items-center gap-1 text-[11px] font-bold text-[#E08F35] hover:underline cursor-pointer"
+                            className="inline-flex items-center gap-1 text-[11px] font-bold text-[#E0B04A] hover:underline cursor-pointer"
                           >
                             <RefreshCw className={`w-3 h-3 ${delhiveryLoading ? "animate-spin" : ""}`} />
                             <span>Refresh</span>
@@ -498,7 +498,7 @@ export const LiveOrderTracker = ({
                               <div
                                 key={sIdx}
                                 className={`p-2 rounded-xl text-[11px] flex items-start gap-2 border ${
-                                  isDark ? "bg-[#1D120B] border-[#3D2514]" : "bg-white border-[#EFE8DC]"
+                                  isDark ? "bg-[#1D120B] border-[#1F3D2B]" : "bg-white border-[#F2E8CC]"
                                 }`}
                               >
                                 <div className="w-2 h-2 rounded-full bg-emerald-500 mt-1.5 shrink-0" />
@@ -519,7 +519,7 @@ export const LiveOrderTracker = ({
                               <button
                                 type="button"
                                 onClick={() => setShowAllScans(!showAllScans)}
-                                className="inline-flex items-center gap-1 text-[11px] font-bold text-[#E08F35] hover:underline cursor-pointer pt-1"
+                                className="inline-flex items-center gap-1 text-[11px] font-bold text-[#E0B04A] hover:underline cursor-pointer pt-1"
                               >
                                 {showAllScans ? (
                                   <>
@@ -537,7 +537,7 @@ export const LiveOrderTracker = ({
                           </div>
                         ) : (
                           !delhiveryLoading && (
-                            <p className={`text-[11px] ${isDark ? "text-[#A89482]" : "text-[#7A5E48]"}`}>
+                            <p className={`text-[11px] ${isDark ? "text-[#A89482]" : "text-[#3F4F45]"}`}>
                               {delhiveryError || "Package manifested. Initial hub scan in progress at Delhivery sorting center."}
                             </p>
                           )
@@ -554,7 +554,7 @@ export const LiveOrderTracker = ({
                       currentStep >= 4
                         ? "bg-emerald-600 text-white shadow-sm ring-4 ring-emerald-500/20"
                         : currentStep === 3
-                        ? "bg-[#E08F35] text-white animate-pulse"
+                        ? "bg-[#E0B04A] text-white animate-pulse"
                         : "bg-stone-200 dark:bg-stone-800 text-stone-500"
                     }`}
                   >
@@ -575,7 +575,7 @@ export const LiveOrderTracker = ({
                         </span>
                       )}
                     </div>
-                    <p className={`text-xs ${isDark ? "text-[#D8C8B8]" : "text-[#5C4230]"}`}>
+                    <p className={`text-xs ${isDark ? "text-[#E0B04A]" : "text-[#5C4230]"}`}>
                       {order.orderStatus === "Delivered"
                         ? "Your pure Marachekku oil package was successfully delivered to your doorstep. Thank you for choosing MANOPAVANA!"
                         : isCod
@@ -593,19 +593,19 @@ export const LiveOrderTracker = ({
             {/* Delivery Address Card */}
             <div
               className={`p-4 rounded-2xl border space-y-2.5 text-xs ${
-                isDark ? "bg-[#140D07] border-[#362114]" : "bg-[#FAF7F2] border-[#E8DEC8]"
+                isDark ? "bg-[#14291D] border-[#1F3D2B]" : "bg-[#FAF3E0] border-[#F2E8CC]"
               }`}
             >
               <div className="flex items-center justify-between font-bold text-xs">
                 <div className="flex items-center gap-1.5">
-                  <MapPin className="w-4 h-4 text-[#E08F35]" />
+                  <MapPin className="w-4 h-4 text-[#E0B04A]" />
                   <span>Delivery Address</span>
                 </div>
                 {canModifyOrCancel && (
                   <button
                     type="button"
                     onClick={() => setIsEditingAddress(true)}
-                    className="text-[11px] text-[#E08F35] hover:underline flex items-center gap-1 cursor-pointer"
+                    className="text-[11px] text-[#E0B04A] hover:underline flex items-center gap-1 cursor-pointer"
                   >
                     <Edit3 className="w-3 h-3" />
                     <span>Edit</span>
@@ -647,7 +647,7 @@ export const LiveOrderTracker = ({
                         href={mapUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="font-bold text-[#E08F35] hover:underline inline-flex items-center gap-1"
+                        className="font-bold text-[#E0B04A] hover:underline inline-flex items-center gap-1"
                       >
                         <span>View Map Pin</span>
                         <ExternalLink className="w-3 h-3" />
@@ -661,36 +661,36 @@ export const LiveOrderTracker = ({
             {/* Bill Summary */}
             <div
               className={`p-4 rounded-2xl border space-y-2.5 text-xs ${
-                isDark ? "bg-[#140D07] border-[#362114]" : "bg-[#FAF7F2] border-[#E8DEC8]"
+                isDark ? "bg-[#14291D] border-[#1F3D2B]" : "bg-[#FAF3E0] border-[#F2E8CC]"
               }`}
             >
               <div className="flex items-center gap-1.5 font-bold text-xs">
                 {isCod ? (
-                  <Banknote className="w-4 h-4 text-[#E08F35]" />
+                  <Banknote className="w-4 h-4 text-[#E0B04A]" />
                 ) : (
-                  <CreditCard className="w-4 h-4 text-[#E08F35]" />
+                  <CreditCard className="w-4 h-4 text-[#E0B04A]" />
                 )}
                 <span>Payment Summary</span>
               </div>
 
               <div className="space-y-1.5 pt-1">
-                <div className="flex justify-between text-stone-500">
+                <div className="flex justify-between text-[#2D4536] dark:text-[#E8DFD5] font-medium">
                   <span>Items Subtotal:</span>
-                  <span>₹{order.subtotal}</span>
+                  <span>₹{order.regularSubtotal || order.subtotal}</span>
                 </div>
-                {order.discount > 0 && (
-                  <div className="flex justify-between text-emerald-600 font-medium">
-                    <span>Loyalty Discount:</span>
-                    <span>-₹{order.discount}</span>
+                {((order.discountAmount || order.discount || 0) > 0) && (
+                  <div className="flex justify-between text-[#1F3D2B] dark:text-[#F3D17A] font-bold">
+                    <span>Discount ({order.discountLabel || "Festive/Promo"}):</span>
+                    <span>-₹{order.discountAmount || order.discount}</span>
                   </div>
                 )}
-                <div className="flex justify-between text-stone-500">
+                <div className="flex justify-between text-[#2D4536] dark:text-[#E8DFD5] font-medium">
                   <span>Doorstep Delivery:</span>
                   <span>{order.shippingFee === 0 ? "FREE" : `₹${order.shippingFee}`}</span>
                 </div>
                 <div className="flex justify-between font-bold text-sm pt-1 border-t border-stone-200 dark:border-stone-800">
                   <span>Total Amount:</span>
-                  <span className="text-[#E08F35]">₹{order.total}</span>
+                  <span className="text-[#14291D] dark:text-[#F3D17A] font-extrabold">₹{order.total}</span>
                 </div>
                 <div className="pt-1">
                   <span
@@ -715,7 +715,7 @@ export const LiveOrderTracker = ({
 
           {/* 6. Ordered Items List */}
           <div className="space-y-3 pt-2">
-            <h4 className={`text-xs font-bold uppercase tracking-wider ${isDark ? "text-[#D8C8B8]" : "text-[#7A5E48]"}`}>
+            <h4 className={`text-xs font-bold uppercase tracking-wider ${isDark ? "text-[#E0B04A]" : "text-[#3F4F45]"}`}>
               Items in this Package ({order.items.length})
             </h4>
 
@@ -724,7 +724,7 @@ export const LiveOrderTracker = ({
                 <div
                   key={idx}
                   className={`p-3 rounded-2xl border flex items-center justify-between gap-4 text-xs ${
-                    isDark ? "bg-[#140D07] border-[#362114]" : "bg-[#FAF7F2] border-[#E8DEC8]"
+                    isDark ? "bg-[#14291D] border-[#1F3D2B]" : "bg-[#FAF3E0] border-[#F2E8CC]"
                   }`}
                 >
                   <div className="flex items-center gap-3">
@@ -737,14 +737,14 @@ export const LiveOrderTracker = ({
                     )}
                     <div>
                       <p className="font-bold text-sm">{item.title}</p>
-                      <p className={`text-[11px] ${isDark ? "text-[#A89482]" : "text-[#7A5E48]"}`}>
+                      <p className={`text-[11px] ${isDark ? "text-[#A89482]" : "text-[#3F4F45]"}`}>
                         Variant: {item.variant} • Quantity: {item.quantity}
                       </p>
                     </div>
                   </div>
 
                   <div className="text-right">
-                    <span className="font-extrabold text-sm text-[#E08F35]">
+                    <span className="font-extrabold text-sm text-[#E0B04A]">
                       ₹{item.price * item.quantity}
                     </span>
                     <p className="text-[10px] text-stone-500">₹{item.price} each</p>
@@ -763,7 +763,7 @@ export const LiveOrderTracker = ({
           aria-modal="true"
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
         >
-          <div className="w-full max-w-md bg-white dark:bg-[#1C120B] text-stone-900 dark:text-[#FAF4EA] rounded-3xl p-6 border border-stone-200 dark:border-[#362114] shadow-2xl space-y-4">
+          <div className="w-full max-w-md bg-white dark:bg-[#14291D] text-stone-900 dark:text-[#FAF3E0] rounded-3xl p-6 border border-stone-200 dark:border-[#1F3D2B] shadow-2xl space-y-4">
             <div className="flex items-center justify-between border-b pb-3 border-stone-200 dark:border-stone-800">
               <h3 className="font-bold font-serif text-sm">Edit Delivery Address & Contact</h3>
               <button
@@ -783,7 +783,7 @@ export const LiveOrderTracker = ({
                   required
                   value={editName}
                   onChange={(e) => setEditName(e.target.value)}
-                  className="w-full p-2.5 rounded-xl border border-stone-300 dark:border-stone-700 bg-transparent focus:ring-2 focus:ring-[#E08F35]/40"
+                  className="w-full p-2.5 rounded-xl border border-stone-300 dark:border-stone-700 bg-transparent focus:ring-2 focus:ring-[#E0B04A]/40"
                 />
               </div>
 
@@ -795,7 +795,7 @@ export const LiveOrderTracker = ({
                   maxLength={10}
                   value={editPhone}
                   onChange={(e) => setEditPhone(e.target.value.replace(/\D/g, ""))}
-                  className="w-full p-2.5 rounded-xl border border-stone-300 dark:border-stone-700 bg-transparent font-mono focus:ring-2 focus:ring-[#E08F35]/40"
+                  className="w-full p-2.5 rounded-xl border border-stone-300 dark:border-stone-700 bg-transparent font-mono focus:ring-2 focus:ring-[#E0B04A]/40"
                 />
               </div>
 
@@ -806,7 +806,7 @@ export const LiveOrderTracker = ({
                   required
                   value={editAddressLine}
                   onChange={(e) => setEditAddressLine(e.target.value)}
-                  className="w-full p-2.5 rounded-xl border border-stone-300 dark:border-stone-700 bg-transparent focus:ring-2 focus:ring-[#E08F35]/40"
+                  className="w-full p-2.5 rounded-xl border border-stone-300 dark:border-stone-700 bg-transparent focus:ring-2 focus:ring-[#E0B04A]/40"
                 />
               </div>
 
@@ -817,7 +817,7 @@ export const LiveOrderTracker = ({
                     type="text"
                     value={editLandmark}
                     onChange={(e) => setEditLandmark(e.target.value)}
-                    className="w-full p-2.5 rounded-xl border border-stone-300 dark:border-stone-700 bg-transparent focus:ring-2 focus:ring-[#E08F35]/40"
+                    className="w-full p-2.5 rounded-xl border border-stone-300 dark:border-stone-700 bg-transparent focus:ring-2 focus:ring-[#E0B04A]/40"
                   />
                 </div>
                 <div>
@@ -828,7 +828,7 @@ export const LiveOrderTracker = ({
                     maxLength={6}
                     value={editPincode}
                     onChange={(e) => setEditPincode(e.target.value.replace(/\D/g, ""))}
-                    className="w-full p-2.5 rounded-xl border border-stone-300 dark:border-stone-700 bg-transparent font-mono focus:ring-2 focus:ring-[#E08F35]/40"
+                    className="w-full p-2.5 rounded-xl border border-stone-300 dark:border-stone-700 bg-transparent font-mono focus:ring-2 focus:ring-[#E0B04A]/40"
                   />
                 </div>
               </div>
@@ -843,7 +843,7 @@ export const LiveOrderTracker = ({
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 rounded-xl bg-[#5E3210] hover:bg-[#43230A] text-white font-bold cursor-pointer transition-all"
+                  className="px-4 py-2 rounded-xl bg-[#1F3D2B] hover:bg-[#1F3D2B] text-white font-bold cursor-pointer transition-all"
                 >
                   Save Changes
                 </button>

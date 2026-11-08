@@ -905,8 +905,8 @@ export const AdminPage: React.FC = () => {
 
         const customIcon = L.divIcon({
           className: "admin-leaflet-marker",
-          html: `<div style="background-color:#5E3210; width:34px; height:34px; border-radius:50%; border:3px solid #FFF; box-shadow:0 4px 14px rgba(0,0,0,0.5); display:flex; align-items:center; justify-content:center;">
-                  <div style="background:#E08F35; width:14px; height:14px; border-radius:50%;"></div>
+          html: `<div style="background-color:#1F3D2B; width:34px; height:34px; border-radius:50%; border:3px solid #FFF; box-shadow:0 4px 14px rgba(0,0,0,0.5); display:flex; align-items:center; justify-content:center;">
+                  <div style="background:#E0B04A; width:14px; height:14px; border-radius:50%;"></div>
                 </div>`,
           iconSize: [34, 34],
           iconAnchor: [17, 17],
@@ -1276,39 +1276,39 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
       <div
         className={`w-full min-h-[calc(100vh-80px)] py-20 flex items-center justify-center transition-colors px-4 box-border ${
           isDark
-            ? "bg-[#140D09] text-[#FAF4EA]"
-            : "bg-[#FAF7F2] text-[#24140A]"
+            ? "bg-[#14291D] text-[#FAF3E0]"
+            : "bg-[#FAF3E0] text-[#14291D]"
         }`}
       >
         <div className="w-full max-w-md mx-auto text-center">
           <div
             className={`p-8 rounded-3xl border shadow-xl space-y-6 ${
               isDark
-                ? "bg-[#1C120B] border-[#362114]"
-                : "bg-white border-[#E8DEC8]"
+                ? "bg-[#14291D] border-[#1F3D2B]"
+                : "bg-white border-[#F2E8CC]"
             }`}
           >
             <div
               className={`w-16 h-16 mx-auto rounded-full border flex items-center justify-center ${
                 isDark
-                  ? "bg-[#150D07] border-[#362114]"
-                  : "bg-[#FAF6EE] border-[#DDD1BE]"
+                  ? "bg-[#14291D] border-[#1F3D2B]"
+                  : "bg-[#FAF3E0] border-[#F2E8CC]"
               }`}
             >
-              <Lock className="w-8 h-8 text-[#E08F35]" />
+              <Lock className="w-8 h-8 text-[#E0B04A]" />
             </div>
 
             <div className="space-y-1">
               <h1
                 className={`text-xl font-bold font-serif ${
-                  isDark ? "text-[#FAF4EA]" : "text-[#1F120A]"
+                  isDark ? "text-[#FAF3E0]" : "text-[#14291D]"
                 }`}
               >
                 MANOPAVANA Administrator Gate
               </h1>
               <p
                 className={`text-xs ${
-                  isDark ? "text-[#D8C8B8]" : "text-[#5C4230]"
+                  isDark ? "text-[#E0B04A]" : "text-[#5C4230]"
                 }`}
               >
                 {currentUser?.email ? (
@@ -1336,10 +1336,10 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                     setPinInput(e.target.value);
                     setPinError(false);
                   }}
-                  className={`w-full text-center tracking-widest text-lg font-mono font-bold px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#E08F35]/40 transition-colors ${
+                  className={`w-full text-center tracking-widest text-lg font-mono font-bold px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#E0B04A]/40 transition-colors ${
                     isDark
-                      ? "bg-[#150D07] border border-[#362114] text-[#FAF4EA] placeholder-[#8A7665]"
-                      : "bg-[#FAF7F2] border border-[#DDD1BE] text-[#1F120A] placeholder-[#8A7665]"
+                      ? "bg-[#14291D] border border-[#1F3D2B] text-[#FAF3E0] placeholder-[#8A7665]"
+                      : "bg-[#FAF3E0] border border-[#F2E8CC] text-[#14291D] placeholder-[#8A7665]"
                   }`}
                 />
                 {pinError && (
@@ -1351,7 +1351,7 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
 
               <button
                 type="submit"
-                className="w-full py-3 rounded-xl bg-[#5E3210] hover:bg-[#43230A] text-white font-bold text-xs shadow-md transition-all cursor-pointer"
+                className="w-full py-3 rounded-xl bg-[#1F3D2B] hover:bg-[#1F3D2B] text-white font-bold text-xs shadow-md transition-all cursor-pointer"
               >
                 Unlock Administration Portal
               </button>
@@ -1361,18 +1361,18 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                 onClick={() => setShowCloudflareGuide(true)}
                 className={`w-full py-2 rounded-xl text-[11px] font-semibold border flex items-center justify-center gap-1.5 transition-colors cursor-pointer ${
                   isDark
-                    ? "bg-transparent border-[#362114] text-[#D8C8B8] hover:bg-[#1C120B]"
-                    : "bg-transparent border-[#DDD1BE] text-[#5C4230] hover:bg-[#FAF6EE]"
+                    ? "bg-transparent border-[#1F3D2B] text-[#E0B04A] hover:bg-[#14291D]"
+                    : "bg-transparent border-[#F2E8CC] text-[#5C4230] hover:bg-[#FAF3E0]"
                 }`}
               >
-                <Key className="w-3.5 h-3.5 text-[#E08F35]" />
+                <Key className="w-3.5 h-3.5 text-[#E0B04A]" />
                 <span>How to store PIN encrypted in Cloudflare</span>
               </button>
             </form>
 
             <p
               className={`text-[11px] ${
-                isDark ? "text-[#A89482]" : "text-[#7A5E48]"
+                isDark ? "text-[#A89482]" : "text-[#3F4F45]"
               }`}
             >
               Authorized Facility: Peenya 2nd Stage, Bangalore • Edge Verified
@@ -1385,13 +1385,13 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
             <div
               className={`w-full max-w-xl rounded-3xl p-6 sm:p-8 space-y-5 text-left border shadow-2xl overflow-y-auto max-h-[90vh] ${
                 isDark
-                  ? "bg-[#1C120B] text-[#FAF4EA] border-[#362114]"
-                  : "bg-white text-[#1F120A] border-[#DDD1BE]"
+                  ? "bg-[#14291D] text-[#FAF3E0] border-[#1F3D2B]"
+                  : "bg-white text-[#14291D] border-[#F2E8CC]"
               }`}
             >
               <div className="flex items-center justify-between border-b pb-3 border-stone-200 dark:border-stone-800">
                 <div className="flex items-center gap-2">
-                  <Key className="w-5 h-5 text-[#E08F35]" />
+                  <Key className="w-5 h-5 text-[#E0B04A]" />
                   <h3 className="font-bold font-serif text-base">
                     Cloudflare Encrypted PIN Setup Guide
                   </h3>
@@ -1452,7 +1452,7 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
               <button
                 type="button"
                 onClick={() => setShowCloudflareGuide(false)}
-                className="w-full py-2.5 rounded-xl bg-[#5E3210] hover:bg-[#43230A] text-white font-bold text-xs shadow-md transition-colors"
+                className="w-full py-2.5 rounded-xl bg-[#1F3D2B] hover:bg-[#1F3D2B] text-white font-bold text-xs shadow-md transition-colors"
               >
                 Got it, Continue
               </button>
@@ -1467,16 +1467,16 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
     <div
       className={`w-full min-h-[calc(100vh-80px)] py-8 transition-colors box-border ${
         isDark
-          ? "bg-[#140D09] text-[#FAF4EA]"
-          : "bg-[#FAF7F2] text-[#24140A]"
+          ? "bg-[#14291D] text-[#FAF3E0]"
+          : "bg-[#FAF3E0] text-[#14291D]"
       }`}
     >
       <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8 box-border">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-[#3D2514] text-white p-6 rounded-3xl shadow-lg">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-[#1F3D2B] text-white p-6 rounded-3xl shadow-lg">
           <div className="flex items-center gap-4">
-            <div className="p-3 rounded-2xl bg-[#E08F35]/20 text-[#E08F35]">
-              <ShieldAlert className="w-6 h-6 text-[#E08F35]" />
+            <div className="p-3 rounded-2xl bg-[#E0B04A]/20 text-[#E0B04A]">
+              <ShieldAlert className="w-6 h-6 text-[#E0B04A]" />
             </div>
             <div>
               <div className="flex items-center gap-2">
@@ -1488,7 +1488,7 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                   Live Delhivery Integration Active
                 </span>
               </div>
-              <p className="text-xs text-[#D6C4B0] mt-0.5">
+              <p className="text-xs text-[#E0B04A] mt-0.5">
                 Admin: {currentUser?.email || "Master PIN Authorized"} •
                 Facility: {facilityAddress}
               </p>
@@ -1499,7 +1499,7 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
             <button
               type="button"
               onClick={() => togglePreviewStorefront(true)}
-              className="px-4 py-2.5 rounded-xl bg-[#E08F35] hover:bg-[#c97a26] text-[#1F120A] text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-md"
+              className="px-4 py-2.5 rounded-xl bg-[#E0B04A] hover:bg-[#C8962E] text-[#14291D] text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-md"
             >
               <Eye className="w-3.5 h-3.5" />
               <span>Preview Storefront as Customer</span>
@@ -1532,12 +1532,12 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
         >
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b pb-4 border-stone-200 dark:border-stone-800">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-[#E08F35]">
+              <div className="w-10 h-10 rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-[#E0B04A]">
                 <Truck className="w-5 h-5" />
               </div>
               <div>
                 <div className="flex items-center gap-2">
-                  <h2 className="text-base font-bold font-serif text-[#1F120A] dark:text-[#FAF4EA]">
+                  <h2 className="text-base font-bold font-serif text-[#14291D] dark:text-[#FAF3E0]">
                     Delhivery Logistics Engine & Testing Lab
                   </h2>
                   <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 text-[10px] font-bold border border-emerald-500/30">
@@ -1545,7 +1545,7 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                     API Active
                   </span>
                 </div>
-                <p className="text-xs text-[#6A523E] dark:text-[#C4B29E]">
+                <p className="text-xs text-[#6A523E] dark:text-[#3F4F45]">
                   Registered Facilities:{" "}
                   <span className="font-semibold text-amber-700 dark:text-amber-400">
                     MANOPAVANA B2C & MANOPAVANA_PEENYA (Bangalore 560058)
@@ -1559,10 +1559,10 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                 type="button"
                 onClick={handlePingDelhivery}
                 disabled={pingingApi}
-                className="px-3.5 py-2 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-[#5E3210] dark:text-amber-200 border border-amber-500/30 text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs"
+                className="px-3.5 py-2 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-[#1F3D2B] dark:text-amber-200 border border-amber-500/30 text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs"
               >
                 <Activity
-                  className={`w-3.5 h-3.5 text-[#E08F35] ${
+                  className={`w-3.5 h-3.5 text-[#E0B04A] ${
                     pingingApi ? "animate-spin" : ""
                   }`}
                 />
@@ -1613,7 +1613,7 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                 href="https://one.delhivery.com"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="px-3.5 py-2 rounded-xl bg-stone-100 dark:bg-stone-800 hover:bg-stone-200 dark:hover:bg-stone-700 text-[#1F120A] dark:text-[#FAF4EA] text-xs font-bold flex items-center gap-1.5 transition-all shadow-2xs"
+                className="px-3.5 py-2 rounded-xl bg-stone-100 dark:bg-stone-800 hover:bg-stone-200 dark:hover:bg-stone-700 text-[#14291D] dark:text-[#FAF3E0] text-xs font-bold flex items-center gap-1.5 transition-all shadow-2xs"
               >
                 <span>Delhivery One</span>
                 <ExternalLink className="w-3.5 h-3.5 opacity-60" />
@@ -1755,33 +1755,33 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
           <div
             className={`p-4 rounded-2xl border shadow-2xs ${
-              isDark ? "bg-[#1C120B] border-[#362114]" : "bg-white border-[#E8DEC8]"
+              isDark ? "bg-[#14291D] border-[#1F3D2B]" : "bg-white border-[#F2E8CC]"
             }`}
           >
             <p className="text-[11px] font-semibold text-stone-500 uppercase tracking-wider">
               Total Store Revenue
             </p>
-            <p className="text-xl sm:text-2xl font-bold font-serif text-[#E08F35] mt-1">
+            <p className="text-xl sm:text-2xl font-bold font-serif text-[#E0B04A] mt-1">
               ₹{totalRevenue.toLocaleString("en-IN")}
             </p>
             <p className="text-[10px] text-stone-400 mt-0.5">from {rawOrders.length} orders logged</p>
           </div>
           <div
             className={`p-4 rounded-2xl border shadow-2xs ${
-              isDark ? "bg-[#1C120B] border-[#362114]" : "bg-white border-[#E8DEC8]"
+              isDark ? "bg-[#14291D] border-[#1F3D2B]" : "bg-white border-[#F2E8CC]"
             }`}
           >
             <p className="text-[11px] font-semibold text-stone-500 uppercase tracking-wider">
               Total Orders Logged
             </p>
-            <p className="text-xl sm:text-2xl font-bold font-serif text-[#5E3210] dark:text-amber-200 mt-1">
+            <p className="text-xl sm:text-2xl font-bold font-serif text-[#1F3D2B] dark:text-amber-200 mt-1">
               {rawOrders.length}
             </p>
             <p className="text-[10px] text-stone-400 mt-0.5">In live database</p>
           </div>
           <div
             className={`p-4 rounded-2xl border shadow-2xs ${
-              isDark ? "bg-[#1C120B] border-[#362114]" : "bg-white border-[#E8DEC8]"
+              isDark ? "bg-[#14291D] border-[#1F3D2B]" : "bg-white border-[#F2E8CC]"
             }`}
           >
             <p className="text-[11px] font-semibold text-stone-500 uppercase tracking-wider">
@@ -1794,7 +1794,7 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
           </div>
           <div
             className={`p-4 rounded-2xl border shadow-2xs ${
-              isDark ? "bg-[#1C120B] border-[#362114]" : "bg-white border-[#E8DEC8]"
+              isDark ? "bg-[#14291D] border-[#1F3D2B]" : "bg-white border-[#F2E8CC]"
             }`}
           >
             <p className="text-[11px] font-semibold text-stone-500 uppercase tracking-wider">
@@ -1812,24 +1812,24 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
           <div
             className={`rounded-3xl border p-6 sm:p-8 shadow-sm space-y-5 transition-colors ${
               isDark
-                ? "bg-[#1C120B] border-[#362114]"
-                : "bg-white border-[#E8DEC8]"
+                ? "bg-[#14291D] border-[#1F3D2B]"
+                : "bg-white border-[#F2E8CC]"
             }`}
           >
             <div
               className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b pb-3 ${
-                isDark ? "border-[#2D1B10]" : "border-[#EFE8DC]"
+                isDark ? "border-[#14291D]" : "border-[#F2E8CC]"
               }`}
             >
                 <div className="flex items-center gap-2">
                   {orderViewTab === "active" ? (
-                    <Truck className="w-4 h-4 text-[#E08F35]" />
+                    <Truck className="w-4 h-4 text-[#E0B04A]" />
                   ) : (
                     <Archive className="w-4 h-4 text-emerald-500" />
                   )}
                   <h2
                     className={`text-sm font-bold font-serif ${
-                      isDark ? "text-[#FAF4EA]" : "text-[#1F120A]"
+                      isDark ? "text-[#FAF3E0]" : "text-[#14291D]"
                     }`}
                   >
                     {orderViewTab === "active"
@@ -1856,9 +1856,9 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                       await refreshAdminOrders();
                       setIsSyncingOrders(false);
                     }}
-                    className="px-2.5 py-1 rounded-lg text-xs font-bold bg-[#E08F35]/15 hover:bg-[#E08F35]/25 text-[#5E3210] dark:text-amber-200 border border-[#E08F35]/30 flex items-center gap-1 cursor-pointer transition-colors"
+                    className="px-2.5 py-1 rounded-lg text-xs font-bold bg-[#E0B04A]/15 hover:bg-[#E0B04A]/25 text-[#1F3D2B] dark:text-amber-200 border border-[#E0B04A]/30 flex items-center gap-1 cursor-pointer transition-colors"
                   >
-                    <Activity className={`w-3 h-3 text-[#E08F35] ${isSyncingOrders ? "animate-spin" : ""}`} />
+                    <Activity className={`w-3 h-3 text-[#E0B04A] ${isSyncingOrders ? "animate-spin" : ""}`} />
                     <span>{isSyncingOrders ? "Syncing..." : "Sync DB"}</span>
                   </button>
                   <span className="text-[11px] text-emerald-700 font-bold bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200 flex items-center gap-1 shrink-0">
@@ -1878,7 +1878,7 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                   }}
                   className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-2 ${
                     orderViewTab === "active"
-                      ? "bg-[#5E3210] text-white shadow-sm"
+                      ? "bg-[#1F3D2B] text-white shadow-sm"
                       : "text-stone-600 dark:text-stone-400 hover:text-stone-900 dark:hover:text-stone-200"
                   }`}
                 >
@@ -1903,7 +1903,7 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                   }}
                   className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-2 ${
                     orderViewTab === "completed"
-                      ? "bg-[#5E3210] text-white shadow-sm"
+                      ? "bg-[#1F3D2B] text-white shadow-sm"
                       : "text-stone-600 dark:text-stone-400 hover:text-stone-900 dark:hover:text-stone-200"
                   }`}
                 >
@@ -1945,7 +1945,7 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                       onClick={() => setAdminStatusFilter(st)}
                       className={`px-2.5 py-1 rounded-lg text-[10px] font-bold capitalize cursor-pointer transition-colors ${
                         adminStatusFilter === st
-                          ? "bg-[#5E3210] text-white"
+                          ? "bg-[#1F3D2B] text-white"
                           : "bg-stone-100 dark:bg-stone-800 text-stone-600 dark:text-stone-300 border border-stone-200 dark:border-stone-700"
                       }`}
                     >
@@ -1961,7 +1961,7 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                     isDark ? "text-[#A89482]" : "text-[#6A523E]"
                   }`}
                 >
-                  <Package className="w-8 h-8 mx-auto text-[#DDD1BE]" />
+                  <Package className="w-8 h-8 mx-auto text-[#F2E8CC]" />
                   <p className="text-xs font-semibold">
                     {orderViewTab === "active"
                       ? "No active ongoing orders right now"
@@ -2019,8 +2019,8 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                         key={ord.orderRef}
                         className={`p-4 rounded-2xl border space-y-3 shadow-2xs ${
                           isDark
-                            ? "bg-[#150D07] border-[#362114]"
-                            : "bg-[#FAF7F2] border-[#E8DEC8]"
+                            ? "bg-[#14291D] border-[#1F3D2B]"
+                            : "bg-[#FAF3E0] border-[#F2E8CC]"
                         }`}
                       >
                         <div className="flex items-start justify-between gap-3 text-xs">
@@ -2028,7 +2028,7 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                             <div className="flex items-center gap-2">
                               <span
                                 className={`font-bold ${
-                                  isDark ? "text-[#FAF4EA]" : "text-[#1F120A]"
+                                  isDark ? "text-[#FAF3E0]" : "text-[#14291D]"
                                 }`}
                               >
                                 #{ord.orderRef}
@@ -2036,15 +2036,15 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                               <span
                                 className={`text-[10px] font-bold px-2 py-0.5 rounded border ${
                                   isDark
-                                    ? "bg-[#1C120B] border-[#3D2514] text-[#E08F35]"
-                                    : "bg-white border-[#DDD1BE] text-[#5E3210]"
+                                    ? "bg-[#14291D] border-[#1F3D2B] text-[#E0B04A]"
+                                    : "bg-white border-[#F2E8CC] text-[#1F3D2B]"
                                 }`}
                               >
                                 ₹{ord.total}
                               </span>
                               <span
                                 className={`text-[10px] ${
-                                  isDark ? "text-[#A89482]" : "text-[#7A5E48]"
+                                  isDark ? "text-[#A89482]" : "text-[#3F4F45]"
                                 }`}
                               >
                                 {ord.paymentMethod?.toUpperCase()}
@@ -2052,7 +2052,7 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                             </div>
                             <p
                               className={`text-[11px] mt-0.5 ${
-                                isDark ? "text-[#D8C8B8]" : "text-[#6A523E]"
+                                isDark ? "text-[#E0B04A]" : "text-[#6A523E]"
                               }`}
                             >
                               {addr.fullName || "Customer"} •{" "}
@@ -2085,10 +2085,10 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                                       e.target.value as OrderStatus
                                     )
                                   }
-                                  className={`px-2.5 py-1 rounded-lg text-xs font-bold focus:ring-1 focus:ring-[#E08F35] ${
+                                  className={`px-2.5 py-1 rounded-lg text-xs font-bold focus:ring-1 focus:ring-[#E0B04A] ${
                                     isDark
-                                      ? "bg-[#1C120B] border border-[#3D2514] text-amber-200"
-                                      : "bg-white border border-[#DDD1BE] text-[#5E3210]"
+                                      ? "bg-[#14291D] border border-[#1F3D2B] text-amber-200"
+                                      : "bg-white border border-[#F2E8CC] text-[#1F3D2B]"
                                   }`}
                                 >
                                   <option value="Placed">Placed</option>
@@ -2141,13 +2141,13 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                         <div
                           className={`text-[11px] p-2.5 rounded-xl border space-y-1 ${
                             isDark
-                              ? "bg-[#1C120B] border-[#362114] text-[#D8C8B8]"
-                              : "bg-white border-[#EFE8DC] text-[#4A3220]"
+                              ? "bg-[#14291D] border-[#1F3D2B] text-[#E0B04A]"
+                              : "bg-white border-[#F2E8CC] text-[#4A3220]"
                           }`}
                         >
                           <span
                             className={`font-semibold block ${
-                              isDark ? "text-[#FAF4EA]" : "text-[#1F120A]"
+                              isDark ? "text-[#FAF3E0]" : "text-[#14291D]"
                             }`}
                           >
                             Ordered Items ({items.length}):
@@ -2166,14 +2166,14 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                         <div
                           className={`text-[11px] p-2.5 rounded-xl border space-y-1.5 ${
                             isDark
-                              ? "bg-[#1C120B] border-[#362114] text-[#D8C8B8]"
-                              : "bg-white border-[#EFE8DC] text-[#4A3220]"
+                              ? "bg-[#14291D] border-[#1F3D2B] text-[#E0B04A]"
+                              : "bg-white border-[#F2E8CC] text-[#4A3220]"
                           }`}
                         >
                           <div className="flex items-center justify-between gap-2">
                             <span
                               className={`font-semibold block ${
-                                isDark ? "text-[#FAF4EA]" : "text-[#1F120A]"
+                                isDark ? "text-[#FAF3E0]" : "text-[#14291D]"
                               }`}
                             >
                               Delivery Drop Address:
@@ -2308,14 +2308,14 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                                         rel="noopener noreferrer"
                                         className="px-2.5 py-1 rounded-lg border border-amber-500/30 text-amber-800 dark:text-amber-200 font-bold text-[11px] flex items-center gap-1"
                                       >
-                                        <Printer className="w-2.5 h-2.5 text-[#E08F35]" />
+                                        <Printer className="w-2.5 h-2.5 text-[#E0B04A]" />
                                         <span>Print Slip</span>
                                       </a>
                                       <a
                                         href={`https://www.delhivery.com/track/package/${ord.trackingNumber}`}
                                         target="_blank"
                                         rel="noopener noreferrer"
-                                        className="px-2.5 py-1 rounded-lg bg-[#5E3210] hover:bg-[#43230A] text-white font-bold text-[11px] flex items-center gap-1 transition-colors"
+                                        className="px-2.5 py-1 rounded-lg bg-[#1F3D2B] hover:bg-[#1F3D2B] text-white font-bold text-[11px] flex items-center gap-1 transition-colors"
                                       >
                                         <span>Track Delhivery</span>
                                         <ExternalLink className="w-2.5 h-2.5" />
@@ -2337,7 +2337,7 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                           <div
                             className={`p-3.5 rounded-xl border space-y-3 text-xs ${
                               isDark
-                                ? "bg-[#191009] border-[#3D2514]"
+                                ? "bg-[#191009] border-[#1F3D2B]"
                                 : "bg-[#F7F2E8] border-[#DFD4BF]"
                             }`}
                           >
@@ -2355,7 +2355,7 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                                   }
                                   className={`px-2.5 py-1 rounded-md transition-all cursor-pointer flex items-center gap-1 ${
                                     (carrierChoice[ord.orderRef] || "delhivery") === "delhivery"
-                                      ? "bg-[#5E3210] text-white shadow-xs"
+                                      ? "bg-[#1F3D2B] text-white shadow-xs"
                                       : "text-stone-600 dark:text-stone-400 hover:text-stone-900"
                                   }`}
                                 >
@@ -2423,8 +2423,8 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                                     disabled={checkingPincode[ord.orderRef]}
                                     className={`text-[10px] font-bold px-2 py-1 rounded-lg border transition-colors cursor-pointer ${
                                       isDark
-                                        ? "bg-[#1C120B] border-[#3D2514] text-[#E08F35] hover:bg-[#28180E]"
-                                        : "bg-white border-[#DDD1BE] text-[#5E3210] hover:bg-[#FAF6EE]"
+                                        ? "bg-[#14291D] border-[#1F3D2B] text-[#E0B04A] hover:bg-[#28180E]"
+                                        : "bg-white border-[#F2E8CC] text-[#1F3D2B] hover:bg-[#FAF3E0]"
                                     }`}
                                   >
                                     {checkingPincode[ord.orderRef] ? "Checking..." : `Verify Delhivery Pin`}
@@ -2450,8 +2450,8 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                                     disabled={checkingEkartPincode[ord.orderRef]}
                                     className={`text-[10px] font-bold px-2 py-1 rounded-lg border transition-colors cursor-pointer ${
                                       isDark
-                                        ? "bg-[#1C120B] border-[#3D2514] text-sky-400 hover:bg-[#28180E]"
-                                        : "bg-white border-[#DDD1BE] text-sky-700 hover:bg-[#FAF6EE]"
+                                        ? "bg-[#14291D] border-[#1F3D2B] text-sky-400 hover:bg-[#28180E]"
+                                        : "bg-white border-[#F2E8CC] text-sky-700 hover:bg-[#FAF3E0]"
                                     }`}
                                   >
                                     {checkingEkartPincode[ord.orderRef] ? "Checking..." : `Verify Ekart Pin`}
@@ -2476,8 +2476,8 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                                   disabled={checkingShadowfaxPincode[ord.orderRef]}
                                   className={`text-[10px] font-bold px-2 py-1 rounded-lg border transition-colors cursor-pointer ${
                                     isDark
-                                      ? "bg-[#1C120B] border-[#3D2514] text-emerald-400 hover:bg-[#28180E]"
-                                      : "bg-white border-[#DDD1BE] text-emerald-700 hover:bg-[#FAF6EE]"
+                                      ? "bg-[#14291D] border-[#1F3D2B] text-emerald-400 hover:bg-[#28180E]"
+                                      : "bg-white border-[#F2E8CC] text-emerald-700 hover:bg-[#FAF3E0]"
                                   }`}
                                 >
                                   {checkingShadowfaxPincode[ord.orderRef] ? "Checking..." : `Verify Shadowfax Pin`}
@@ -2500,9 +2500,9 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                               <button
                                 type="button"
                                 onClick={() => handleOpenEditAddress(ord)}
-                                className="text-[11px] font-bold text-[#E08F35] hover:underline flex items-center gap-1 cursor-pointer"
+                                className="text-[11px] font-bold text-[#E0B04A] hover:underline flex items-center gap-1 cursor-pointer"
                               >
-                                <Edit2 className="w-3 h-3 text-[#E08F35]" />
+                                <Edit2 className="w-3 h-3 text-[#E0B04A]" />
                                 <span>Edit Address / Pin</span>
                               </button>
                               <a
@@ -2520,7 +2520,7 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                           {ord.trackingNumber ? (
                             <div
                               className={`p-2.5 rounded-lg border space-y-2 ${
-                                isDark ? "bg-[#140D07] border-[#362114]" : "bg-white border-[#E5DAC8]"
+                                isDark ? "bg-[#14291D] border-[#1F3D2B]" : "bg-white border-[#E5DAC8]"
                               }`}
                             >
                               <div className="flex flex-wrap items-center justify-between gap-2">
@@ -2537,7 +2537,7 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                                   </span>
                                   <span
                                     className={`font-mono text-xs font-bold ${
-                                      isDark ? "text-[#FAF4EA]" : "text-[#1F120A]"
+                                      isDark ? "text-[#FAF3E0]" : "text-[#14291D]"
                                     }`}
                                   >
                                     AWB: {ord.trackingNumber}
@@ -2576,8 +2576,8 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                                         rel="noopener noreferrer"
                                         className={`px-2.5 py-1 rounded-lg border font-bold text-[11px] flex items-center gap-1 transition-colors ${
                                           isDark
-                                            ? "bg-[#1E130B] border-[#3D2514] text-[#FAF4EA] hover:bg-[#2A1A0F]"
-                                            : "bg-[#FAF6EE] border-[#DDD1BE] text-[#1F120A] hover:bg-[#EFE8DC]"
+                                            ? "bg-[#1E130B] border-[#1F3D2B] text-[#FAF3E0] hover:bg-[#2A1A0F]"
+                                            : "bg-[#FAF3E0] border-[#F2E8CC] text-[#14291D] hover:bg-[#F2E8CC]"
                                         }`}
                                         title="Print Shadowfax Shipping Label"
                                       >
@@ -2601,8 +2601,8 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                                         rel="noopener noreferrer"
                                         className={`px-2.5 py-1 rounded-lg border font-bold text-[11px] flex items-center gap-1 transition-colors ${
                                           isDark
-                                            ? "bg-[#1E130B] border-[#3D2514] text-[#FAF4EA] hover:bg-[#2A1A0F]"
-                                            : "bg-[#FAF6EE] border-[#DDD1BE] text-[#1F120A] hover:bg-[#EFE8DC]"
+                                            ? "bg-[#1E130B] border-[#1F3D2B] text-[#FAF3E0] hover:bg-[#2A1A0F]"
+                                            : "bg-[#FAF3E0] border-[#F2E8CC] text-[#14291D] hover:bg-[#F2E8CC]"
                                         }`}
                                       >
                                         <span>Shadowfax 360</span>
@@ -2640,8 +2640,8 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                                         rel="noopener noreferrer"
                                         className={`px-2.5 py-1 rounded-lg border font-bold text-[11px] flex items-center gap-1 transition-colors ${
                                           isDark
-                                            ? "bg-[#1E130B] border-[#3D2514] text-[#FAF4EA] hover:bg-[#2A1A0F]"
-                                            : "bg-[#FAF6EE] border-[#DDD1BE] text-[#1F120A] hover:bg-[#EFE8DC]"
+                                            ? "bg-[#1E130B] border-[#1F3D2B] text-[#FAF3E0] hover:bg-[#2A1A0F]"
+                                            : "bg-[#FAF3E0] border-[#F2E8CC] text-[#14291D] hover:bg-[#F2E8CC]"
                                         }`}
                                         title="Print Ekart Shipping Label"
                                       >
@@ -2665,8 +2665,8 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                                         rel="noopener noreferrer"
                                         className={`px-2.5 py-1 rounded-lg border font-bold text-[11px] flex items-center gap-1 transition-colors ${
                                           isDark
-                                            ? "bg-[#1E130B] border-[#3D2514] text-[#FAF4EA] hover:bg-[#2A1A0F]"
-                                            : "bg-[#FAF6EE] border-[#DDD1BE] text-[#1F120A] hover:bg-[#EFE8DC]"
+                                            ? "bg-[#1E130B] border-[#1F3D2B] text-[#FAF3E0] hover:bg-[#2A1A0F]"
+                                            : "bg-[#FAF3E0] border-[#F2E8CC] text-[#14291D] hover:bg-[#F2E8CC]"
                                         }`}
                                       >
                                         <span>Ekart Dashboard</span>
@@ -2683,19 +2683,19 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                                         rel="noopener noreferrer"
                                         className={`px-2.5 py-1 rounded-lg border font-bold text-[11px] flex items-center gap-1 transition-colors ${
                                           isDark
-                                            ? "bg-[#1E130B] border-[#3D2514] text-[#FAF4EA] hover:bg-[#2A1A0F]"
-                                            : "bg-[#FAF6EE] border-[#DDD1BE] text-[#1F120A] hover:bg-[#EFE8DC]"
+                                            ? "bg-[#1E130B] border-[#1F3D2B] text-[#FAF3E0] hover:bg-[#2A1A0F]"
+                                            : "bg-[#FAF3E0] border-[#F2E8CC] text-[#14291D] hover:bg-[#F2E8CC]"
                                         }`}
                                         title="Print Delhivery Packing Slip"
                                       >
-                                        <Printer className="w-2.5 h-2.5 text-[#E08F35]" />
+                                        <Printer className="w-2.5 h-2.5 text-[#E0B04A]" />
                                         <span>Print Label</span>
                                       </a>
                                       <a
                                         href={`https://www.delhivery.com/track/package/${ord.trackingNumber}`}
                                         target="_blank"
                                         rel="noopener noreferrer"
-                                        className="px-2.5 py-1 rounded-lg bg-[#5E3210] hover:bg-[#43230A] text-white font-bold text-[11px] flex items-center gap-1 transition-colors"
+                                        className="px-2.5 py-1 rounded-lg bg-[#1F3D2B] hover:bg-[#1F3D2B] text-white font-bold text-[11px] flex items-center gap-1 transition-colors"
                                       >
                                         <span>Track Delhivery</span>
                                         <ExternalLink className="w-2.5 h-2.5" />
@@ -2756,8 +2756,8 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                                     }
                                     className={`flex-1 px-2.5 py-1 text-xs rounded-lg font-mono focus:outline-none focus:ring-1 focus:ring-emerald-500 ${
                                       isDark
-                                        ? "bg-[#140D07] border border-[#362114] text-[#FAF4EA] placeholder-[#8A7665]"
-                                        : "bg-white border border-[#DDD1BE] text-[#1F120A] placeholder-[#8A7665]"
+                                        ? "bg-[#14291D] border border-[#1F3D2B] text-[#FAF3E0] placeholder-[#8A7665]"
+                                        : "bg-white border border-[#F2E8CC] text-[#14291D] placeholder-[#8A7665]"
                                     }`}
                                   />
                                   <button
@@ -2790,7 +2790,7 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                                     <button
                                       type="button"
                                       onClick={() => setCarrierChoice((p) => ({ ...p, [ord.orderRef]: "delhivery" }))}
-                                      className="px-2.5 py-1 rounded-md bg-[#5E3210] hover:bg-[#43230A] text-white font-bold text-[10px] flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
+                                      className="px-2.5 py-1 rounded-md bg-[#1F3D2B] hover:bg-[#1F3D2B] text-white font-bold text-[10px] flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
                                     >
                                       <Truck className="w-3 h-3 text-amber-300" />
                                       <span>Switch to Delhivery Express</span>
@@ -2838,8 +2838,8 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                                     }
                                     className={`flex-1 px-2.5 py-1 text-xs rounded-lg font-mono focus:outline-none focus:ring-1 focus:ring-sky-500 ${
                                       isDark
-                                        ? "bg-[#140D07] border border-[#362114] text-[#FAF4EA] placeholder-[#8A7665]"
-                                        : "bg-white border border-[#DDD1BE] text-[#1F120A] placeholder-[#8A7665]"
+                                        ? "bg-[#14291D] border border-[#1F3D2B] text-[#FAF3E0] placeholder-[#8A7665]"
+                                        : "bg-white border border-[#F2E8CC] text-[#14291D] placeholder-[#8A7665]"
                                     }`}
                                   />
                                   <button
@@ -2871,7 +2871,7 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                                     <button
                                       type="button"
                                       onClick={() => setCarrierChoice((p) => ({ ...p, [ord.orderRef]: "delhivery" }))}
-                                      className="px-2.5 py-1 rounded-md bg-[#5E3210] hover:bg-[#43230A] text-white font-bold text-[10px] flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
+                                      className="px-2.5 py-1 rounded-md bg-[#1F3D2B] hover:bg-[#1F3D2B] text-white font-bold text-[10px] flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
                                     >
                                       <Truck className="w-3 h-3 text-amber-300" />
                                       <span>Switch to Delhivery Express (Ready Now)</span>
@@ -2888,7 +2888,7 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                                   type="button"
                                   onClick={() => handleManifestDelhivery(ord)}
                                   disabled={manifesting[ord.orderRef]}
-                                  className="px-3 py-1.5 rounded-lg bg-[#5E3210] hover:bg-[#43230A] disabled:opacity-50 text-white font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
+                                  className="px-3 py-1.5 rounded-lg bg-[#1F3D2B] hover:bg-[#1F3D2B] disabled:opacity-50 text-white font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
                                 >
                                   <Truck className="w-3.5 h-3.5 text-amber-300" />
                                   <span>
@@ -2909,10 +2909,10 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                                         [ord.orderRef]: e.target.value,
                                       }))
                                     }
-                                    className={`flex-1 px-2.5 py-1 text-xs rounded-lg font-mono focus:outline-none focus:ring-1 focus:ring-[#E08F35] ${
+                                    className={`flex-1 px-2.5 py-1 text-xs rounded-lg font-mono focus:outline-none focus:ring-1 focus:ring-[#E0B04A] ${
                                       isDark
-                                        ? "bg-[#140D07] border border-[#362114] text-[#FAF4EA] placeholder-[#8A7665]"
-                                        : "bg-white border border-[#DDD1BE] text-[#1F120A] placeholder-[#8A7665]"
+                                        ? "bg-[#14291D] border border-[#1F3D2B] text-[#FAF3E0] placeholder-[#8A7665]"
+                                        : "bg-white border border-[#F2E8CC] text-[#14291D] placeholder-[#8A7665]"
                                     }`}
                                   />
                                   <button
@@ -2949,11 +2949,11 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                               rel="noopener noreferrer"
                               className={`px-3 py-1.5 rounded-lg border text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer ${
                                 isDark
-                                  ? "bg-[#1C120B] border-[#362114] text-amber-200 hover:border-[#E08F35]"
-                                  : "bg-white border-[#DDD1BE] hover:border-[#E08F35] text-[#5E3210]"
+                                  ? "bg-[#14291D] border-[#1F3D2B] text-amber-200 hover:border-[#E0B04A]"
+                                  : "bg-white border-[#F2E8CC] hover:border-[#E0B04A] text-[#1F3D2B]"
                               }`}
                             >
-                              <MapPin className="w-3.5 h-3.5 text-[#E08F35]" />
+                              <MapPin className="w-3.5 h-3.5 text-[#E0B04A]" />
                               <span>Google Maps Pin</span>
                               <ExternalLink className="w-3 h-3 text-[#A69788]" />
                             </a>
@@ -2964,12 +2964,12 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                                 onClick={() => handleOpenEditAddress(ord)}
                                 className={`px-3 py-1.5 rounded-lg border text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer ${
                                   isDark
-                                    ? "bg-[#1C120B] border-[#362114] text-amber-300 hover:border-[#E08F35] hover:bg-[#28180E]"
-                                    : "bg-white border-[#DDD1BE] hover:border-[#E08F35] text-[#5E3210] hover:bg-amber-50"
+                                    ? "bg-[#14291D] border-[#1F3D2B] text-amber-300 hover:border-[#E0B04A] hover:bg-[#28180E]"
+                                    : "bg-white border-[#F2E8CC] hover:border-[#E0B04A] text-[#1F3D2B] hover:bg-amber-50"
                                 }`}
                                 title="Edit address, phone, or adjust doorstep GPS pin before courier dispatch"
                               >
-                                <Edit2 className="w-3.5 h-3.5 text-[#E08F35]" />
+                                <Edit2 className="w-3.5 h-3.5 text-[#E0B04A]" />
                                 <span>Edit Address & Pin</span>
                               </button>
                             )}
@@ -2981,14 +2981,14 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                                 copiedAddress[ord.orderRef]
                                   ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-600"
                                   : isDark
-                                  ? "bg-[#1C120B] border-[#362114] text-[#FAF4EA] hover:border-[#E08F35]"
-                                  : "bg-white border-[#DDD1BE] hover:border-[#E08F35] text-[#1F120A]"
+                                  ? "bg-[#14291D] border-[#1F3D2B] text-[#FAF3E0] hover:border-[#E0B04A]"
+                                  : "bg-white border-[#F2E8CC] hover:border-[#E0B04A] text-[#14291D]"
                               }`}
                             >
                               {copiedAddress[ord.orderRef] ? (
                                 <Check className="w-3.5 h-3.5 text-emerald-600" />
                               ) : (
-                                <Copy className="w-3.5 h-3.5 text-[#E08F35]" />
+                                <Copy className="w-3.5 h-3.5 text-[#E0B04A]" />
                               )}
                               <span>
                                 {copiedAddress[ord.orderRef]
@@ -3051,20 +3051,20 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
             <div
               className={`w-full max-w-4xl rounded-3xl p-5 sm:p-7 space-y-5 text-left border shadow-2xl max-h-[92vh] overflow-y-auto ${
                 isDark
-                  ? "bg-[#180E08] text-[#FAF4EA] border-[#362114]"
-                  : "bg-white text-[#1F120A] border-[#DDD1BE]"
+                  ? "bg-[#14291D] text-[#FAF3E0] border-[#1F3D2B]"
+                  : "bg-white text-[#14291D] border-[#F2E8CC]"
               }`}
             >
               {/* Modal Header */}
               <div className="flex items-center justify-between border-b pb-3 border-stone-200 dark:border-stone-800">
                 <div className="flex items-center gap-2.5">
-                  <div className="p-2 rounded-xl bg-[#E08F35]/20 text-[#E08F35]">
-                    <MapPin className="w-5 h-5 text-[#E08F35]" />
+                  <div className="p-2 rounded-xl bg-[#E0B04A]/20 text-[#E0B04A]">
+                    <MapPin className="w-5 h-5 text-[#E0B04A]" />
                   </div>
                   <div>
                     <h3 className="font-bold font-serif text-base flex items-center gap-2">
                       <span>Edit Delivery Address & GPS Pin</span>
-                      <span className="text-xs font-mono font-bold px-2 py-0.5 rounded-full bg-amber-500/15 text-[#E08F35]">
+                      <span className="text-xs font-mono font-bold px-2 py-0.5 rounded-full bg-amber-500/15 text-[#E0B04A]">
                         #{editingOrderAddress.orderRef}
                       </span>
                     </h3>
@@ -3086,7 +3086,7 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
                 {/* Column 1: Address Fields */}
                 <div className="space-y-3.5">
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-[#E08F35] flex items-center gap-1.5">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-[#E0B04A] flex items-center gap-1.5">
                     <span>1. Customer & Delivery Address</span>
                   </h4>
 
@@ -3101,10 +3101,10 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                         onChange={(e) =>
                           setEditAddressForm((p) => ({ ...p, fullName: e.target.value }))
                         }
-                        className={`w-full px-3 py-2 text-xs rounded-xl focus:outline-none focus:ring-1 focus:ring-[#E08F35] ${
+                        className={`w-full px-3 py-2 text-xs rounded-xl focus:outline-none focus:ring-1 focus:ring-[#E0B04A] ${
                           isDark
-                            ? "bg-[#100905] border border-[#362114] text-[#FAF4EA]"
-                            : "bg-[#FAF7F2] border border-[#DDD1BE] text-[#1F120A]"
+                            ? "bg-[#100905] border border-[#1F3D2B] text-[#FAF3E0]"
+                            : "bg-[#FAF3E0] border border-[#F2E8CC] text-[#14291D]"
                         }`}
                       />
                     </div>
@@ -3123,10 +3123,10 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                             phone: e.target.value.replace(/\D/g, "").slice(0, 10),
                           }))
                         }
-                        className={`w-full px-3 py-2 text-xs font-mono rounded-xl focus:outline-none focus:ring-1 focus:ring-[#E08F35] ${
+                        className={`w-full px-3 py-2 text-xs font-mono rounded-xl focus:outline-none focus:ring-1 focus:ring-[#E0B04A] ${
                           isDark
-                            ? "bg-[#100905] border border-[#362114] text-[#FAF4EA]"
-                            : "bg-[#FAF7F2] border border-[#DDD1BE] text-[#1F120A]"
+                            ? "bg-[#100905] border border-[#1F3D2B] text-[#FAF3E0]"
+                            : "bg-[#FAF3E0] border border-[#F2E8CC] text-[#14291D]"
                         }`}
                       />
                     </div>
@@ -3142,10 +3142,10 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                       onChange={(e) =>
                         setEditAddressForm((p) => ({ ...p, addressLine1: e.target.value }))
                       }
-                      className={`w-full px-3 py-2 text-xs rounded-xl focus:outline-none focus:ring-1 focus:ring-[#E08F35] resize-none ${
+                      className={`w-full px-3 py-2 text-xs rounded-xl focus:outline-none focus:ring-1 focus:ring-[#E0B04A] resize-none ${
                         isDark
-                          ? "bg-[#100905] border border-[#362114] text-[#FAF4EA]"
-                          : "bg-[#FAF7F2] border border-[#DDD1BE] text-[#1F120A]"
+                          ? "bg-[#100905] border border-[#1F3D2B] text-[#FAF3E0]"
+                          : "bg-[#FAF3E0] border border-[#F2E8CC] text-[#14291D]"
                       }`}
                     />
                   </div>
@@ -3161,10 +3161,10 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                       onChange={(e) =>
                         setEditAddressForm((p) => ({ ...p, landmark: e.target.value }))
                       }
-                      className={`w-full px-3 py-2 text-xs rounded-xl focus:outline-none focus:ring-1 focus:ring-[#E08F35] ${
+                      className={`w-full px-3 py-2 text-xs rounded-xl focus:outline-none focus:ring-1 focus:ring-[#E0B04A] ${
                         isDark
-                          ? "bg-[#100905] border border-[#362114] text-[#FAF4EA]"
-                          : "bg-[#FAF7F2] border border-[#DDD1BE] text-[#1F120A]"
+                          ? "bg-[#100905] border border-[#1F3D2B] text-[#FAF3E0]"
+                          : "bg-[#FAF3E0] border border-[#F2E8CC] text-[#14291D]"
                       }`}
                     />
                   </div>
@@ -3185,10 +3185,10 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                             district: districts[0] || p.district,
                           }));
                         }}
-                        className={`w-full px-3 py-2 text-xs rounded-xl focus:outline-none focus:ring-1 focus:ring-[#E08F35] ${
+                        className={`w-full px-3 py-2 text-xs rounded-xl focus:outline-none focus:ring-1 focus:ring-[#E0B04A] ${
                           isDark
-                            ? "bg-[#100905] border border-[#362114] text-[#FAF4EA]"
-                            : "bg-[#FAF7F2] border border-[#DDD1BE] text-[#1F120A]"
+                            ? "bg-[#100905] border border-[#1F3D2B] text-[#FAF3E0]"
+                            : "bg-[#FAF3E0] border border-[#F2E8CC] text-[#14291D]"
                         }`}
                       >
                         {Object.keys(INDIAN_STATES_DISTRICTS).map((st) => (
@@ -3208,10 +3208,10 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                         onChange={(e) =>
                           setEditAddressForm((p) => ({ ...p, district: e.target.value }))
                         }
-                        className={`w-full px-3 py-2 text-xs rounded-xl focus:outline-none focus:ring-1 focus:ring-[#E08F35] ${
+                        className={`w-full px-3 py-2 text-xs rounded-xl focus:outline-none focus:ring-1 focus:ring-[#E0B04A] ${
                           isDark
-                            ? "bg-[#100905] border border-[#362114] text-[#FAF4EA]"
-                            : "bg-[#FAF7F2] border border-[#DDD1BE] text-[#1F120A]"
+                            ? "bg-[#100905] border border-[#1F3D2B] text-[#FAF3E0]"
+                            : "bg-[#FAF3E0] border border-[#F2E8CC] text-[#14291D]"
                         }`}
                       >
                         {!((INDIAN_STATES_DISTRICTS[editAddressForm.state] || []).includes(editAddressForm.district)) && editAddressForm.district && (
@@ -3239,10 +3239,10 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                             pincode: e.target.value.replace(/\D/g, "").slice(0, 6),
                           }))
                         }
-                        className={`w-full px-3 py-2 text-xs font-mono rounded-xl focus:outline-none focus:ring-1 focus:ring-[#E08F35] ${
+                        className={`w-full px-3 py-2 text-xs font-mono rounded-xl focus:outline-none focus:ring-1 focus:ring-[#E0B04A] ${
                           isDark
-                            ? "bg-[#100905] border border-[#362114] text-[#FAF4EA]"
-                            : "bg-[#FAF7F2] border border-[#DDD1BE] text-[#1F120A]"
+                            ? "bg-[#100905] border border-[#1F3D2B] text-[#FAF3E0]"
+                            : "bg-[#FAF3E0] border border-[#F2E8CC] text-[#14291D]"
                         }`}
                       />
                     </div>
@@ -3252,7 +3252,7 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                     type="button"
                     onClick={handleLocatePincodeInEditModal}
                     disabled={isLocatingEditPincode}
-                    className="w-full py-2 rounded-xl bg-amber-500/15 border border-amber-500/30 text-[#E08F35] text-xs font-bold flex items-center justify-center gap-1.5 hover:bg-amber-500/25 transition-colors cursor-pointer disabled:opacity-50"
+                    className="w-full py-2 rounded-xl bg-amber-500/15 border border-amber-500/30 text-[#E0B04A] text-xs font-bold flex items-center justify-center gap-1.5 hover:bg-amber-500/25 transition-colors cursor-pointer disabled:opacity-50"
                   >
                     <Navigation className="w-3.5 h-3.5" />
                     <span>
@@ -3266,7 +3266,7 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                 {/* Column 2: Interactive Leaflet Map & GPS Verification */}
                 <div className="space-y-3.5">
                   <div className="flex items-center justify-between">
-                    <h4 className="text-xs font-bold uppercase tracking-wider text-[#E08F35] flex items-center gap-1.5">
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-[#E0B04A] flex items-center gap-1.5">
                       <span>2. Doorstep GPS Pinpoint</span>
                     </h4>
                     <span className="text-[11px] font-mono text-stone-500">
@@ -3282,25 +3282,25 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                       placeholder="Search locality, street, or building name..."
                       value={editMapSearchQuery}
                       onChange={(e) => handleEditMapSearch(e.target.value)}
-                      className={`w-full pl-9 pr-9 py-2 text-xs rounded-xl focus:outline-none focus:ring-1 focus:ring-[#E08F35] ${
+                      className={`w-full pl-9 pr-9 py-2 text-xs rounded-xl focus:outline-none focus:ring-1 focus:ring-[#E0B04A] ${
                         isDark
-                          ? "bg-[#100905] border border-[#362114] text-[#FAF4EA]"
-                          : "bg-[#FAF7F2] border border-[#DDD1BE] text-[#1F120A]"
+                          ? "bg-[#100905] border border-[#1F3D2B] text-[#FAF3E0]"
+                          : "bg-[#FAF3E0] border border-[#F2E8CC] text-[#14291D]"
                       }`}
                     />
                     {isSearchingEditMap && (
-                      <Loader2 className="absolute right-3 top-2.5 w-3.5 h-3.5 text-[#E08F35] animate-spin" />
+                      <Loader2 className="absolute right-3 top-2.5 w-3.5 h-3.5 text-[#E0B04A] animate-spin" />
                     )}
 
                     {editMapSearchResults.length > 0 && (
-                      <ul className="absolute left-0 right-0 top-full mt-1.5 bg-white dark:bg-[#1C110B] border border-stone-200 dark:border-[#4A301E] rounded-xl shadow-xl max-h-48 overflow-y-auto divide-y divide-stone-100 dark:divide-[#2C1D14] z-50">
+                      <ul className="absolute left-0 right-0 top-full mt-1.5 bg-white dark:bg-[#14291D] border border-stone-200 dark:border-[#2D5A3F] rounded-xl shadow-xl max-h-48 overflow-y-auto divide-y divide-stone-100 dark:divide-[#2C1D14] z-50">
                         {editMapSearchResults.map((res, i) => (
                           <li
                             key={i}
                             onClick={() => handleSelectEditSearchResult(res)}
                             className="p-2.5 text-xs hover:bg-amber-50 dark:hover:bg-[#2C1D14] cursor-pointer flex items-start gap-2"
                           >
-                            <MapPin className="w-3.5 h-3.5 text-[#E08F35] shrink-0 mt-0.5" />
+                            <MapPin className="w-3.5 h-3.5 text-[#E0B04A] shrink-0 mt-0.5" />
                             <span className="line-clamp-2">{res.display_name}</span>
                           </li>
                         ))}
@@ -3371,8 +3371,8 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
             <div
               className={`w-full max-w-lg rounded-3xl p-5 sm:p-6 shadow-2xl border transition-all ${
                 isDark
-                  ? "bg-[#180F08] border-[#362114] text-[#FAF4EA]"
-                  : "bg-white border-[#E8DEC8] text-[#1F120A]"
+                  ? "bg-[#180F08] border-[#1F3D2B] text-[#FAF3E0]"
+                  : "bg-white border-[#F2E8CC] text-[#14291D]"
               }`}
             >
               {/* Header */}
@@ -3422,8 +3422,8 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                     placeholder="e.g. manojmr1712@gmail.com"
                     className={`w-full px-3 py-2 rounded-xl text-xs font-mono focus:outline-none focus:ring-1 focus:ring-sky-500 ${
                       isDark
-                        ? "bg-[#140D07] border border-[#362114] text-[#FAF4EA]"
-                        : "bg-stone-50 border border-[#DDD1BE] text-[#1F120A]"
+                        ? "bg-[#14291D] border border-[#1F3D2B] text-[#FAF3E0]"
+                        : "bg-stone-50 border border-[#F2E8CC] text-[#14291D]"
                     }`}
                   />
                 </div>
@@ -3443,8 +3443,8 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                       placeholder="Enter your app.elite.ekartlogistics.in password"
                       className={`w-full px-3 py-2 pr-9 rounded-xl text-xs font-mono focus:outline-none focus:ring-1 focus:ring-sky-500 ${
                         isDark
-                          ? "bg-[#140D07] border border-[#362114] text-[#FAF4EA]"
-                          : "bg-stone-50 border border-[#DDD1BE] text-[#1F120A]"
+                          ? "bg-[#14291D] border border-[#1F3D2B] text-[#FAF3E0]"
+                          : "bg-stone-50 border border-[#F2E8CC] text-[#14291D]"
                       }`}
                     />
                     <button
@@ -3471,8 +3471,8 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                     placeholder="Leave blank to use password, or paste 24-hr JWT"
                     className={`w-full px-3 py-2 rounded-xl text-xs font-mono focus:outline-none focus:ring-1 focus:ring-sky-500 ${
                       isDark
-                        ? "bg-[#140D07] border border-[#362114] text-[#FAF4EA]"
-                        : "bg-stone-50 border border-[#DDD1BE] text-[#1F120A]"
+                        ? "bg-[#14291D] border border-[#1F3D2B] text-[#FAF3E0]"
+                        : "bg-stone-50 border border-[#F2E8CC] text-[#14291D]"
                     }`}
                   />
                   <p className="text-[10px] text-amber-600 dark:text-amber-400 mt-1">

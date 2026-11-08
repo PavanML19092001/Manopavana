@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { useStore } from "../context/StoreContext";
 import { BUSINESS_CONFIG } from "../constants";
+import { isSaleActive, getSaleDeadlineLabel } from "../utils/salePricing";
 
 export const CartPage: React.FC = () => {
   const navigate = useNavigate();
@@ -25,7 +26,10 @@ export const CartPage: React.FC = () => {
     removeFromCart,
     clearCart,
     subtotal,
+    regularSubtotal,
     discount,
+    discountAmount,
+    netAmount,
     shippingFee,
     total,
     freeShippingProgress,
@@ -47,36 +51,36 @@ export const CartPage: React.FC = () => {
     return (
       <div
         className={`w-full min-h-[calc(100vh-80px)] py-20 flex items-center justify-center transition-colors box-border ${
-          isDark ? "bg-[#140D09] text-[#FAF4EA]" : "bg-[#FAF6F0] text-[#23150C]"
+          isDark ? "bg-[#14291D] text-[#FAF3E0]" : "bg-[#FAF3E0] text-[#14291D]"
         }`}
       >
         <div
           className={`max-w-lg w-full mx-4 p-10 rounded-3xl border text-center space-y-6 shadow-sm ${
-            isDark ? "bg-[#1C120B] border-[#362114]" : "bg-white border-[#E8DEC8]"
+            isDark ? "bg-[#14291D] border-[#1F3D2B]" : "bg-white border-[#F2E8CC]"
           }`}
         >
           <div
             className={`w-20 h-20 mx-auto rounded-full border-2 flex items-center justify-center ${
-              isDark ? "bg-[#150D07] border-[#362114]" : "bg-[#FAF6EE] border-[#E8DEC8]"
+              isDark ? "bg-[#14291D] border-[#1F3D2B]" : "bg-[#FAF3E0] border-[#F2E8CC]"
             }`}
           >
-            <ShoppingBag className={`w-8 h-8 ${isDark ? "text-amber-400" : "text-[#C8751B]"}`} />
+            <ShoppingBag className={`w-8 h-8 ${isDark ? "text-amber-400" : "text-[#E0B04A]"}`} />
           </div>
           <div className="space-y-2">
             <h1
               className={`text-2xl font-bold font-serif ${
-                isDark ? "text-[#FAF4EA]" : "text-[#23150C]"
+                isDark ? "text-[#FAF3E0]" : "text-[#14291D]"
               }`}
             >
               Your Bag is Empty
             </h1>
-            <p className={`text-xs sm:text-sm ${isDark ? "text-[#D6C4B0]" : "text-[#5C402D]"}`}>
+            <p className={`text-xs sm:text-sm ${isDark ? "text-[#E0B04A]" : "text-[#3F4F45]"}`}>
               Experience authentic unrefined wood-pressed oils fresh from our Bengaluru packaging facility.
             </p>
           </div>
           <Link
             to="/"
-            className="inline-flex items-center gap-2 px-6 py-3.5 rounded-2xl bg-[#5E3210] hover:bg-[#43230A] text-white font-bold text-xs shadow-md transition-all cursor-pointer"
+            className="inline-flex items-center gap-2 px-6 py-3.5 rounded-2xl bg-[#1F3D2B] hover:bg-[#1F3D2B] text-white font-bold text-xs shadow-md transition-all cursor-pointer"
           >
             <span>Explore Wood-Pressed Oils</span>
             <ArrowRight className="w-4 h-4 text-amber-300" />
@@ -98,7 +102,7 @@ export const CartPage: React.FC = () => {
   return (
     <div
       className={`w-full min-h-[calc(100vh-80px)] py-8 transition-colors box-border ${
-        isDark ? "bg-[#140D09] text-[#FAF4EA]" : "bg-[#FAF6F0] text-[#23150C]"
+        isDark ? "bg-[#14291D] text-[#FAF3E0]" : "bg-[#FAF3E0] text-[#14291D]"
       }`}
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
@@ -109,8 +113,8 @@ export const CartPage: React.FC = () => {
               to="/"
               className={`p-2 rounded-xl border transition-colors ${
                 isDark
-                  ? "bg-[#1C120B] border-[#362114] text-[#D6C4B0] hover:text-white"
-                  : "bg-white border-[#E8DEC8] text-[#5A402D] hover:bg-[#FAF6EE]"
+                  ? "bg-[#14291D] border-[#1F3D2B] text-[#E0B04A] hover:text-white"
+                  : "bg-white border-[#F2E8CC] text-[#3F4F45] hover:bg-[#FAF3E0]"
               }`}
             >
               <ArrowLeft className="w-4 h-4" />
@@ -118,12 +122,12 @@ export const CartPage: React.FC = () => {
             <div>
               <h1
                 className={`text-2xl sm:text-3xl font-extrabold font-serif ${
-                  isDark ? "text-[#FAF4EA]" : "text-[#23150C]"
+                  isDark ? "text-[#FAF3E0]" : "text-[#14291D]"
                 }`}
               >
                 Shopping Bag
               </h1>
-              <p className={`text-xs ${isDark ? "text-[#D6C4B0]" : "text-[#5C402D]"}`}>
+              <p className={`text-xs ${isDark ? "text-[#E0B04A]" : "text-[#3F4F45]"}`}>
                 Review your wood-pressed oils before doorstep dispatch
               </p>
             </div>
@@ -140,13 +144,13 @@ export const CartPage: React.FC = () => {
         {/* Free Shipping Progress Bar */}
         <div
           className={`p-5 rounded-2xl border shadow-2xs space-y-2.5 ${
-            isDark ? "bg-[#1C120B] border-[#362114]" : "bg-white border-[#E8DEC8]"
+            isDark ? "bg-[#14291D] border-[#1F3D2B]" : "bg-white border-[#F2E8CC]"
           }`}
         >
           <div className="flex items-center justify-between text-xs">
             <div className="flex items-center gap-2">
-              <Truck className="w-4 h-4 text-[#E08F35]" />
-              <span className={`font-bold ${isDark ? "text-[#FAF4EA]" : "text-[#23150C]"}`}>
+              <Truck className="w-4 h-4 text-[#E0B04A]" />
+              <span className={`font-bold ${isDark ? "text-[#FAF3E0]" : "text-[#14291D]"}`}>
                 {freeShippingProgress >= 100
                   ? "🎉 Congratulations! You have unlocked FREE Doorstep Delivery across India!"
                   : `Add ₹${freeShippingShortfall} more (or add any 2+ bottles) to unlock FREE Doorstep Delivery across India!`}
@@ -154,7 +158,7 @@ export const CartPage: React.FC = () => {
             </div>
             <span
               className={`font-mono text-xs font-bold ${
-                isDark ? "text-amber-300" : "text-[#5E3210]"
+                isDark ? "text-amber-300" : "text-[#1F3D2B]"
               }`}
             >
               {freeShippingProgress}%
@@ -162,11 +166,11 @@ export const CartPage: React.FC = () => {
           </div>
           <div
             className={`w-full h-2.5 rounded-full overflow-hidden ${
-              isDark ? "bg-[#150D07]" : "bg-[#EFE9DF]"
+              isDark ? "bg-[#14291D]" : "bg-[#F2E8CC]"
             }`}
           >
             <div
-              className="bg-gradient-to-r from-[#E08F35] to-[#2E7D32] h-full transition-all duration-500 rounded-full"
+              className="bg-gradient-to-r from-[#E0B04A] to-[#2E7D32] h-full transition-all duration-500 rounded-full"
               style={{ width: `${freeShippingProgress}%` }}
             />
           </div>
@@ -180,7 +184,7 @@ export const CartPage: React.FC = () => {
               <div
                 key={item.id}
                 className={`p-4 sm:p-5 rounded-2xl border shadow-2xs transition-all ${
-                  isDark ? "bg-[#1C120B] border-[#362114]" : "bg-white border-[#E8DEC8]"
+                  isDark ? "bg-[#14291D] border-[#1F3D2B]" : "bg-white border-[#F2E8CC]"
                 }`}
               >
                 {/* Mobile & Desktop Clean Item Row */}
@@ -192,32 +196,32 @@ export const CartPage: React.FC = () => {
                       alt={item.title}
                       className={`w-16 h-20 sm:w-20 sm:h-22 object-contain p-1 rounded-xl border shrink-0 ${
                         isDark
-                          ? "bg-[#150D07] border-[#362114]"
-                          : "bg-[#FAF6EE] border-[#E8DEC8]"
+                          ? "bg-[#14291D] border-[#1F3D2B]"
+                          : "bg-[#FAF3E0] border-[#F2E8CC]"
                       }`}
                     />
                     <div className="space-y-1 min-w-0 flex-1">
                       <h3
                         className={`text-sm sm:text-base font-bold font-serif leading-snug truncate ${
-                          isDark ? "text-[#FAF4EA]" : "text-[#23150C]"
+                          isDark ? "text-[#FAF3E0]" : "text-[#14291D]"
                         }`}
                       >
                         {item.title}
                       </h3>
-                      <p className={`text-xs ${isDark ? "text-[#D6C4B0]" : "text-[#5C402D]"}`}>
+                      <p className={`text-xs ${isDark ? "text-[#E0B04A]" : "text-[#3F4F45]"}`}>
                         {item.subtitle} • <span className="font-semibold">{item.variant}</span>
                       </p>
                       <div className="flex items-baseline gap-2 pt-0.5">
                         <span
                           className={`text-sm font-extrabold ${
-                            isDark ? "text-amber-300" : "text-[#C8751B]"
+                            isDark ? "text-amber-300" : "text-[#E0B04A]"
                           }`}
                         >
                           ₹{item.price}
                         </span>
                         {item.regularPrice > item.price && (
                           <span
-                            className="text-xs line-through text-[#8C7A6B]"
+                            className="text-xs line-through text-[#3F4F45]"
                           >
                             ₹{item.regularPrice}
                           </span>
@@ -244,21 +248,21 @@ export const CartPage: React.FC = () => {
                 {/* Bottom Row: Quantity Stepper & Line Item Total */}
                 <div
                   className={`flex items-center justify-between mt-3 pt-3 border-t sm:mt-4 sm:pt-4 ${
-                    isDark ? "border-[#2D1B10]" : "border-[#F3ECE1]"
+                    isDark ? "border-[#14291D]" : "border-[#F2E8CC]"
                   }`}
                 >
                   {/* High-Contrast Stepper Controls */}
                   <div className="flex items-center gap-1 sm:gap-2">
                     <span className={`text-[11px] font-semibold mr-1.5 hidden sm:inline ${
-                      isDark ? "text-[#A8907E]" : "text-[#7A5E48]"
+                      isDark ? "text-[#3F4F45]" : "text-[#3F4F45]"
                     }`}>
                       Quantity:
                     </span>
                     <div
                       className={`flex items-center rounded-xl p-1 border shadow-2xs ${
                         isDark
-                          ? "bg-[#140D07] border-[#3D2517]"
-                          : "bg-[#FAF6EE] border-[#DDD0BF]"
+                          ? "bg-[#14291D] border-[#1F3D2B]"
+                          : "bg-[#FAF3E0] border-[#E0B04A]"
                       }`}
                     >
                       {/* Decrement Button */}
@@ -267,8 +271,8 @@ export const CartPage: React.FC = () => {
                         onClick={() => updateQuantity(item.id, -1)}
                         className={`w-8 h-8 rounded-lg flex items-center justify-center font-black active:scale-95 transition-all cursor-pointer border ${
                           isDark
-                            ? "bg-[#25150C] border-[#4D2E1A] text-[#F5BC51] hover:bg-[#361E10]"
-                            : "bg-white border-[#D8C6B2] text-[#5E3210] hover:bg-[#F3EDE2]"
+                            ? "bg-[#1F3D2B] border-[#2D5A3F] text-[#F3D17A] hover:bg-[#1F3D2B]"
+                            : "bg-white border-[#E0B04A] text-[#1F3D2B] hover:bg-[#F2E8CC]"
                         }`}
                         aria-label="Decrease quantity"
                       >
@@ -278,7 +282,7 @@ export const CartPage: React.FC = () => {
                       {/* Quantity Display */}
                       <span
                         className={`w-8 text-center text-xs font-black select-none ${
-                          isDark ? "text-[#FAF4EA]" : "text-[#1F120A]"
+                          isDark ? "text-[#FAF3E0]" : "text-[#14291D]"
                         }`}
                       >
                         {item.quantity}
@@ -288,7 +292,7 @@ export const CartPage: React.FC = () => {
                       <button
                         type="button"
                         onClick={() => updateQuantity(item.id, 1)}
-                        className="w-8 h-8 rounded-lg bg-[#E08F35] hover:bg-[#F5BC51] text-[#140D09] border border-[#F5BC51] flex items-center justify-center font-black active:scale-95 transition-all cursor-pointer shadow-xs"
+                        className="w-8 h-8 rounded-lg bg-[#E0B04A] hover:bg-[#F3D17A] text-[#14291D] border border-[#F3D17A] flex items-center justify-center font-black active:scale-95 transition-all cursor-pointer shadow-xs"
                         aria-label="Increase quantity"
                       >
                         <Plus className="w-3.5 h-3.5 stroke-[3]" />
@@ -298,12 +302,12 @@ export const CartPage: React.FC = () => {
 
                   {/* Line Item Total */}
                   <div className="text-right">
-                    <span className={`text-[11px] block ${isDark ? "text-[#A8907E]" : "text-[#8C7A6B]"}`}>
+                    <span className={`text-[11px] block ${isDark ? "text-[#3F4F45]" : "text-[#3F4F45]"}`}>
                       Subtotal
                     </span>
                     <span
                       className={`text-base sm:text-lg font-black font-serif ${
-                        isDark ? "text-[#FAF4EA]" : "text-[#1F120A]"
+                        isDark ? "text-[#FAF3E0]" : "text-[#14291D]"
                       }`}
                     >
                       ₹{item.price * item.quantity}
@@ -313,52 +317,59 @@ export const CartPage: React.FC = () => {
               </div>
             ))}
 
-            {/* 10% Discount on Orders Above ₹1,000 Card */}
+            {/* 10% Discount / Offer Card */}
             <div
               className={`p-4 rounded-2xl border flex items-center justify-between gap-4 ${
-                subtotal >= 1000
+                isSaleActive()
+                  ? "bg-[#1F3D2B]/10 border-[#E0B04A]/40"
+                  : subtotal >= 1000
                   ? "bg-emerald-500/10 border-emerald-500/30"
                   : isDark
-                  ? "bg-[#1C120B] border-[#362114]"
+                  ? "bg-[#14291D] border-[#1F3D2B]"
                   : "bg-amber-50/90 border border-amber-200"
               }`}
             >
               <div className="flex items-center gap-3">
-                <Sparkles className="w-5 h-5 text-[#E08F35] shrink-0" />
+                <Sparkles className="w-5 h-5 text-[#E0B04A] shrink-0" />
                 <div>
                   <p
                     className={`text-xs font-black ${
-                      subtotal >= 1000
+                      isSaleActive()
+                        ? "text-[#14291D] dark:text-[#F3D17A]"
+                        : subtotal >= 1000
                         ? "text-emerald-800 dark:text-emerald-400"
                         : isDark
                         ? "text-amber-200"
-                        : "text-[#5A381E]"
+                        : "text-[#3F4F45]"
                     }`}
                   >
-                    {subtotal >= 1000
+                    {isSaleActive()
+                      ? "🎉 10% Diwali Festive Offer Applied!"
+                      : subtotal >= 1000
                       ? "🎉 10% Discount Unlocked!"
                       : "Get 10% OFF on Orders Above ₹1,000"}
                   </p>
                   <p
                     className={`text-[11px] font-medium ${
-                      isDark ? "text-[#D6C4B0]" : "text-[#5C402D]"
+                      isDark ? "text-[#FAF3E0]/80" : "text-[#3F4F45]"
                     }`}
                   >
-                    {subtotal >= 1000
+                    {isSaleActive()
+                      ? `Flat 10% discount (-₹${discount}) applied sitewide on all items. (${getSaleDeadlineLabel()})`
+                      : subtotal >= 1000
                       ? `Flat 10% discount (-₹${discount}) automatically deducted from your total.`
                       : `Add ₹${1000 - subtotal} more of wood-pressed oils to unlock 10% instant savings!`}
                   </p>
+                  {isSaleActive() && (
+                    <p className="text-[10px] text-[#3F4F45] dark:text-[#FAF3E0]/70 mt-0.5">
+                      Best percentage discount applies; discounts do not stack.
+                    </p>
+                  )}
                 </div>
               </div>
-              {subtotal >= 1000 ? (
-                <span className="text-xs font-black text-emerald-800 bg-emerald-100 dark:bg-emerald-950/60 dark:text-emerald-300 px-3 py-1 rounded-xl shrink-0 border border-emerald-400">
-                  10% APPLIED
-                </span>
-              ) : (
-                <span className="text-[11px] font-black text-amber-900 bg-amber-100 dark:bg-amber-950/60 dark:text-amber-300 px-3 py-1 rounded-xl shrink-0 border border-amber-400">
-                  Min ₹1,000
-                </span>
-              )}
+              <span className="text-xs font-black text-[#14291D] bg-[#E0B04A] px-3 py-1 rounded-xl shrink-0 border border-[#F3D17A] shadow-2xs">
+                10% APPLIED
+              </span>
             </div>
           </div>
 
@@ -366,55 +377,60 @@ export const CartPage: React.FC = () => {
           <div className="lg:col-span-5 space-y-4">
             <div
               className={`rounded-2xl border p-6 shadow-2xs space-y-4 ${
-                isDark ? "bg-[#1C120B] border-[#362114]" : "bg-white border-[#E8DEC8]"
+                isDark ? "bg-[#14291D] border-[#1F3D2B]" : "bg-white border-[#F2E8CC]"
               }`}
             >
               <h2
                 className={`text-base font-bold font-serif border-b pb-3 ${
                   isDark
-                    ? "text-[#FAF4EA] border-[#2D1B10]"
-                    : "text-[#23150C] border-[#EFE8DC]"
+                    ? "text-[#FAF3E0] border-[#14291D]"
+                    : "text-[#14291D] border-[#F2E8CC]"
                 }`}
               >
                 Order Summary
               </h2>
 
               <div className="space-y-2.5 text-xs">
+                {regularSubtotal > subtotal && (
+                  <div
+                    className={`flex items-center justify-between ${
+                      isDark ? "text-[#FAF3E0]/70" : "text-[#3F4F45]"
+                    }`}
+                  >
+                    <span>Regular Subtotal</span>
+                    <span className="line-through font-semibold">
+                      ₹{regularSubtotal}
+                    </span>
+                  </div>
+                )}
                 <div
                   className={`flex items-center justify-between ${
-                    isDark ? "text-[#D6C4B0]" : "text-[#5C402D]"
+                    isDark ? "text-[#FAF3E0]" : "text-[#14291D]"
                   }`}
                 >
-                  <span>Items Subtotal</span>
+                  <span className="font-medium">Items Subtotal</span>
                   <span
                     className={`font-bold ${
-                      isDark ? "text-[#FAF4EA]" : "text-[#23150C]"
+                      isDark ? "text-[#FAF3E0]" : "text-[#14291D]"
                     }`}
                   >
                     ₹{subtotal}
                   </span>
                 </div>
 
-                {subtotal >= 1000 && (
-                  <div className="flex items-center justify-between text-emerald-600 font-bold">
+                {discount > 0 && (
+                  <div className="flex items-center justify-between text-emerald-800 dark:text-emerald-300 font-bold">
                     <span className="flex items-center gap-1">
-                      <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-                      <span>10% Order Discount (Orders &gt; ₹1,000)</span>
+                      <Sparkles className="w-3.5 h-3.5 text-[#E0B04A]" />
+                      <span>{isSaleActive() ? "10% Diwali Savings" : "10% Order Discount"}</span>
                     </span>
                     <span className="font-bold">-₹{discount}</span>
                   </div>
                 )}
 
-                {subtotal < 1000 && (
-                  <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-[11px] text-amber-900 dark:text-amber-200 flex items-center justify-between font-bold">
-                    <span>Add ₹{1000 - subtotal} more to get 10% OFF</span>
-                    <span className="font-black text-amber-700">Orders &gt; ₹1000</span>
-                  </div>
-                )}
-
                 <div
                   className={`flex items-center justify-between ${
-                    isDark ? "text-[#D6C4B0]" : "text-[#5C402D]"
+                    isDark ? "text-[#E0B04A]" : "text-[#3F4F45]"
                   }`}
                 >
                   <div className="flex items-center gap-1">
@@ -427,7 +443,7 @@ export const CartPage: React.FC = () => {
                   </div>
                   <span
                     className={`font-bold ${
-                      isDark ? "text-[#FAF4EA]" : "text-[#23150C]"
+                      isDark ? "text-[#FAF3E0]" : "text-[#14291D]"
                     }`}
                   >
                     {shippingFee === 0 ? "₹0" : `₹${shippingFee}`}
@@ -436,19 +452,19 @@ export const CartPage: React.FC = () => {
 
                 <div
                   className={`pt-3 border-t flex items-center justify-between text-sm ${
-                    isDark ? "border-[#2D1B10]" : "border-[#EFE8DC]"
+                    isDark ? "border-[#14291D]" : "border-[#F2E8CC]"
                   }`}
                 >
                   <span
                     className={`font-bold ${
-                      isDark ? "text-[#FAF4EA]" : "text-[#23150C]"
+                      isDark ? "text-[#FAF3E0]" : "text-[#14291D]"
                     }`}
                   >
                     Total Amount
                   </span>
                   <span
                     className={`text-2xl font-black font-serif ${
-                      isDark ? "text-amber-300" : "text-[#C8751B]"
+                      isDark ? "text-amber-300" : "text-[#E0B04A]"
                     }`}
                   >
                     ₹{total}
@@ -457,7 +473,7 @@ export const CartPage: React.FC = () => {
 
                 <p
                   className={`text-[11px] text-right ${
-                    isDark ? "text-[#A8907E]" : "text-[#7A5E48]"
+                    isDark ? "text-[#3F4F45]" : "text-[#3F4F45]"
                   }`}
                 >
                   Inclusive of all taxes & GST (GSTIN: {BUSINESS_CONFIG.GSTIN})
@@ -467,7 +483,7 @@ export const CartPage: React.FC = () => {
               <button
                 type="button"
                 onClick={handleProceedToCheckout}
-                className="w-full py-4 rounded-xl bg-[#5E3210] hover:bg-[#43230A] text-white font-black text-xs shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer hover:brightness-110"
+                className="w-full py-4 rounded-xl bg-[#1F3D2B] hover:bg-[#1F3D2B] text-white font-black text-xs shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer hover:brightness-110"
               >
                 {!currentUser ? (
                   <>
@@ -484,7 +500,7 @@ export const CartPage: React.FC = () => {
 
               <div
                 className={`pt-2 text-[11px] space-y-1.5 ${
-                  isDark ? "text-[#D6C4B0]" : "text-[#5C402D]"
+                  isDark ? "text-[#E0B04A]" : "text-[#3F4F45]"
                 }`}
               >
                 <div className="flex items-center gap-2">

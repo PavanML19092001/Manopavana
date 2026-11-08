@@ -189,10 +189,10 @@ export const AccountPage = () => {
     return (
       <div
         className={`w-full min-h-[calc(100vh-80px)] py-16 flex items-center justify-center transition-colors box-border ${
-          isDark ? "bg-[#140D09]" : "bg-[#FAF7F2]"
+          isDark ? "bg-[#14291D]" : "bg-[#FAF3E0]"
         }`}
       >
-        <div className="w-10 h-10 border-3 border-[#D49A37] border-t-transparent rounded-full animate-spin" />
+        <div className="w-10 h-10 border-3 border-[#E0B04A] border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
@@ -201,22 +201,22 @@ export const AccountPage = () => {
     return (
       <div
         className={`w-full min-h-[calc(100vh-80px)] py-16 flex items-center justify-center transition-colors box-border ${
-          isDark ? "bg-[#140D09] text-[#FAF4EA]" : "bg-[#FAF7F2] text-[#24140A]"
+          isDark ? "bg-[#14291D] text-[#FAF3E0]" : "bg-[#FAF3E0] text-[#14291D]"
         }`}
       >
         <div
           className={`max-w-md w-full mx-4 p-8 sm:p-10 rounded-3xl border text-center space-y-6 shadow-xl ${
-            isDark ? "bg-[#1C120B] border-[#362114]" : "bg-white border-[#E8DEC8]"
+            isDark ? "bg-[#14291D] border-[#1F3D2B]" : "bg-white border-[#F2E8CC]"
           }`}
         >
-          <div className="w-16 h-16 mx-auto rounded-full bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-[#E08F35]">
-            <Lock className="w-8 h-8 text-[#E08F35]" />
+          <div className="w-16 h-16 mx-auto rounded-full bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-[#E0B04A]">
+            <Lock className="w-8 h-8 text-[#E0B04A]" />
           </div>
           <div className="space-y-2">
-            <h1 className={`text-2xl font-bold font-serif ${isDark ? "text-[#FAF4EA]" : "text-[#1F120A]"}`}>
+            <h1 className={`text-2xl font-bold font-serif ${isDark ? "text-[#FAF3E0]" : "text-[#14291D]"}`}>
               Sign In to Track Orders
             </h1>
-            <p className={`text-xs sm:text-sm leading-relaxed ${isDark ? "text-[#D8C8B8]" : "text-[#5C4230]"}`}>
+            <p className={`text-xs sm:text-sm leading-relaxed ${isDark ? "text-[#E0B04A]" : "text-[#5C4230]"}`}>
               Order history and live shipment tracking are exclusive to your personal account. Please sign in or register to access your orders.
             </p>
           </div>
@@ -224,14 +224,14 @@ export const AccountPage = () => {
           <button
             type="button"
             onClick={() => setLoginModalOpen(true)}
-            className="w-full py-3.5 rounded-2xl bg-[#5E3210] hover:bg-[#43230A] text-white font-bold text-xs shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer hover:brightness-110"
+            className="w-full py-3.5 rounded-2xl bg-[#1F3D2B] hover:bg-[#1F3D2B] text-white font-bold text-xs shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer hover:brightness-110"
           >
             <LogIn className="w-4 h-4 text-amber-300" />
             <span>Sign In / Create Account</span>
           </button>
 
           <div className="pt-2">
-            <Link to="/" className={`text-xs font-semibold hover:underline ${isDark ? "text-amber-400" : "text-[#5E3210]"}`}>
+            <Link to="/" className={`text-xs font-semibold hover:underline ${isDark ? "text-amber-400" : "text-[#1F3D2B]"}`}>
               ← Back to Storefront
             </Link>
           </div>
@@ -243,17 +243,17 @@ export const AccountPage = () => {
   return (
     <div
       className={`w-full min-h-[calc(100vh-80px)] py-8 transition-colors box-border ${
-        isDark ? "bg-[#140D09] text-[#FAF4EA]" : "bg-[#FAF7F2] text-[#24140A]"
+        isDark ? "bg-[#14291D] text-[#FAF3E0]" : "bg-[#FAF3E0] text-[#14291D]"
       }`}
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
         {/* Top Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <h1 className={`text-2xl sm:text-3xl font-extrabold font-serif ${isDark ? "text-[#FAF4EA]" : "text-[#1F120A]"}`}>
+            <h1 className={`text-2xl sm:text-3xl font-extrabold font-serif ${isDark ? "text-[#FAF3E0]" : "text-[#14291D]"}`}>
               My Account & Order Tracking
             </h1>
-            <p className={`text-xs ${isDark ? "text-[#D8C8B8]" : "text-[#5C4230]"}`}>
+            <p className={`text-xs ${isDark ? "text-[#E0B04A]" : "text-[#5C4230]"}`}>
               Real-time Firestore sync • Peenya facility dispatch status
               {currentUser && ` • Signed in as ${resolvedDisplayName || "Valued Customer"}${phone ? ` (+91 ${phone})` : ""}`}
             </p>
@@ -262,7 +262,7 @@ export const AccountPage = () => {
           {/* Quick Search & Top-Right Sign Out */}
           <div className="flex items-center gap-2.5">
             <div className="relative w-full sm:w-64">
-              <Search className={`w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 ${isDark ? "text-[#A89482]" : "text-[#7A5E48]"}`} />
+              <Search className={`w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 ${isDark ? "text-[#A89482]" : "text-[#3F4F45]"}`} />
               <input
                 type="text"
                 placeholder="Search Order Ref (e.g. MV-123456)..."
@@ -276,10 +276,10 @@ export const AccountPage = () => {
                   );
                   if (match) handleSelectOrder(match.orderRef);
                 }}
-                className={`w-full pl-9 pr-3 py-2 text-xs rounded-xl focus:outline-none focus:ring-2 focus:ring-[#E08F35]/40 transition-colors ${
+                className={`w-full pl-9 pr-3 py-2 text-xs rounded-xl focus:outline-none focus:ring-2 focus:ring-[#E0B04A]/40 transition-colors ${
                   isDark
-                    ? "bg-[#1C120B] border border-[#3A2417] text-[#FAF4EA] placeholder-[#8A7665]"
-                    : "bg-white border border-[#DDD1BE] text-[#1F120A] placeholder-[#8A7665]"
+                    ? "bg-[#14291D] border border-[#1F3D2B] text-[#FAF3E0] placeholder-[#8A7665]"
+                    : "bg-white border border-[#F2E8CC] text-[#14291D] placeholder-[#8A7665]"
                 }`}
               />
             </div>
@@ -306,21 +306,21 @@ export const AccountPage = () => {
             ) : (
               <div
                 className={`p-10 rounded-3xl border text-center space-y-4 ${
-                  isDark ? "bg-[#1C120B] border-[#362114]" : "bg-white border-[#E8DEC8]"
+                  isDark ? "bg-[#14291D] border-[#1F3D2B]" : "bg-white border-[#F2E8CC]"
                 }`}
               >
                 <ShoppingBag className="w-12 h-12 text-[#C8BAA8] mx-auto" />
                 <div className="space-y-1">
-                  <h3 className={`font-bold text-sm font-serif ${isDark ? "text-[#FAF4EA]" : "text-[#1F120A]"}`}>
+                  <h3 className={`font-bold text-sm font-serif ${isDark ? "text-[#FAF3E0]" : "text-[#14291D]"}`}>
                     No Active Orders Displayed
                   </h3>
-                  <p className={`text-xs max-w-md mx-auto ${isDark ? "text-[#D8C8B8]" : "text-[#6A523E]"}`}>
+                  <p className={`text-xs max-w-md mx-auto ${isDark ? "text-[#E0B04A]" : "text-[#6A523E]"}`}>
                     Orders placed by your account will appear here with real-time shipment updates once you place an order.
                   </p>
                 </div>
                 <Link
                   to="/"
-                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#5E3210] hover:bg-[#43230A] text-white font-bold text-xs shadow-sm transition-all"
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#1F3D2B] hover:bg-[#1F3D2B] text-white font-bold text-xs shadow-sm transition-all"
                 >
                   <span>Browse Pure Cold-Pressed Oils</span>
                 </Link>
@@ -331,10 +331,10 @@ export const AccountPage = () => {
             {visibleOrders.length > 0 && (
               <div
                 className={`rounded-2xl border p-6 shadow-2xs space-y-4 ${
-                  isDark ? "bg-[#1C120B] border-[#362114]" : "bg-white border-[#E8DEC8]"
+                  isDark ? "bg-[#14291D] border-[#1F3D2B]" : "bg-white border-[#F2E8CC]"
                 }`}
               >
-                <h3 className={`text-sm font-bold font-serif ${isDark ? "text-[#FAF4EA]" : "text-[#1F120A]"}`}>
+                <h3 className={`text-sm font-bold font-serif ${isDark ? "text-[#FAF3E0]" : "text-[#14291D]"}`}>
                   All Orders ({visibleOrders.length})
                 </h3>
                 <div className="space-y-3">
@@ -347,15 +347,15 @@ export const AccountPage = () => {
                         onClick={() => handleSelectOrder(ord.orderRef)}
                         className={`p-3.5 rounded-xl border text-xs flex items-center justify-between cursor-pointer transition-all ${
                           isSelected
-                            ? "bg-amber-500/10 border-[#E08F35] ring-2 ring-[#E08F35]/50 shadow-xs"
+                            ? "bg-amber-500/10 border-[#E0B04A] ring-2 ring-[#E0B04A]/50 shadow-xs"
                             : isDark
-                            ? "bg-[#150D07] border-[#362114] hover:border-[#4D2E1A]"
-                            : "bg-[#FAF7F2] border-[#E8DEC8] hover:border-[#DDD1BE]"
+                            ? "bg-[#14291D] border-[#1F3D2B] hover:border-[#2D5A3F]"
+                            : "bg-[#FAF3E0] border-[#F2E8CC] hover:border-[#F2E8CC]"
                         }`}
                       >
                         <div>
                           <div className="flex items-center gap-2">
-                            <span className={`font-bold ${isDark ? "text-[#FAF4EA]" : "text-[#1F120A]"}`}>
+                            <span className={`font-bold ${isDark ? "text-[#FAF3E0]" : "text-[#14291D]"}`}>
                               #{ord.orderRef}
                             </span>
                             <span
@@ -363,19 +363,19 @@ export const AccountPage = () => {
                                 isCancelled
                                   ? "bg-red-500/10 text-red-600 border-red-500/30"
                                   : isDark
-                                  ? "bg-[#1C120B] border-[#3D2514] text-amber-200"
-                                  : "bg-white border-[#DDD1BE] text-[#5A381E]"
+                                  ? "bg-[#14291D] border-[#1F3D2B] text-amber-200"
+                                  : "bg-white border-[#F2E8CC] text-[#3F4F45]"
                               }`}
                             >
                               {ord.orderStatus}
                             </span>
                           </div>
-                          <p className={`text-[11px] mt-0.5 ${isDark ? "text-[#A89482]" : "text-[#7A5E48]"}`}>
+                          <p className={`text-[11px] mt-0.5 ${isDark ? "text-[#A89482]" : "text-[#3F4F45]"}`}>
                             {ord.date} • {ord.items.length} item{ord.items.length === 1 ? "" : "s"}
                           </p>
                         </div>
                         <div className="text-right">
-                          <span className="font-black text-[#E08F35] block text-sm">
+                          <span className="font-black text-[#E0B04A] block text-sm">
                             ₹{ord.total}
                           </span>
                           <span
@@ -403,12 +403,12 @@ export const AccountPage = () => {
             {/* Bottle QR Loyalty Card */}
             <div
               className={`rounded-2xl p-5 shadow-sm space-y-3 ${
-                isDark ? "bg-[#1C120B] border border-[#362114] text-white" : "bg-[#25150C] text-white"
+                isDark ? "bg-[#14291D] border border-[#1F3D2B] text-white" : "bg-[#1F3D2B] text-white"
               }`}
             >
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-amber-300 flex items-center gap-1.5">
-                  <QrCode className="w-4 h-4 text-[#E08F35]" />
+                  <QrCode className="w-4 h-4 text-[#E0B04A]" />
                   Loyalty Reorder Program
                 </span>
                 {loyalty.isActive && (
@@ -418,7 +418,7 @@ export const AccountPage = () => {
                 )}
               </div>
 
-              <p className="text-xs text-[#D6C4B0] leading-relaxed">
+              <p className="text-xs text-[#E0B04A] leading-relaxed">
                 {loyalty.isActive
                   ? `10% discount applied to your account. ${loyaltyRemainingText}`
                   : "Own a previous MANOPAVANA bottle? Verify the front label to unlock 10% off for 7 days."}
@@ -427,7 +427,7 @@ export const AccountPage = () => {
               <button
                 type="button"
                 onClick={() => openLoyaltyQuiz()}
-                className="w-full py-2.5 rounded-xl bg-[#E08F35] hover:bg-[#F59E0B] text-[#29170C] font-black text-xs transition-colors cursor-pointer"
+                className="w-full py-2.5 rounded-xl bg-[#E0B04A] hover:bg-[#F59E0B] text-[#14291D] font-black text-xs transition-colors cursor-pointer"
               >
                 {loyalty.isActive ? "Scan Another Bottle" : "Scan Bottle QR (10% Off)"}
               </button>
@@ -437,17 +437,17 @@ export const AccountPage = () => {
             <div
               id="profile-card"
               className={`rounded-2xl border p-5 shadow-2xs space-y-4 ${
-                isDark ? "bg-[#1C120B] border-[#362114]" : "bg-white border-[#E8DEC8]"
+                isDark ? "bg-[#14291D] border-[#1F3D2B]" : "bg-white border-[#F2E8CC]"
               }`}
             >
               <div
                 className={`flex items-center justify-between border-b pb-3 ${
-                  isDark ? "border-[#2D1B10]" : "border-[#EFE8DC]"
+                  isDark ? "border-[#14291D]" : "border-[#F2E8CC]"
                 }`}
               >
                 <div className="flex items-center gap-2">
-                  <User className="w-4 h-4 text-[#E08F35]" />
-                  <h3 className={`text-sm font-bold font-serif ${isDark ? "text-[#FAF4EA]" : "text-[#1F120A]"}`}>
+                  <User className="w-4 h-4 text-[#E0B04A]" />
+                  <h3 className={`text-sm font-bold font-serif ${isDark ? "text-[#FAF3E0]" : "text-[#14291D]"}`}>
                     Customer Profile & Address
                   </h3>
                 </div>
@@ -468,7 +468,7 @@ export const AccountPage = () => {
                 {/* 1. Profile Information */}
                 <form onSubmit={handleUpdateProfile} className="space-y-3">
                   <div>
-                    <label className={`block font-semibold mb-1 ${isDark ? "text-[#FAF4EA]" : "text-[#4A3220]"}`}>
+                    <label className={`block font-semibold mb-1 ${isDark ? "text-[#FAF3E0]" : "text-[#4A3220]"}`}>
                       Full Name
                     </label>
                     <input
@@ -476,16 +476,16 @@ export const AccountPage = () => {
                       value={name}
                       onChange={(e) => setName(e.target.value)}
                       placeholder="Manoj Kumar"
-                      className={`w-full px-3 py-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#E08F35]/40 transition-colors ${
+                      className={`w-full px-3 py-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#E0B04A]/40 transition-colors ${
                         isDark
-                          ? "bg-[#150D07] border border-[#362114] text-[#FAF4EA] placeholder-[#8A7665]"
-                          : "bg-white border border-[#DDD1BE] text-[#1F120A] placeholder-[#8A7665]"
+                          ? "bg-[#14291D] border border-[#1F3D2B] text-[#FAF3E0] placeholder-[#8A7665]"
+                          : "bg-white border border-[#F2E8CC] text-[#14291D] placeholder-[#8A7665]"
                       }`}
                     />
                   </div>
 
                   <div>
-                    <label className={`block font-semibold mb-1 ${isDark ? "text-[#FAF4EA]" : "text-[#4A3220]"}`}>
+                    <label className={`block font-semibold mb-1 ${isDark ? "text-[#FAF3E0]" : "text-[#4A3220]"}`}>
                       WhatsApp Contact
                     </label>
                     <input
@@ -493,10 +493,10 @@ export const AccountPage = () => {
                       value={phone}
                       onChange={(e) => setPhone(e.target.value)}
                       placeholder="9180301917"
-                      className={`w-full px-3 py-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#E08F35]/40 transition-colors ${
+                      className={`w-full px-3 py-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#E0B04A]/40 transition-colors ${
                         isDark
-                          ? "bg-[#150D07] border border-[#362114] text-[#FAF4EA] placeholder-[#8A7665]"
-                          : "bg-white border border-[#DDD1BE] text-[#1F120A] placeholder-[#8A7665]"
+                          ? "bg-[#14291D] border border-[#1F3D2B] text-[#FAF3E0] placeholder-[#8A7665]"
+                          : "bg-white border border-[#F2E8CC] text-[#14291D] placeholder-[#8A7665]"
                       }`}
                     />
                   </div>
@@ -504,7 +504,7 @@ export const AccountPage = () => {
                   <div className="pt-1">
                     <button
                       type="submit"
-                      className="w-full py-2 rounded-xl bg-[#5E3210] hover:bg-[#43230A] text-white font-bold transition-colors cursor-pointer shadow-sm text-xs"
+                      className="w-full py-2 rounded-xl bg-[#1F3D2B] hover:bg-[#1F3D2B] text-white font-bold transition-colors cursor-pointer shadow-sm text-xs"
                     >
                       Update Profile
                     </button>
@@ -512,11 +512,11 @@ export const AccountPage = () => {
                 </form>
 
                 {/* 2. Saved Delivery Addresses */}
-                <div className={`pt-4 border-t ${isDark ? "border-[#2D1B10]" : "border-[#EFE8DC]"} space-y-3`}>
+                <div className={`pt-4 border-t ${isDark ? "border-[#14291D]" : "border-[#F2E8CC]"} space-y-3`}>
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-1.5">
-                      <MapPin className="w-3.5 h-3.5 text-[#E08F35]" />
-                      <h4 className={`font-bold font-serif ${isDark ? "text-[#FAF4EA]" : "text-[#1F120A]"}`}>
+                      <MapPin className="w-3.5 h-3.5 text-[#E0B04A]" />
+                      <h4 className={`font-bold font-serif ${isDark ? "text-[#FAF3E0]" : "text-[#14291D]"}`}>
                         Saved Delivery Addresses
                       </h4>
                     </div>
@@ -545,16 +545,16 @@ export const AccountPage = () => {
                           key={addr.id}
                           className={`p-3 rounded-xl border transition-all ${
                             isDark
-                              ? "bg-[#150D07] border-[#362114]"
-                              : "bg-[#FAF7F2] border-[#E8DEC8]"
+                              ? "bg-[#14291D] border-[#1F3D2B]"
+                              : "bg-[#FAF3E0] border-[#F2E8CC]"
                           }`}
                         >
                           <div className="flex items-center justify-between mb-1">
                             <span className="flex items-center gap-1.5">
-                              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-[#E08F35]/20 text-[#E08F35]">
+                              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-[#E0B04A]/20 text-[#E0B04A]">
                                 {addr.label}
                               </span>
-                              <span className="font-bold text-[#FAF4EA] truncate max-w-[120px]">
+                              <span className="font-bold text-[#FAF3E0] truncate max-w-[120px]">
                                 {addr.fullName || name}
                               </span>
                             </span>
@@ -590,7 +590,7 @@ export const AccountPage = () => {
                               </button>
                             </div>
                           </div>
-                          <p className="font-mono text-[10px] text-[#A88D77] mb-0.5">{addr.phone || phone}</p>
+                          <p className="font-mono text-[10px] text-[#3F4F45] mb-0.5">{addr.phone || phone}</p>
                           <p className="text-[11px] text-stone-400 line-clamp-2">
                             {addr.addressLine1}, {addr.district || addr.city} - {addr.pincode}
                           </p>
@@ -644,7 +644,7 @@ export const AccountPage = () => {
                         }
                       }}
                       className={`p-3.5 rounded-2xl border space-y-3 ${
-                        isDark ? "bg-[#180E08] border-[#4A301E]" : "bg-white border-[#DDD1BE]"
+                        isDark ? "bg-[#14291D] border-[#2D5A3F]" : "bg-white border-[#F2E8CC]"
                       }`}
                     >
                       <div className="flex items-center justify-between pb-1 border-b border-stone-200 dark:border-stone-800">
@@ -665,7 +665,7 @@ export const AccountPage = () => {
 
                       {/* Label Selector */}
                       <div>
-                        <label className={`block font-semibold mb-1 ${isDark ? "text-[#FAF4EA]" : "text-[#4A3220]"}`}>
+                        <label className={`block font-semibold mb-1 ${isDark ? "text-[#FAF3E0]" : "text-[#4A3220]"}`}>
                           Label
                         </label>
                         <div className="flex gap-2">
@@ -676,10 +676,10 @@ export const AccountPage = () => {
                               onClick={() => setAddressLabel(lbl)}
                               className={`px-2.5 py-1 rounded-lg text-[11px] font-bold cursor-pointer transition-all ${
                                 addressLabel === lbl
-                                  ? "bg-[#5E3210] text-white"
+                                  ? "bg-[#1F3D2B] text-white"
                                   : isDark
-                                  ? "bg-[#150D07] text-[#A88D77] border border-[#362114]"
-                                  : "bg-[#FAF7F2] text-[#5C402D] border border-[#DDD1BE]"
+                                  ? "bg-[#14291D] text-[#3F4F45] border border-[#1F3D2B]"
+                                  : "bg-[#FAF3E0] text-[#3F4F45] border border-[#F2E8CC]"
                               }`}
                             >
                               {lbl}
@@ -689,7 +689,7 @@ export const AccountPage = () => {
                       </div>
 
                       <div>
-                        <label className={`block font-semibold mb-1 ${isDark ? "text-[#FAF4EA]" : "text-[#4A3220]"}`}>
+                        <label className={`block font-semibold mb-1 ${isDark ? "text-[#FAF3E0]" : "text-[#4A3220]"}`}>
                           Street Address *
                         </label>
                         <input
@@ -700,14 +700,14 @@ export const AccountPage = () => {
                           placeholder="House/Flat No, Street, Layout"
                           className={`w-full px-3 py-1.5 rounded-xl text-xs ${
                             isDark
-                              ? "bg-[#150D07] border border-[#362114] text-[#FAF4EA]"
-                              : "bg-white border border-[#DDD1BE] text-[#1F120A]"
+                              ? "bg-[#14291D] border border-[#1F3D2B] text-[#FAF3E0]"
+                              : "bg-white border border-[#F2E8CC] text-[#14291D]"
                           }`}
                         />
                       </div>
 
                       <div>
-                        <label className={`block font-semibold mb-1 ${isDark ? "text-[#FAF4EA]" : "text-[#4A3220]"}`}>
+                        <label className={`block font-semibold mb-1 ${isDark ? "text-[#FAF3E0]" : "text-[#4A3220]"}`}>
                           Landmark
                         </label>
                         <input
@@ -717,15 +717,15 @@ export const AccountPage = () => {
                           placeholder="Near Water Tank / Landmark"
                           className={`w-full px-3 py-1.5 rounded-xl text-xs ${
                             isDark
-                              ? "bg-[#150D07] border border-[#362114] text-[#FAF4EA]"
-                              : "bg-white border border-[#DDD1BE] text-[#1F120A]"
+                              ? "bg-[#14291D] border border-[#1F3D2B] text-[#FAF3E0]"
+                              : "bg-white border border-[#F2E8CC] text-[#14291D]"
                           }`}
                         />
                       </div>
 
                       <div className="grid grid-cols-2 gap-2">
                         <div>
-                          <label className={`block font-semibold mb-1 ${isDark ? "text-[#FAF4EA]" : "text-[#4A3220]"}`}>
+                          <label className={`block font-semibold mb-1 ${isDark ? "text-[#FAF3E0]" : "text-[#4A3220]"}`}>
                             District
                           </label>
                           <input
@@ -735,13 +735,13 @@ export const AccountPage = () => {
                             placeholder="District"
                             className={`w-full px-3 py-1.5 rounded-xl text-xs ${
                               isDark
-                                ? "bg-[#150D07] border border-[#362114] text-[#FAF4EA]"
-                                : "bg-white border border-[#DDD1BE] text-[#1F120A]"
+                                ? "bg-[#14291D] border border-[#1F3D2B] text-[#FAF3E0]"
+                                : "bg-white border border-[#F2E8CC] text-[#14291D]"
                             }`}
                           />
                         </div>
                         <div>
-                          <label className={`block font-semibold mb-1 ${isDark ? "text-[#FAF4EA]" : "text-[#4A3220]"}`}>
+                          <label className={`block font-semibold mb-1 ${isDark ? "text-[#FAF3E0]" : "text-[#4A3220]"}`}>
                             Pincode *
                           </label>
                           <input
@@ -753,8 +753,8 @@ export const AccountPage = () => {
                             placeholder="560058"
                             className={`w-full px-3 py-1.5 rounded-xl text-xs ${
                               isDark
-                                ? "bg-[#150D07] border border-[#362114] text-[#FAF4EA]"
-                                : "bg-white border border-[#DDD1BE] text-[#1F120A]"
+                                ? "bg-[#14291D] border border-[#1F3D2B] text-[#FAF3E0]"
+                                : "bg-white border border-[#F2E8CC] text-[#14291D]"
                             }`}
                           />
                         </div>
@@ -774,7 +774,7 @@ export const AccountPage = () => {
                             setIsAddingNewAddress(false);
                           }}
                           className={`px-3 py-2 rounded-xl border text-xs font-semibold cursor-pointer ${
-                            isDark ? "border-[#362114] text-[#A88D77]" : "border-[#DDD1BE] text-[#5C402D]"
+                            isDark ? "border-[#1F3D2B] text-[#3F4F45]" : "border-[#F2E8CC] text-[#3F4F45]"
                           }`}
                         >
                           Cancel
@@ -785,12 +785,12 @@ export const AccountPage = () => {
                 </div>
 
                 {currentUser?.email === "manopavana@gmail.com" && (
-                  <div className={`pt-3 border-t ${isDark ? "border-[#2D1B10]" : "border-[#EFE8DC]"}`}>
+                  <div className={`pt-3 border-t ${isDark ? "border-[#14291D]" : "border-[#F2E8CC]"}`}>
                     <Link
                       to="/admin"
-                      className="w-full py-2.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-[#E08F35] border border-[#E08F35]/40 font-bold flex items-center justify-center gap-2 transition-colors text-xs"
+                      className="w-full py-2.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-[#E0B04A] border border-[#E0B04A]/40 font-bold flex items-center justify-center gap-2 transition-colors text-xs"
                     >
-                      <ShieldAlert className="w-4 h-4 text-[#E08F35]" />
+                      <ShieldAlert className="w-4 h-4 text-[#E0B04A]" />
                       <span>Open Admin Storefront CMS & Dispatch Hub</span>
                     </Link>
                   </div>

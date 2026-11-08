@@ -138,7 +138,7 @@ export const LoyaltyQuizModal: React.FC = () => {
         particleCount: 80,
         spread: 70,
         origin: { y: 0.6 },
-        colors: ["#E08F35", "#F5B853", "#3D2514", "#2E7D32"],
+        colors: ["#E0B04A", "#F5B853", "#1F3D2B", "#2E7D32"],
       });
 
       setTimeout(() => {
@@ -186,18 +186,18 @@ export const LoyaltyQuizModal: React.FC = () => {
       aria-labelledby="quiz-modal-title"
       className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in"
     >
-      <div className="relative w-full max-w-xl bg-gradient-to-b from-[#24160F] to-[#140D09] text-[#FDF6EC] rounded-3xl shadow-[0_25px_60px_rgba(0,0,0,0.95)] border border-[#4A301E] overflow-hidden flex flex-col max-h-[92vh]">
+      <div className="relative w-full max-w-xl bg-gradient-to-b from-[#24160F] to-[#14291D] text-[#FAF3E0] rounded-3xl shadow-[0_25px_60px_rgba(0,0,0,0.95)] border border-[#2D5A3F] overflow-hidden flex flex-col max-h-[92vh] animate-modal-pop">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4.5 bg-[#120A06] border-b border-[#3A2417]">
+        <div className="flex items-center justify-between px-6 py-4.5 bg-[#14291D] border-b border-[#1F3D2B]">
           <div className="flex items-center gap-3">
-            <span className="p-2 rounded-2xl bg-[#D49A37]/20 text-[#F5BC51]">
-              <QrCode className="w-5 h-5 text-[#F5BC51]" />
+            <span className="p-2 rounded-2xl bg-[#E0B04A]/20 text-[#F3D17A]">
+              <QrCode className="w-5 h-5 text-[#F3D17A]" />
             </span>
             <div>
-              <h2 id="quiz-modal-title" className="text-lg font-bold font-serif text-[#FFD885]">
+              <h2 id="quiz-modal-title" className="text-lg font-bold font-serif text-[#F3D17A]">
                 Bottle QR Loyalty Verification
               </h2>
-              <p className="text-xs text-[#A88D77]">
+              <p className="text-xs text-[#3F4F45]">
                 Returning customer? Verify your bottle for an instant 10% discount for 7 days
               </p>
             </div>
@@ -205,7 +205,7 @@ export const LoyaltyQuizModal: React.FC = () => {
           <button
             onClick={closeLoyaltyQuiz}
             aria-label="Close bottle QR loyalty verification modal"
-            className="p-2 text-[#A88D77] hover:text-[#FDF6EC] hover:bg-[#2C1D14] rounded-full transition-colors cursor-pointer"
+            className="p-2 text-[#3F4F45] hover:text-[#FAF3E0] hover:bg-[#2C1D14] rounded-full transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
@@ -234,8 +234,8 @@ export const LoyaltyQuizModal: React.FC = () => {
           )}
 
           {/* 3 Step Visual Explainer (ENLARGED HIGH-VISIBILITY IMAGES) */}
-          <div className="grid grid-cols-3 gap-3 p-3.5 bg-[#1C110B] rounded-2xl border border-[#3A2417]">
-            <div className="flex flex-col items-center text-center p-2 rounded-xl bg-[#25150C]/60 border border-[#3A2417]/50">
+          <div className="grid grid-cols-3 gap-3 p-3.5 bg-[#14291D] rounded-2xl border border-[#1F3D2B]">
+            <div className="flex flex-col items-center text-center p-2 rounded-xl bg-[#1F3D2B]/60 border border-[#1F3D2B]/50">
               <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl overflow-hidden shadow-md border-2 border-[#5A3820] bg-[#120904] flex items-center justify-center p-1 mb-2">
                 <img
                   src={MEDIA_ASSETS.loyaltySteps.step1}
@@ -243,10 +243,10 @@ export const LoyaltyQuizModal: React.FC = () => {
                   className="w-full h-full object-contain hover:scale-105 transition-transform"
                 />
               </div>
-              <span className="text-xs font-bold text-[#FDF6EC]">1. Check Bottle</span>
-              <span className="text-[10px] text-[#A88D77]">Locate front label</span>
+              <span className="text-xs font-bold text-[#FAF3E0]">1. Check Bottle</span>
+              <span className="text-[10px] text-[#3F4F45]">Locate front label</span>
             </div>
-            <div className="flex flex-col items-center text-center p-2 rounded-xl bg-[#25150C]/60 border border-[#3A2417]/50">
+            <div className="flex flex-col items-center text-center p-2 rounded-xl bg-[#1F3D2B]/60 border border-[#1F3D2B]/50">
               <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl overflow-hidden shadow-md border-2 border-[#5A3820] bg-[#120904] flex items-center justify-center p-1 mb-2">
                 <img
                   src={MEDIA_ASSETS.loyaltySteps.step2}
@@ -254,10 +254,10 @@ export const LoyaltyQuizModal: React.FC = () => {
                   className="w-full h-full object-contain hover:scale-105 transition-transform"
                 />
               </div>
-              <span className="text-xs font-bold text-[#FDF6EC]">2. Scan QR</span>
-              <span className="text-[10px] text-[#A88D77]">Scan label QR code</span>
+              <span className="text-xs font-bold text-[#FAF3E0]">2. Scan QR</span>
+              <span className="text-[10px] text-[#3F4F45]">Scan label QR code</span>
             </div>
-            <div className="flex flex-col items-center text-center p-2 rounded-xl bg-[#25150C]/60 border border-[#3A2417]/50">
+            <div className="flex flex-col items-center text-center p-2 rounded-xl bg-[#1F3D2B]/60 border border-[#1F3D2B]/50">
               <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl overflow-hidden shadow-md border-2 border-[#5A3820] bg-[#120904] flex items-center justify-center p-1 mb-2">
                 <img
                   src={MEDIA_ASSETS.loyaltySteps.step3}
@@ -265,8 +265,8 @@ export const LoyaltyQuizModal: React.FC = () => {
                   className="w-full h-full object-contain hover:scale-105 transition-transform"
                 />
               </div>
-              <span className="text-xs font-bold text-[#FDF6EC]">3. 10% Off 7 Days</span>
-              <span className="text-[10px] text-[#A88D77]">Auto-applied at cart</span>
+              <span className="text-xs font-bold text-[#FAF3E0]">3. 10% Off 7 Days</span>
+              <span className="text-[10px] text-[#3F4F45]">Auto-applied at cart</span>
             </div>
           </div>
 
@@ -295,7 +295,7 @@ export const LoyaltyQuizModal: React.FC = () => {
 
           {/* Oil Selector Tabs */}
           <div>
-            <label className="block text-xs font-semibold text-[#D6BEAA] mb-2">
+            <label className="block text-xs font-semibold text-[#E0B04A] mb-2">
               Select the bottle you are verifying:
             </label>
             <div className="grid grid-cols-3 gap-2">
@@ -306,8 +306,8 @@ export const LoyaltyQuizModal: React.FC = () => {
                   onClick={() => handleResetForOil(prod.id)}
                   className={`p-2.5 rounded-xl border text-xs font-semibold transition-all flex flex-col items-center gap-1 cursor-pointer ${
                     activeTabOil === prod.id
-                      ? "bg-gradient-to-r from-[#D49A37] to-[#B87C24] text-[#140D09] border-[#FFD885] font-bold shadow-md"
-                      : "bg-[#1C110B] text-[#D6BEAA] border-[#4A301E] hover:border-[#D49A37]"
+                      ? "bg-gradient-to-r from-[#E0B04A] to-[#B87C24] text-[#14291D] border-[#F3D17A] font-bold shadow-md"
+                      : "bg-[#14291D] text-[#E0B04A] border-[#2D5A3F] hover:border-[#E0B04A]"
                   }`}
                 >
                   <span className="truncate max-w-full">
@@ -319,14 +319,14 @@ export const LoyaltyQuizModal: React.FC = () => {
           </div>
 
           {/* Question Box */}
-          <div className="p-4 bg-[#1C110B] rounded-2xl border border-[#4A301E] space-y-3">
+          <div className="p-4 bg-[#14291D] rounded-2xl border border-[#2D5A3F] space-y-3">
             <div className="flex items-start gap-2.5">
-              <HelpCircle className="w-5 h-5 text-[#F5BC51] shrink-0 mt-0.5" />
+              <HelpCircle className="w-5 h-5 text-[#F3D17A] shrink-0 mt-0.5" />
               <div>
-                <p className="text-xs font-bold text-[#FFD885]">
+                <p className="text-xs font-bold text-[#F3D17A]">
                   Security Verification Question:
                 </p>
-                <p className="text-xs text-[#D6BEAA] font-medium mt-0.5">
+                <p className="text-xs text-[#E0B04A] font-medium mt-0.5">
                   {quiz.question}
                 </p>
               </div>
@@ -344,19 +344,19 @@ export const LoyaltyQuizModal: React.FC = () => {
                     onClick={() => handleSelectOption(opt)}
                     className={`w-full text-left p-3 rounded-xl border text-xs font-medium transition-all flex items-center justify-between cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ${
                       isSelected
-                        ? "bg-[#2D1B10] border-[#D49A37] text-[#FFD885] ring-1 ring-[#D49A37]"
-                        : "bg-[#140D09] border-[#3A2417] text-[#D6BEAA] hover:border-[#5C3C26]"
+                        ? "bg-[#14291D] border-[#E0B04A] text-[#F3D17A] ring-1 ring-[#E0B04A]"
+                        : "bg-[#14291D] border-[#1F3D2B] text-[#E0B04A] hover:border-[#5C3C26]"
                     }`}
                   >
                     <span>{opt}</span>
                     <span
                       className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 ml-2 ${
                         isSelected
-                          ? "border-[#D49A37] bg-[#D49A37]"
-                          : "border-[#4A301E] bg-[#140D09]"
+                          ? "border-[#E0B04A] bg-[#E0B04A]"
+                          : "border-[#2D5A3F] bg-[#14291D]"
                       }`}
                     >
-                      {isSelected && <span className="w-1.5 h-1.5 rounded-full bg-[#140D09]" />}
+                      {isSelected && <span className="w-1.5 h-1.5 rounded-full bg-[#14291D]" />}
                     </span>
                   </button>
                 );
@@ -383,22 +383,22 @@ export const LoyaltyQuizModal: React.FC = () => {
         </div>
 
         {/* Footer Actions */}
-        <div className="flex items-center justify-between px-6 py-4 bg-[#120A06] border-t border-[#3A2417]">
+        <div className="flex items-center justify-between px-6 py-4 bg-[#14291D] border-t border-[#1F3D2B]">
           {isLocked ? (
             <span className="text-[11px] text-amber-300 font-medium flex items-center gap-1.5">
               <Clock className="w-3.5 h-3.5 text-amber-400" />
               <span>Re-enables in <strong>{timeRemainingText}</strong> (2 fresh chances)</span>
             </span>
           ) : (
-            <span className="text-[11px] text-[#A88D77]">
-              Chances remaining: <strong className="text-[#FFD885]">{attemptsLeft} / 2</strong>
+            <span className="text-[11px] text-[#3F4F45]">
+              Chances remaining: <strong className="text-[#F3D17A]">{attemptsLeft} / 2</strong>
             </span>
           )}
           <div className="flex items-center gap-2.5">
             <button
               type="button"
               onClick={closeLoyaltyQuiz}
-              className="px-4 py-2 text-xs font-medium text-[#A88D77] hover:text-[#FDF6EC] rounded-xl cursor-pointer"
+              className="px-4 py-2 text-xs font-medium text-[#3F4F45] hover:text-[#FAF3E0] rounded-xl cursor-pointer"
             >
               Close
             </button>
@@ -406,16 +406,16 @@ export const LoyaltyQuizModal: React.FC = () => {
               type="button"
               disabled={isLocked || attemptsLeft <= 0 || isSuccess}
               onClick={handleVerify}
-              className="px-5 py-2.5 text-xs font-bold font-serif uppercase tracking-wider text-[#140D09] bg-gradient-to-r from-[#D49A37] via-[#F5BC51] to-[#BF7E16] hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl shadow-[0_4px_20px_rgba(212,154,55,0.35)] border border-[#FFD885] transition-all flex items-center gap-1.5 cursor-pointer"
+              className="px-5 py-2.5 text-xs font-bold font-serif uppercase tracking-wider text-[#14291D] bg-gradient-to-r from-[#E0B04A] via-[#F3D17A] to-[#BF7E16] hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl shadow-[0_4px_20px_rgba(212,154,55,0.35)] border border-[#F3D17A] transition-all flex items-center gap-1.5 cursor-pointer"
             >
               {isLocked ? (
                 <>
-                  <Lock className="w-3.5 h-3.5 text-[#140D09]" />
+                  <Lock className="w-3.5 h-3.5 text-[#14291D]" />
                   <span>Locked (48h)</span>
                 </>
               ) : (
                 <>
-                  <Sparkles className="w-3.5 h-3.5 text-[#140D09]" />
+                  <Sparkles className="w-3.5 h-3.5 text-[#14291D]" />
                   <span>Verify & Unlock 10%</span>
                 </>
               )}
