@@ -344,7 +344,7 @@ export const CartPage: React.FC = () => {
                     }`}
                   >
                     {isSaleActive()
-                      ? "🎉 10% Diwali Festive Offer Applied!"
+                      ? "🎉 10% Discount Applied!"
                       : subtotal >= 1000
                       ? "🎉 10% Discount Unlocked!"
                       : "Get 10% OFF on Orders Above ₹1,000"}
@@ -355,7 +355,7 @@ export const CartPage: React.FC = () => {
                     }`}
                   >
                     {isSaleActive()
-                      ? `Flat 10% discount (-₹${discount}) applied sitewide on all items. (${getSaleDeadlineLabel()})`
+                      ? `Flat 10% discount (-₹${discount}) applied sitewide on all items.`
                       : subtotal >= 1000
                       ? `Flat 10% discount (-₹${discount}) automatically deducted from your total.`
                       : `Add ₹${1000 - subtotal} more of wood-pressed oils to unlock 10% instant savings!`}
@@ -367,8 +367,12 @@ export const CartPage: React.FC = () => {
                   )}
                 </div>
               </div>
-              <span className="text-xs font-black text-[#14291D] bg-[#E0B04A] px-3 py-1 rounded-xl shrink-0 border border-[#F3D17A] shadow-2xs">
-                10% APPLIED
+              <span className={`text-xs font-black px-3 py-1 rounded-xl shrink-0 border shadow-2xs ${
+                discount > 0
+                  ? "text-[#14291D] bg-[#E0B04A] border-[#F3D17A]"
+                  : "text-stone-700 bg-stone-100 border-stone-200 dark:bg-stone-800 dark:text-stone-300 dark:border-stone-700"
+              }`}>
+                {discount > 0 ? "10% APPLIED" : "10% OFFER"}
               </span>
             </div>
           </div>
@@ -409,7 +413,7 @@ export const CartPage: React.FC = () => {
                   <div className="flex items-center justify-between text-emerald-800 dark:text-emerald-300 font-bold">
                     <span className="flex items-center gap-1">
                       <Sparkles className="w-3.5 h-3.5 text-[#E0B04A]" />
-                      <span>{isSaleActive() ? "10% Diwali Savings" : "10% Order Discount"}</span>
+                      <span>10% Order Discount</span>
                     </span>
                     <span className="font-bold">-₹{discount}</span>
                   </div>

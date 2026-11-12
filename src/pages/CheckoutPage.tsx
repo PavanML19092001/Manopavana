@@ -692,7 +692,7 @@ export const CheckoutPage: React.FC = () => {
           regularSubtotal: checkoutRegularSubtotal,
           discountAmount: checkoutDiscount,
           netAmount: checkoutDiscountedSubtotal,
-          discountLabel: isSaleActive() ? "10% Diwali Festive Discount" : checkoutDiscount > 0 ? "10% Order Discount" : undefined,
+          discountLabel: isSaleActive() ? "10% Order Discount" : checkoutDiscount > 0 ? "10% Order Discount" : undefined,
           shippingFee: checkoutShippingFee,
           total: checkoutTotal,
           paymentMethod: "cod",
@@ -747,7 +747,7 @@ export const CheckoutPage: React.FC = () => {
         regularSubtotal: checkoutRegularSubtotal,
         discountAmount: checkoutDiscount,
         netAmount: checkoutDiscountedSubtotal,
-        discountLabel: isSaleActive() ? "10% Diwali Festive Discount" : checkoutDiscount > 0 ? "10% Order Discount" : undefined,
+        discountLabel: isSaleActive() ? "10% Order Discount" : checkoutDiscount > 0 ? "10% Order Discount" : undefined,
         shippingFee: checkoutShippingFee,
         total: checkoutTotal,
         paymentMethod: "phonepe",
@@ -1796,7 +1796,7 @@ export const CheckoutPage: React.FC = () => {
                 </div>
                 {checkoutDiscount > 0 && (
                   <div className="flex justify-between text-emerald-800 dark:text-emerald-300 font-bold">
-                    <span>{isSaleActive() ? "10% Diwali Festive Discount:" : "10% Order Discount:"}</span>
+                    <span>10% Order Discount:</span>
                     <span>-₹{checkoutDiscount}</span>
                   </div>
                 )}

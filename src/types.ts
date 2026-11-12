@@ -49,12 +49,24 @@ export interface CulinaryPairing {
 }
 
 export interface Product {
-  id: "groundnut" | "coconut" | "sesame";
+  id: "groundnut" | "coconut" | "sesame" | "dispenser" | string;
   name: string;
   kannadaName: string;
+  category?: string;
+  badge?: string;
   subtitle?: string;
   searchKeywords: string;
   shortDescription: string;
+  fullDescription?: string;
+  bullets?: string[];
+  sku?: {
+    "1L": string;
+    "500ml": string;
+  };
+  variantLabels?: {
+    "1L": string;
+    "500ml": string;
+  };
   prices: {
     "1L": number;
     "500ml": number;
@@ -104,6 +116,7 @@ export interface CartItem {
   regularPrice: number;
   quantity: number;
   image: string;
+  sku?: string;
 }
 
 export interface Address {
@@ -170,6 +183,8 @@ export interface Order {
   shippingAddress: Address;
   trackingNumber?: string;
   courier?: string;
+  transactionId?: string;
+  phonepeTransactionId?: string;
   notes?: string;
   customerUid?: string | null;
   customerPhone?: string | null;

@@ -39,9 +39,6 @@ import {
   THEMED_PRODUCT_IMAGES,
 } from "../constants";
 import { BottleVolume, Product } from "../types";
-import diwaliBannerImg from "../assets/diwali/diwali_banner.jpg";
-import combo1lImg from "../assets/diwali/combo_1l.jpg";
-import combo500mlImg from "../assets/diwali/combo_500ml.jpg";
 import { FESTIVE_CONFIG, isFestiveActive } from "../config/festiveConfig";
 import { getSalePrice, getSaleSavings, isSaleActive, getSaleDeadlineLabel } from "../utils/salePricing";
 
@@ -66,6 +63,7 @@ export const HomePage: React.FC = () => {
     currentUser,
     setLoginModalOpen,
     themeMode,
+    showToast,
   } = useStore();
 
   const isDark = themeMode === "dark";
@@ -138,33 +136,44 @@ export const HomePage: React.FC = () => {
     const variant = selectedVariants[product.id] || "1L";
     const regularPrice = product.prices[variant];
     const price = getSalePrice(regularPrice);
+    const sku = product.sku?.[variant] || (product.id === "dispenser" ? (variant === "1L" ? "MP-DISP-1L-001" : "MP-DISP-500ML-001") : undefined);
+    const subtitle = product.id === "dispenser"
+      ? (variant === "1L" ? "1 L (Full Kitchen Size)" : "500 ml (Compact Counter Size)")
+      : `Marachekku Pure • ${variant}`;
     addToCart({
       id: `${product.id}-${variant}`,
       productId: product.id,
       title: product.name,
-      subtitle: `Marachekku Pure • ${variant}`,
+      subtitle,
       variant,
       price,
       regularPrice,
       image: THEMED_PRODUCT_IMAGES[product.id]?.light || product.images[0] || product.labelImage,
+      sku,
     });
+    showToast(`Added ${product.name} (${variant}) to your bag`);
   };
 
   const handleBuyNow = (product: Product) => {
     const variant = selectedVariants[product.id] || "1L";
     const regularPrice = product.prices[variant];
     const price = getSalePrice(regularPrice);
+    const sku = product.sku?.[variant] || (product.id === "dispenser" ? (variant === "1L" ? "MP-DISP-1L-001" : "MP-DISP-500ML-001") : undefined);
+    const subtitle = product.id === "dispenser"
+      ? (variant === "1L" ? "1 L (Full Kitchen Size)" : "500 ml (Compact Counter Size)")
+      : `Marachekku Pure • ${variant}`;
     const image = THEMED_PRODUCT_IMAGES[product.id]?.light || product.images[0] || product.labelImage;
     startBuyNow(
       {
         id: `${product.id}-${variant}`,
         productId: product.id,
         title: product.name,
-        subtitle: `Marachekku Pure • ${variant}`,
+        subtitle,
         variant,
         price,
         regularPrice,
         image,
+        sku,
       },
       1
     );
@@ -174,7 +183,11 @@ export const HomePage: React.FC = () => {
   const handleAddCombo = (combo: (typeof COMBOS)[0]) => {
     const regularPrice = combo.regularPrice;
     const price = getSalePrice(regularPrice);
-    const comboImg = combo.id === "combo-3l" ? combo1lImg : combo500mlImg;
+    const comboImg =
+      combo.image ||
+      (combo.id === "combo-3l"
+        ? "/assets/aistudio/283108387_1794145171256125_bf92e08a.jpg"
+        : "/assets/aistudio/1003513490_1794145169189153_45f26b2d.jpg");
     addToCart({
       id: combo.id,
       productId: combo.id,
@@ -184,14 +197,18 @@ export const HomePage: React.FC = () => {
       variant: combo.id === "combo-3l" ? "3L Trio" : "1.5L Trio",
       price,
       regularPrice,
-      image: combo.image || comboImg,
+      image: comboImg,
     });
   };
 
   const handleBuyNowCombo = (combo: (typeof COMBOS)[0]) => {
     const regularPrice = combo.regularPrice;
     const price = getSalePrice(regularPrice);
-    const comboImg = combo.id === "combo-3l" ? combo1lImg : combo500mlImg;
+    const comboImg =
+      combo.image ||
+      (combo.id === "combo-3l"
+        ? "/assets/aistudio/283108387_1794145171256125_bf92e08a.jpg"
+        : "/assets/aistudio/1003513490_1794145169189153_45f26b2d.jpg");
     startBuyNow(
       {
         id: combo.id,
@@ -202,7 +219,7 @@ export const HomePage: React.FC = () => {
         variant: combo.id === "combo-3l" ? "3L Trio" : "1.5L Trio",
         price,
         regularPrice,
-        image: combo.image || comboImg,
+        image: comboImg,
       },
       1
     );
@@ -211,107 +228,32 @@ export const HomePage: React.FC = () => {
 
   return (
     <div className="w-full max-w-full overflow-x-hidden flex flex-col box-border">
-      {/* 1. DIWALI HABBADA SHUBHASHAYAGALU SMALL BANNER (FIRST BELOW NAVBAR) */}
-      {cmsConfig?.festiveBanner?.enabled !== false && (
-        <section
-          className={`w-full relative shadow-xs border-b transition-colors overflow-hidden ${
-            isDark
-              ? "bg-gradient-to-r from-[#14291D] via-[#1F3D2B] to-[#14291D] border-[#E0B04A]/40 text-[#FAF3E0]"
-              : "bg-gradient-to-r from-[#FAF3E0] via-[#F2E8CC] to-[#FAF3E0] border-[#E0B04A]/30 text-[#14291D]"
-          }`}
-        >
-          <div className="max-w-7xl mx-auto py-2.5 px-4 sm:px-6 relative z-10 flex items-center justify-between gap-3">
-            <div className="flex items-center gap-3 min-w-0">
-              {/* Festive Diya & Kannada Pride Emblem */}
-              <div className="flex items-center gap-2 shrink-0">
-                <span className="text-lg leading-none" role="img" aria-label="Diya">🪔</span>
-                <div
-                  title="ಕನ್ನಡ ಧ್ವಜ (Karnataka Flag)"
-                  className="relative w-8 h-5.5 rounded-xs overflow-hidden border border-[#E0B04A]/70 shadow-xs shrink-0 flex flex-col"
-                >
-                  <div className="w-full h-1/2 bg-[#FFD700]" />
-                  <div className="w-full h-1/2 bg-[#DC2626]" />
-                </div>
-              </div>
-
-              {/* Greeting & Tagline */}
-              <div className="min-w-0">
-                <h3
-                  className={`font-bold text-xs sm:text-sm font-serif tracking-wide truncate ${
-                    isDark ? "text-[#F3D17A]" : "text-[#14291D]"
-                  }`}
-                >
-                  {cmsConfig?.festiveBanner?.title || "ದೀಪಾವಳಿ ಹಬ್ಬದ ಶುಭಾಶಯಗಳು! • Happy Deepavali"}
-                </h3>
-                <p
-                  className={`text-[11px] sm:text-xs font-semibold leading-tight truncate ${
-                    isDark ? "text-[#FAF3E0]" : "text-[#2D4536]"
-                  }`}
-                >
-                  {cmsConfig?.festiveBanner?.tagline ||
-                    "Authentic 100% Marachekku Wood-Pressed Cooking Oils • Direct from Karnataka Farmers to Your Home"}
-                </p>
-              </div>
-            </div>
-
-            {/* Quick Link Badge to Combos */}
-            <a
-              href="#combos"
-              className="shrink-0 hidden sm:inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#E0B04A] hover:bg-[#F3D17A] text-[#14291D] text-xs font-black shadow-xs transition-colors"
+      {/* STOREFRONT HERO SECTION WITH VIDEO (RESTORED TO PRE-DIWALI STATE) */}
+      <section className="w-full bg-[#14291D] border-b border-[#E0B04A]/40 overflow-hidden relative">
+        <div className="relative w-full aspect-[1376/768] sm:aspect-[16/9] max-h-[620px] overflow-hidden bg-[#14291D] flex items-center justify-center">
+          {cmsConfig.mainBannerMediaType === "image" && cmsConfig.mainBannerImageUrl ? (
+            <img
+              src={cmsConfig.mainBannerImageUrl}
+              alt={cmsConfig.brandName || "MANOPAVANA Wood-Pressed Oils"}
+              className="w-full h-full object-cover object-center"
+            />
+          ) : (
+            <video
+              autoPlay
+              loop
+              muted
+              playsInline
+              poster={cmsConfig.mainBannerImageUrl || cmsConfig.heroFallbackImage || MEDIA_ASSETS.heroFallbackImage}
+              className="w-full h-full object-cover object-center"
             >
-              <span>{FESTIVE_CONFIG.giftButtonText}</span>
-              <span>→</span>
-            </a>
-          </div>
-        </section>
-      )}
-
-      {/* 2. MAIN STOREFRONT HERO / DIWALI BANNER (DIRECTLY BELOW CELEBRATION RIBBON) */}
-      {(isFestiveActive() || cmsConfig.mainBannerImageUrl || cmsConfig.mainBannerVideoUrl) && (
-        <section className="w-full bg-[#14291D] border-b border-[#E0B04A]/40 overflow-hidden relative">
-          <a
-            href="#combos"
-            className="block relative group overflow-hidden cursor-pointer"
-            aria-label="Gift a Diwali combo - Scroll to Value Combos"
-          >
-            <div className="relative w-full aspect-[1376/768] sm:aspect-[16/9] max-h-[600px] overflow-hidden bg-[#14291D] flex items-center justify-center">
-              {cmsConfig.mainBannerMediaType === "video" && cmsConfig.mainBannerVideoUrl ? (
-                <video
-                  autoPlay
-                  loop
-                  muted
-                  playsInline
-                  poster={cmsConfig.mainBannerImageUrl || diwaliBannerImg}
-                  className="w-full h-full object-cover object-center"
-                >
-                  <source src={cmsConfig.mainBannerVideoUrl} type="video/mp4" />
-                </video>
-              ) : (
-                <img
-                  src={cmsConfig.mainBannerImageUrl || diwaliBannerImg}
-                  alt="Happy Diwali - Light up your kitchen with Manopavana Wood-Pressed Oils"
-                  className="w-full h-full object-cover object-center"
-                />
-              )}
-            </div>
-          </a>
-        </section>
-      )}
-
-      {/* CENTERED 'GIFT A DIWALI COMBO' ACTION BUTTON BELOW BANNER IMAGE */}
-      {isFestiveActive() && (
-        <div className="w-full py-2.5 sm:py-3 bg-[#FAF3E0] border-b border-[#E0B04A]/30 flex justify-center items-center px-4">
-          <a
-            href="#combos"
-            className="inline-flex items-center justify-center gap-2 px-5 py-2 sm:px-6 sm:py-2.5 rounded-xl bg-[#E0B04A] hover:bg-[#F3D17A] text-[#14291D] font-black text-xs sm:text-sm shadow-md border border-[#14291D]/20 transition-all cursor-pointer hover:scale-105 active:scale-95"
-            aria-label="Gift a Diwali combo - Scroll to Value Combos"
-          >
-            <span role="img" aria-label="Diya" className="text-sm sm:text-base">🪔</span>
-            <span>{FESTIVE_CONFIG.giftButtonText}</span>
-            <span className="font-extrabold text-xs sm:text-sm">→</span>
-          </a>
+              <source
+                src={cmsConfig.mainBannerVideoUrl || cmsConfig.chekkuVideoUrl || MEDIA_ASSETS.heroVideo}
+                type="video/mp4"
+              />
+            </video>
+          )}
         </div>
-      )}
+      </section>
 
       {/* 3. EDITORIAL BRAND SECTION ("Unrefined by Nature, Bottled Fresh") */}
       <section
@@ -428,7 +370,7 @@ export const HomePage: React.FC = () => {
           </div>
 
           {/* Product Cards Grid */}
-          <div className="w-full max-w-full grid grid-cols-1 md:grid-cols-3 gap-8">
+          <div className="w-full max-w-full grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 lg:gap-8">
             {filteredProducts.map((product) => {
               const currentVolume = selectedVariants[product.id] || "1L";
               const regularPrice = product.prices[currentVolume];
@@ -506,7 +448,7 @@ export const HomePage: React.FC = () => {
                       }`}
                     >
                       <span className={`w-1.5 h-1.5 rounded-full ${isDark ? "bg-amber-400" : "bg-amber-600"} animate-pulse`} />
-                      <span>{product.smokePoint}</span>
+                      <span>{product.badge || product.smokePoint}</span>
                     </div>
                   </div>
 
@@ -892,7 +834,7 @@ export const HomePage: React.FC = () => {
               {/* Combo Section Banner Image */}
               <div className="w-full max-w-4xl mx-auto rounded-3xl overflow-hidden bg-[#14291D] border border-[#1F3D2B] p-4 flex items-center justify-center">
                 <img
-                  src={cmsConfig.comboBannerImage || (isFestiveActive() ? diwaliBannerImg : MEDIA_ASSETS.comboBanner)}
+                  src={cmsConfig.comboBannerImage || MEDIA_ASSETS.comboBanner}
                   alt="MANOPAVANA Complete 3-Oil Essential Trio Box"
                   className="w-full h-auto max-h-[480px] object-contain block mx-auto"
                 />
@@ -906,8 +848,11 @@ export const HomePage: React.FC = () => {
                   const festiveActive = isFestiveActive();
                   const price = saleActive ? getSalePrice(regularPrice) : (loyalty.isActive ? combo.loyaltyPrice : regularPrice);
                   const savings = saleActive ? getSaleSavings(regularPrice) : (regularPrice - price);
-                  const comboImg = combo.id === "combo-3l" ? combo1lImg : combo500mlImg;
-                  const displayImg = combo.image || comboImg;
+                  const displayImg =
+                    combo.image ||
+                    (combo.id === "combo-3l"
+                      ? "/assets/aistudio/283108387_1794145171256125_bf92e08a.jpg"
+                      : "/assets/aistudio/1003513490_1794145169189153_45f26b2d.jpg");
 
                   return (
                     <div

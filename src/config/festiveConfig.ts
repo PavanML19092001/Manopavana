@@ -15,22 +15,20 @@ export interface FestiveConfig {
 }
 
 export const FESTIVE_CONFIG: FestiveConfig = {
-  enabled: true,
-  endDate: "2026-11-12T23:59:59+05:30",
-  ribbonText: "Diwali Special",
-  subText: "Gift a Diwali combo",
-  subtext: "Gift a Diwali combo",
-  giftButtonText: "Gift a Diwali combo",
-  offerDeadlineText: "Offer till 12 November",
-  badgeText: "Offer till 12 November",
+  enabled: false,
+  endDate: null,
+  ribbonText: "",
+  subText: "",
+  subtext: "",
+  giftButtonText: "Buy Now",
+  offerDeadlineText: "",
+  badgeText: "",
 };
 
 /**
- * Returns true if the festive Diwali campaign is active.
- * Reverts automatically after endDate.
+ * Returns true if the festive campaign is active.
  */
 export const isFestiveActive = (): boolean => {
-  if (!FESTIVE_CONFIG.enabled) return false;
-  if (!FESTIVE_CONFIG.endDate) return true;
-  return new Date() <= new Date(FESTIVE_CONFIG.endDate);
+  return false;
 };
+

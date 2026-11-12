@@ -24,8 +24,6 @@ import {
   FAQS,
   LEGAL_POLICIES,
 } from "../constants";
-import combo1lImg from "../assets/diwali/combo_1l.jpg";
-import combo500mlImg from "../assets/diwali/combo_500ml.jpg";
 import { isSaleActive, getSalePrice } from "../utils/salePricing";
 import {
   auth,
@@ -1495,7 +1493,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       regularSubtotal: regSubtotal,
       discountAmount: finalDiscount,
       netAmount: payableItems,
-      discountLabel: isSaleActive() ? "10% Diwali Festive Discount" : finalDiscount > 0 ? "10% Order Discount" : undefined,
+      discountLabel: isSaleActive() ? "10% Order Discount" : finalDiscount > 0 ? "10% Order Discount" : undefined,
       shippingFee: finalShipping,
       total: finalTotal,
       paymentMethod: "cod",
@@ -1799,7 +1797,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           heading: overrides?.heading || c.heading,
           volumeLabel: overrides?.volumeLabel || c.volumeLabel,
           description: overrides?.description || c.description,
-          image: overrides?.image || combo1lImg || c.image,
+          image: overrides?.image || c.image,
           bullets: parsedBullets.length > 0 ? parsedBullets : c.bullets,
           regularPrice: reg,
           loyaltyPrice: loyVal,
@@ -1818,7 +1816,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           heading: overrides?.heading || c.heading,
           volumeLabel: overrides?.volumeLabel || c.volumeLabel,
           description: overrides?.description || c.description,
-          image: overrides?.image || combo500mlImg || c.image,
+          image: overrides?.image || c.image,
           bullets: parsedBullets.length > 0 ? parsedBullets : c.bullets,
           regularPrice: reg,
           loyaltyPrice: loyVal,

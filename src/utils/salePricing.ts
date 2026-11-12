@@ -10,51 +10,38 @@ export interface SaleConfig {
 }
 
 export const SALE_CONFIG: SaleConfig = {
-  enabled: true,
-  percent: 10,
-  label: "10% OFF",
-  endDate: "2026-11-12T23:59:59+05:30",
+  enabled: false,
+  percent: 0,
+  label: "",
+  endDate: null,
 };
 
 /**
  * Returns true if the sitewide sale is currently active.
  */
 export const isSaleActive = (): boolean => {
-  if (!SALE_CONFIG.enabled) return false;
-  if (!SALE_CONFIG.endDate) return true;
-  return new Date() <= new Date(SALE_CONFIG.endDate);
+  return false;
 };
 
 /**
  * Calculates the active discounted sale price for any given regular price.
- * Returns Math.round(regularPrice * (1 - percent/100)) while active,
- * or regularPrice if inactive.
+ * Returns regularPrice (original price).
  */
 export const getSalePrice = (regularPrice: number): number => {
   if (!regularPrice || regularPrice <= 0) return 0;
-  if (!isSaleActive()) return regularPrice;
-  return Math.round(regularPrice * (1 - SALE_CONFIG.percent / 100));
+  return regularPrice;
 };
 
 /**
  * Calculates savings between regular price and sale price.
  */
 export const getSaleSavings = (regularPrice: number): number => {
-  if (!regularPrice || regularPrice <= 0 || !isSaleActive()) return 0;
-  return regularPrice - getSalePrice(regularPrice);
+  return 0;
 };
 
 /**
- * Returns formatted deadline string e.g. "Offer till 12 November"
+ * Returns formatted deadline string
  */
 export const getSaleDeadlineLabel = (): string => {
-  if (!SALE_CONFIG.endDate) return "";
-  try {
-    const end = new Date(SALE_CONFIG.endDate);
-    const day = end.getDate();
-    const month = end.toLocaleString("en-IN", { month: "long" });
-    return `Offer till ${day} ${month}`;
-  } catch {
-    return "Offer till 12 November";
-  }
+  return "Limited Period Offer";
 };

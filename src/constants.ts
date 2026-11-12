@@ -12,6 +12,7 @@ import sesameLight from "./assets/products/sesame-light.png";
 import sesameDark from "./assets/products/sesame-dark.png";
 import sesameStudio from "./assets/products/sesame-studio.jpg";
 import sesameWhite from "./assets/products/sesame-white.jpg";
+import dispenserWhite from "./assets/products/dispenser-white.jpg";
 
 export const BUSINESS_CONFIG = {
   BRAND_NAME: "MANOPAVANA",
@@ -107,6 +108,12 @@ export const THEMED_PRODUCT_IMAGES: Record<string, { light: string; dark: string
     dark: sesameDark,
     studio: sesameStudio,
     white: sesameWhite,
+  },
+  dispenser: {
+    light: "https://pub-9e18bb265ecf4224ae1230cf913745ca.r2.dev/manopavana-drip-free-dispenser-hero-01.webp.png",
+    dark: "https://pub-9e18bb265ecf4224ae1230cf913745ca.r2.dev/manopavana-drip-free-dispenser-hero-01.webp.png",
+    studio: "https://pub-9e18bb265ecf4224ae1230cf913745ca.r2.dev/manopavana-drip-free-dispenser-hero-01.webp.png",
+    white: dispenserWhite,
   },
 };
 
@@ -544,6 +551,97 @@ export const PRODUCTS: Product[] = [
         "Extracted using industrial chemical solvents"
       ]
     }
+  },
+  {
+    id: "dispenser",
+    name: "Manopavana Zero-Drip Precision Oil Dispenser",
+    kannadaName: "ಜೀರೋ-ಡ್ರಿಪ್ ನಿಖರ ಎಣ್ಣೆ ಡಿಸ್ಪೆನ್ಸರ್",
+    category: "Kitchen Essentials / Accessories",
+    badge: "Kitchen Utility • Shatterproof",
+    subtitle: "Empty Refillable Precision Dispenser Bottle",
+    searchKeywords: "dispenser bottle empty bottle drip free spout pourer kitchen cruet plastic pet 1l 500ml accessories shatterproof",
+    shortDescription: "Crystal-clear, unbreakable food-grade PET dispenser with a one-thumb flip-top drip-free spout and embossed ml measurement markings.",
+    fullDescription: "Upgrade your everyday cooking counter with the Manopavana Zero-Drip Precision Oil Dispenser. Engineered from crystal-clear, shatterproof, BPA-free food-grade PET, it gives you the clean visual clarity of glass without the risk of breaking on hard granite kitchen slabs.\n\n• 100% Drip-Free Flip Spout: Precision silver-and-black nozzle with one-thumb flip cap and air-return vent that cuts oil flow cleanly—eliminating greasy bottle necks and sticky oil rings.\n• Shatterproof & Featherlight: Weighing just ~91g empty, easy to grip even with wet hands, and won't crack or shatter near the stove.\n• Built-In Portion Control: Clear, embossed milliliter (ml) markings along the bottle body to track daily oil usage effortlessly.\n• Wide-Mouth Easy Refill: Unscrews cleanly for mess-free refilling with Manopavana Wood-Pressed Groundnut, Coconut, or Sesame oils.",
+    bullets: [
+      "100% Drip-Free Flip Spout with air-return vent that cuts flow cleanly",
+      "Shatterproof food-grade heavy PET (~91g) — zero risk of breaking on granite",
+      "Embossed ml measurement scale along bottle body for daily portion control",
+      "Wide-mouth opening for easy, spill-free refilling with any cooking oil"
+    ],
+    sku: {
+      "1L": "MP-DISP-1L-001",
+      "500ml": "MP-DISP-500ML-001"
+    },
+    variantLabels: {
+      "1L": "1 L (Full Kitchen Size)",
+      "500ml": "500 ml (Compact Counter Size)"
+    },
+    prices: {
+      "1L": 149,
+      "500ml": 99
+    },
+    mrp: {
+      "1L": 249,
+      "500ml": 179
+    },
+    inStock: {
+      "1L": true,
+      "500ml": true
+    },
+    smokePoint: "Kitchen Utility • Shatterproof",
+    features: {
+      aroma: "100% Odourless",
+      texture: "Shatterproof Heavy PET",
+      cooking: "Zero Counter Drips",
+      quality: "Portion-Controlled Spout"
+    },
+    specs: {
+      extraction: "BPA-Free Food-Grade Heavy PET",
+      processing: "Precision Injection Molded • Leakproof Silicone Gasket",
+      fssai: "Food-Contact Safe (IS 12252 / IS 9845 Standards)",
+      facility: "Bangalore Packaging & Distribution Facility",
+      container: "Crystal Clear Heavy PET Bottle + Flip-Top Spout Nozzle",
+      bestFor: "Precision Dosing for Dosas, Rotis, Curries, Deep Frying & Sautéing",
+      shelfLife: "Multi-Year Reusable (Wash with warm water & mild soap)",
+      standards: "BPA-Free, Phthalate-Free, Lead-Free, 100% Recyclable"
+    },
+    nutrition: {
+      energy: "0 Kcal (Empty Dispenser)",
+      carbohydrates: "0.0 gm",
+      totalFat: "0.0 gm",
+      saturatedFat: "0.0 gm",
+      monoUnsaturatedFat: "0.0 gm",
+      polyUnsaturatedFat: "0.0 gm",
+      transFat: "0.0 gm",
+      cholesterol: "0.0 mg",
+      protein: "0.0 gm",
+      totalSugar: "0.0 gm",
+      dietaryFiber: "0.0 gm",
+      moisture: "0.0 %",
+      totalAsh: "0.0 %"
+    },
+    culinaryPairing: {
+      title: "Refill with Any Manopavana Wood-Pressed Oil",
+      description: "Compatible with our 1L and 500ml Groundnut, Coconut, and Sesame oils for clean, mess-free dispensing."
+    },
+    labelImage: "https://pub-9e18bb265ecf4224ae1230cf913745ca.r2.dev/manopavana-drip-free-dispenser-hero-01.webp.png",
+    images: [
+      "https://pub-9e18bb265ecf4224ae1230cf913745ca.r2.dev/manopavana-drip-free-dispenser-hero-01.webp.png",
+      "https://pub-9e18bb265ecf4224ae1230cf913745ca.r2.dev/manopavana-drip-free-spout-closeup-02.webp.png",
+      "https://pub-9e18bb265ecf4224ae1230cf913745ca.r2.dev/manopavana-unbreakable-pet-bottle-03.webp.png",
+      "https://pub-9e18bb265ecf4224ae1230cf913745ca.r2.dev/manopavana-embossed-ml-scale-04.webp.png",
+      "https://pub-9e18bb265ecf4224ae1230cf913745ca.r2.dev/manopavana-dispenser-1l-vs-500ml-05.webp.png"
+    ],
+    quiz: {
+      question: "What key advantage does the Manopavana Precision Dispenser have over glass oil bottles?",
+      correctAnswer: "100% Shatterproof and drip-free one-thumb flip spout",
+      options: [
+        "100% Shatterproof and drip-free one-thumb flip spout",
+        "Fragile and prone to shattering on kitchen granite",
+        "Single-use non-recyclable soft plastic",
+        "Lacks measurement markings"
+      ]
+    }
   }
 ];
 
@@ -558,7 +656,7 @@ export const COMBOS: ComboProduct[] = [
     loyaltyPrice: 1169,
     mrp: 1560,
     description: "Equip your kitchen with South India's 3 core traditional wood-pressed oils. Sourced directly from traditional wood-press artisans, settled naturally, and packed hygienically at our Bangalore packaging and distribution facility. Includes brand-new sealed 1L Groundnut Oil, 1L Coconut Oil, and 1L Sesame Oil.",
-    image: MEDIA_ASSETS.comboBanner,
+    image: "/assets/aistudio/283108387_1794145171256125_bf92e08a.jpg",
     bullets: [
       "Complete monthly cooking coverage for your family",
       "Free Doorstep Delivery included across India (24–72 hrs)",
@@ -578,7 +676,7 @@ export const COMBOS: ComboProduct[] = [
     loyaltyPrice: 629,
     mrp: 840,
     description: "Compact kitchen starter box containing 500ml Groundnut Oil, 500ml Coconut Oil, and 500ml Sesame Oil, packed fresh at our Bangalore packaging and distribution facility.",
-    image: MEDIA_ASSETS.comboBanner,
+    image: "/assets/aistudio/1003513490_1794145169189153_45f26b2d.jpg",
     bullets: [
       "Complete monthly cooking coverage for your family",
       "Free Doorstep Delivery included across India (24–72 hrs)",

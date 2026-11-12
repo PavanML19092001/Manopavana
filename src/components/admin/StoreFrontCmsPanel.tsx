@@ -899,7 +899,7 @@ export const StorefrontCMSPanel: React.FC<{ isDark: boolean }> = ({ isDark }) =>
                     className="w-full px-3 py-2 rounded-xl border border-stone-300 dark:border-stone-700 bg-transparent text-xs"
                   />
                   <span className="text-[10px] text-stone-500 block mt-1">
-                    Leave blank to use default festive Diwali artwork
+                    Enter an image URL from Cloudflare R2 or leave blank to hide
                   </span>
                   {mainBannerImageUrl && (
                     <div className="mt-2 rounded-lg overflow-hidden border border-stone-300 max-h-32 bg-stone-100 flex items-center justify-center">

@@ -21,9 +21,12 @@ export const LoyaltyQuizModal: React.FC = () => {
     loyaltyRemainingText,
   } = useStore();
 
-  const [activeTabOil, setActiveTabOil] = useState<"groundnut" | "coconut" | "sesame">(
-    quizProduct?.id || "groundnut"
-  );
+  const initialOil: "groundnut" | "coconut" | "sesame" =
+    quizProduct?.id === "coconut" || quizProduct?.id === "sesame"
+      ? quizProduct.id
+      : "groundnut";
+
+  const [activeTabOil, setActiveTabOil] = useState<"groundnut" | "coconut" | "sesame">(initialOil);
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
   
   // Track 2 chances and 2-day cooldown
@@ -299,11 +302,11 @@ export const LoyaltyQuizModal: React.FC = () => {
               Select the bottle you are verifying:
             </label>
             <div className="grid grid-cols-3 gap-2">
-              {PRODUCTS.map((prod) => (
+              {PRODUCTS.filter((prod) => prod.id === "groundnut" || prod.id === "coconut" || prod.id === "sesame").map((prod) => (
                 <button
                   key={prod.id}
                   type="button"
-                  onClick={() => handleResetForOil(prod.id)}
+                  onClick={() => handleResetForOil(prod.id as "groundnut" | "coconut" | "sesame")}
                   className={`p-2.5 rounded-xl border text-xs font-semibold transition-all flex flex-col items-center gap-1 cursor-pointer ${
                     activeTabOil === prod.id
                       ? "bg-gradient-to-r from-[#E0B04A] to-[#B87C24] text-[#14291D] border-[#F3D17A] font-bold shadow-md"

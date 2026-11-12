@@ -1,6 +1,8 @@
 import React, { useEffect, useState, useRef } from "react";
 import L from "leaflet";
 import { StorefrontCMSPanel } from "../components/admin/StoreFrontCmsPanel";
+import { LiveOrderTracker } from "../components/LiveOrderTracker";
+import { InvoiceModal } from "../components/InvoiceModal";
 import {
   Lock,
   ShieldAlert,
@@ -31,6 +33,8 @@ import {
   X,
   Archive,
   Unlock,
+  ArrowLeft,
+  ChevronRight,
 } from "lucide-react";
 import { useStore } from "../context/StoreContext";
 import { BUSINESS_CONFIG, INDIAN_STATES_DISTRICTS } from "../constants";
@@ -57,6 +61,10 @@ export const AdminPage: React.FC = () => {
   } = useStore();
 
   const isDark = themeMode === "dark";
+  type CmsView = "dashboard" | "orders-list" | "order-detail";
+  const [cmsView, setCmsView] = useState<CmsView>("dashboard");
+  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
+  const [activeInvoiceOrder, setActiveInvoiceOrder] = useState<Order | null>(null);
 
   const [adminOrderSearch, setAdminOrderSearch] = useState("");
   const [adminStatusFilter, setAdminStatusFilter] = useState<string>("all");
@@ -1241,6 +1249,7 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
 
   const activeOrdersCount = rawOrders.filter((o) => !isTerminalOrder(o.orderStatus)).length;
   const completedOrdersCount = rawOrders.filter((o) => isTerminalOrder(o.orderStatus)).length;
+  const currentOrder = rawOrders.find((o) => o.orderRef === selectedOrderId || o.id === selectedOrderId);
 
   const displayOrders = rawOrders.filter((ord) => {
     const isCompleted = isTerminalOrder(ord.orderStatus);
@@ -1807,20 +1816,111 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
           </div>
         </div>
 
-        {/* Live Incoming Orders & Delhivery Queue (Top Priority) */}
-        <div className="space-y-4">
-          <div
-            className={`rounded-3xl border p-6 sm:p-8 shadow-sm space-y-5 transition-colors ${
-              isDark
-                ? "bg-[#14291D] border-[#1F3D2B]"
-                : "bg-white border-[#F2E8CC]"
-            }`}
-          >
+        {/* VIEW 1: CMS FRONT PAGE (CONTAINS ONLY THE BUTTON TO OPEN ORDERS) */}
+        {cmsView === "dashboard" && (
+          <div className="space-y-6">
             <div
-              className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b pb-3 ${
-                isDark ? "border-[#14291D]" : "border-[#F2E8CC]"
+              className={`rounded-3xl border p-6 sm:p-7 shadow-sm transition-colors ${
+                isDark ? "bg-[#14291D] border-[#1F3D2B]" : "bg-white border-[#E0B04A]/40"
+              } flex flex-col md:flex-row md:items-center justify-between gap-6`}
+            >
+              <div className="space-y-2.5">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-2xl bg-[#E0B04A]/20 flex items-center justify-center text-[#E0B04A] shrink-0">
+                    <Package className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h2 className="text-lg sm:text-xl font-bold font-serif text-[#14291D] dark:text-[#FAF3E0] flex items-center gap-2">
+                      <span>Customer Orders & Logistics Hub</span>
+                      <span className="text-xs px-2.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 font-bold border border-emerald-500/30">
+                        {activeOrdersCount} Active Ongoing
+                      </span>
+                    </h2>
+                    <p className="text-xs text-[#5C6E63] dark:text-[#A89482]">
+                      Dedicated orders workspace to view customer orders, live tracking as customers see it, Delhivery manifests, and invoices.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2 pt-1 text-xs font-semibold">
+                  <span className="px-3 py-1 rounded-xl bg-stone-100 dark:bg-stone-900/60 border border-stone-200 dark:border-stone-800 text-[#14291D] dark:text-[#FAF3E0]">
+                    Total Orders: <strong className="font-black text-[#14291D] dark:text-[#F3D17A]">{rawOrders.length}</strong>
+                  </span>
+                  <span className="px-3 py-1 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-800 dark:text-amber-300">
+                    Pending Dispatch: <strong className="font-black">{pendingDispatchCount}</strong>
+                  </span>
+                  <span className="px-3 py-1 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-800 dark:text-emerald-300">
+                    Delivered: <strong className="font-black">{deliveredCount}</strong>
+                  </span>
+                  <span className="px-3 py-1 rounded-xl bg-[#FAF3E0] dark:bg-[#1F3D2B] border border-[#E0B04A]/30 text-[#14291D] dark:text-[#FAF3E0]">
+                    Revenue: <strong className="font-black text-[#14291D] dark:text-[#F3D17A]">₹{totalRevenue.toLocaleString("en-IN")}</strong>
+                  </span>
+                </div>
+              </div>
+
+              {/* Front Page Dedicated Orders Button */}
+              <button
+                type="button"
+                onClick={() => {
+                  setCmsView("orders-list");
+                  window.scrollTo({ top: 0, behavior: "smooth" });
+                }}
+                className="px-7 py-4 rounded-2xl bg-[#E0B04A] hover:bg-[#F3D17A] text-[#14291D] font-black text-sm shadow-xl border-2 border-[#14291D]/20 transition-all flex items-center justify-center gap-2.5 cursor-pointer shrink-0 hover:scale-105 active:scale-95"
+              >
+                <Truck className="w-5 h-5 text-[#14291D]" />
+                <span>Open Orders Management ({rawOrders.length}) →</span>
+              </button>
+            </div>
+
+            {/* Master Storefront CMS Panel (On the front page) */}
+            <StorefrontCMSPanel isDark={isDark} />
+          </div>
+        )}
+
+        {/* VIEW 2: DEDICATED ORDERS PAGE (ONLY THE ORDERS) */}
+        {cmsView === "orders-list" && (
+          <div className="space-y-4">
+            {/* Top Navigation Bar with Back Button */}
+            <div
+              className={`p-5 rounded-3xl border shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-colors ${
+                isDark ? "bg-[#14291D] border-[#1F3D2B]" : "bg-[#F2E8CC] border-[#E0B04A]/40"
               }`}
             >
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCmsView("dashboard");
+                    window.scrollTo({ top: 0, behavior: "smooth" });
+                  }}
+                  className="px-3 py-2 rounded-xl bg-white dark:bg-[#1F3D2B] text-[#14291D] dark:text-[#FAF3E0] font-bold text-xs border border-[#E0B04A]/40 hover:bg-[#E0B04A]/25 transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                  <span>Back to CMS Dashboard</span>
+                </button>
+                <div>
+                  <h1 className="text-xl sm:text-2xl font-bold font-serif text-[#14291D] dark:text-[#FAF3E0]">
+                    Customer Orders Hub
+                  </h1>
+                  <p className="text-xs text-[#2D4536] dark:text-[#A89482]">
+                    Dedicated orders workspace. Click any order to open its full details and customer tracking view.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div
+              className={`rounded-3xl border p-6 sm:p-8 shadow-sm space-y-5 transition-colors ${
+                isDark
+                  ? "bg-[#14291D] border-[#1F3D2B]"
+                  : "bg-white border-[#F2E8CC]"
+              }`}
+            >
+              <div
+                className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b pb-3 ${
+                  isDark ? "border-[#14291D]" : "border-[#F2E8CC]"
+                }`}
+              >
                 <div className="flex items-center gap-2">
                   {orderViewTab === "active" ? (
                     <Truck className="w-4 h-4 text-[#E0B04A]" />
@@ -3030,6 +3130,19 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                                 : "WhatsApp Dispatch"}
                             </span>
                           </a>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedOrderId(ord.orderRef);
+                              setCmsView("order-detail");
+                              window.scrollTo({ top: 0, behavior: "smooth" });
+                            }}
+                            className="px-3.5 py-1.5 rounded-lg bg-[#E0B04A] hover:bg-[#F3D17A] text-[#14291D] text-xs font-black flex items-center gap-1.5 transition-all cursor-pointer shadow-xs hover:scale-105 active:scale-95"
+                          >
+                            <Eye className="w-3.5 h-3.5 text-[#14291D]" />
+                            <span>Open Order & Live Tracking →</span>
+                          </button>
                         </div>
                       </div>
                     );
@@ -3038,11 +3151,414 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
               )}
           </div>
         </div>
+      )}
 
-        {/* Master Storefront CMS Panel (Below Orders) */}
+      {/* VIEW 3: DEDICATED ORDER DETAIL & LIVE TRACKING PAGE */}
+      {cmsView === "order-detail" && (
         <div className="space-y-6">
-          <StorefrontCMSPanel isDark={isDark} />
+          {currentOrder ? (
+            <>
+              {/* Detail Top Navigation */}
+              <div
+                className={`p-5 rounded-3xl border shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-colors ${
+                  isDark ? "bg-[#14291D] border-[#1F3D2B]" : "bg-[#F2E8CC] border-[#E0B04A]/40"
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCmsView("orders-list");
+                      window.scrollTo({ top: 0, behavior: "smooth" });
+                    }}
+                    className="px-3 py-2 rounded-xl bg-white dark:bg-[#1F3D2B] text-[#14291D] dark:text-[#FAF3E0] font-bold text-xs border border-[#E0B04A]/40 hover:bg-[#E0B04A]/25 transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
+                  >
+                    <ArrowLeft className="w-4 h-4" />
+                    <span>Back to Orders List</span>
+                  </button>
+                  <div>
+                    <h1 className="text-xl sm:text-2xl font-bold font-serif text-[#14291D] dark:text-[#FAF3E0] flex items-center gap-2">
+                      <span>Order #{currentOrder.orderRef}</span>
+                      <span
+                        className={`text-xs px-2.5 py-0.5 rounded-full font-bold border ${
+                          currentOrder.orderStatus === "Delivered"
+                            ? "bg-emerald-500/15 border-emerald-500/30 text-emerald-700 dark:text-emerald-300"
+                            : currentOrder.orderStatus === "Dispatched"
+                            ? "bg-blue-500/15 border-blue-500/30 text-blue-700 dark:text-blue-300"
+                            : currentOrder.orderStatus === "Packed"
+                            ? "bg-amber-500/15 border-amber-500/30 text-amber-700 dark:text-amber-300"
+                            : currentOrder.orderStatus === "Cancelled"
+                            ? "bg-red-500/15 border-red-500/30 text-red-700 dark:text-red-300"
+                            : "bg-stone-100 dark:bg-stone-800 border-stone-200 dark:border-stone-700 text-stone-800 dark:text-stone-200"
+                        }`}
+                      >
+                        {currentOrder.orderStatus}
+                      </span>
+                    </h1>
+                    <p className="text-xs text-[#2D4536] dark:text-[#A89482]">
+                      Dedicated Order Management & Customer Tracking View • Placed on{" "}
+                      {currentOrder.createdAt?.toDate
+                        ? new Date(currentOrder.createdAt.toDate()).toLocaleString("en-IN")
+                        : currentOrder.createdAt
+                        ? new Date(currentOrder.createdAt).toLocaleString("en-IN")
+                        : "Recently"}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setActiveInvoiceOrder(currentOrder)}
+                    className="px-3.5 py-2 rounded-xl text-xs font-bold bg-white dark:bg-[#1F3D2B] text-[#14291D] dark:text-[#FAF3E0] border border-[#E0B04A]/40 hover:bg-[#E0B04A]/20 flex items-center gap-1.5 cursor-pointer shadow-xs"
+                  >
+                    <Printer className="w-3.5 h-3.5 text-[#E0B04A]" />
+                    <span>Print Tax Invoice</span>
+                  </button>
+                  <a
+                    href={`https://wa.me/91${(currentOrder.shippingAddress?.phone || "").replace(/\D/g, "").slice(-10)}?text=${encodeURIComponent(
+                      `Hi ${currentOrder.shippingAddress?.fullName || "Customer"}, regarding your MANOPAVANA order #${currentOrder.orderRef}...`
+                    )}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-3.5 py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-1.5 cursor-pointer shadow-xs"
+                  >
+                    <MessageCircle className="w-3.5 h-3.5" />
+                    <span>WhatsApp Customer</span>
+                  </a>
+                </div>
+              </div>
+
+              {/* 1. EXACT LIVE ORDER TRACKING IN CMS (AS SEEN BY CUSTOMER) */}
+              <div
+                className={`rounded-3xl border p-6 sm:p-7 shadow-sm transition-colors ${
+                  isDark ? "bg-[#14291D] border-[#1F3D2B]" : "bg-white border-[#F2E8CC]"
+                }`}
+              >
+                <div className="flex items-center justify-between border-b pb-4 mb-5 border-stone-200 dark:border-stone-800">
+                  <div className="flex items-center gap-2.5">
+                    <span className="p-2.5 rounded-2xl bg-[#E0B04A]/20 text-[#E0B04A]">
+                      <Truck className="w-5 h-5 text-[#E0B04A]" />
+                    </span>
+                    <div>
+                      <h2 className="text-base font-bold font-serif text-[#14291D] dark:text-[#FAF3E0]">
+                        Customer Live Tracking View
+                      </h2>
+                      <p className="text-xs text-stone-500 dark:text-stone-400">
+                        Visual tracking milestones, Delhivery carrier scan checkpoints, and delivery updates as seen by the customer.
+                      </p>
+                    </div>
+                  </div>
+                  {currentOrder.trackingNumber && (
+                    <span className="px-3 py-1 rounded-xl text-xs font-bold bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-500/30">
+                      AWB: {currentOrder.trackingNumber}
+                    </span>
+                  )}
+                </div>
+
+                {/* Embedded customer-facing tracking component */}
+                <LiveOrderTracker order={currentOrder} themeMode={isDark ? "dark" : "light"} />
+              </div>
+
+              {/* 2. COMPLETE ORDER DETAILS & FINANCIALS */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Customer & Shipping Information */}
+                <div
+                  className={`rounded-3xl border p-6 shadow-sm space-y-4 ${
+                    isDark ? "bg-[#14291D] border-[#1F3D2B]" : "bg-white border-[#F2E8CC]"
+                  }`}
+                >
+                  <div className="flex items-center justify-between border-b pb-3 border-stone-200 dark:border-stone-800">
+                    <h3 className="font-bold font-serif text-sm flex items-center gap-2 text-[#14291D] dark:text-[#FAF3E0]">
+                      <MapPin className="w-4 h-4 text-[#E0B04A]" />
+                      <span>Customer & Delivery Details</span>
+                    </h3>
+                    <button
+                      type="button"
+                      onClick={() => handleOpenEditAddress(currentOrder)}
+                      className="px-2.5 py-1 rounded-lg text-xs font-bold bg-[#E0B04A]/15 hover:bg-[#E0B04A]/25 text-[#14291D] dark:text-amber-200 border border-[#E0B04A]/40 transition-colors flex items-center gap-1 cursor-pointer"
+                    >
+                      <Edit2 className="w-3.5 h-3.5 text-[#E0B04A]" />
+                      <span>Edit Address & Pin</span>
+                    </button>
+                  </div>
+
+                  <div className="space-y-3 text-xs">
+                    <div>
+                      <span className="text-stone-500 block text-[11px]">Recipient Full Name</span>
+                      <strong className="text-sm font-bold text-[#14291D] dark:text-[#FAF3E0]">
+                        {currentOrder.shippingAddress?.fullName || "Not provided"}
+                      </strong>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <span className="text-stone-500 block text-[11px]">WhatsApp Phone</span>
+                        <strong className="font-mono text-xs">
+                          {currentOrder.shippingAddress?.phone || "Not provided"}
+                        </strong>
+                      </div>
+                      <div>
+                        <span className="text-stone-500 block text-[11px]">Email Address</span>
+                        <strong className="text-xs truncate block">
+                          {currentOrder.shippingAddress?.email || currentOrder.customerEmail || "Not provided"}
+                        </strong>
+                      </div>
+                    </div>
+
+                    <div>
+                      <span className="text-stone-500 block text-[11px]">Street Address</span>
+                      <p className="font-medium text-[#14291D] dark:text-[#FAF3E0]">
+                        {currentOrder.shippingAddress?.addressLine1 || "No street address"}
+                      </p>
+                      {currentOrder.shippingAddress?.landmark && (
+                        <p className="text-stone-500 text-[11px]">
+                          Landmark: {currentOrder.shippingAddress.landmark}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-2 pt-1 border-t border-stone-100 dark:border-stone-800">
+                      <div>
+                        <span className="text-stone-500 block text-[11px]">District/City</span>
+                        <span className="font-bold">{currentOrder.shippingAddress?.district || currentOrder.shippingAddress?.city || "Bengaluru"}</span>
+                      </div>
+                      <div>
+                        <span className="text-stone-500 block text-[11px]">State</span>
+                        <span className="font-bold">{currentOrder.shippingAddress?.state || "Karnataka"}</span>
+                      </div>
+                      <div>
+                        <span className="text-stone-500 block text-[11px]">Pincode</span>
+                        <span className="font-bold font-mono">{currentOrder.shippingAddress?.pincode || "560058"}</span>
+                      </div>
+                    </div>
+
+                    {/* Maps Pin & Action */}
+                    <div className="pt-2 flex flex-wrap items-center gap-2">
+                      <a
+                        href={
+                          currentOrder.shippingAddress?.lat && currentOrder.shippingAddress?.lng
+                            ? `https://www.google.com/maps/search/?api=1&query=${currentOrder.shippingAddress.lat},${currentOrder.shippingAddress.lng}`
+                            : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+                                `${currentOrder.shippingAddress?.addressLine1 || ""}, ${currentOrder.shippingAddress?.city || ""} ${currentOrder.shippingAddress?.pincode || ""}`
+                              )}`
+                        }
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-3 py-1.5 rounded-lg border text-xs font-bold bg-white dark:bg-[#1F3D2B] text-[#14291D] dark:text-[#FAF3E0] hover:border-[#E0B04A] flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                      >
+                        <MapPin className="w-3.5 h-3.5 text-[#E0B04A]" />
+                        <span>Google Maps Location</span>
+                        <ExternalLink className="w-3 h-3 text-stone-400" />
+                      </a>
+
+                      <button
+                        type="button"
+                        onClick={() => handleCopyCustomerAddress(currentOrder)}
+                        className="px-3 py-1.5 rounded-lg border text-xs font-bold bg-white dark:bg-[#1F3D2B] text-[#14291D] dark:text-[#FAF3E0] hover:border-[#E0B04A] flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                      >
+                        {copiedAddress[currentOrder.orderRef] ? (
+                          <>
+                            <Check className="w-3.5 h-3.5 text-emerald-600" />
+                            <span>Copied!</span>
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="w-3.5 h-3.5 text-[#E0B04A]" />
+                            <span>Copy Address</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Purchased Items & Payment Details */}
+                <div
+                  className={`rounded-3xl border p-6 shadow-sm space-y-4 ${
+                    isDark ? "bg-[#14291D] border-[#1F3D2B]" : "bg-white border-[#F2E8CC]"
+                  }`}
+                >
+                  <div className="flex items-center justify-between border-b pb-3 border-stone-200 dark:border-stone-800">
+                    <h3 className="font-bold font-serif text-sm flex items-center gap-2 text-[#14291D] dark:text-[#FAF3E0]">
+                      <Package className="w-4 h-4 text-[#E0B04A]" />
+                      <span>Purchased Items & Payment</span>
+                    </h3>
+                    <span className="text-xs font-bold text-[#E0B04A]">
+                      {currentOrder.paymentMethod?.toUpperCase()}
+                    </span>
+                  </div>
+
+                  {/* Items List */}
+                  <div className="space-y-2">
+                    {((Array.isArray(currentOrder.items)
+                      ? currentOrder.items
+                      : currentOrder.items && typeof currentOrder.items === "object"
+                      ? Object.values(currentOrder.items)
+                      : []) as any[]).map((item, idx) => (
+                      <div
+                        key={idx}
+                        className="flex items-center justify-between p-2.5 rounded-xl bg-stone-50 dark:bg-stone-900/40 border border-stone-100 dark:border-stone-800 text-xs"
+                      >
+                        <div>
+                          <p className="font-bold text-[#14291D] dark:text-[#FAF3E0]">
+                            {item.productName || item.name}
+                          </p>
+                          <p className="text-[11px] text-stone-500">
+                            Qty: {item.quantity || 1} • Unit: ₹{item.price || item.unitPrice || 0}
+                          </p>
+                        </div>
+                        <span className="font-bold font-mono text-sm">
+                          ₹{(item.price || item.unitPrice || 0) * (item.quantity || 1)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Payment Breakdown */}
+                  <div className="p-3.5 rounded-2xl bg-stone-50 dark:bg-stone-900/60 border border-stone-200 dark:border-stone-800 text-xs space-y-1.5">
+                    <div className="flex justify-between text-stone-600 dark:text-stone-400">
+                      <span>Payment Mode:</span>
+                      <span className="font-bold text-[#14291D] dark:text-[#FAF3E0]">{currentOrder.paymentMethod?.toUpperCase()}</span>
+                    </div>
+                    {(currentOrder.phonepeTransactionId || (currentOrder as any).transactionId) && (
+                      <div className="flex justify-between text-stone-600 dark:text-stone-400 font-mono text-[11px]">
+                        <span>Transaction Ref:</span>
+                        <span>{currentOrder.phonepeTransactionId || (currentOrder as any).transactionId}</span>
+                      </div>
+                    )}
+                    <div className="border-t border-stone-200 dark:border-stone-800 pt-2 flex justify-between font-bold text-sm text-[#14291D] dark:text-[#FAF3E0]">
+                      <span>Total Amount Paid:</span>
+                      <span className="text-[#E0B04A] font-black text-base">₹{currentOrder.total}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* 3. LOGISTICS & ADMIN ORDER ACTIONS */}
+              <div
+                className={`rounded-3xl border p-6 shadow-sm space-y-5 ${
+                  isDark ? "bg-[#14291D] border-[#1F3D2B]" : "bg-white border-[#F2E8CC]"
+                }`}
+              >
+                <div className="flex items-center justify-between border-b pb-3 border-stone-200 dark:border-stone-800">
+                  <h3 className="font-bold font-serif text-sm flex items-center gap-2 text-[#14291D] dark:text-[#FAF3E0]">
+                    <Truck className="w-4 h-4 text-[#E0B04A]" />
+                    <span>Logistics Dispatch & Status Controls</span>
+                  </h3>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-stone-500 font-semibold">Change Status:</span>
+                    <select
+                      value={currentOrder.orderStatus}
+                      onChange={(e) => handleStatusChange(currentOrder, e.target.value as OrderStatus)}
+                      className="px-3 py-1.5 rounded-xl text-xs font-bold bg-[#FAF3E0] dark:bg-[#1F3D2B] border border-[#E0B04A]/50 text-[#14291D] dark:text-[#FAF3E0] focus:ring-1 focus:ring-[#E0B04A]"
+                    >
+                      <option value="Placed">Placed</option>
+                      <option value="Packed">Packed</option>
+                      <option value="Dispatched">Dispatched</option>
+                      <option value="Delivered">Delivered</option>
+                      <option value="Cancelled">Cancelled</option>
+                      <option value="Payment Incomplete">Payment Incomplete</option>
+                      <option value="Failed (Expired)">Failed (Expired)</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Carrier Manifest Actions */}
+                <div className="p-4 rounded-2xl bg-stone-50 dark:bg-stone-900/50 border border-stone-200 dark:border-stone-800 space-y-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div>
+                      <h4 className="text-xs font-bold text-[#14291D] dark:text-[#FAF3E0]">
+                        Generate Courier Shipping Waybill
+                      </h4>
+                      <p className="text-[11px] text-stone-500">
+                        Dispatches parcel directly through Delhivery Express API.
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleManifestDelhivery(currentOrder)}
+                        disabled={manifesting[currentOrder.orderRef]}
+                        className="px-4 py-2 rounded-xl bg-[#1F3D2B] hover:bg-[#14291D] disabled:opacity-50 text-white font-bold text-xs flex items-center gap-2 cursor-pointer shadow-md"
+                      >
+                        <Truck className="w-3.5 h-3.5 text-amber-300" />
+                        <span>
+                          {manifesting[currentOrder.orderRef] ? "Generating Waybill..." : "⚡ 1-Click Delhivery Manifest"}
+                        </span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Custom AWB input */}
+                  <div className="flex items-center gap-2 pt-2 border-t border-stone-200 dark:border-stone-800">
+                    <input
+                      type="text"
+                      placeholder="Or paste custom AWB from carrier..."
+                      value={customAwb[currentOrder.orderRef] || ""}
+                      onChange={(e) => setCustomAwb((p) => ({ ...p, [currentOrder.orderRef]: e.target.value }))}
+                      className="flex-1 px-3 py-2 text-xs rounded-xl border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 font-mono"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleSaveCustomAwb(currentOrder.orderRef)}
+                      className="px-3.5 py-2 rounded-xl bg-stone-700 hover:bg-stone-800 text-white text-xs font-bold cursor-pointer"
+                    >
+                      Save AWB
+                    </button>
+                  </div>
+
+                  {manifestError[currentOrder.orderRef] && (
+                    <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-300 text-xs">
+                      ⚠️ {manifestError[currentOrder.orderRef]}
+                    </div>
+                  )}
+                </div>
+
+                {/* Danger Zone: Delete Order */}
+                <div className="pt-2 flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (window.confirm(`Delete order #${currentOrder.orderRef} permanently?`)) {
+                        deleteOrder(currentOrder.orderRef);
+                        setCmsView("orders-list");
+                      }
+                    }}
+                    className="px-3 py-1.5 rounded-xl text-xs text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 border border-red-200 dark:border-red-900 flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Delete Order from Database</span>
+                  </button>
+                </div>
+              </div>
+            </>
+          ) : (
+            <div className="p-12 text-center space-y-4 bg-white dark:bg-[#14291D] rounded-3xl border border-[#F2E8CC] dark:border-[#1F3D2B]">
+              <Package className="w-12 h-12 mx-auto text-[#E0B04A]" />
+              <h3 className="text-base font-bold text-[#14291D] dark:text-[#FAF3E0]">Order Not Found</h3>
+              <p className="text-xs text-stone-500">The selected order could not be loaded.</p>
+              <button
+                type="button"
+                onClick={() => setCmsView("orders-list")}
+                className="px-5 py-2.5 rounded-xl bg-[#E0B04A] text-[#14291D] font-bold text-xs cursor-pointer"
+              >
+                Return to Orders List
+              </button>
+            </div>
+          )}
         </div>
+      )}
+
+      {/* Invoice Printable Tax Modal */}
+      {activeInvoiceOrder && (
+        <InvoiceModal
+          order={activeInvoiceOrder}
+          isOpen={!!activeInvoiceOrder}
+          onClose={() => setActiveInvoiceOrder(null)}
+        />
+      )}
 
 
         {/* Order Delivery Address & GPS Coordinates Editor Modal */}

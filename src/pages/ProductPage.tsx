@@ -20,8 +20,6 @@ import {
 } from "lucide-react";
 import { useStore } from "../context/StoreContext";
 import { BottleVolume } from "../types";
-import combo1lImg from "../assets/diwali/combo_1l.jpg";
-import combo500mlImg from "../assets/diwali/combo_500ml.jpg";
 import { THEMED_PRODUCT_IMAGES } from "../constants";
 import { FESTIVE_CONFIG, isFestiveActive } from "../config/festiveConfig";
 import { getSalePrice, getSaleSavings, isSaleActive, getSaleDeadlineLabel } from "../utils/salePricing";
@@ -104,6 +102,13 @@ export const ProductPage = () => {
         aroma: "Fresh Copra Fragrance",
       };
     }
+    if (product.id === "dispenser") {
+      return {
+        smokePoint: "Food-Grade BPA-Free PET",
+        bestStyle: "Precision Dosing for Dosas, Rotis & Deep Frying",
+        aroma: "Crystal Clear & Odourless",
+      };
+    }
     return {
       smokePoint: "210°C (Medium-High Heat)",
       bestStyle: "Tadka, Dosa Seasoning, Gravies & Ayurvedic Oil Pulling",
@@ -113,17 +118,33 @@ export const ProductPage = () => {
 
   const cookingProfile = getCookingProfile();
 
+  const currentSku =
+    product.sku?.[selectedVolume] ||
+    (product.id === "dispenser"
+      ? selectedVolume === "1L"
+        ? "MP-DISP-1L-001"
+        : "MP-DISP-500ML-001"
+      : undefined);
+
+  const currentSubtitle =
+    product.id === "dispenser"
+      ? selectedVolume === "1L"
+        ? "1 L (Full Kitchen Size)"
+        : "500 ml (Compact Counter Size)"
+      : `Marachekku Pure • ${selectedVolume}`;
+
   const handleAddToCart = () => {
     addToCart(
       {
         id: cartItemId,
         productId: product.id,
         title: product.name,
-        subtitle: `Marachekku Pure • ${selectedVolume}`,
+        subtitle: currentSubtitle,
         variant: selectedVolume,
         price,
         regularPrice,
         image: product.images[selectedImageIndex] || product.images[0],
+        sku: currentSku,
       },
       1
     );
@@ -150,11 +171,12 @@ export const ProductPage = () => {
         id: cartItemId,
         productId: product.id,
         title: product.name,
-        subtitle: `Marachekku Pure • ${selectedVolume}`,
+        subtitle: currentSubtitle,
         variant: selectedVolume,
         price,
         regularPrice,
         image: product.images[selectedImageIndex] || product.images[0],
+        sku: currentSku,
       },
       currentQuantity > 0 ? currentQuantity : 1
     );
@@ -247,12 +269,17 @@ export const ProductPage = () => {
     }
   };
 
-  // FLIPKART STYLE SHARE HANDLER - SENDS CLEAN LINK WITH RICH PREVIEW CARD
+  // FLIPKART STYLE SHARE HANDLER - SENDS CLEAN LINK WITH RICH PREVIEW CARD & PHOTO
   const handleShare = async () => {
     const shareUrl = window.location.href;
-    const shareTitle = `${product.name} (Pure Marachekku Wood-Pressed Oil)`;
-    // Clean text without trailing url: navigator.share with url appends the url automatically
-    const shareText = `Check out *${product.name}* (100% Marachekku Wood-Pressed Oil) from MANOPAVANA Bengaluru:\nPrice: ₹${price} (${selectedVolume})`;
+    const shareTitle =
+      product.id === "dispenser"
+        ? `${product.name} (Zero-Drip Precision Oil Dispenser Bottle)`
+        : `${product.name} (Pure Marachekku Wood-Pressed Oil)`;
+    const shareText =
+      product.id === "dispenser"
+        ? `Check out the *${product.name}* (Shatterproof Food-Grade Bottle with Drip-Free Flip Spout) from MANOPAVANA Bengaluru:\nPrice: ₹${price} (${product.variantLabels?.[selectedVolume] || selectedVolume})`
+        : `Check out *${product.name}* (100% Marachekku Wood-Pressed Oil) from MANOPAVANA Bengaluru:\nPrice: ₹${price} (${selectedVolume})`;
     const shareTextWithUrl = `${shareText}\n${shareUrl}`;
 
     // Try Web Share API with white-background image file if supported
@@ -260,14 +287,16 @@ export const ProductPage = () => {
       try {
         let fileShared = false;
         try {
-          // Use guaranteed white-background image for sharing
+          // Use guaranteed white-background local image for sharing (never blocked by CORS)
           const whiteImgPath =
             THEMED_PRODUCT_IMAGES[product.id]?.white ||
             `/images/products/${product.id}-white.jpg`;
 
           const file = await getWhiteBackgroundShareFile(
             whiteImgPath,
-            `${product.id}-pure-wood-pressed-oil`
+            product.id === "dispenser"
+              ? "manopavana-zero-drip-dispenser-bottle"
+              : `${product.id}-pure-wood-pressed-oil`
           );
 
           if (file) {
@@ -337,16 +366,28 @@ export const ProductPage = () => {
 
   const activeImageUrl = product.images[selectedImageIndex] || product.images[0];
   const shareMessage = encodeURIComponent(
-    `🌿 *${product.name}* (100% Traditional Marachekku Wood-Pressed Oil)\n` +
-    `💰 Price: ₹${price} (${selectedVolume} Bottle)\n` +
-    `📍 MANOPAVANA, Bengaluru\n\n` +
-    `🔗 Order & View Details: ${window.location.href}`
+    product.id === "dispenser"
+      ? `🧴 *${product.name}*\n` +
+        `✨ Shatterproof Food-Grade Refillable Bottle with Zero-Drip Flip Spout\n` +
+        `💰 Price: ₹${price} (${product.variantLabels?.[selectedVolume] || selectedVolume})\n` +
+        `📍 MANOPAVANA, Bengaluru\n\n` +
+        `🔗 Order & View Details: ${window.location.href}`
+      : `🌿 *${product.name}* (100% Traditional Marachekku Wood-Pressed Oil)\n` +
+        `💰 Price: ₹${price} (${selectedVolume} Bottle)\n` +
+        `📍 MANOPAVANA, Bengaluru\n\n` +
+        `🔗 Order & View Details: ${window.location.href}`
   );
 
   React.useEffect(() => {
-    document.title = `${product.name} - MANOPAVANA Artisanal Oils`;
+    document.title = `${product.name} - MANOPAVANA`;
     // Update OpenGraph image to solid white background image for WhatsApp/social preview cards
-    const whiteImgUrl = THEMED_PRODUCT_IMAGES[product.id]?.white || `${window.location.origin}/images/products/${product.id}-white.jpg`;
+    const rawWhite =
+      THEMED_PRODUCT_IMAGES[product.id]?.white ||
+      `/images/products/${product.id}-white.jpg`;
+    const whiteImgUrl = rawWhite.startsWith("http")
+      ? rawWhite
+      : `${window.location.origin}${rawWhite.startsWith("/") ? "" : "/"}${rawWhite}`;
+
     const ogImage = document.querySelector('meta[property="og:image"]');
     if (ogImage) {
       ogImage.setAttribute("content", whiteImgUrl);
@@ -380,10 +421,12 @@ export const ProductPage = () => {
           }`}
         >
           <ArrowLeft className="w-3.5 h-3.5" />
-          <span>Back to All Oils</span>
+          <span>Back to Catalog</span>
         </Link>
         <ChevronRight className={`w-3 h-3 ${isDark ? "text-[#5A3E2C]" : "text-[#C8BAA8]"}`} />
-        <span className={isDark ? "text-[#3F4F45]" : "text-[#3F4F45]"}>Artisanal Wood-Pressed</span>
+        <span className={isDark ? "text-[#3F4F45]" : "text-[#3F4F45]"}>
+          {product.category || "Artisanal Wood-Pressed"}
+        </span>
         <ChevronRight className={`w-3 h-3 ${isDark ? "text-[#5A3E2C]" : "text-[#C8BAA8]"}`} />
         <span className={`font-bold truncate max-w-[160px] sm:max-w-none ${isDark ? "text-[#FAF3E0]" : "text-[#14291D]"}`}>
           {product.name}
@@ -402,9 +445,18 @@ export const ProductPage = () => {
         >
           <div className="flex items-start justify-between gap-4">
             <div className="space-y-1.5 flex-1 min-w-0">
-              <div className="flex items-center gap-2 text-xs text-[#E0B04A] font-semibold">
-                <span className="font-bold">{product.kannadaName}</span>
-                <span className="text-[10px] opacity-75">• 100% Traditional Marachekku</span>
+              <div className="flex items-center gap-2 text-xs text-[#E0B04A] font-semibold flex-wrap">
+                {product.badge ? (
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-900 dark:text-amber-300 font-bold text-xs">
+                    <Sparkles className="w-3.5 h-3.5 text-[#E0B04A]" />
+                    <span>{product.badge}</span>
+                  </span>
+                ) : (
+                  <>
+                    <span className="font-bold">{product.kannadaName}</span>
+                    <span className="text-[10px] opacity-75">• 100% Traditional Marachekku</span>
+                  </>
+                )}
               </div>
 
               <h1
@@ -612,15 +664,28 @@ export const ProductPage = () => {
                     >
                       {selectedVolume === "1L" && <span className="w-1.5 h-1.5 rounded-full bg-white" />}
                     </span>
-                    <span className="font-bold text-sm sm:text-base">1 Litre Bottle</span>
+                    <span className="font-bold text-sm sm:text-base">
+                      {product.variantLabels?.["1L"] || "1 Litre Bottle"}
+                    </span>
                   </div>
-                  <span className="font-black text-base text-[#E0B04A]">
-                    ₹{product.prices["1L"]}
+                  <div className="text-right">
+                    <span className="font-black text-base text-[#E0B04A]">
+                      ₹{product.prices["1L"]}
+                    </span>
+                    {product.mrp["1L"] > product.prices["1L"] && (
+                      <span className="text-xs line-through text-[#4A5A50] block">
+                        ₹{product.mrp["1L"]}
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <div className="mt-1 pl-6">
+                  <span className={`text-[11px] block ${isDark ? "text-[#3F4F45]" : "text-[#3F4F45]"}`}>
+                    {product.id === "dispenser"
+                      ? "Full kitchen size for daily cooking & refill"
+                      : "Best value for daily cooking & frying"}
                   </span>
                 </div>
-                <span className={`text-[11px] mt-1 pl-6 block ${isDark ? "text-[#3F4F45]" : "text-[#3F4F45]"}`}>
-                  Best value for daily cooking & frying
-                </span>
               </button>
 
               <button
@@ -645,46 +710,116 @@ export const ProductPage = () => {
                     >
                       {selectedVolume === "500ml" && <span className="w-1.5 h-1.5 rounded-full bg-white" />}
                     </span>
-                    <span className="font-bold text-sm sm:text-base">500 ml Bottle</span>
+                    <span className="font-bold text-sm sm:text-base">
+                      {product.variantLabels?.["500ml"] || "500 ml Bottle"}
+                    </span>
                   </div>
-                  <span className="font-black text-base text-[#E0B04A]">
-                    ₹{product.prices["500ml"]}
+                  <div className="text-right">
+                    <span className="font-black text-base text-[#E0B04A]">
+                      ₹{product.prices["500ml"]}
+                    </span>
+                    {product.mrp["500ml"] > product.prices["500ml"] && (
+                      <span className="text-xs line-through text-[#4A5A50] block">
+                        ₹{product.mrp["500ml"]}
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <div className="mt-1 pl-6">
+                  <span className={`text-[11px] block ${isDark ? "text-[#3F4F45]" : "text-[#3F4F45]"}`}>
+                    {product.id === "dispenser"
+                      ? "Compact counter size for dining & seasoning"
+                      : "Compact bottle for smaller kitchen needs"}
                   </span>
                 </div>
-                <span className={`text-[11px] mt-1 pl-6 block ${isDark ? "text-[#3F4F45]" : "text-[#3F4F45]"}`}>
-                  Compact bottle for smaller kitchen needs
-                </span>
               </button>
             </div>
+
+            {/* Smart Cross-Sell Banner inside the Dispenser Page */}
+            {product.id === "dispenser" && (
+              <div className="mt-4 p-4 sm:p-5 rounded-2xl bg-amber-500/10 border-2 border-[#E0B04A]/40 space-y-2 transition-all shadow-xs">
+                <div className="flex items-start gap-3">
+                  <span className="text-2xl shrink-0" role="img" aria-label="Value Tip">💡</span>
+                  <div className="space-y-1.5 flex-1 min-w-0">
+                    <p className="text-xs sm:text-sm font-bold text-[#14291D] dark:text-[#FAF3E0] leading-snug">
+                      <span className="text-amber-800 dark:text-[#F3D17A] font-black uppercase tracking-wider text-[11px] mr-1 inline-block">
+                        Value Tip:
+                      </span>
+                      Our Wood-Pressed Groundnut, Coconut &amp; Sesame oils come pre-filled inside this exact reusable dispenser! Get 1L Pure Oil + This Dispenser together starting at ₹399.
+                    </p>
+                    <div className="pt-0.5">
+                      <Link
+                        to="/#catalog"
+                        className="inline-flex items-center gap-1.5 text-xs font-bold text-[#1F3D2B] dark:text-[#F3D17A] hover:text-[#E0B04A] underline decoration-[#E0B04A] underline-offset-4 transition-colors cursor-pointer"
+                      >
+                        <span>Explore Wood-Pressed Oils Collection</span>
+                        <span>→</span>
+                      </Link>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </section>
 
-        {/* Bottle QR Loyalty Banner */}
-        <section
-          aria-label="Loyalty Discount"
-          className="p-4 sm:p-5 rounded-3xl bg-[#1F3D2B] text-white flex flex-col sm:flex-row items-center justify-between gap-4 shadow-lg border border-[#5A3820]"
-        >
-          <div className="flex items-center gap-3.5">
-            <span className="p-2.5 rounded-2xl bg-[#E0B04A]/20 text-[#E0B04A] shrink-0">
-              <QrCode className="w-6 h-6 text-[#E0B04A]" />
-            </span>
-            <div>
-              <h4 className="text-sm font-bold text-amber-200">
-                Already own this bottle?
-              </h4>
-              <p className="text-xs text-[#E0B04A] mt-0.5">
-                Scan your front label security tagline to unlock 10% repeat order discount for 7 days!
-              </p>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={() => openLoyaltyQuiz(product)}
-            className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-[#E0B04A] text-[#14291D] font-black text-xs shrink-0 hover:bg-[#F59E0B] transition-colors cursor-pointer shadow-md text-center"
+        {/* Key Product Bullets / Highlights */}
+        {product.bullets && product.bullets.length > 0 && (
+          <section
+            aria-label="Key Highlights"
+            className={`rounded-3xl border p-5 sm:p-6 space-y-3.5 transition-colors ${
+              isDark ? "bg-[#14291D] border-[#1F3D2B]" : "bg-white border-[#F2E8CC]"
+            }`}
           >
-            Scan & Save 10%
-          </button>
-        </section>
+            <h3 className={`text-base font-bold font-serif ${isDark ? "text-[#FAF3E0]" : "text-[#14291D]"}`}>
+              {product.id === "dispenser" ? "Engineered Specifications & Design" : "Key Product Highlights"}
+            </h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+              {product.bullets.map((bullet, idx) => (
+                <div
+                  key={idx}
+                  className={`p-3.5 rounded-2xl flex items-start gap-2.5 ${
+                    isDark ? "bg-[#14291D]/80 border border-[#2D5A3F]/50" : "bg-[#FAF3E0] border border-[#F2E8CC]"
+                  }`}
+                >
+                  <Check className="w-4 h-4 text-[#E0B04A] shrink-0 mt-0.5" />
+                  <span className={`leading-relaxed ${isDark ? "text-stone-200" : "text-[#3F4F45]"}`}>
+                    {bullet}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* Bottle QR Loyalty Banner (Oils only) */}
+        {product.id !== "dispenser" && (
+          <section
+            aria-label="Loyalty Discount"
+            className="p-4 sm:p-5 rounded-3xl bg-[#1F3D2B] text-white flex flex-col sm:flex-row items-center justify-between gap-4 shadow-lg border border-[#5A3820]"
+          >
+            <div className="flex items-center gap-3.5">
+              <span className="p-2.5 rounded-2xl bg-[#E0B04A]/20 text-[#E0B04A] shrink-0">
+                <QrCode className="w-6 h-6 text-[#E0B04A]" />
+              </span>
+              <div>
+                <h4 className="text-sm font-bold text-amber-200">
+                  Already own this bottle?
+                </h4>
+                <p className="text-xs text-[#E0B04A] mt-0.5">
+                  Scan your front label security tagline to unlock 10% repeat order discount for 7 days!
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => openLoyaltyQuiz(product)}
+              className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-[#E0B04A] text-[#14291D] font-black text-xs shrink-0 hover:bg-[#F59E0B] transition-colors cursor-pointer shadow-md text-center"
+            >
+              Scan & Save 10%
+            </button>
+          </section>
+        )}
 
         {/* Culinary Pairing & Cooking Profile */}
         <section
@@ -694,12 +829,12 @@ export const ProductPage = () => {
           }`}
         >
           <h3 className={`text-base font-bold font-serif ${isDark ? "text-[#FAF3E0]" : "text-[#14291D]"}`}>
-            Culinary Usage & Cooking Profile
+            {product.id === "dispenser" ? "Material & Dispensing Profile" : "Culinary Usage & Cooking Profile"}
           </h3>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
             <div className={`p-3.5 rounded-2xl ${isDark ? "bg-[#14291D]" : "bg-[#FAF3E0]"}`}>
               <span className={`block text-[10px] uppercase font-bold ${isDark ? "text-[#3F4F45]" : "text-[#3F4F45]"}`}>
-                Smoke Point
+                {product.id === "dispenser" ? "Material Grade" : "Smoke Point"}
               </span>
               <span className={`font-bold mt-1 block ${isDark ? "text-[#FAF3E0]" : "text-[#14291D]"}`}>
                 {cookingProfile.smokePoint}
@@ -707,7 +842,7 @@ export const ProductPage = () => {
             </div>
             <div className={`p-3.5 rounded-2xl ${isDark ? "bg-[#14291D]" : "bg-[#FAF3E0]"}`}>
               <span className={`block text-[10px] uppercase font-bold ${isDark ? "text-[#3F4F45]" : "text-[#3F4F45]"}`}>
-                Best Culinary Style
+                {product.id === "dispenser" ? "Precision Flow" : "Best Culinary Style"}
               </span>
               <span className={`font-bold mt-1 block ${isDark ? "text-[#FAF3E0]" : "text-[#14291D]"}`}>
                 {cookingProfile.bestStyle}
@@ -715,7 +850,7 @@ export const ProductPage = () => {
             </div>
             <div className={`p-3.5 rounded-2xl ${isDark ? "bg-[#14291D]" : "bg-[#FAF3E0]"}`}>
               <span className={`block text-[10px] uppercase font-bold ${isDark ? "text-[#3F4F45]" : "text-[#3F4F45]"}`}>
-                Natural Aroma
+                {product.id === "dispenser" ? "Visual Clarity" : "Natural Aroma"}
               </span>
               <span className={`font-bold mt-1 block ${isDark ? "text-[#FAF3E0]" : "text-[#14291D]"}`}>
                 {cookingProfile.aroma}
@@ -732,12 +867,12 @@ export const ProductPage = () => {
           }`}
         >
           <h3 className={`text-base font-bold font-serif ${isDark ? "text-[#FAF3E0]" : "text-[#14291D]"}`}>
-            Extraction & Quality Specifications
+            {product.id === "dispenser" ? "Engineering & Material Specifications" : "Extraction & Quality Specifications"}
           </h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-xs">
             <div className={`p-3 rounded-2xl ${isDark ? "bg-[#14291D]" : "bg-[#FAF3E0]"}`}>
               <span className={`block text-[10px] uppercase font-bold ${isDark ? "text-[#3F4F45]" : "text-[#3F4F45]"}`}>
-                Extraction Method
+                {product.id === "dispenser" ? "Dispenser Mechanism" : "Extraction Method"}
               </span>
               <span className={`font-semibold mt-0.5 block ${isDark ? "text-[#FAF3E0]" : "text-[#14291D]"}`}>
                 {product.specs.extraction}
@@ -745,7 +880,7 @@ export const ProductPage = () => {
             </div>
             <div className={`p-3 rounded-2xl ${isDark ? "bg-[#14291D]" : "bg-[#FAF3E0]"}`}>
               <span className={`block text-[10px] uppercase font-bold ${isDark ? "text-[#3F4F45]" : "text-[#3F4F45]"}`}>
-                Processing
+                {product.id === "dispenser" ? "Material Standard" : "Processing"}
               </span>
               <span className={`font-semibold mt-0.5 block ${isDark ? "text-[#FAF3E0]" : "text-[#14291D]"}`}>
                 {product.specs.processing}
@@ -753,7 +888,7 @@ export const ProductPage = () => {
             </div>
             <div className={`p-3 rounded-2xl ${isDark ? "bg-[#14291D]" : "bg-[#FAF3E0]"}`}>
               <span className={`block text-[10px] uppercase font-bold ${isDark ? "text-[#3F4F45]" : "text-[#3F4F45]"}`}>
-                Facility
+                {product.id === "dispenser" ? "Origin & Facility" : "Facility"}
               </span>
               <span className={`font-semibold mt-0.5 block ${isDark ? "text-[#FAF3E0]" : "text-[#14291D]"}`}>
                 {product.specs.facility}
@@ -777,7 +912,7 @@ export const ProductPage = () => {
             </div>
             <div className={`p-3 rounded-2xl ${isDark ? "bg-[#14291D]" : "bg-[#FAF3E0]"}`}>
               <span className={`block text-[10px] uppercase font-bold ${isDark ? "text-[#3F4F45]" : "text-[#3F4F45]"}`}>
-                Shelf Life
+                Durability / Life
               </span>
               <span className={`font-semibold mt-0.5 block ${isDark ? "text-[#FAF3E0]" : "text-[#14291D]"}`}>
                 {product.specs.shelfLife}
@@ -795,77 +930,79 @@ export const ProductPage = () => {
           </p>
         </section>
 
-        {/* Nutritional Matrix Table */}
-        <section
-          aria-label="Nutritional Matrix"
-          className={`rounded-3xl border p-5 sm:p-6 space-y-3.5 transition-colors ${
-            isDark ? "bg-[#14291D] border-[#1F3D2B]" : "bg-white border-[#F2E8CC]"
-          }`}
-        >
-          <h3 className={`text-base font-bold font-serif ${isDark ? "text-[#FAF3E0]" : "text-[#14291D]"}`}>
-            Nutritional Matrix (per 100g serving)
-          </h3>
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <tbody className={`divide-y ${isDark ? "divide-[#14291D]" : "divide-[#F2E8CC]"}`}>
-                <tr>
-                  <td className={`py-2.5 ${isDark ? "text-[#E0B04A]" : "text-[#3F4F45]"}`}>Energy</td>
-                  <td className={`py-2.5 font-bold text-right ${isDark ? "text-[#FAF3E0]" : "text-[#14291D]"}`}>
-                    {product.nutrition.energy}
-                  </td>
-                </tr>
-                <tr>
-                  <td className={`py-2.5 ${isDark ? "text-[#E0B04A]" : "text-[#3F4F45]"}`}>Total Fat</td>
-                  <td className={`py-2.5 font-bold text-right ${isDark ? "text-[#FAF3E0]" : "text-[#14291D]"}`}>
-                    {product.nutrition.totalFat}
-                  </td>
-                </tr>
-                <tr>
-                  <td className={`py-2.5 ${isDark ? "text-[#E0B04A]" : "text-[#3F4F45]"}`}>Saturated Fat</td>
-                  <td className={`py-2.5 font-bold text-right ${isDark ? "text-[#FAF3E0]" : "text-[#14291D]"}`}>
-                    {product.nutrition.saturatedFat}
-                  </td>
-                </tr>
-                <tr>
-                  <td className={`py-2.5 ${isDark ? "text-[#E0B04A]" : "text-[#3F4F45]"}`}>Mono Unsaturated Fat</td>
-                  <td className={`py-2.5 font-bold text-right ${isDark ? "text-[#FAF3E0]" : "text-[#14291D]"}`}>
-                    {product.nutrition.monoUnsaturatedFat}
-                  </td>
-                </tr>
-                <tr>
-                  <td className={`py-2.5 ${isDark ? "text-[#E0B04A]" : "text-[#3F4F45]"}`}>Poly Unsaturated Fat</td>
-                  <td className={`py-2.5 font-bold text-right ${isDark ? "text-[#FAF3E0]" : "text-[#14291D]"}`}>
-                    {product.nutrition.polyUnsaturatedFat}
-                  </td>
-                </tr>
-                <tr>
-                  <td className={`py-2.5 ${isDark ? "text-[#E0B04A]" : "text-[#3F4F45]"}`}>Trans Fat</td>
-                  <td className={`py-2.5 font-bold text-right ${isDark ? "text-[#FAF3E0]" : "text-[#14291D]"}`}>
-                    {product.nutrition.transFat}
-                  </td>
-                </tr>
-                <tr>
-                  <td className={`py-2.5 ${isDark ? "text-[#E0B04A]" : "text-[#3F4F45]"}`}>Cholesterol</td>
-                  <td className={`py-2.5 font-bold text-right ${isDark ? "text-[#FAF3E0]" : "text-[#14291D]"}`}>
-                    {product.nutrition.cholesterol}
-                  </td>
-                </tr>
-                <tr>
-                  <td className={`py-2.5 ${isDark ? "text-[#E0B04A]" : "text-[#3F4F45]"}`}>Protein & Total Sugar</td>
-                  <td className={`py-2.5 font-bold text-right ${isDark ? "text-[#FAF3E0]" : "text-[#14291D]"}`}>
-                    0.0 gm
-                  </td>
-                </tr>
-                <tr>
-                  <td className={`py-2.5 ${isDark ? "text-[#E0B04A]" : "text-[#3F4F45]"}`}>Moisture / Total Ash</td>
-                  <td className={`py-2.5 font-bold text-right ${isDark ? "text-[#FAF3E0]" : "text-[#14291D]"}`}>
-                    {product.nutrition.moisture}
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </section>
+        {/* Nutritional Matrix Table (Oils only) */}
+        {product.id !== "dispenser" && (
+          <section
+            aria-label="Nutritional Matrix"
+            className={`rounded-3xl border p-5 sm:p-6 space-y-3.5 transition-colors ${
+              isDark ? "bg-[#14291D] border-[#1F3D2B]" : "bg-white border-[#F2E8CC]"
+            }`}
+          >
+            <h3 className={`text-base font-bold font-serif ${isDark ? "text-[#FAF3E0]" : "text-[#14291D]"}`}>
+              Nutritional Matrix (per 100g serving)
+            </h3>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <tbody className={`divide-y ${isDark ? "divide-[#14291D]" : "divide-[#F2E8CC]"}`}>
+                  <tr>
+                    <td className={`py-2.5 ${isDark ? "text-[#E0B04A]" : "text-[#3F4F45]"}`}>Energy</td>
+                    <td className={`py-2.5 font-bold text-right ${isDark ? "text-[#FAF3E0]" : "text-[#14291D]"}`}>
+                      {product.nutrition.energy}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className={`py-2.5 ${isDark ? "text-[#E0B04A]" : "text-[#3F4F45]"}`}>Total Fat</td>
+                    <td className={`py-2.5 font-bold text-right ${isDark ? "text-[#FAF3E0]" : "text-[#14291D]"}`}>
+                      {product.nutrition.totalFat}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className={`py-2.5 ${isDark ? "text-[#E0B04A]" : "text-[#3F4F45]"}`}>Saturated Fat</td>
+                    <td className={`py-2.5 font-bold text-right ${isDark ? "text-[#FAF3E0]" : "text-[#14291D]"}`}>
+                      {product.nutrition.saturatedFat}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className={`py-2.5 ${isDark ? "text-[#E0B04A]" : "text-[#3F4F45]"}`}>Mono Unsaturated Fat</td>
+                    <td className={`py-2.5 font-bold text-right ${isDark ? "text-[#FAF3E0]" : "text-[#14291D]"}`}>
+                      {product.nutrition.monoUnsaturatedFat}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className={`py-2.5 ${isDark ? "text-[#E0B04A]" : "text-[#3F4F45]"}`}>Poly Unsaturated Fat</td>
+                    <td className={`py-2.5 font-bold text-right ${isDark ? "text-[#FAF3E0]" : "text-[#14291D]"}`}>
+                      {product.nutrition.polyUnsaturatedFat}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className={`py-2.5 ${isDark ? "text-[#E0B04A]" : "text-[#3F4F45]"}`}>Trans Fat</td>
+                    <td className={`py-2.5 font-bold text-right ${isDark ? "text-[#FAF3E0]" : "text-[#14291D]"}`}>
+                      {product.nutrition.transFat}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className={`py-2.5 ${isDark ? "text-[#E0B04A]" : "text-[#3F4F45]"}`}>Cholesterol</td>
+                    <td className={`py-2.5 font-bold text-right ${isDark ? "text-[#FAF3E0]" : "text-[#14291D]"}`}>
+                      {product.nutrition.cholesterol}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className={`py-2.5 ${isDark ? "text-[#E0B04A]" : "text-[#3F4F45]"}`}>Protein & Total Sugar</td>
+                    <td className={`py-2.5 font-bold text-right ${isDark ? "text-[#FAF3E0]" : "text-[#14291D]"}`}>
+                      0.0 gm
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className={`py-2.5 ${isDark ? "text-[#E0B04A]" : "text-[#3F4F45]"}`}>Moisture / Total Ash</td>
+                    <td className={`py-2.5 font-bold text-right ${isDark ? "text-[#FAF3E0]" : "text-[#14291D]"}`}>
+                      {product.nutrition.moisture}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+        )}
 
         {/* ------------------------------------------------------------- */}
         {/* STEP 4: REVIEWS AT THE END                                    */}
@@ -1024,7 +1161,7 @@ export const ProductPage = () => {
           {/* Price & Variant Snapshot */}
           <div className="min-w-0 pr-2">
             <div className={`text-[10px] sm:text-xs font-bold uppercase tracking-wider truncate ${isDark ? "text-[#3F4F45]" : "text-[#3F4F45]"}`}>
-              {product.name} ({selectedVolume})
+              {product.name} • {product.variantLabels?.[selectedVolume] || selectedVolume}
             </div>
             <div className="flex items-baseline gap-2">
               <span className={`text-xl sm:text-2xl font-black font-serif ${isDark ? "text-[#FAF3E0]" : "text-[#14291D]"}`}>
