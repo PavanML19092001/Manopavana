@@ -176,6 +176,7 @@ export interface Order {
   discountAmount?: number;
   netAmount?: number;
   discountLabel?: string;
+  couponCode?: string;
   paymentMethod: "online" | "phonepe" | "cod";
   paymentMode?: "ONLINE" | "PHONEPE" | "PHONEPE_PAID" | "COD" | string;
   paymentStatus: "PENDING" | "COMPLETED" | "FAILED" | "PHONEPE_PAID" | string;
@@ -434,4 +435,22 @@ export interface CustomerDiscountTier {
   maxSlots: number;
   isEnrolled: boolean;
   ordersPlacedCount: number;
+}
+
+export interface Coupon {
+  code: string;
+  type: "shared" | "single_use";
+  discountPercent: number;
+  minOrderAmount?: number;
+  maxTotalUses?: number | null;
+  usedCount: number;
+  maxUsesPerCustomer: number;
+  redeemedByUids?: string[];
+  redeemedPhones?: string[];
+  totalRevenueDriven?: number;
+  expiresAt?: number | null;
+  isActive: boolean;
+  campaignTag?: string;
+  createdAt?: any;
+  updatedAt?: any;
 }

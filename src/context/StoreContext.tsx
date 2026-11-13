@@ -10,6 +10,7 @@ import {
   Order,
   Product,
   StoreCMSConfig,
+  Coupon,
 } from "../types";
 import {
   BUSINESS_CONFIG,
@@ -44,6 +45,9 @@ import {
   extractCleanPhone,
   isSyntheticAccount,
   saveCustomerProfile,
+  validateCouponInFirestore,
+  recordCouponRedemptionInFirestore,
+  normalizeCouponCode,
 } from "../firebase";
 import { doc, setDoc, onSnapshot, serverTimestamp } from "firebase/firestore";
 import { sendOrderConfirmationEmail } from "../services/emailService";
@@ -106,6 +110,13 @@ interface StoreContextType {
   quizProduct: Product | null;
   openLoyaltyQuiz: (product?: Product) => void;
   closeLoyaltyQuiz: () => void;
+
+  appliedCoupon: Coupon | null;
+  couponError: string | null;
+  isValidatingCoupon: boolean;
+  discountLabel: string | undefined;
+  applyCouponCode: (code: string, phoneOverride?: string) => Promise<{ valid: boolean; error?: string }>;
+  removeAppliedCoupon: () => void;
 
   isPlayingAudio: boolean;
   toggleAudio: () => void;
@@ -891,6 +902,8 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setAddress(DEFAULT_ADDRESS);
     setCart([]);
     setBuyNowItem(null);
+    setAppliedCoupon(null);
+    setCouponError(null);
     setIsAdminAuthenticated(false);
     sessionStorage.removeItem("manopavana_admin_auth");
 
@@ -1017,6 +1030,113 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const closeLoyaltyQuiz = () => {
     setIsQuizModalOpen(false);
   };
+
+  // ==========================================
+  // PROMO / REEL COUPON STATE (ZERO localStorage)
+  // ==========================================
+  const [appliedCoupon, setAppliedCoupon] = useState<Coupon | null>(null);
+  const [couponError, setCouponError] = useState<string | null>(null);
+  const [isValidatingCoupon, setIsValidatingCoupon] = useState(false);
+
+  const removeAppliedCoupon = () => {
+    setAppliedCoupon(null);
+    setCouponError(null);
+  };
+
+  const applyCouponCode = async (
+    rawCode: string,
+    phoneOverride?: string
+  ): Promise<{ valid: boolean; error?: string }> => {
+    const cleanCode = normalizeCouponCode(rawCode);
+    if (!cleanCode) {
+      const errMsg = "Please enter a valid coupon code.";
+      setCouponError(errMsg);
+      return { valid: false, error: errMsg };
+    }
+
+    setIsValidatingCoupon(true);
+    setCouponError(null);
+    try {
+      const checkPhone = phoneOverride || customerProfile?.phone || address?.phone || "";
+      const currentSubtotal = cart.reduce((acc, c) => acc + c.price * c.quantity, 0);
+      const res = await validateCouponInFirestore(
+        cleanCode,
+        currentSubtotal,
+        currentUser?.uid,
+        checkPhone
+      );
+
+      if (res.valid && res.coupon) {
+        setAppliedCoupon(res.coupon);
+        setCouponError(null);
+        showToast(
+          `🎉 ${res.coupon.discountPercent}% Off coupon "${res.coupon.code}" applied for this order!`
+        );
+        return { valid: true };
+      } else {
+        const msg = res.error || "Coupon code is invalid or expired.";
+        setCouponError(msg);
+        showToast(msg);
+        return { valid: false, error: msg };
+      }
+    } finally {
+      setIsValidatingCoupon(false);
+    }
+  };
+
+  // Detect ?coupon=CODE magic DM link on page load (NEVER stored in localStorage)
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const urlCoupon = params.get("coupon");
+      if (!urlCoupon) return;
+
+      const cleanCode = normalizeCouponCode(urlCoupon);
+      if (cleanCode) {
+        params.delete("coupon");
+        const nextQuery = params.toString();
+        const nextUrl = `${window.location.pathname}${nextQuery ? `?${nextQuery}` : ""}${window.location.hash}`;
+        window.history.replaceState({}, document.title, nextUrl);
+
+        validateCouponInFirestore(cleanCode, 0, auth.currentUser?.uid, customerProfile?.phone || address?.phone).then(
+          (res) => {
+            if (res.valid && res.coupon) {
+              setAppliedCoupon(res.coupon);
+              setCouponError(null);
+              showToast(
+                `🎉 ${res.coupon.discountPercent}% Instagram Reel discount (${res.coupon.code}) unlocked for this order!`
+              );
+            } else if (res.error) {
+              setCouponError(res.error);
+              showToast(res.error);
+            }
+          }
+        );
+      }
+    } catch {}
+  }, []);
+
+  // Re-validate in-memory coupon against Firestore once user logs in or profile loads
+  // Prevents someone clicking ?coupon=REEL10 while logged out and reusing it after signing in
+  useEffect(() => {
+    if (!appliedCoupon || !currentUser?.uid) return;
+    let cancelled = false;
+    validateCouponInFirestore(
+      appliedCoupon.code,
+      0,
+      currentUser.uid,
+      customerProfile?.phone || address?.phone
+    ).then((res) => {
+      if (!cancelled && !res.valid) {
+        setAppliedCoupon(null);
+        setCouponError(res.error || null);
+        if (res.error) showToast(res.error);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [currentUser?.uid, customerProfile?.phone]);
 
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -1493,7 +1613,11 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       regularSubtotal: regSubtotal,
       discountAmount: finalDiscount,
       netAmount: payableItems,
-      discountLabel: isSaleActive() ? "10% Order Discount" : finalDiscount > 0 ? "10% Order Discount" : undefined,
+      discountLabel:
+        target?.discountLabel ||
+        discountLabel ||
+        (isSaleActive() ? "10% Order Discount" : finalDiscount > 0 ? "10% Order Discount" : undefined),
+      couponCode: target?.couponCode || appliedCoupon?.code || undefined,
       shippingFee: finalShipping,
       total: finalTotal,
       paymentMethod: "cod",
@@ -1525,6 +1649,15 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       orderStatus: "Placed",
     });
     await saveOrderToFirestore(updated, currentUser?.uid);
+    if (updated.couponCode) {
+      await recordCouponRedemptionInFirestore(
+        updated.couponCode,
+        currentUser?.uid || updated.customerUid,
+        updated.customerPhone,
+        updated.total
+      );
+      setAppliedCoupon(null);
+    }
     await sendOrderConfirmationEmail(updated);
 
     if (isDirectBuy) {
@@ -1958,19 +2091,40 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return cart.reduce((acc, curr) => acc + curr.price * curr.quantity, 0);
   }, [cart]);
 
-  const discount = useMemo(() => {
+  const discountInfo = useMemo(() => {
     const saleDiff = Math.max(0, regularSubtotal - subtotal);
     if (isSaleActive() && saleDiff > 0) {
-      return saleDiff;
+      return { amount: saleDiff, label: "10% Order Discount" as string | undefined };
     }
-    if (subtotal >= 1000) {
-      return Math.round((subtotal * 10) / 100);
+    const auto1000Percent = subtotal >= 1000 ? 10 : 0;
+    const loyaltyPercent = loyalty.isActive ? loyalty.discountPercent : 0;
+    const couponEligible =
+      appliedCoupon &&
+      appliedCoupon.isActive &&
+      subtotal > 0 &&
+      subtotal >= (Number(appliedCoupon.minOrderAmount) || 0);
+    const couponPercent = couponEligible ? Number(appliedCoupon.discountPercent) || 0 : 0;
+
+    const effectivePercent = Math.max(auto1000Percent, loyaltyPercent, couponPercent);
+    if (effectivePercent <= 0) {
+      return { amount: 0, label: undefined };
     }
-    if (loyalty.isActive) {
-      return Math.round((subtotal * loyalty.discountPercent) / 100);
+
+    const amount = Math.round((subtotal * effectivePercent) / 100);
+    let label: string | undefined;
+    if (couponEligible && couponPercent >= Math.max(auto1000Percent, loyaltyPercent)) {
+      label = `${couponPercent}% Promo Coupon (${appliedCoupon.code})`;
+    } else if (auto1000Percent >= loyaltyPercent && auto1000Percent > 0) {
+      label = "10% Order Discount";
+    } else if (loyaltyPercent > 0) {
+      label = `${loyaltyPercent}% Bottle QR Loyalty`;
     }
-    return 0;
-  }, [regularSubtotal, subtotal, loyalty.isActive, loyalty.discountPercent]);
+
+    return { amount, label };
+  }, [regularSubtotal, subtotal, loyalty.isActive, loyalty.discountPercent, appliedCoupon]);
+
+  const discount = discountInfo.amount;
+  const discountLabel = discountInfo.label;
 
   const discountedSubtotal = useMemo(() => {
     if (isSaleActive() && regularSubtotal > subtotal) {
@@ -2060,6 +2214,12 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         quizProduct,
         openLoyaltyQuiz,
         closeLoyaltyQuiz,
+        appliedCoupon,
+        couponError,
+        isValidatingCoupon,
+        discountLabel,
+        applyCouponCode,
+        removeAppliedCoupon,
         isPlayingAudio,
         toggleAudio,
         orders,

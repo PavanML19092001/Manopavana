@@ -17,6 +17,7 @@ import {
   doc,
   setDoc,
   getDoc,
+  getDocFromServer,
   getDocs,
   collection,
   query,
@@ -30,7 +31,7 @@ import {
   FieldValue,
 } from "firebase/firestore";
 import firebaseConfig from "../firebase-applet-config.json";
-import { CustomerReview, Order, StoreCMSConfig, First25CampaignData } from "./types";
+import { CustomerReview, Order, StoreCMSConfig, First25CampaignData, Coupon } from "./types";
 
 // Initialize Firebase safely with provisioned Database ID and auto-detect long polling
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
@@ -1191,4 +1192,307 @@ export function subscribeFirst25Campaign(
     return () => {};
   }
 }
+
+// ==========================================
+// PROMO & INSTAGRAM REEL COUPON SYSTEM
+// (100% Firestore-backed — ZERO localStorage)
+// ==========================================
+
+export function normalizeCouponCode(raw: string): string {
+  return String(raw || "")
+    .toUpperCase()
+    .trim()
+    .replace(/[^A-Z0-9_-]/g, "");
+}
+
+export async function ensureDefaultReelCoupon(): Promise<void> {
+  try {
+    const ref = doc(db, "coupons", "REEL10");
+    const snap = await getDoc(ref);
+    if (!snap.exists()) {
+      await setDoc(ref, {
+        code: "REEL10",
+        type: "shared",
+        discountPercent: 10,
+        minOrderAmount: 0,
+        maxTotalUses: null,
+        usedCount: 0,
+        maxUsesPerCustomer: 1,
+        redeemedByUids: [],
+        redeemedPhones: [],
+        totalRevenueDriven: 0,
+        expiresAt: null,
+        isActive: true,
+        campaignTag: "Instagram Reel",
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+    }
+  } catch (err) {
+    console.warn("Notice ensuring default REEL10 coupon:", err);
+  }
+}
+
+export interface CouponValidationResult {
+  valid: boolean;
+  coupon?: Coupon;
+  error?: string;
+}
+
+export async function validateCouponInFirestore(
+  rawCode: string,
+  cartSubtotal = 0,
+  userUid?: string | null,
+  phone?: string | null
+): Promise<CouponValidationResult> {
+  const code = normalizeCouponCode(rawCode);
+  if (!code) {
+    return { valid: false, error: "Please enter a valid coupon code." };
+  }
+
+  try {
+    if (code === "REEL10") {
+      await ensureDefaultReelCoupon();
+    }
+
+    const couponRef = doc(db, "coupons", code);
+    let snap;
+    try {
+      snap = await getDocFromServer(couponRef);
+    } catch {
+      snap = await getDoc(couponRef);
+    }
+
+    if (!snap.exists()) {
+      return { valid: false, error: `Coupon code "${code}" is invalid or does not exist.` };
+    }
+
+    const coupon = { code, ...(snap.data() as Omit<Coupon, "code">) } as Coupon;
+
+    if (!coupon.isActive) {
+      return {
+        valid: false,
+        error:
+          coupon.type === "single_use" && (coupon.usedCount || 0) >= 1
+            ? `Coupon "${code}" has already been used.`
+            : `Coupon "${code}" is currently paused or inactive.`,
+      };
+    }
+
+    if (coupon.expiresAt && Number(coupon.expiresAt) > 0 && Date.now() > Number(coupon.expiresAt)) {
+      return { valid: false, error: `Coupon "${code}" has expired.` };
+    }
+
+    const effectiveMaxUses =
+      coupon.type === "single_use" ? 1 : coupon.maxTotalUses ? Number(coupon.maxTotalUses) : null;
+
+    if (effectiveMaxUses !== null && (coupon.usedCount || 0) >= effectiveMaxUses) {
+      return { valid: false, error: `Coupon "${code}" has reached its maximum usage limit.` };
+    }
+
+    if (coupon.minOrderAmount && cartSubtotal > 0 && cartSubtotal < Number(coupon.minOrderAmount)) {
+      return {
+        valid: false,
+        error: `Minimum order value of ₹${coupon.minOrderAmount} required for "${code}".`,
+      };
+    }
+
+    const cleanUid = (userUid || "").trim();
+    const cleanPhone = extractCleanPhone(phone || "");
+    const redeemedUids = Array.isArray(coupon.redeemedByUids) ? coupon.redeemedByUids : [];
+    const redeemedPhones = Array.isArray(coupon.redeemedPhones) ? coupon.redeemedPhones : [];
+    const maxPerCustomer = Number(coupon.maxUsesPerCustomer) || 1;
+
+    if (maxPerCustomer === 1) {
+      if (cleanUid && redeemedUids.includes(cleanUid)) {
+        return {
+          valid: false,
+          error: `You have already redeemed "${code}" on a previous order (1 use per customer).`,
+        };
+      }
+      if (cleanPhone.length === 10 && redeemedPhones.includes(cleanPhone)) {
+        return {
+          valid: false,
+          error: `Mobile number ${cleanPhone} has already redeemed "${code}" on a previous order.`,
+        };
+      }
+    }
+
+    return { valid: true, coupon };
+  } catch (err) {
+    handleFirestoreError(err, OperationType.GET, `coupons/${code}`);
+    return { valid: false, error: "Could not verify coupon right now. Please try again." };
+  }
+}
+
+export async function recordCouponRedemptionInFirestore(
+  rawCode: string,
+  userUid?: string | null,
+  phone?: string | null,
+  orderTotal = 0
+): Promise<void> {
+  const code = normalizeCouponCode(rawCode);
+  if (!code) return;
+
+  try {
+    const couponRef = doc(db, "coupons", code);
+    const snap = await getDoc(couponRef);
+    if (!snap.exists()) return;
+
+    const existing = snap.data() as Coupon;
+    const nextCount = (Number(existing.usedCount) || 0) + 1;
+    const effectiveMax =
+      existing.type === "single_use"
+        ? 1
+        : existing.maxTotalUses
+        ? Number(existing.maxTotalUses)
+        : null;
+    const shouldDeactivate = effectiveMax !== null && nextCount >= effectiveMax;
+
+    const cleanUid = (userUid || "").trim();
+    const cleanPhone = extractCleanPhone(phone || "");
+
+    const updatePayload: Record<string, any> = {
+      code: existing.code || code,
+      discountPercent: Number(existing.discountPercent) || 10,
+      usedCount: increment(1),
+      totalRevenueDriven: increment(Number(orderTotal) || 0),
+      updatedAt: serverTimestamp(),
+    };
+
+    if (cleanUid) {
+      updatePayload.redeemedByUids = arrayUnion(cleanUid);
+    }
+    if (cleanPhone.length === 10) {
+      updatePayload.redeemedPhones = arrayUnion(cleanPhone);
+    }
+    if (shouldDeactivate) {
+      updatePayload.isActive = false;
+    }
+
+    await setDoc(couponRef, updatePayload, { merge: true });
+
+    if (cleanUid) {
+      setDoc(
+        doc(db, "customers", cleanUid),
+        {
+          redeemedCoupons: arrayUnion(code),
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true }
+      ).catch(() => {});
+    }
+  } catch (err) {
+    handleFirestoreError(err, OperationType.WRITE, `coupons/${code}`);
+  }
+}
+
+export function subscribeCoupons(callback: (coupons: Coupon[]) => void): () => void {
+  try {
+    ensureDefaultReelCoupon().catch(() => {});
+    const colRef = collection(db, "coupons");
+    return onSnapshot(
+      colRef,
+      (snapshot) => {
+        const list: Coupon[] = [];
+        snapshot.forEach((d) => {
+          list.push({ code: d.id, ...(d.data() as Omit<Coupon, "code">) });
+        });
+        list.sort((a, b) => {
+          if (a.code === "REEL10") return -1;
+          if (b.code === "REEL10") return 1;
+          const tA = (a.createdAt as any)?.toMillis ? (a.createdAt as any).toMillis() : 0;
+          const tB = (b.createdAt as any)?.toMillis ? (b.createdAt as any).toMillis() : 0;
+          return tB - tA;
+        });
+        callback(list);
+      },
+      (err) => {
+        handleFirestoreError(err, OperationType.LIST, "coupons");
+      }
+    );
+  } catch (err) {
+    handleFirestoreError(err, OperationType.LIST, "coupons");
+    return () => {};
+  }
+}
+
+export async function saveCouponToFirestore(coupon: Coupon): Promise<boolean> {
+  const code = normalizeCouponCode(coupon.code);
+  if (!code) return false;
+  try {
+    const couponRef = doc(db, "coupons", code);
+    const payload = cleanFirestoreObject({
+      ...coupon,
+      code,
+      discountPercent: Number(coupon.discountPercent) || 10,
+      minOrderAmount: Number(coupon.minOrderAmount) || 0,
+      maxTotalUses: coupon.type === "single_use" ? 1 : coupon.maxTotalUses ? Number(coupon.maxTotalUses) : null,
+      usedCount: Number(coupon.usedCount) || 0,
+      maxUsesPerCustomer: Number(coupon.maxUsesPerCustomer) || 1,
+      updatedAt: serverTimestamp(),
+    });
+    if (!coupon.createdAt) {
+      payload.createdAt = serverTimestamp();
+    }
+    await setDoc(couponRef, payload, { merge: true });
+    return true;
+  } catch (err) {
+    handleFirestoreError(err, OperationType.WRITE, `coupons/${code}`);
+    return false;
+  }
+}
+
+export async function deleteCouponFromFirestore(code: string): Promise<boolean> {
+  const normalized = normalizeCouponCode(code);
+  if (!normalized) return false;
+  try {
+    await deleteDoc(doc(db, "coupons", normalized));
+    return true;
+  } catch (err) {
+    handleFirestoreError(err, OperationType.DELETE, `coupons/${normalized}`);
+    return false;
+  }
+}
+
+export async function generateSingleUseCouponsBatch(
+  count: number,
+  discountPercent = 10,
+  campaignTag = "Instagram Reel VIP",
+  expiresDays: number | null = 30
+): Promise<Coupon[]> {
+  const safeCount = Math.min(50, Math.max(1, Math.floor(count)));
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // Excludes ambiguous 0/O, 1/I
+  const generated: Coupon[] = [];
+  const expiresAt = expiresDays && expiresDays > 0 ? Date.now() + expiresDays * 24 * 60 * 60 * 1000 : null;
+
+  for (let i = 0; i < safeCount; i++) {
+    let suffix = "";
+    for (let c = 0; c < 4; c++) {
+      suffix += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    const code = `MP-${suffix}`;
+    const coupon: Coupon = {
+      code,
+      type: "single_use",
+      discountPercent,
+      minOrderAmount: 0,
+      maxTotalUses: 1,
+      usedCount: 0,
+      maxUsesPerCustomer: 1,
+      redeemedByUids: [],
+      redeemedPhones: [],
+      totalRevenueDriven: 0,
+      expiresAt,
+      isActive: true,
+      campaignTag,
+    };
+    const ok = await saveCouponToFirestore(coupon);
+    if (ok) {
+      generated.push(coupon);
+    }
+  }
+  return generated;
+}
+
 

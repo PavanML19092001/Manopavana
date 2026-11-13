@@ -64,6 +64,16 @@ service cloud.firestore {
       allow read: if true;
       allow write: if true;
     }
+
+    // Promo & Instagram Reel Coupons (validated & tracked in Firestore)
+    match /coupons/{couponId} {
+      allow read: if true;
+      allow create, update: if request.resource.data.code is string
+                            && request.resource.data.discountPercent is number
+                            && request.resource.data.discountPercent > 0
+                            && request.resource.data.discountPercent <= 50;
+      allow delete: if isAdmin() || isSignedIn() || true;
+    }
   }
 }
 

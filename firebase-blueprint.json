@@ -32,6 +32,8 @@
         "items": { "type": "array" },
         "subtotal": { "type": "number" },
         "discount": { "type": "number" },
+        "discountLabel": { "type": "string" },
+        "couponCode": { "type": "string" },
         "shippingFee": { "type": "number" },
         "total": { "type": "number" },
         "paymentMethod": { "type": "string" },
@@ -109,6 +111,29 @@
         "policies": { "type": "object" },
         "updatedAt": { "type": "string", "format": "date-time" }
       }
+    },
+    "Coupon": {
+      "title": "Coupon",
+      "description": "Promo and Instagram Reel DM discount coupons with per-customer redemption tracking",
+      "type": "object",
+      "properties": {
+        "code": { "type": "string" },
+        "type": { "type": "string" },
+        "discountPercent": { "type": "number" },
+        "minOrderAmount": { "type": "number" },
+        "maxTotalUses": { "type": "number" },
+        "usedCount": { "type": "number" },
+        "maxUsesPerCustomer": { "type": "number" },
+        "redeemedByUids": { "type": "array" },
+        "redeemedPhones": { "type": "array" },
+        "totalRevenueDriven": { "type": "number" },
+        "expiresAt": { "type": "number" },
+        "isActive": { "type": "boolean" },
+        "campaignTag": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["code", "type", "discountPercent", "isActive"]
     }
   },
   "firestore": {
@@ -131,6 +156,10 @@
     "/campaigns/{campaignId}": {
       "schema": { "$ref": "#/entities/StoreConfig" },
       "description": "First 25 Kitchens campaign slot and cohort tracker"
+    },
+    "/coupons/{couponId}": {
+      "schema": { "$ref": "#/entities/Coupon" },
+      "description": "Promo and Instagram Reel coupons with Firestore-backed single-use and per-customer enforcement"
     }
   }
 }

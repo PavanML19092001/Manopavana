@@ -21,9 +21,9 @@ import { AdminPage } from "./pages/AdminPage";
 import { useStore } from "./context/StoreContext";
 import { Order } from "./types";
 import { PendingOrderBanner } from "./components/PendingOrderBanner";
-import { updateFirestoreOrderStatus, getOrderFromFirestore } from "./firebase";
+import { updateFirestoreOrderStatus, getOrderFromFirestore, recordCouponRedemptionInFirestore } from "./firebase";
 import { sendOrderConfirmationEmail } from "./services/emailService";
-import { Sparkles, LogOut, Home, RefreshCw } from "lucide-react";
+import { Sparkles, LogOut, Home, RefreshCw, Tag, X } from "lucide-react";
 
 // Automatically scrolls to top on route change
 function ScrollToTop() {
@@ -138,6 +138,8 @@ export default function App() {
     togglePreviewStorefront,
     logoutUser,
     logoutAdmin,
+    appliedCoupon,
+    removeAppliedCoupon,
   } = useStore();
 
   // REAL PAYMENT RETURN & VERIFICATION ROUTE HANDLER
@@ -188,6 +190,14 @@ export default function App() {
           });
 
           if (matched) {
+            if (matched.couponCode) {
+              await recordCouponRedemptionInFirestore(
+                matched.couponCode,
+                matched.customerUid,
+                matched.customerPhone,
+                matched.total
+              );
+            }
             await sendOrderConfirmationEmail({
               ...matched,
               orderStatus: "Placed",
@@ -196,6 +206,7 @@ export default function App() {
             });
           }
 
+          removeAppliedCoupon();
           if (matched?.isBuyNow) {
             clearBuyNow();
           } else {
@@ -355,6 +366,28 @@ export default function App() {
 
       <PendingOrderBanner />
       <Navbar />
+
+      {appliedCoupon && (
+        <div className="bg-gradient-to-r from-[#1F3D2B] via-[#264A35] to-[#1F3D2B] text-[#FAF3E0] px-4 py-2 text-xs border-b border-[#E0B04A]/40 flex items-center justify-center gap-3 relative z-30 shadow-xs">
+          <Tag className="w-3.5 h-3.5 text-[#F3D17A] shrink-0" />
+          <span className="font-semibold text-center">
+            <strong className="text-[#F3D17A]">{appliedCoupon.discountPercent}% OFF</strong> coupon{" "}
+            <span className="font-mono font-black px-1.5 py-0.5 rounded bg-[#E0B04A] text-[#14291D] mx-0.5">
+              {appliedCoupon.code}
+            </span>{" "}
+            is active for this order (valid on all oils & dispenser • auto-applies in Bag)
+          </span>
+          <button
+            type="button"
+            onClick={removeAppliedCoupon}
+            aria-label="Dismiss coupon"
+            className="p-1 rounded-full hover:bg-white/10 text-[#F3D17A] transition-colors cursor-pointer shrink-0"
+            title="Remove coupon"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
 
       <ErrorBoundary>
         <main className="w-full max-w-full overflow-x-hidden flex-1 box-border pb-20 md:pb-0">

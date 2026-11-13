@@ -20,6 +20,8 @@ import {
   Loader2,
   Edit2,
   Trash2,
+  Tag,
+  X,
 } from "lucide-react";
 import L from "leaflet";
 import { useStore, LabeledAddress } from "../context/StoreContext";
@@ -30,7 +32,14 @@ import {
 } from "../constants";
 import { isSaleActive } from "../utils/salePricing";
 import { Order } from "../types";
-import { updateFirestoreOrderStatus, getOrderFromFirestore, extractCleanPhone, db } from "../firebase";
+import {
+  updateFirestoreOrderStatus,
+  getOrderFromFirestore,
+  extractCleanPhone,
+  db,
+  validateCouponInFirestore,
+  recordCouponRedemptionInFirestore,
+} from "../firebase";
 import { doc, getDoc } from "firebase/firestore";
 import { sendOrderConfirmationEmail } from "../services/emailService";
 
@@ -61,7 +70,15 @@ export const CheckoutPage: React.FC = () => {
     getOrder,
     currentUser,
     themeMode,
+    appliedCoupon,
+    couponError,
+    isValidatingCoupon,
+    applyCouponCode,
+    removeAppliedCoupon,
   } = useStore();
+
+  const [checkoutCouponInput, setCheckoutCouponInput] = useState("");
+  const [checkoutCouponError, setCheckoutCouponError] = useState<string | null>(null);
 
   const isDark = themeMode === "dark";
 
@@ -75,14 +92,38 @@ export const CheckoutPage: React.FC = () => {
   );
   const checkoutSubtotal = checkoutItems.reduce((acc, curr) => acc + curr.price * curr.quantity, 0);
   const saleDiff = Math.max(0, checkoutRegularSubtotal - checkoutSubtotal);
+  const checkoutAuto1000Percent = checkoutSubtotal >= 1000 ? 10 : 0;
+  const checkoutLoyaltyPercent = loyalty.isActive ? loyalty.discountPercent : 0;
+  const checkoutCouponEligible = Boolean(
+    appliedCoupon &&
+      appliedCoupon.isActive &&
+      checkoutSubtotal > 0 &&
+      checkoutSubtotal >= (Number(appliedCoupon.minOrderAmount) || 0)
+  );
+  const checkoutCouponPercent = checkoutCouponEligible && appliedCoupon ? Number(appliedCoupon.discountPercent) || 0 : 0;
+  const checkoutEffectivePercent = Math.max(
+    checkoutAuto1000Percent,
+    checkoutLoyaltyPercent,
+    checkoutCouponPercent
+  );
   const checkoutDiscount =
     isSaleActive() && saleDiff > 0
       ? saleDiff
-      : checkoutSubtotal >= 1000
-      ? Math.round((checkoutSubtotal * 10) / 100)
-      : loyalty.isActive
-      ? Math.round((checkoutSubtotal * loyalty.discountPercent) / 100)
+      : checkoutEffectivePercent > 0
+      ? Math.round((checkoutSubtotal * checkoutEffectivePercent) / 100)
       : 0;
+  const checkoutDiscountLabel =
+    isSaleActive() && saleDiff > 0
+      ? "10% Order Discount"
+      : checkoutCouponEligible &&
+        appliedCoupon &&
+        checkoutCouponPercent >= Math.max(checkoutAuto1000Percent, checkoutLoyaltyPercent)
+      ? `${checkoutCouponPercent}% Promo Coupon (${appliedCoupon.code})`
+      : checkoutAuto1000Percent >= checkoutLoyaltyPercent && checkoutAuto1000Percent > 0
+      ? "10% Order Discount"
+      : checkoutLoyaltyPercent > 0
+      ? `${checkoutLoyaltyPercent}% Bottle QR Loyalty`
+      : undefined;
   const checkoutDiscountedSubtotal =
     isSaleActive() && saleDiff > 0 ? checkoutSubtotal : checkoutSubtotal - checkoutDiscount;
   const checkoutBottleCount = checkoutItems.reduce((acc, curr) => acc + curr.quantity, 0);
@@ -661,6 +702,27 @@ export const CheckoutPage: React.FC = () => {
 
     const finalCustomerUid = currentUser.uid;
 
+    // Server-fresh Firestore check on applied coupon against both UID and 10-digit mobile number
+    let activeOrderCoupon = appliedCoupon;
+    if (activeOrderCoupon) {
+      const couponCheck = await validateCouponInFirestore(
+        activeOrderCoupon.code,
+        checkoutSubtotal,
+        finalCustomerUid,
+        cleanPhone
+      );
+      if (!couponCheck.valid) {
+        removeAppliedCoupon();
+        setCheckoutCouponError(couponCheck.error || "Coupon cannot be used again on this account/number.");
+        showToast(couponCheck.error || "Coupon was already redeemed and has been removed.");
+        return;
+      }
+      activeOrderCoupon = couponCheck.coupon || activeOrderCoupon;
+    }
+
+    const appliedCouponCodeForOrder =
+      checkoutCouponEligible && activeOrderCoupon ? activeOrderCoupon.code : undefined;
+
     if (effectiveMethod === "cod") {
       const expected = codChallenge.a + codChallenge.b;
       if (parseInt(codAnswerInput.trim(), 10) !== expected) {
@@ -692,7 +754,8 @@ export const CheckoutPage: React.FC = () => {
           regularSubtotal: checkoutRegularSubtotal,
           discountAmount: checkoutDiscount,
           netAmount: checkoutDiscountedSubtotal,
-          discountLabel: isSaleActive() ? "10% Order Discount" : checkoutDiscount > 0 ? "10% Order Discount" : undefined,
+          discountLabel: checkoutDiscountLabel,
+          couponCode: appliedCouponCodeForOrder,
           shippingFee: checkoutShippingFee,
           total: checkoutTotal,
           paymentMethod: "cod",
@@ -709,6 +772,15 @@ export const CheckoutPage: React.FC = () => {
         };
 
         await saveOrder(newOrder);
+        if (appliedCouponCodeForOrder) {
+          await recordCouponRedemptionInFirestore(
+            appliedCouponCodeForOrder,
+            finalCustomerUid,
+            cleanPhone,
+            checkoutTotal
+          );
+          removeAppliedCoupon();
+        }
         sendOrderConfirmationEmail(newOrder).catch((e) => console.warn("Email alert notice:", e));
 
         if (isBuyNowMode) {
@@ -747,7 +819,8 @@ export const CheckoutPage: React.FC = () => {
         regularSubtotal: checkoutRegularSubtotal,
         discountAmount: checkoutDiscount,
         netAmount: checkoutDiscountedSubtotal,
-        discountLabel: isSaleActive() ? "10% Order Discount" : checkoutDiscount > 0 ? "10% Order Discount" : undefined,
+        discountLabel: checkoutDiscountLabel,
+        couponCode: appliedCouponCodeForOrder,
         shippingFee: checkoutShippingFee,
         total: checkoutTotal,
         paymentMethod: "phonepe",
@@ -1782,6 +1855,97 @@ export const CheckoutPage: React.FC = () => {
                 ))}
               </div>
 
+              {/* Promo / Instagram Reel Coupon Input */}
+              <div
+                className={`p-3.5 rounded-xl border space-y-2 ${
+                  isDark ? "bg-[#14291D] border-[#1F3D2B]" : "bg-[#FAF3E0]/70 border-[#E0B04A]/40"
+                }`}
+              >
+                <div className="flex items-center justify-between text-xs">
+                  <span className="flex items-center gap-1.5 font-bold text-[#14291D] dark:text-[#FAF3E0]">
+                    <Tag className="w-3.5 h-3.5 text-[#E0B04A]" />
+                    <span>Promo / Reel Coupon Code</span>
+                  </span>
+                  {appliedCoupon && (
+                    <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded">
+                      1-Time Active
+                    </span>
+                  )}
+                </div>
+
+                {appliedCoupon ? (
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between gap-2 p-2 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                        <span className="font-mono font-black truncate">{appliedCoupon.code}</span>
+                        <span className="text-[11px] font-medium shrink-0">
+                          ({appliedCoupon.discountPercent}% Off)
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          removeAppliedCoupon();
+                          setCheckoutCouponError(null);
+                        }}
+                        className="text-[11px] font-bold text-red-600 hover:text-red-700 flex items-center gap-0.5 cursor-pointer shrink-0"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                        <span>Remove</span>
+                      </button>
+                    </div>
+                    {checkoutSubtotal >= 1000 && (
+                      <p className="text-[10px] text-[#3F4F45] leading-snug">
+                        Orders ≥ ₹1,000 already qualify for 10% off automatically (no stacking). You can remove{" "}
+                        <strong>{appliedCoupon.code}</strong> to save it for a smaller order!
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                  <div className="space-y-1.5">
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={checkoutCouponInput}
+                        onChange={(e) => {
+                          setCheckoutCouponInput(e.target.value.toUpperCase());
+                          setCheckoutCouponError(null);
+                        }}
+                        onKeyDown={async (e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            const res = await applyCouponCode(checkoutCouponInput, phone);
+                            if (res.valid) setCheckoutCouponInput("");
+                            else if (res.error) setCheckoutCouponError(res.error);
+                          }
+                        }}
+                        placeholder="Enter code (e.g. REEL10)"
+                        className="flex-1 px-3 py-2 text-xs font-mono font-bold uppercase rounded-lg bg-white border border-[#E0B04A]/50 text-[#14291D] placeholder-[#3F4F45]/60 focus:outline-none focus:ring-2 focus:ring-[#E0B04A]"
+                      />
+                      <button
+                        type="button"
+                        disabled={isValidatingCoupon || !checkoutCouponInput.trim()}
+                        onClick={async () => {
+                          const res = await applyCouponCode(checkoutCouponInput, phone);
+                          if (res.valid) setCheckoutCouponInput("");
+                          else if (res.error) setCheckoutCouponError(res.error);
+                        }}
+                        className="px-4 py-2 rounded-lg bg-[#1F3D2B] hover:bg-[#14291D] text-white text-xs font-bold transition-colors cursor-pointer disabled:opacity-50"
+                      >
+                        {isValidatingCoupon ? "..." : "Apply"}
+                      </button>
+                    </div>
+                    {(checkoutCouponError || couponError) && (
+                      <p className="text-[11px] text-red-600 font-semibold flex items-center gap-1">
+                        <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                        <span>{checkoutCouponError || couponError}</span>
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+
               {/* Price Breakdown */}
               <div className="space-y-2 pt-3 border-t border-[#E0B04A]/30 text-xs">
                 {checkoutRegularSubtotal > checkoutSubtotal && (
@@ -1796,7 +1960,7 @@ export const CheckoutPage: React.FC = () => {
                 </div>
                 {checkoutDiscount > 0 && (
                   <div className="flex justify-between text-emerald-800 dark:text-emerald-300 font-bold">
-                    <span>10% Order Discount:</span>
+                    <span>{checkoutDiscountLabel || "10% Order Discount"}:</span>
                     <span>-₹{checkoutDiscount}</span>
                   </div>
                 )}

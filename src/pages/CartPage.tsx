@@ -13,6 +13,10 @@ import {
   Lock,
   Minus,
   Plus,
+  Tag,
+  X,
+  Loader2,
+  AlertCircle,
 } from "lucide-react";
 import { useStore } from "../context/StoreContext";
 import { BUSINESS_CONFIG } from "../constants";
@@ -43,7 +47,16 @@ export const CartPage: React.FC = () => {
     currentUser,
     setLoginModalOpen,
     showToast,
+    appliedCoupon,
+    couponError,
+    isValidatingCoupon,
+    discountLabel,
+    applyCouponCode,
+    removeAppliedCoupon,
   } = useStore();
+
+  const [couponInput, setCouponInput] = React.useState("");
+  const [localCouponError, setLocalCouponError] = React.useState<string | null>(null);
 
   const isDark = themeMode === "dark";
 
@@ -322,7 +335,7 @@ export const CartPage: React.FC = () => {
               className={`p-4 rounded-2xl border flex items-center justify-between gap-4 ${
                 isSaleActive()
                   ? "bg-[#1F3D2B]/10 border-[#E0B04A]/40"
-                  : subtotal >= 1000
+                  : discount > 0
                   ? "bg-emerald-500/10 border-emerald-500/30"
                   : isDark
                   ? "bg-[#14291D] border-[#1F3D2B]"
@@ -336,7 +349,7 @@ export const CartPage: React.FC = () => {
                     className={`text-xs font-black ${
                       isSaleActive()
                         ? "text-[#14291D] dark:text-[#F3D17A]"
-                        : subtotal >= 1000
+                        : discount > 0
                         ? "text-emerald-800 dark:text-emerald-400"
                         : isDark
                         ? "text-amber-200"
@@ -345,6 +358,8 @@ export const CartPage: React.FC = () => {
                   >
                     {isSaleActive()
                       ? "🎉 10% Discount Applied!"
+                      : appliedCoupon
+                      ? `🎉 ${appliedCoupon.discountPercent}% Coupon (${appliedCoupon.code}) Applied!`
                       : subtotal >= 1000
                       ? "🎉 10% Discount Unlocked!"
                       : "Get 10% OFF on Orders Above ₹1,000"}
@@ -356,15 +371,12 @@ export const CartPage: React.FC = () => {
                   >
                     {isSaleActive()
                       ? `Flat 10% discount (-₹${discount}) applied sitewide on all items.`
+                      : appliedCoupon
+                      ? `Flat ${appliedCoupon.discountPercent}% discount (-₹${discount}) applied via coupon ${appliedCoupon.code}. Discounts do not stack (max 10%).`
                       : subtotal >= 1000
                       ? `Flat 10% discount (-₹${discount}) automatically deducted from your total.`
-                      : `Add ₹${1000 - subtotal} more of wood-pressed oils to unlock 10% instant savings!`}
+                      : `Add ₹${1000 - subtotal} more to unlock 10% instant savings automatically, or apply a promo code!`}
                   </p>
-                  {isSaleActive() && (
-                    <p className="text-[10px] text-[#3F4F45] dark:text-[#FAF3E0]/70 mt-0.5">
-                      Best percentage discount applies; discounts do not stack.
-                    </p>
-                  )}
                 </div>
               </div>
               <span className={`text-xs font-black px-3 py-1 rounded-xl shrink-0 border shadow-2xs ${
@@ -409,11 +421,110 @@ export const CartPage: React.FC = () => {
                 )}
 
 
+                {/* Promo / Instagram Reel Coupon Code Box */}
+                <div
+                  className={`p-3.5 rounded-xl border space-y-2 ${
+                    isDark
+                      ? "bg-[#14291D] border-[#1F3D2B]"
+                      : "bg-[#FAF3E0]/70 border-[#E0B04A]/40"
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="flex items-center gap-1.5 font-bold text-[#14291D] dark:text-[#FAF3E0]">
+                      <Tag className="w-3.5 h-3.5 text-[#E0B04A]" />
+                      <span>Promo / Reel Coupon Code</span>
+                    </span>
+                    {appliedCoupon && (
+                      <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-md">
+                        Active
+                      </span>
+                    )}
+                  </div>
+
+                  {appliedCoupon ? (
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between gap-2 p-2 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-900">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                          <div className="truncate">
+                            <span className="font-mono font-black text-xs">{appliedCoupon.code}</span>
+                            <span className="text-[11px] ml-1.5 font-medium">
+                              ({appliedCoupon.discountPercent}% Off • 1 use)
+                            </span>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={removeAppliedCoupon}
+                          className="text-[11px] font-bold text-red-600 hover:text-red-700 flex items-center gap-0.5 cursor-pointer shrink-0"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                          <span>Remove</span>
+                        </button>
+                      </div>
+                      {subtotal >= 1000 && (
+                        <p className="text-[10px] text-[#3F4F45] leading-snug">
+                          Orders ≥ ₹1,000 already get 10% off automatically (no stacking). You can remove{" "}
+                          <strong>{appliedCoupon.code}</strong> to save it for a smaller order!
+                        </p>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="space-y-1.5">
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={couponInput}
+                          onChange={(e) => {
+                            setCouponInput(e.target.value.toUpperCase());
+                            setLocalCouponError(null);
+                          }}
+                          onKeyDown={async (e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              const res = await applyCouponCode(couponInput);
+                              if (res.valid) setCouponInput("");
+                              else if (res.error) setLocalCouponError(res.error);
+                            }
+                          }}
+                          placeholder="Enter code (e.g. REEL10)"
+                          className="flex-1 px-3 py-2 text-xs font-mono font-bold uppercase rounded-lg bg-white border border-[#E0B04A]/50 text-[#14291D] placeholder-[#3F4F45]/60 focus:outline-none focus:ring-2 focus:ring-[#E0B04A]"
+                        />
+                        <button
+                          type="button"
+                          disabled={isValidatingCoupon || !couponInput.trim()}
+                          onClick={async () => {
+                            const res = await applyCouponCode(couponInput);
+                            if (res.valid) setCouponInput("");
+                            else if (res.error) setLocalCouponError(res.error);
+                          }}
+                          className="px-4 py-2 rounded-lg bg-[#1F3D2B] hover:bg-[#14291D] text-white text-xs font-bold transition-colors cursor-pointer disabled:opacity-50 flex items-center gap-1"
+                        >
+                          {isValidatingCoupon ? (
+                            <>
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              <span>Wait</span>
+                            </>
+                          ) : (
+                            <span>Apply</span>
+                          )}
+                        </button>
+                      </div>
+                      {(localCouponError || couponError) && (
+                        <p className="text-[11px] text-red-600 font-semibold flex items-center gap-1">
+                          <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                          <span>{localCouponError || couponError}</span>
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
+
                 {discount > 0 && (
                   <div className="flex items-center justify-between text-emerald-800 dark:text-emerald-300 font-bold">
                     <span className="flex items-center gap-1">
                       <Sparkles className="w-3.5 h-3.5 text-[#E0B04A]" />
-                      <span>10% Order Discount</span>
+                      <span>{discountLabel || "10% Order Discount"}</span>
                     </span>
                     <span className="font-bold">-₹{discount}</span>
                   </div>

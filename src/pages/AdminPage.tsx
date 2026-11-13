@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef } from "react";
 import L from "leaflet";
 import { StorefrontCMSPanel } from "../components/admin/StoreFrontCmsPanel";
+import { CouponsManagerPanel } from "../components/admin/CouponsManagerPanel";
 import { LiveOrderTracker } from "../components/LiveOrderTracker";
 import { InvoiceModal } from "../components/InvoiceModal";
 import {
@@ -35,6 +36,7 @@ import {
   Unlock,
   ArrowLeft,
   ChevronRight,
+  Tag,
 } from "lucide-react";
 import { useStore } from "../context/StoreContext";
 import { BUSINESS_CONFIG, INDIAN_STATES_DISTRICTS } from "../constants";
@@ -61,7 +63,7 @@ export const AdminPage: React.FC = () => {
   } = useStore();
 
   const isDark = themeMode === "dark";
-  type CmsView = "dashboard" | "orders-list" | "order-detail";
+  type CmsView = "dashboard" | "orders-list" | "order-detail" | "coupons";
   const [cmsView, setCmsView] = useState<CmsView>("dashboard");
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [activeInvoiceOrder, setActiveInvoiceOrder] = useState<Order | null>(null);
@@ -1872,9 +1874,57 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
               </button>
             </div>
 
+            {/* Instagram Reel Coupons & Promo Manager Card */}
+            <div
+              className={`rounded-3xl border p-6 sm:p-7 shadow-sm transition-colors ${
+                isDark ? "bg-[#14291D] border-[#1F3D2B]" : "bg-white border-[#E0B04A]/40"
+              } flex flex-col md:flex-row md:items-center justify-between gap-6`}
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-2xl bg-[#1F3D2B]/10 flex items-center justify-center text-[#1F3D2B] dark:text-[#E0B04A] shrink-0">
+                  <Tag className="w-6 h-6 text-[#E0B04A]" />
+                </div>
+                <div>
+                  <h2 className="text-lg sm:text-xl font-bold font-serif text-[#14291D] dark:text-[#FAF3E0] flex items-center gap-2">
+                    <span>Instagram Reel Coupons & Promo Codes</span>
+                    <span className="text-xs px-2.5 py-0.5 rounded-full bg-amber-500/15 text-amber-800 dark:text-amber-300 font-bold border border-amber-500/30">
+                      REEL10 Active
+                    </span>
+                  </h2>
+                  <p className="text-xs text-[#5C6E63] dark:text-[#A89482]">
+                    Copy Instagram DM magic links, track redemptions & revenue, or 1-click generate single-use VIP codes.
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setCmsView("coupons");
+                  window.scrollTo({ top: 0, behavior: "smooth" });
+                }}
+                className="px-7 py-4 rounded-2xl bg-[#1F3D2B] hover:bg-[#14291D] text-white font-black text-sm shadow-xl border-2 border-[#E0B04A]/40 transition-all flex items-center justify-center gap-2.5 cursor-pointer shrink-0 hover:scale-105 active:scale-95"
+              >
+                <Tag className="w-5 h-5 text-[#F3D17A]" />
+                <span>Open Coupons & Reel Promos →</span>
+              </button>
+            </div>
+
             {/* Master Storefront CMS Panel (On the front page) */}
             <StorefrontCMSPanel isDark={isDark} />
           </div>
+        )}
+
+        {/* VIEW 1B: INSTAGRAM REEL COUPONS & PROMO MANAGER */}
+        {cmsView === "coupons" && (
+          <CouponsManagerPanel
+            isDark={isDark}
+            onBack={() => {
+              setCmsView("dashboard");
+              window.scrollTo({ top: 0, behavior: "smooth" });
+            }}
+            showToast={showToast}
+          />
         )}
 
         {/* VIEW 2: DEDICATED ORDERS PAGE (ONLY THE ORDERS) */}
@@ -2149,6 +2199,11 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                               >
                                 {ord.paymentMethod?.toUpperCase()}
                               </span>
+                              {ord.couponCode && (
+                                <span className="text-[10px] font-mono font-black px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                  🏷️ {ord.couponCode}
+                                </span>
+                              )}
                             </div>
                             <p
                               className={`text-[11px] mt-0.5 ${
@@ -3194,6 +3249,11 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                       >
                         {currentOrder.orderStatus}
                       </span>
+                      {currentOrder.couponCode && (
+                        <span className="text-xs font-mono font-black px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
+                          🏷️ {currentOrder.couponCode}
+                        </span>
+                      )}
                     </h1>
                     <p className="text-xs text-[#2D4536] dark:text-[#A89482]">
                       Dedicated Order Management & Customer Tracking View • Placed on{" "}
