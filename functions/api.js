@@ -5,23 +5,25 @@
 
 // In-memory token cache across warm serverless requests
 let cachedToken = null;
+let cachedTokenType = "O-Bearer";
 let tokenExpiresAt = 0;
 
 /**
  * Fetch or reuse OAuth v2 Bearer token from PhonePe identity manager
  */
-async function getOAuthToken(env) {
+async function getOAuthToken(env, forceRefresh = false) {
   const now = Date.now();
-  if (cachedToken && tokenExpiresAt > now + 60000) {
+  if (!forceRefresh && cachedToken && tokenExpiresAt > now + 60000) {
     return cachedToken;
   }
 
-  const clientId = env.PHONEPE_CLIENT_ID;
-  const clientSecret = env.PHONEPE_CLIENT_SECRET;
-  const clientVersion = env.PHONEPE_CLIENT_VERSION || "1";
-  const authUrl =
+  const clientId = String(env.PHONEPE_CLIENT_ID || "").trim();
+  const clientSecret = String(env.PHONEPE_CLIENT_SECRET || "").trim();
+  const clientVersion = String(env.PHONEPE_CLIENT_VERSION || "1").trim();
+  const authUrl = String(
     env.PHONEPE_AUTH_URL ||
-    "https://api.phonepe.com/apis/identity-manager/v1/oauth/token";
+      "https://api.phonepe.com/apis/identity-manager/v1/oauth/token"
+  ).trim();
 
   if (!clientId || !clientSecret) {
     throw new Error(
@@ -44,6 +46,8 @@ async function getOAuthToken(env) {
   });
 
   if (!response.ok) {
+    cachedToken = null;
+    tokenExpiresAt = 0;
     const errorText = await response.text();
     throw new Error(
       `PhonePe Auth Token Request Failed (${response.status}): ${errorText}`
@@ -51,12 +55,28 @@ async function getOAuthToken(env) {
   }
 
   const data = await response.json();
-  const token = data.access_token || data.token;
-  const expiresIn = data.expires_in || 1200;
+  const token = String(data.access_token || data.token || "").trim();
+  if (!token) {
+    cachedToken = null;
+    tokenExpiresAt = 0;
+    throw new Error("PhonePe Auth returned an empty access_token.");
+  }
+
+  cachedTokenType = String(data.token_type || "O-Bearer").trim() || "O-Bearer";
+  const rawExpiresAt = Number(data.expires_at || data.session_expires_at || 0);
+  if (Number.isFinite(rawExpiresAt) && rawExpiresAt > 0) {
+    tokenExpiresAt = rawExpiresAt < 1e12 ? rawExpiresAt * 1000 : rawExpiresAt;
+  } else {
+    const expiresIn = Number(data.expires_in) || 900;
+    tokenExpiresAt = Date.now() + expiresIn * 1000;
+  }
 
   cachedToken = token;
-  tokenExpiresAt = Date.now() + expiresIn * 1000;
   return cachedToken;
+}
+
+function buildPhonePeAuthHeader(token) {
+  return `${cachedTokenType || "O-Bearer"} ${String(token || "").trim()}`;
 }
 
 // In-memory token cache for Ekart Elite across warm edge invocations
@@ -226,12 +246,24 @@ export async function onRequest(context) {
   const action = url.searchParams.get("action");
 
   // Read endpoints & configuration from Cloudflare environment variables
-  const PAY_URL =
-    env.PHONEPE_PAY_URL || "https://api.phonepe.com/apis/pg/checkout/v2/pay";
-  const STATUS_URL =
-    env.PHONEPE_STATUS_URL || "https://api.phonepe.com/apis/pg/checkout/v2/order";
-  const REFUND_URL =
-    env.PHONEPE_REFUND_URL || "https://api.phonepe.com/apis/pg/payments/v2/refund";
+  const PAY_URL = String(
+    env.PHONEPE_PAY_URL || "https://api.phonepe.com/apis/pg/checkout/v2/pay"
+  ).trim();
+  const STATUS_URL = String(
+    env.PHONEPE_STATUS_URL || "https://api.phonepe.com/apis/pg/checkout/v2/order"
+  ).trim();
+  const isSandboxPay =
+    PAY_URL.includes("api-preprod.phonepe.com") || PAY_URL.includes("pg-sandbox");
+  const defaultRefundUrl = isSandboxPay
+    ? "https://api-preprod.phonepe.com/apis/pg-sandbox/payments/v2/refund"
+    : "https://api.phonepe.com/apis/pg/payments/v2/refund";
+  let REFUND_URL = String(env.PHONEPE_REFUND_URL || defaultRefundUrl).trim();
+  if (REFUND_URL.includes("/checkout/v2/refund")) {
+    REFUND_URL = REFUND_URL.replace("/checkout/v2/refund", "/payments/v2/refund");
+  }
+  if (!isSandboxPay && REFUND_URL.includes("api-preprod.phonepe.com")) {
+    REFUND_URL = defaultRefundUrl;
+  }
   const PRODUCTION_ORIGIN = env.PRODUCTION_ORIGIN || "https://manopavana.com";
 
   try {
@@ -358,14 +390,28 @@ export async function onRequest(context) {
         };
       }
 
-      const payResponse = await fetch(PAY_URL, {
+      let payResponse = await fetch(PAY_URL, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `O-Bearer ${token}`,
+          Authorization: buildPhonePeAuthHeader(token),
         },
         body: JSON.stringify(checkoutPayload),
       });
+
+      if (payResponse.status === 401) {
+        try {
+          token = await getOAuthToken(env, true);
+          payResponse = await fetch(PAY_URL, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: buildPhonePeAuthHeader(token),
+            },
+            body: JSON.stringify(checkoutPayload),
+          });
+        } catch {}
+      }
 
       const payData = await payResponse.json();
 
@@ -432,13 +478,26 @@ export async function onRequest(context) {
       }
 
       const statusEndpoint = `${STATUS_URL}/${orderRef}/status?details=false`;
-      const verifyResponse = await fetch(statusEndpoint, {
+      let verifyResponse = await fetch(statusEndpoint, {
         method: "GET",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `O-Bearer ${token}`,
+          Authorization: buildPhonePeAuthHeader(token),
         },
       });
+
+      if (verifyResponse.status === 401) {
+        try {
+          token = await getOAuthToken(env, true);
+          verifyResponse = await fetch(statusEndpoint, {
+            method: "GET",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: buildPhonePeAuthHeader(token),
+            },
+          });
+        } catch {}
+      }
 
       const verifyData = await verifyResponse.json();
       const state = verifyData.state || verifyData.data?.state || "";
@@ -485,12 +544,14 @@ export async function onRequest(context) {
 
       let token;
       try {
-        token = await getOAuthToken(env);
+        // Always mint a fresh OAuth token for refunds to avoid stale worker-isolate token rejections
+        token = await getOAuthToken(env, true);
       } catch (authErr) {
         return jsonResponse(
           {
             status: "FAILED",
-            message: "Unable to authenticate with payment provider for refund",
+            success: false,
+            message: authErr.message || "Unable to authenticate with payment provider for refund",
             details: authErr.message,
           },
           502
@@ -513,20 +574,38 @@ export async function onRequest(context) {
         amount: amountInPaise,
       };
 
-      const refundResp = await fetch(REFUND_URL, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `O-Bearer ${token}`,
-        },
-        body: JSON.stringify(refundPayload),
-      });
+      const executeRefundRequest = async (authToken) => {
+        const resp = await fetch(REFUND_URL, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+            Authorization: buildPhonePeAuthHeader(authToken),
+          },
+          body: JSON.stringify(refundPayload),
+        });
+        let parsed = {};
+        try {
+          parsed = await resp.json();
+        } catch {
+          parsed = { message: `Empty response from PhonePe refund API (HTTP ${resp.status})` };
+        }
+        return { resp, parsed };
+      };
 
-      let refundData = {};
-      try {
-        refundData = await refundResp.json();
-      } catch {
-        refundData = { message: "Empty response from PhonePe refund API" };
+      let { resp: refundResp, parsed: refundData } = await executeRefundRequest(token);
+
+      // Retry once with a brand-new OAuth token if PhonePe returns 401 Authorization failed
+      if (
+        refundResp.status === 401 ||
+        String(refundData.message || "").toLowerCase().includes("authorization failed")
+      ) {
+        try {
+          token = await getOAuthToken(env, true);
+          ({ resp: refundResp, parsed: refundData } = await executeRefundRequest(token));
+        } catch (retryErr) {
+          console.warn("PhonePe refund token retry failed:", retryErr);
+        }
       }
 
       const refundState = String(refundData.state || refundData.data?.state || "").toUpperCase();
@@ -541,6 +620,39 @@ export async function onRequest(context) {
           refundCode === "PAYMENT_SUCCESS" ||
           refundCode === "PAYMENT_PENDING");
 
+      let friendlyMessage =
+        refundData.message ||
+        (isSuccess ? "Refund initiated with PhonePe" : "PhonePe refund request failed");
+
+      // If PhonePe still rejects authorization after a fresh token, run a read-only order status check
+      // with the SAME fresh token so we can pinpoint whether the token itself or Refund API scope failed.
+      if (
+        !isSuccess &&
+        (refundResp.status === 401 ||
+          String(friendlyMessage).toLowerCase().includes("authorization failed"))
+      ) {
+        let orderCheckOk = false;
+        try {
+          const checkResp = await fetch(
+            `${STATUS_URL}/${encodeURIComponent(originalTransactionId || orderRef)}/status?details=false`,
+            {
+              method: "GET",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: buildPhonePeAuthHeader(token),
+              },
+            }
+          );
+          orderCheckOk = checkResp.ok;
+        } catch {}
+
+        if (orderCheckOk) {
+          friendlyMessage = `${friendlyMessage}. Your PhonePe OAuth token is valid for order lookup, which means PhonePe rejected refund authorization on this Client ID at ${REFUND_URL}. Please check PhonePe Business Dashboard → Developer Settings to enable Refund API permission for your V2 Client ID (and ensure Cloudflare has no wrong PHONEPE_REFUND_URL override).`;
+        } else {
+          friendlyMessage = `${friendlyMessage}. Please verify PHONEPE_CLIENT_ID, PHONEPE_CLIENT_SECRET, PHONEPE_CLIENT_VERSION, and PHONEPE_AUTH_URL in Cloudflare Pages environment variables.`;
+        }
+      }
+
       return jsonResponse(
         {
           status: isSuccess ? "SUCCESS" : "FAILED",
@@ -548,7 +660,8 @@ export async function onRequest(context) {
           refundMerchantId,
           phonepeRefundId,
           state: refundState || (isSuccess ? "PENDING" : "FAILED"),
-          message: refundData.message || (isSuccess ? "Refund initiated with PhonePe" : "PhonePe refund request failed"),
+          message: friendlyMessage,
+          endpointUsed: REFUND_URL,
           orderRef,
           data: refundData,
         },
@@ -570,7 +683,7 @@ export async function onRequest(context) {
 
       let token;
       try {
-        token = await getOAuthToken(env);
+        token = await getOAuthToken(env, true);
       } catch (authErr) {
         return jsonResponse(
           {
@@ -583,13 +696,28 @@ export async function onRequest(context) {
       }
 
       const statusEndpoint = `${REFUND_URL}/${encodeURIComponent(merchantRefundId)}/status`;
-      const statusResp = await fetch(statusEndpoint, {
+      let statusResp = await fetch(statusEndpoint, {
         method: "GET",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `O-Bearer ${token}`,
+          Accept: "application/json",
+          Authorization: buildPhonePeAuthHeader(token),
         },
       });
+
+      if (statusResp.status === 401) {
+        try {
+          token = await getOAuthToken(env, true);
+          statusResp = await fetch(statusEndpoint, {
+            method: "GET",
+            headers: {
+              "Content-Type": "application/json",
+              Accept: "application/json",
+              Authorization: buildPhonePeAuthHeader(token),
+            },
+          });
+        } catch {}
+      }
 
       let statusData = {};
       try {
@@ -606,6 +734,7 @@ export async function onRequest(context) {
           refundId: statusData.refundId || statusData.data?.refundId || null,
           state,
           amount: statusData.amount || statusData.data?.amount || null,
+          message: statusData.message || undefined,
           data: statusData,
         },
         statusResp.ok ? 200 : statusResp.status

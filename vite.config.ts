@@ -200,30 +200,54 @@ export default defineConfig(() => {
               res.setHeader('Access-Control-Allow-Origin', '*');
 
               let cachedToken: string | null = null;
+              let cachedTokenType = "O-Bearer";
               let tokenExpiresAt = 0;
 
-              async function getPhonePeToken() {
+              async function getPhonePeToken(forceRefresh = false) {
                 const now = Date.now();
-                if (cachedToken && tokenExpiresAt > now + 60000) return cachedToken;
+                if (!forceRefresh && cachedToken && tokenExpiresAt > now + 60000) return cachedToken;
+                const clientId = String(process.env.PHONEPE_CLIENT_ID || "SU2609091606384536532802").trim();
+                const clientVersion = String(process.env.PHONEPE_CLIENT_VERSION || "1").trim();
+                const clientSecret = String(process.env.PHONEPE_CLIENT_SECRET || "4c8a116b-8cfc-46ad-beda-1572fe0acc2f").trim();
+                const authUrl = String(process.env.PHONEPE_AUTH_URL || "https://api.phonepe.com/apis/identity-manager/v1/oauth/token").trim();
+
                 const params = new URLSearchParams();
-                params.append("client_id", "SU2609091606384536532802");
-                params.append("client_version", "1");
-                params.append("client_secret", "4c8a116b-8cfc-46ad-beda-1572fe0acc2f");
+                params.append("client_id", clientId);
+                params.append("client_version", clientVersion);
+                params.append("client_secret", clientSecret);
                 params.append("grant_type", "client_credentials");
 
-                const r = await fetch("https://api.phonepe.com/apis/identity-manager/v1/oauth/token", {
+                const r = await fetch(authUrl, {
                   method: "POST",
                   headers: { "Content-Type": "application/x-www-form-urlencoded" },
                   body: params.toString(),
                 });
                 if (!r.ok) {
+                  cachedToken = null;
+                  tokenExpiresAt = 0;
                   const txt = await r.text();
                   throw new Error(`PhonePe Auth Failed: ${txt}`);
                 }
                 const d = await r.json();
-                cachedToken = d.access_token || d.token;
-                tokenExpiresAt = Date.now() + (d.expires_in || 1200) * 1000;
+                const tok = String(d.access_token || d.token || "").trim();
+                if (!tok) {
+                  cachedToken = null;
+                  tokenExpiresAt = 0;
+                  throw new Error("PhonePe Auth returned an empty access_token.");
+                }
+                cachedTokenType = String(d.token_type || "O-Bearer").trim() || "O-Bearer";
+                const rawExpiresAt = Number(d.expires_at || d.session_expires_at || 0);
+                if (Number.isFinite(rawExpiresAt) && rawExpiresAt > 0) {
+                  tokenExpiresAt = rawExpiresAt < 1e12 ? rawExpiresAt * 1000 : rawExpiresAt;
+                } else {
+                  tokenExpiresAt = Date.now() + (Number(d.expires_in) || 900) * 1000;
+                }
+                cachedToken = tok;
                 return cachedToken;
+              }
+
+              function buildPhonePeAuth(tok: string | null) {
+                return `${cachedTokenType || "O-Bearer"} ${String(tok || "").trim()}`;
               }
 
               if (req.method === 'POST' && action === 'verify_admin_pin') {
@@ -371,6 +395,144 @@ export default defineConfig(() => {
                   res.statusCode = 502;
                   res.end(JSON.stringify({ status: 'ERROR', message: e?.message || 'Verification error' }));
                 }
+                return;
+              }
+
+              if (req.method === 'POST' && action === 'phonepe_refund') {
+                let bodyStr = '';
+                req.on('data', chunk => { bodyStr += chunk; });
+                req.on('end', async () => {
+                  try {
+                    const parsed = JSON.parse(bodyStr || '{}');
+                    const { orderRef, originalTransactionId, amountInRupees } = parsed;
+                    if (!orderRef || !amountInRupees) {
+                      res.statusCode = 400;
+                      res.end(JSON.stringify({ status: 'FAILED', success: false, message: 'Missing orderRef or amountInRupees' }));
+                      return;
+                    }
+                    const amountInPaise = Math.round(parseFloat(amountInRupees) * 100);
+                    if (isNaN(amountInPaise) || amountInPaise < 100) {
+                      res.statusCode = 400;
+                      res.end(JSON.stringify({ status: 'FAILED', success: false, message: 'Refund amount must be at least ₹1.00 (100 paise)' }));
+                      return;
+                    }
+                    const refundMerchantId = `REF_${String(orderRef).replace(/[^a-zA-Z0-9_-]/g, '')}_${Date.now()}`.slice(0, 63);
+                    const payUrl = String(process.env.PHONEPE_PAY_URL || 'https://api.phonepe.com/apis/pg/checkout/v2/pay').trim();
+                    const isSandbox = payUrl.includes('api-preprod.phonepe.com') || payUrl.includes('pg-sandbox');
+                    const defaultRefundUrl = isSandbox
+                      ? 'https://api-preprod.phonepe.com/apis/pg-sandbox/payments/v2/refund'
+                      : 'https://api.phonepe.com/apis/pg/payments/v2/refund';
+                    let refundUrl = String(process.env.PHONEPE_REFUND_URL || defaultRefundUrl).trim();
+                    if (refundUrl.includes('/checkout/v2/refund')) {
+                      refundUrl = refundUrl.replace('/checkout/v2/refund', '/payments/v2/refund');
+                    }
+
+                    let token = await getPhonePeToken(true);
+                    const refundPayload = {
+                      merchantRefundId: refundMerchantId,
+                      originalMerchantOrderId: originalTransactionId || orderRef,
+                      amount: amountInPaise,
+                    };
+                    let refundResp = await fetch(refundUrl, {
+                      method: 'POST',
+                      headers: {
+                        'Content-Type': 'application/json',
+                        Accept: 'application/json',
+                        Authorization: buildPhonePeAuth(token),
+                      },
+                      body: JSON.stringify(refundPayload),
+                    });
+                    let refundData: any = {};
+                    try { refundData = await refundResp.json(); } catch { refundData = {}; }
+                    if (refundResp.status === 401 || String(refundData.message || '').toLowerCase().includes('authorization failed')) {
+                      token = await getPhonePeToken(true);
+                      refundResp = await fetch(refundUrl, {
+                        method: 'POST',
+                        headers: {
+                          'Content-Type': 'application/json',
+                          Accept: 'application/json',
+                          Authorization: buildPhonePeAuth(token),
+                        },
+                        body: JSON.stringify(refundPayload),
+                      });
+                      try { refundData = await refundResp.json(); } catch { refundData = {}; }
+                    }
+                    const refundState = String(refundData.state || refundData.data?.state || '').toUpperCase();
+                    const refundCode = String(refundData.code || '').toUpperCase();
+                    const phonepeRefundId = refundData.refundId || refundData.data?.refundId || null;
+                    const isSuccess = refundResp.ok && (
+                      refundState === 'COMPLETED' || refundState === 'PENDING' || refundState === 'CONFIRMED' ||
+                      refundCode === 'PAYMENT_SUCCESS' || refundCode === 'PAYMENT_PENDING'
+                    );
+                    res.statusCode = refundResp.ok ? 200 : refundResp.status;
+                    res.end(JSON.stringify({
+                      status: isSuccess ? 'SUCCESS' : 'FAILED',
+                      success: isSuccess,
+                      refundMerchantId,
+                      phonepeRefundId,
+                      state: refundState || (isSuccess ? 'PENDING' : 'FAILED'),
+                      message: refundData.message || (isSuccess ? 'Refund initiated with PhonePe' : 'PhonePe refund request failed'),
+                      endpointUsed: refundUrl,
+                      orderRef,
+                      data: refundData,
+                    }));
+                  } catch (e: any) {
+                    res.statusCode = 502;
+                    res.end(JSON.stringify({ status: 'FAILED', success: false, message: e?.message || 'Refund proxy error' }));
+                  }
+                });
+                return;
+              }
+
+              if (req.method === 'GET' && action === 'phonepe_refund_status') {
+                const merchantRefundId = url.searchParams.get('merchantRefundId');
+                if (!merchantRefundId) {
+                  res.statusCode = 400;
+                  res.end(JSON.stringify({ status: 'FAILED', message: 'Missing merchantRefundId parameter' }));
+                  return;
+                }
+                try {
+                  const payUrl = String(process.env.PHONEPE_PAY_URL || 'https://api.phonepe.com/apis/pg/checkout/v2/pay').trim();
+                  const isSandbox = payUrl.includes('api-preprod.phonepe.com') || payUrl.includes('pg-sandbox');
+                  const defaultRefundUrl = isSandbox
+                    ? 'https://api-preprod.phonepe.com/apis/pg-sandbox/payments/v2/refund'
+                    : 'https://api.phonepe.com/apis/pg/payments/v2/refund';
+                  let refundUrl = String(process.env.PHONEPE_REFUND_URL || defaultRefundUrl).trim();
+                  if (refundUrl.includes('/checkout/v2/refund')) {
+                    refundUrl = refundUrl.replace('/checkout/v2/refund', '/payments/v2/refund');
+                  }
+                  const token = await getPhonePeToken(true);
+                  const statusResp = await fetch(`${refundUrl}/${encodeURIComponent(merchantRefundId)}/status`, {
+                    method: 'GET',
+                    headers: {
+                      'Content-Type': 'application/json',
+                      Accept: 'application/json',
+                      Authorization: buildPhonePeAuth(token),
+                    },
+                  });
+                  let statusData: any = {};
+                  try { statusData = await statusResp.json(); } catch {}
+                  const state = String(statusData.state || statusData.data?.state || 'PENDING').toUpperCase();
+                  res.statusCode = statusResp.ok ? 200 : statusResp.status;
+                  res.end(JSON.stringify({
+                    status: statusResp.ok ? 'SUCCESS' : 'FAILED',
+                    merchantRefundId,
+                    refundId: statusData.refundId || statusData.data?.refundId || null,
+                    state,
+                    amount: statusData.amount || statusData.data?.amount || null,
+                    message: statusData.message || undefined,
+                    data: statusData,
+                  }));
+                } catch (e: any) {
+                  res.statusCode = 502;
+                  res.end(JSON.stringify({ status: 'FAILED', message: e?.message || 'Refund status error' }));
+                }
+                return;
+              }
+
+              if (req.method === 'POST' && action === 'phonepe_refund_callback') {
+                res.statusCode = 200;
+                res.end(JSON.stringify({ status: 'ACKNOWLEDGED' }));
                 return;
               }
 
