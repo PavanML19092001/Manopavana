@@ -1285,46 +1285,50 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const cancelOrderWithinWindow = async (orderRef: string): Promise<boolean> => {
     const target =
-      orders.find((o) => o.orderRef === orderRef) ||
-      adminOrders.find((o) => o.orderRef === orderRef);
+      orders.find((o) => o.orderRef === orderRef || o.id === orderRef) ||
+      adminOrders.find((o) => o.orderRef === orderRef || o.id === orderRef);
 
     if (!target) return false;
 
-    // Immediately remove cancel option if order is packed, picked up, dispatched, or has an AWB
+    // Immediately disallow customer cancellation once packed, picked up, dispatched, delivered, returned, cancelled, or assigned an AWB
     if (
       target.orderStatus === "Packed" ||
       target.orderStatus === "Dispatched" ||
       target.orderStatus === "Delivered" ||
+      target.orderStatus === "Returned" ||
+      target.orderStatus === "Cancelled" ||
       Boolean(target.trackingNumber)
     ) {
-      showToast("This order has already been packed/picked up by Delhivery and cannot be cancelled.");
+      showToast("This order cannot be cancelled because it has already been packed, dispatched, or closed.");
       return false;
     }
 
-    // If Delhivery waybill was already generated, void on carrier to restore wallet credit
-    if (target.trackingNumber) {
+    const isCod =
+      target.paymentMethod === "cod" || target.paymentMode === "COD";
+    const isAlreadyRefunded =
+      target.paymentStatus === "REFUND_INITIATED" ||
+      target.paymentStatus === "REFUNDED";
+    const isOnlinePaid =
+      !isCod &&
+      target.orderStatus !== "Payment Incomplete" &&
+      target.orderStatus !== "Failed (Expired)" &&
+      target.paymentStatus !== "PENDING" &&
+      target.paymentStatus !== "FAILED" &&
+      (target.paymentMethod === "phonepe" ||
+        target.paymentMethod === "online" ||
+        Boolean(target.paymentMode?.includes("PHONEPE")) ||
+        Boolean(target.paymentMode?.includes("ONLINE")) ||
+        target.paymentStatus === "COMPLETED" ||
+        target.paymentStatus === "PHONEPE_PAID");
+
+    const orderUpdates: Partial<Order> = {
+      orderStatus: "Cancelled",
+      paymentStatus: isCod ? "CANCELLED" : target.paymentStatus || "CANCELLED",
+    };
+
+    if (isOnlinePaid && !isAlreadyRefunded && target.total > 0) {
       try {
-        showToast("Notifying Delhivery of order cancellation...");
-        await fetch("/api?action=delhivery_cancel_order", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ waybill: target.trackingNumber }),
-        });
-      } catch (err) {
-        console.warn("Delhivery cancellation notice:", err);
-      }
-    }
-
-    const isOnlinePayment =
-      target.paymentMethod === "phonepe" ||
-      target.paymentMethod === "online" ||
-      target.paymentMode?.includes("PHONEPE");
-
-    let refundStatus = "CANCELLED";
-
-    if (isOnlinePayment && target.total > 0) {
-      try {
-        showToast("Initiating online refund with PhonePe...");
+        showToast("Initiating automatic PhonePe refund...");
         const res = await fetch("/api?action=phonepe_refund", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -1335,27 +1339,49 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           }),
         });
 
-        const result = await res.json();
+        let result: any = {};
+        try {
+          result = await res.json();
+        } catch {
+          result = { success: false, message: "Invalid refund gateway response" };
+        }
+
         if (result.success) {
-          refundStatus = "REFUND_INITIATED";
-          showToast("Online refund initiated successfully! Funds will credit in 3–5 working days.");
+          const isCompleted = String(result.state || "").toUpperCase() === "COMPLETED";
+          orderUpdates.paymentStatus = isCompleted ? "REFUNDED" : "REFUND_INITIATED";
+          orderUpdates.refundMerchantId = result.refundMerchantId;
+          if (result.phonepeRefundId) {
+            orderUpdates.phonepeRefundId = result.phonepeRefundId;
+          }
+          orderUpdates.refundAmount = target.total;
+          orderUpdates.refundReason = "Cancelled by customer before packing";
+          orderUpdates.refundedAt = Date.now();
+          showToast(
+            `Online refund of ₹${target.total} ${isCompleted ? "completed" : "initiated"} via PhonePe! Ref: ${result.refundMerchantId}`
+          );
         } else {
-          refundStatus = "REFUND_PENDING_MANUAL";
-          showToast("Order cancelled. Refund queued for processing.");
+          orderUpdates.paymentStatus = "REFUND_PENDING_MANUAL";
+          orderUpdates.refundAmount = target.total;
+          orderUpdates.refundReason = `Cancelled before packing (Auto-refund pending: ${result.message || "Gateway error"})`;
+          orderUpdates.refundedAt = Date.now();
+          showToast("Order cancelled. Refund queued for admin retry.");
         }
       } catch (err) {
         console.warn("PhonePe refund trigger error:", err);
-        refundStatus = "REFUND_PENDING_MANUAL";
+        orderUpdates.paymentStatus = "REFUND_PENDING_MANUAL";
+        orderUpdates.refundAmount = target.total;
+        orderUpdates.refundReason = "Cancelled before packing (Network error during auto-refund)";
+        orderUpdates.refundedAt = Date.now();
+        showToast("Order cancelled. Refund queued for admin verification.");
       }
+    } else if (isCod) {
+      orderUpdates.paymentStatus = "CANCELLED";
+      showToast(`COD Order #${target.orderRef} cancelled successfully.`);
     } else {
-      showToast(`Order #${orderRef} cancelled successfully.`);
+      showToast(`Order #${target.orderRef} cancelled.`);
     }
 
-    await updateOrderDetails(orderRef, {
-      orderStatus: "Cancelled",
-      paymentStatus: refundStatus,
-    });
-
+    await updateOrderDetails(target.orderRef, orderUpdates);
     return true;
   };
 

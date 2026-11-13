@@ -1864,7 +1864,7 @@ export const CheckoutPage: React.FC = () => {
                 <div className="flex items-center justify-between text-xs">
                   <span className="flex items-center gap-1.5 font-bold text-[#14291D] dark:text-[#FAF3E0]">
                     <Tag className="w-3.5 h-3.5 text-[#E0B04A]" />
-                    <span>Promo / Reel Coupon Code</span>
+                    <span>Have a Promo / Coupon Code?</span>
                   </span>
                   {appliedCoupon && (
                     <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded">
@@ -1920,7 +1920,7 @@ export const CheckoutPage: React.FC = () => {
                             else if (res.error) setCheckoutCouponError(res.error);
                           }
                         }}
-                        placeholder="Enter code (e.g. REEL10)"
+                        placeholder="Enter promo code"
                         className="flex-1 px-3 py-2 text-xs font-mono font-bold uppercase rounded-lg bg-white border border-[#E0B04A]/50 text-[#14291D] placeholder-[#3F4F45]/60 focus:outline-none focus:ring-2 focus:ring-[#E0B04A]"
                       />
                       <button

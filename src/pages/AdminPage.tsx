@@ -37,6 +37,8 @@ import {
   ArrowLeft,
   ChevronRight,
   Tag,
+  Banknote,
+  RefreshCw,
 } from "lucide-react";
 import { useStore } from "../context/StoreContext";
 import { BUSINESS_CONFIG, INDIAN_STATES_DISTRICTS } from "../constants";
@@ -117,6 +119,17 @@ export const AdminPage: React.FC = () => {
   const [checkingShadowfaxPincode, setCheckingShadowfaxPincode] = useState<Record<string, boolean>>({});
   const [shadowfaxPincodeStatus, setShadowfaxPincodeStatus] = useState<Record<string, any>>({});
   const [pingingShadowfax, setPingingShadowfax] = useState(false);
+
+  // Admin PhonePe Refund Modal & Status Checker State
+  const [refundModalTarget, setRefundModalTarget] = useState<{
+    order: Order;
+    targetStatus: OrderStatus;
+    amount: string;
+    reason: string;
+    error?: string;
+  } | null>(null);
+  const [isProcessingRefund, setIsProcessingRefund] = useState(false);
+  const [checkingRefundStatus, setCheckingRefundStatus] = useState<Record<string, boolean>>({});
   const [shadowfaxPingResult, setShadowfaxPingResult] = useState<{
     status: string;
     authenticated: boolean;
@@ -1105,8 +1118,50 @@ export const AdminPage: React.FC = () => {
     }
   };
 
-  const handleStatusChange = async (ord: Order, newStatus: OrderStatus) => {
-    if (newStatus === "Cancelled" && ord.trackingNumber) {
+  const isCodOrder = (ord: Order) =>
+    ord.paymentMethod === "cod" || ord.paymentMode === "COD";
+
+  const isOnlinePaidOrder = (ord: Order) => {
+    if (isCodOrder(ord)) return false;
+    if (
+      ord.orderStatus === "Payment Incomplete" ||
+      ord.orderStatus === "Failed (Expired)" ||
+      ord.paymentStatus === "PENDING" ||
+      ord.paymentStatus === "FAILED"
+    ) {
+      return false;
+    }
+    return (
+      ord.paymentMethod === "phonepe" ||
+      ord.paymentMethod === "online" ||
+      Boolean(ord.paymentMode?.includes("PHONEPE")) ||
+      Boolean(ord.paymentMode?.includes("ONLINE")) ||
+      ord.paymentStatus === "COMPLETED" ||
+      ord.paymentStatus === "PHONEPE_PAID" ||
+      ord.paymentStatus === "REFUND_PENDING_MANUAL" ||
+      ord.paymentStatus === "REFUND_INITIATED" ||
+      ord.paymentStatus === "REFUNDED"
+    );
+  };
+
+  const isAlreadyRefunded = (ord: Order) =>
+    ord.paymentStatus === "REFUNDED" || ord.paymentStatus === "REFUND_INITIATED";
+
+  const openAdminRefundModal = (ord: Order, targetStatus: OrderStatus) => {
+    setRefundModalTarget({
+      order: ord,
+      targetStatus,
+      amount: String(ord.total || 0),
+      reason:
+        targetStatus === "Returned"
+          ? "Order returned by delivery team (Damaged / Undeliverable)"
+          : "Cancelled by store admin",
+      error: undefined,
+    });
+  };
+
+  const cancelCarrierShipmentIfNeeded = async (ord: Order, targetStatus: OrderStatus) => {
+    if (targetStatus === "Cancelled" && ord.trackingNumber) {
       try {
         showToast("Notifying Delhivery of order cancellation...");
         const res = await fetch("/api?action=delhivery_cancel_order", {
@@ -1118,23 +1173,179 @@ export const AdminPage: React.FC = () => {
         if (data.status === "SUCCESS") {
           showToast("Delhivery shipment cancelled & wallet credited!");
         } else {
-          showToast(
-            `Delhivery notice: ${data.message || "Failed to cancel on carrier"}`
-          );
+          showToast(`Delhivery notice: ${data.message || "Failed to cancel on carrier"}`);
         }
       } catch (e) {
         console.warn("Delhivery cancellation sync notice:", e);
       }
     }
+  };
 
+  const handleStatusChange = async (ord: Order, newStatus: OrderStatus) => {
+    if (
+      (newStatus === "Returned" || newStatus === "Cancelled") &&
+      isOnlinePaidOrder(ord) &&
+      !isAlreadyRefunded(ord)
+    ) {
+      openAdminRefundModal(ord, newStatus);
+      return;
+    }
+
+    await cancelCarrierShipmentIfNeeded(ord, newStatus);
     await updateOrderStatus(ord.id || ord.orderRef, newStatus);
+  };
+
+  const handleConfirmAdminRefund = async (issueRefund: boolean) => {
+    if (!refundModalTarget) return;
+    const { order, targetStatus, amount, reason } = refundModalTarget;
+
+    if (!issueRefund) {
+      setIsProcessingRefund(true);
+      try {
+        await cancelCarrierShipmentIfNeeded(order, targetStatus);
+        await updateOrderDetails(order.orderRef, {
+          orderStatus: targetStatus,
+          ...(reason.trim() ? { refundReason: reason.trim() } : {}),
+        });
+        showToast(`Order #${order.orderRef} marked as "${targetStatus}" (no auto-refund issued).`);
+        setRefundModalTarget(null);
+      } finally {
+        setIsProcessingRefund(false);
+      }
+      return;
+    }
+
+    const parsedAmount = Number.parseFloat(amount);
+    if (!Number.isFinite(parsedAmount) || parsedAmount < 1) {
+      setRefundModalTarget((prev) =>
+        prev ? { ...prev, error: "Refund amount must be at least ₹1.00." } : prev
+      );
+      return;
+    }
+    if (parsedAmount > Number(order.total || 0)) {
+      setRefundModalTarget((prev) =>
+        prev
+          ? {
+              ...prev,
+              error: `Refund amount (₹${parsedAmount}) cannot exceed paid order total (₹${order.total}).`,
+            }
+          : prev
+      );
+      return;
+    }
+
+    setIsProcessingRefund(true);
+    setRefundModalTarget((prev) => (prev ? { ...prev, error: undefined } : prev));
+    try {
+      await cancelCarrierShipmentIfNeeded(order, targetStatus);
+
+      const res = await fetch("/api?action=phonepe_refund", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          orderRef: order.orderRef,
+          originalTransactionId: order.orderRef,
+          amountInRupees: parsedAmount,
+        }),
+      });
+
+      let data: any = {};
+      try {
+        data = await res.json();
+      } catch {
+        data = { success: false, message: "Invalid JSON response from PhonePe refund gateway" };
+      }
+
+      if (!res.ok || !data.success) {
+        setRefundModalTarget((prev) =>
+          prev
+            ? {
+                ...prev,
+                error:
+                  data.message ||
+                  data.data?.message ||
+                  `PhonePe rejected refund (HTTP ${res.status}). Status was not changed.`,
+              }
+            : prev
+        );
+        return;
+      }
+
+      const isCompleted = String(data.state || "").toUpperCase() === "COMPLETED";
+      await updateOrderDetails(order.orderRef, {
+        orderStatus: targetStatus,
+        paymentStatus: isCompleted ? "REFUNDED" : "REFUND_INITIATED",
+        refundMerchantId: data.refundMerchantId,
+        ...(data.phonepeRefundId ? { phonepeRefundId: data.phonepeRefundId } : {}),
+        refundAmount: parsedAmount,
+        refundReason: reason.trim() || `Marked ${targetStatus} by admin`,
+        refundedAt: Date.now(),
+      });
+
+      showToast(
+        `₹${parsedAmount} PhonePe refund ${isCompleted ? "completed" : "initiated"} for #${order.orderRef}! Ref: ${data.refundMerchantId}`
+      );
+      setRefundModalTarget(null);
+    } catch (err: any) {
+      setRefundModalTarget((prev) =>
+        prev
+          ? {
+              ...prev,
+              error: err?.message || "Network error contacting PhonePe refund service.",
+            }
+          : prev
+      );
+    } finally {
+      setIsProcessingRefund(false);
+    }
+  };
+
+  const handleCheckLiveRefundStatus = async (ord: Order) => {
+    if (!ord.refundMerchantId) {
+      showToast("No refundMerchantId saved on this order.");
+      return;
+    }
+    setCheckingRefundStatus((p) => ({ ...p, [ord.orderRef]: true }));
+    try {
+      const res = await fetch(
+        `/api?action=phonepe_refund_status&merchantRefundId=${encodeURIComponent(ord.refundMerchantId)}`
+      );
+      const data = await res.json();
+      if (!res.ok || data.status !== "SUCCESS") {
+        showToast(data.message || "Could not fetch PhonePe refund status.");
+        return;
+      }
+      const liveState = String(data.state || "PENDING").toUpperCase();
+      if (liveState === "COMPLETED" || liveState === "SUCCESS") {
+        await updateOrderDetails(ord.orderRef, {
+          paymentStatus: "REFUNDED",
+          ...(data.refundId ? { phonepeRefundId: data.refundId } : {}),
+        });
+        showToast(`Refund for #${ord.orderRef} is COMPLETED on PhonePe!`);
+      } else if (liveState === "FAILED") {
+        await updateOrderDetails(ord.orderRef, {
+          paymentStatus: "REFUND_PENDING_MANUAL",
+        });
+        showToast(`PhonePe reports refund FAILED for #${ord.orderRef}. Marked for retry.`);
+      } else {
+        showToast(`Live PhonePe status for #${ord.orderRef}: ${liveState} (still processing)`);
+      }
+    } catch (err: any) {
+      showToast(err?.message || "Error checking PhonePe refund status.");
+    } finally {
+      setCheckingRefundStatus((p) => ({ ...p, [ord.orderRef]: false }));
+    }
   };
 
   const [isSyncingDelhivery, setIsSyncingDelhivery] = useState(false);
 
   const handleSyncAllDelhiveryTracking = async () => {
     const trackableOrders = adminOrders.filter(
-      (o) => o.trackingNumber && o.trackingNumber.length > 5 && o.orderStatus !== "Cancelled"
+      (o) =>
+        o.trackingNumber &&
+        o.trackingNumber.length > 5 &&
+        o.orderStatus !== "Cancelled" &&
+        o.orderStatus !== "Returned"
     );
     if (trackableOrders.length === 0) {
       showToast("No active shipments with AWB to track.");
@@ -1244,7 +1455,12 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
   };
 
   const isTerminalOrder = (status?: string) => {
-    return status === "Delivered" || status === "Cancelled" || status === "Failed (Expired)";
+    return (
+      status === "Delivered" ||
+      status === "Returned" ||
+      status === "Cancelled" ||
+      status === "Failed (Expired)"
+    );
   };
 
   const rawOrders = (adminOrders && adminOrders.length > 0 ? adminOrders : orders) || [];
@@ -1274,7 +1490,11 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
   });
 
   const totalRevenue = rawOrders.reduce(
-    (acc, o) => acc + (o.orderStatus !== "Cancelled" ? Number(o.total) || 0 : 0),
+    (acc, o) =>
+      acc +
+      (o.orderStatus !== "Cancelled" && o.orderStatus !== "Returned"
+        ? Number(o.total) || 0
+        : 0),
     0
   );
   const pendingDispatchCount = rawOrders.filter(
@@ -2087,7 +2307,7 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                 <div className="flex flex-wrap gap-1">
                   {(orderViewTab === "active"
                     ? ["all", "Placed", "Packed", "Dispatched", "Payment Incomplete"]
-                    : ["all", "Delivered", "Cancelled", "Failed (Expired)"]
+                    : ["all", "Delivered", "Returned", "Cancelled", "Failed (Expired)"]
                   ).map((st) => (
                     <button
                       key={st}
@@ -2253,6 +2473,7 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                                   <option value="Packed">Packed</option>
                                   <option value="Dispatched">Dispatched</option>
                                   <option value="Delivered">Delivered</option>
+                                  <option value="Returned">Returned (Damaged / RTO)</option>
                                   <option value="Cancelled">Cancelled</option>
                                   <option value="Failed (Expired)">
                                     Failed (Expired)
@@ -2387,10 +2608,16 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                                 className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
                                   ord.orderStatus === "Delivered"
                                     ? "bg-emerald-500/15 text-emerald-600 border border-emerald-500/30"
+                                    : ord.orderStatus === "Returned"
+                                    ? "bg-orange-500/15 text-orange-600 border border-orange-500/30"
                                     : "bg-red-500/15 text-red-600 border border-red-500/30"
                                 }`}
                               >
-                                {ord.orderStatus === "Delivered" ? "Delivered to Customer" : "Cancelled / Closed"}
+                                {ord.orderStatus === "Delivered"
+                                  ? "Delivered to Customer"
+                                  : ord.orderStatus === "Returned"
+                                  ? "Returned (Closed)"
+                                  : "Cancelled / Closed"}
                               </span>
                             </div>
 
@@ -3095,6 +3322,94 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                         </div>
                       )}
 
+                        {/* Admin Online Refund & Delivery Return Controls */}
+                        {isOnlinePaidOrder(ord) &&
+                          (ord.orderStatus === "Delivered" ||
+                            ord.orderStatus === "Returned" ||
+                            ord.orderStatus === "Cancelled" ||
+                            ord.paymentStatus === "REFUND_INITIATED" ||
+                            ord.paymentStatus === "REFUNDED" ||
+                            ord.paymentStatus === "REFUND_PENDING_MANUAL") && (
+                            <div
+                              className={`p-3 rounded-xl border text-xs flex flex-wrap items-center justify-between gap-2 ${
+                                ord.paymentStatus === "REFUNDED"
+                                  ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-700 dark:text-emerald-300"
+                                  : ord.paymentStatus === "REFUND_INITIATED"
+                                  ? "bg-amber-500/10 border-amber-500/30 text-amber-800 dark:text-amber-300"
+                                  : ord.orderStatus === "Returned" ||
+                                    ord.orderStatus === "Cancelled" ||
+                                    ord.paymentStatus === "REFUND_PENDING_MANUAL"
+                                  ? "bg-red-500/10 border-red-500/30 text-red-700 dark:text-red-300"
+                                  : isDark
+                                  ? "bg-[#191009] border-[#1F3D2B] text-[#FAF3E0]"
+                                  : "bg-stone-50 border-stone-200 text-stone-700"
+                              }`}
+                            >
+                              <div className="space-y-0.5 min-w-0">
+                                <div className="font-bold flex items-center gap-1.5">
+                                  <Banknote className="w-3.5 h-3.5 shrink-0" />
+                                  <span>
+                                    {ord.paymentStatus === "REFUNDED"
+                                      ? `Refunded ₹${ord.refundAmount || ord.total} via PhonePe`
+                                      : ord.paymentStatus === "REFUND_INITIATED"
+                                      ? `PhonePe Refund Initiated (₹${ord.refundAmount || ord.total})`
+                                      : ord.paymentStatus === "REFUND_PENDING_MANUAL"
+                                      ? `Auto-Refund Needs Retry (₹${ord.refundAmount || ord.total})`
+                                      : ord.orderStatus === "Returned" || ord.orderStatus === "Cancelled"
+                                      ? `Paid Online (₹${ord.total}) — Not Yet Refunded`
+                                      : `Paid Online (₹${ord.total})`}
+                                  </span>
+                                </div>
+                                {(ord.refundMerchantId || ord.phonepeRefundId) && (
+                                  <p className="text-[10px] font-mono opacity-85 truncate">
+                                    Ref: {ord.phonepeRefundId || ord.refundMerchantId}
+                                  </p>
+                                )}
+                              </div>
+
+                              <div className="flex items-center gap-2 shrink-0">
+                                {ord.paymentStatus === "REFUND_INITIATED" && ord.refundMerchantId && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleCheckLiveRefundStatus(ord)}
+                                    disabled={checkingRefundStatus[ord.orderRef]}
+                                    className="px-2.5 py-1 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-bold text-[11px] flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                                  >
+                                    <RefreshCw
+                                      className={`w-3 h-3 ${
+                                        checkingRefundStatus[ord.orderRef] ? "animate-spin" : ""
+                                      }`}
+                                    />
+                                    <span>Check Live Status</span>
+                                  </button>
+                                )}
+                                {!isAlreadyRefunded(ord) &&
+                                  (ord.orderStatus === "Returned" ||
+                                    ord.orderStatus === "Cancelled" ||
+                                    ord.paymentStatus === "REFUND_PENDING_MANUAL") && (
+                                    <button
+                                      type="button"
+                                      onClick={() => openAdminRefundModal(ord, ord.orderStatus)}
+                                      className="px-2.5 py-1 rounded-lg bg-red-600 hover:bg-red-700 text-white font-bold text-[11px] flex items-center gap-1 cursor-pointer shadow-xs"
+                                    >
+                                      <RotateCcw className="w-3 h-3" />
+                                      <span>Issue PhonePe Refund</span>
+                                    </button>
+                                  )}
+                                {!isAlreadyRefunded(ord) && ord.orderStatus === "Delivered" && (
+                                  <button
+                                    type="button"
+                                    onClick={() => openAdminRefundModal(ord, "Returned")}
+                                    className="px-2.5 py-1 rounded-lg bg-orange-600 hover:bg-orange-700 text-white font-bold text-[11px] flex items-center gap-1 cursor-pointer shadow-xs"
+                                  >
+                                    <RotateCcw className="w-3 h-3" />
+                                    <span>Mark Returned & Refund</span>
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          )}
+
                         {/* Customer Actions */}
                         <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
                           <div className="flex flex-wrap items-center gap-2">
@@ -3242,6 +3557,8 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                             ? "bg-blue-500/15 border-blue-500/30 text-blue-700 dark:text-blue-300"
                             : currentOrder.orderStatus === "Packed"
                             ? "bg-amber-500/15 border-amber-500/30 text-amber-700 dark:text-amber-300"
+                            : currentOrder.orderStatus === "Returned"
+                            ? "bg-orange-500/15 border-orange-500/30 text-orange-700 dark:text-orange-300"
                             : currentOrder.orderStatus === "Cancelled"
                             ? "bg-red-500/15 border-red-500/30 text-red-700 dark:text-red-300"
                             : "bg-stone-100 dark:bg-stone-800 border-stone-200 dark:border-stone-700 text-stone-800 dark:text-stone-200"
@@ -3517,12 +3834,104 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                       <option value="Packed">Packed</option>
                       <option value="Dispatched">Dispatched</option>
                       <option value="Delivered">Delivered</option>
+                      <option value="Returned">Returned (Damaged / RTO)</option>
                       <option value="Cancelled">Cancelled</option>
                       <option value="Payment Incomplete">Payment Incomplete</option>
                       <option value="Failed (Expired)">Failed (Expired)</option>
                     </select>
                   </div>
                 </div>
+
+                {/* Online Payment Refund & Delivery Return Panel */}
+                {isOnlinePaidOrder(currentOrder) && (
+                  <div
+                    className={`p-4 rounded-2xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs ${
+                      currentOrder.paymentStatus === "REFUNDED"
+                        ? "bg-emerald-500/10 border-emerald-500/30"
+                        : currentOrder.paymentStatus === "REFUND_INITIATED"
+                        ? "bg-amber-500/10 border-amber-500/30"
+                        : currentOrder.orderStatus === "Returned" ||
+                          currentOrder.orderStatus === "Cancelled" ||
+                          currentOrder.paymentStatus === "REFUND_PENDING_MANUAL"
+                        ? "bg-red-500/10 border-red-500/30"
+                        : "bg-stone-50 dark:bg-stone-900/50 border-stone-200 dark:border-stone-800"
+                    }`}
+                  >
+                    <div className="space-y-1">
+                      <div className="font-bold text-sm flex items-center gap-2 text-[#14291D] dark:text-[#FAF3E0]">
+                        <Banknote className="w-4 h-4 text-[#E0B04A]" />
+                        <span>
+                          {currentOrder.paymentStatus === "REFUNDED"
+                            ? `PhonePe Refund Completed — ₹${currentOrder.refundAmount || currentOrder.total}`
+                            : currentOrder.paymentStatus === "REFUND_INITIATED"
+                            ? `PhonePe Refund Initiated — ₹${currentOrder.refundAmount || currentOrder.total}`
+                            : currentOrder.paymentStatus === "REFUND_PENDING_MANUAL"
+                            ? `Auto-Refund Queued / Needs Retry — ₹${currentOrder.refundAmount || currentOrder.total}`
+                            : `Online Payment Collected — ₹${currentOrder.total}`}
+                        </span>
+                      </div>
+                      {currentOrder.refundReason && (
+                        <p className="text-[11px] text-stone-600 dark:text-stone-300">
+                          Reason: {currentOrder.refundReason}
+                        </p>
+                      )}
+                      {(currentOrder.refundMerchantId || currentOrder.phonepeRefundId) && (
+                        <p className="text-[11px] font-mono text-stone-500">
+                          Merchant Refund ID: {currentOrder.refundMerchantId || "—"}
+                          {currentOrder.phonepeRefundId
+                            ? ` • PhonePe Refund ID: ${currentOrder.phonepeRefundId}`
+                            : ""}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-2 shrink-0">
+                      {currentOrder.paymentStatus === "REFUND_INITIATED" &&
+                        currentOrder.refundMerchantId && (
+                          <button
+                            type="button"
+                            onClick={() => handleCheckLiveRefundStatus(currentOrder)}
+                            disabled={checkingRefundStatus[currentOrder.orderRef]}
+                            className="px-3.5 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                          >
+                            <RefreshCw
+                              className={`w-3.5 h-3.5 ${
+                                checkingRefundStatus[currentOrder.orderRef] ? "animate-spin" : ""
+                              }`}
+                            />
+                            <span>Check Live PhonePe Status</span>
+                          </button>
+                        )}
+                      {!isAlreadyRefunded(currentOrder) &&
+                        (currentOrder.orderStatus === "Returned" ||
+                          currentOrder.orderStatus === "Cancelled" ||
+                          currentOrder.paymentStatus === "REFUND_PENDING_MANUAL") && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              openAdminRefundModal(currentOrder, currentOrder.orderStatus)
+                            }
+                            className="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-sm"
+                          >
+                            <RotateCcw className="w-3.5 h-3.5" />
+                            <span>Issue PhonePe Refund (₹{currentOrder.total})</span>
+                          </button>
+                        )}
+                      {!isAlreadyRefunded(currentOrder) &&
+                        currentOrder.orderStatus !== "Returned" &&
+                        currentOrder.orderStatus !== "Cancelled" && (
+                          <button
+                            type="button"
+                            onClick={() => openAdminRefundModal(currentOrder, "Returned")}
+                            className="px-4 py-2 rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-sm"
+                          >
+                            <RotateCcw className="w-3.5 h-3.5" />
+                            <span>Mark Returned & Issue Refund</span>
+                          </button>
+                        )}
+                    </div>
+                  </div>
+                )}
 
                 {/* Carrier Manifest Actions */}
                 <div className="p-4 rounded-2xl bg-stone-50 dark:bg-stone-900/50 border border-stone-200 dark:border-stone-800 space-y-3">
@@ -4098,6 +4507,145 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                         <span>Save & Activate Ekart</span>
                       </>
                     )}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Admin Refund & Return Confirmation Modal */}
+        {refundModalTarget && (
+          <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
+            <div
+              className={`w-full max-w-md rounded-3xl p-6 border shadow-2xl space-y-4 ${
+                isDark
+                  ? "bg-[#14291D] border-[#1F3D2B] text-[#FAF3E0]"
+                  : "bg-white border-[#F2E8CC] text-[#14291D]"
+              }`}
+            >
+              <div className="flex items-start justify-between gap-3 border-b pb-3 border-stone-200 dark:border-stone-800">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-10 h-10 rounded-xl bg-red-500/15 border border-red-500/30 flex items-center justify-center text-red-500 shrink-0">
+                    <RotateCcw className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold font-serif text-base">
+                      {refundModalTarget.targetStatus === "Returned"
+                        ? "Mark Returned & Issue PhonePe Refund"
+                        : "Cancel Order & Issue PhonePe Refund"}
+                    </h3>
+                    <p className="text-[11px] text-stone-500">
+                      Order #{refundModalTarget.order.orderRef} • Paid ₹{refundModalTarget.order.total} via PhonePe
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  disabled={isProcessingRefund}
+                  onClick={() => setRefundModalTarget(null)}
+                  className="p-1.5 rounded-lg text-stone-400 hover:text-stone-600 dark:hover:text-stone-200 cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="space-y-3 text-xs">
+                <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-800 dark:text-amber-200 text-[11px] leading-relaxed">
+                  Refunds are credited back to the customer&apos;s original UPI/Bank account via PhonePe v2 API. You can adjust the amount below (for example, to deduct one-way shipping if needed).
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold uppercase tracking-wider text-stone-500 mb-1">
+                    Refund Amount (₹) — Max ₹{refundModalTarget.order.total}
+                  </label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={refundModalTarget.order.total}
+                    step="0.01"
+                    value={refundModalTarget.amount}
+                    onChange={(e) =>
+                      setRefundModalTarget((prev) =>
+                        prev ? { ...prev, amount: e.target.value, error: undefined } : prev
+                      )
+                    }
+                    className={`w-full px-3 py-2 rounded-xl text-sm font-bold font-mono focus:outline-none focus:ring-2 focus:ring-[#E0B04A] ${
+                      isDark
+                        ? "bg-[#191009] border border-[#1F3D2B] text-[#FAF3E0]"
+                        : "bg-stone-50 border border-[#F2E8CC] text-[#14291D]"
+                    }`}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold uppercase tracking-wider text-stone-500 mb-1">
+                    Return / Refund Reason (Visible on Order Tracker)
+                  </label>
+                  <input
+                    type="text"
+                    value={refundModalTarget.reason}
+                    onChange={(e) =>
+                      setRefundModalTarget((prev) =>
+                        prev ? { ...prev, reason: e.target.value } : prev
+                      )
+                    }
+                    placeholder="e.g. Damaged bottle during transit — returned by Delhivery"
+                    className={`w-full px-3 py-2 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-[#E0B04A] ${
+                      isDark
+                        ? "bg-[#191009] border border-[#1F3D2B] text-[#FAF3E0]"
+                        : "bg-stone-50 border border-[#F2E8CC] text-[#14291D]"
+                    }`}
+                  />
+                </div>
+
+                {refundModalTarget.error && (
+                  <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-600 dark:text-red-300 text-xs flex items-start gap-2">
+                    <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                    <span>{refundModalTarget.error}</span>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex flex-col gap-2 pt-2 border-t border-stone-200 dark:border-stone-800">
+                <button
+                  type="button"
+                  disabled={isProcessingRefund}
+                  onClick={() => handleConfirmAdminRefund(true)}
+                  className="w-full py-2.5 px-4 rounded-xl bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white font-bold text-xs flex items-center justify-center gap-2 cursor-pointer shadow-md"
+                >
+                  {isProcessingRefund ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>Calling PhonePe Refund API...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Banknote className="w-4 h-4" />
+                      <span>
+                        Confirm &quot;{refundModalTarget.targetStatus}&quot; & Refund ₹
+                        {refundModalTarget.amount || 0} via PhonePe
+                      </span>
+                    </>
+                  )}
+                </button>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    disabled={isProcessingRefund}
+                    onClick={() => handleConfirmAdminRefund(false)}
+                    className="flex-1 py-2 px-3 rounded-xl border border-stone-300 dark:border-stone-700 hover:bg-stone-100 dark:hover:bg-stone-800 text-[11px] font-bold cursor-pointer disabled:opacity-50"
+                  >
+                    Mark Status Only (No Auto Refund)
+                  </button>
+                  <button
+                    type="button"
+                    disabled={isProcessingRefund}
+                    onClick={() => setRefundModalTarget(null)}
+                    className="py-2 px-4 rounded-xl border border-stone-300 dark:border-stone-700 text-[11px] font-semibold cursor-pointer disabled:opacity-50"
+                  >
+                    Cancel
                   </button>
                 </div>
               </div>

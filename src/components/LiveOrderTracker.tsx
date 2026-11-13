@@ -60,6 +60,8 @@ export const LiveOrderTracker = ({
 
   const isCod = order.paymentMethod === "cod" || order.paymentMode === "COD";
   const isCancelled = (order.orderStatus as string) === "Cancelled";
+  const isReturned = (order.orderStatus as string) === "Returned";
+  const isTerminated = isCancelled || isReturned;
 
   // Allowed to edit or cancel ONLY while order is in initial "Placed" status and before carrier pickup/AWB manifestation
   const canModifyOrCancel =
@@ -67,10 +69,10 @@ export const LiveOrderTracker = ({
 
   // Universal: Poll Delhivery tracking for any order with a waybill regardless of pincode
   useEffect(() => {
-    if (order.trackingNumber && order.trackingNumber.length > 5 && !isCancelled) {
+    if (order.trackingNumber && order.trackingNumber.length > 5 && !isTerminated) {
       fetchDelhiveryTracking(order.trackingNumber);
     }
-  }, [order.trackingNumber, isCancelled]);
+  }, [order.trackingNumber, isTerminated]);
 
   const fetchDelhiveryTracking = async (waybill: string) => {
     setDelhiveryLoading(true);
@@ -155,6 +157,9 @@ export const LiveOrderTracker = ({
   const currentStep = getStepProgress(order.orderStatus);
 
   const getEstimatedDeliveryText = () => {
+    if (isReturned) {
+      return "Order Returned by Delivery Team (Damaged / Undeliverable). Refund status shown below.";
+    }
     if (isCancelled) {
       return "Order Cancelled. Delivery process terminated.";
     }
@@ -184,7 +189,7 @@ export const LiveOrderTracker = ({
               </h2>
               <span
                 className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${
-                  isCancelled
+                  isTerminated
                     ? "bg-red-500/15 text-red-600 border border-red-500/30"
                     : order.orderStatus === "Delivered"
                     ? "bg-emerald-500/15 text-emerald-600 border border-emerald-500/30"
@@ -221,8 +226,10 @@ export const LiveOrderTracker = ({
           <div className="flex flex-wrap items-center gap-2">
             <a
               href={`https://wa.me/${BUSINESS_CONFIG.PHONE_RAW}?text=${encodeURIComponent(
-                isCancelled
-                  ? `Hi MANOPAVANA, my order #${order.orderRef} was cancelled. Could you please confirm the status?`
+                isReturned
+                  ? `Hi MANOPAVANA, my order #${order.orderRef} was returned by the delivery team. Could you share an update on the refund?`
+                  : isCancelled
+                  ? `Hi MANOPAVANA, my order #${order.orderRef} was cancelled. Could you please confirm the refund status?`
                   : `Hi MANOPAVANA, I want to track my order #${order.orderRef}. Could you provide the latest dispatch update?`
               )}`}
               target="_blank"
@@ -304,7 +311,7 @@ export const LiveOrderTracker = ({
         {/* 3. Expected Delivery Callout */}
         <div
           className={`px-6 py-3.5 flex items-center gap-3 border-b text-xs font-semibold ${
-            isCancelled
+            isTerminated
               ? "bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-900/30 text-red-700 dark:text-red-400"
               : order.orderStatus === "Delivered"
               ? isDark
@@ -315,7 +322,7 @@ export const LiveOrderTracker = ({
               : "bg-[#FFF9EE] border-[#F2E5CC] text-[#7A4B1A]"
           }`}
         >
-          {isCancelled ? (
+          {isTerminated ? (
             <AlertTriangle className="w-4 h-4 shrink-0 text-red-600" />
           ) : (
             <Calendar className="w-4 h-4 shrink-0 text-[#E0B04A]" />
@@ -330,7 +337,7 @@ export const LiveOrderTracker = ({
               Delivery Milestones & Live Status
             </h3>
 
-            {isCancelled ? (
+            {isTerminated ? (
               <div className="p-6 rounded-2xl bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800/40 space-y-4">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-full bg-red-100 dark:bg-red-900/40 flex items-center justify-center text-red-600 shrink-0">
@@ -338,10 +345,12 @@ export const LiveOrderTracker = ({
                   </div>
                   <div>
                     <h4 className="text-base font-bold text-red-700 dark:text-red-300">
-                      Order Cancelled
+                      {isReturned ? "Order Returned by Delivery Team" : "Order Cancelled"}
                     </h4>
                     <p className="text-xs text-stone-600 dark:text-stone-400 mt-0.5">
-                      This order has been cancelled and will not be dispatched.
+                      {isReturned
+                        ? order.refundReason || "Shipment was returned to facility (damaged in transit / undeliverable)."
+                        : "This order has been cancelled and will not be dispatched."}
                     </p>
                   </div>
                 </div>
@@ -349,19 +358,46 @@ export const LiveOrderTracker = ({
                 <div className="pt-3 border-t border-red-200 dark:border-red-900/30 text-xs text-stone-600 dark:text-stone-400 leading-relaxed">
                   {isCod ? (
                     <p>
-                      <strong>Cash on Delivery (COD) Status:</strong> Cash collection has been completely voided. No payment is required.
+                      <strong>Cash on Delivery (COD) Status:</strong> Cash collection has been voided. No payment is required.
                     </p>
                   ) : (
                     <div className="space-y-1.5 bg-white dark:bg-[#14291D] p-3.5 rounded-xl border border-red-200 dark:border-red-900/40">
                       <div className="flex justify-between items-center font-bold">
                         <span className="text-stone-900 dark:text-[#FAF3E0]">Online Refund Status:</span>
-                        <span className="text-emerald-600 dark:text-emerald-400">
-                          {order.paymentStatus === "REFUND_INITIATED" ? "Refund Initiated" : "Processing Refund"}
+                        <span
+                          className={
+                            order.paymentStatus === "REFUNDED"
+                              ? "text-emerald-600 dark:text-emerald-400"
+                              : order.paymentStatus === "REFUND_INITIATED"
+                              ? "text-amber-600 dark:text-amber-400"
+                              : "text-stone-600 dark:text-stone-300"
+                          }
+                        >
+                          {order.paymentStatus === "REFUNDED"
+                            ? "Refund Completed"
+                            : order.paymentStatus === "REFUND_INITIATED"
+                            ? "Refund Initiated"
+                            : order.paymentStatus === "REFUND_PENDING_MANUAL"
+                            ? "Refund Queued (Support Processing)"
+                            : "Processing Refund"}
                         </span>
                       </div>
                       <p className="text-stone-600 dark:text-stone-400">
-                        A full refund of <strong>₹{order.total}</strong> has been reversed via PhonePe to your original payment mode (UPI / Bank Account).
+                        {order.paymentStatus === "REFUNDED" || order.paymentStatus === "REFUND_INITIATED" ? (
+                          <>
+                            A refund of <strong>₹{order.refundAmount || order.total}</strong> has been processed via PhonePe to your original payment source (UPI / Bank Account).
+                          </>
+                        ) : (
+                          <>
+                            Your order is eligible for a PhonePe refund of <strong>₹{order.refundAmount || order.total}</strong>. Our team is finalizing the reversal to your original payment source.
+                          </>
+                        )}
                       </p>
+                      {(order.phonepeRefundId || order.refundMerchantId) && (
+                        <p className="text-[11px] font-mono text-stone-500">
+                          Refund Reference: {order.phonepeRefundId || order.refundMerchantId}
+                        </p>
+                      )}
                       <p className="text-[11px] text-stone-500">
                         Timeline: Typically credits within <strong>2 to 24 hours for UPI</strong>, or <strong>3 to 5 business days</strong> for cards/net banking.
                       </p>
@@ -695,15 +731,23 @@ export const LiveOrderTracker = ({
                 <div className="pt-1">
                   <span
                     className={`inline-block text-[11px] font-bold px-2 py-0.5 rounded ${
-                      isCancelled
-                        ? "bg-red-500/15 text-red-600"
+                      isTerminated
+                        ? order.paymentStatus === "REFUNDED"
+                          ? "bg-emerald-500/15 text-emerald-600"
+                          : "bg-red-500/15 text-red-600"
                         : isCod
                         ? "bg-amber-500/15 text-amber-600"
                         : "bg-emerald-500/15 text-emerald-600"
                     }`}
                   >
-                    {isCancelled
-                      ? "Order Cancelled"
+                    {isTerminated
+                      ? order.paymentStatus === "REFUNDED"
+                        ? "Refund Completed"
+                        : order.paymentStatus === "REFUND_INITIATED"
+                        ? "Refund Initiated"
+                        : isReturned
+                        ? "Order Returned"
+                        : "Order Cancelled"
                       : isCod
                       ? `Collect ₹${order.total} on Arrival`
                       : "Paid Online via PhonePe"}
@@ -854,7 +898,7 @@ export const LiveOrderTracker = ({
       )}
 
       {/* Printable Tax Invoice Modal */}
-      {!isCancelled && (
+      {!isTerminated && (
         <InvoiceModal
           order={order}
           isOpen={isInvoiceOpen}

@@ -340,6 +340,7 @@ export const AccountPage = () => {
                 <div className="space-y-3">
                   {visibleOrders.map((ord) => {
                     const isCancelled = (ord.orderStatus as string) === "Cancelled";
+                    const isReturned = (ord.orderStatus as string) === "Returned";
                     const isSelected = selectedOrderRef === ord.orderRef || selectedOrderRef === ord.id;
                     return (
                       <div
@@ -360,7 +361,7 @@ export const AccountPage = () => {
                             </span>
                             <span
                               className={`text-[10px] px-2 py-0.5 rounded border font-semibold ${
-                                isCancelled
+                                isCancelled || isReturned
                                   ? "bg-red-500/10 text-red-600 border-red-500/30"
                                   : isDark
                                   ? "bg-[#14291D] border-[#1F3D2B] text-amber-200"
@@ -380,14 +381,28 @@ export const AccountPage = () => {
                           </span>
                           <span
                             className={`text-[10px] font-bold ${
-                              isCancelled
+                              ord.paymentStatus === "REFUNDED"
+                                ? "text-emerald-500"
+                                : ord.paymentStatus === "REFUND_INITIATED" || ord.paymentStatus === "REFUND_PENDING_MANUAL"
+                                ? "text-amber-500"
+                                : isCancelled || isReturned
                                 ? "text-red-500 font-semibold"
                                 : ord.paymentStatus === "FAILED"
                                 ? "text-red-600 font-semibold"
                                 : "text-emerald-500"
                             }`}
                           >
-                            {isCancelled ? "CANCELLED" : ord.paymentStatus || "COMPLETED"}
+                            {ord.paymentStatus === "REFUNDED"
+                              ? "REFUNDED"
+                              : ord.paymentStatus === "REFUND_INITIATED"
+                              ? "REFUND INITIATED"
+                              : ord.paymentStatus === "REFUND_PENDING_MANUAL"
+                              ? "REFUND PROCESSING"
+                              : isReturned
+                              ? "RETURNED"
+                              : isCancelled
+                              ? "CANCELLED"
+                              : ord.paymentStatus || "COMPLETED"}
                           </span>
                         </div>
                       </div>

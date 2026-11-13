@@ -158,6 +158,7 @@ export type OrderStatus =
   | "Packed"
   | "Dispatched"
   | "Delivered"
+  | "Returned"
   | "Failed (Expired)"
   | "Cancelled";
 
@@ -186,6 +187,11 @@ export interface Order {
   courier?: string;
   transactionId?: string;
   phonepeTransactionId?: string;
+  refundMerchantId?: string;
+  phonepeRefundId?: string;
+  refundAmount?: number;
+  refundReason?: string;
+  refundedAt?: number;
   notes?: string;
   customerUid?: string | null;
   customerPhone?: string | null;

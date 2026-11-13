@@ -81,10 +81,14 @@ export const OrdersPage = () => {
       // Status filter
       if (statusFilter !== "all") {
         if (statusFilter === "Delivered" && ord.orderStatus !== "Delivered") return false;
+        if (statusFilter === "Returned" && ord.orderStatus !== "Returned") return false;
         if (statusFilter === "Cancelled" && ord.orderStatus !== "Cancelled") return false;
         if (
           statusFilter === "In Transit" &&
-          (ord.orderStatus === "Delivered" || ord.orderStatus === "Cancelled")
+          (ord.orderStatus === "Delivered" ||
+            ord.orderStatus === "Cancelled" ||
+            ord.orderStatus === "Returned" ||
+            ord.orderStatus === "Failed (Expired)")
         )
           return false;
       }
@@ -156,11 +160,14 @@ export const OrdersPage = () => {
       Boolean(activeOrder.trackingNumber);
 
     const canCancel = activeOrder.orderStatus === "Placed" && !activeOrder.trackingNumber;
+    const isCodOrder = activeOrder.paymentMethod === "cod" || activeOrder.paymentMode === "COD";
+    const isReturnedOrder = activeOrder.orderStatus === "Returned";
+    const isCancelledOrReturned = activeOrder.orderStatus === "Cancelled" || isReturnedOrder;
 
     const getStepStatus = (stepIndex: number) => {
       // 1: Confirmed, 2: Packed/Picked Up, 3: Shipped, 4: Out for Delivery, 5: Delivered
       const status = activeOrder.orderStatus;
-      if (status === "Cancelled") return "cancelled";
+      if (status === "Cancelled" || status === "Returned") return "cancelled";
       if (status === "Delivered") return "completed";
       if (status === "Dispatched") {
         return stepIndex <= 3 ? "completed" : stepIndex === 4 ? "current" : "upcoming";
@@ -246,7 +253,9 @@ export const OrdersPage = () => {
                     className={`w-2.5 h-2.5 rounded-full ${
                       activeOrder.orderStatus === "Delivered"
                         ? "bg-emerald-500"
-                        : activeOrder.orderStatus === "Cancelled" || activeOrder.orderStatus === "Failed (Expired)"
+                        : activeOrder.orderStatus === "Cancelled" ||
+                          activeOrder.orderStatus === "Returned" ||
+                          activeOrder.orderStatus === "Failed (Expired)"
                         ? "bg-red-500"
                         : activeOrder.orderStatus === "Payment Incomplete"
                         ? "bg-amber-500 animate-pulse"
@@ -256,6 +265,8 @@ export const OrdersPage = () => {
                   <h2 className="text-base font-bold font-serif">
                     {activeOrder.orderStatus === "Delivered"
                       ? "Delivered to Doorstep"
+                      : activeOrder.orderStatus === "Returned"
+                      ? "Order Returned by Delivery Team"
                       : activeOrder.orderStatus === "Cancelled"
                       ? "Order Cancelled"
                       : activeOrder.orderStatus === "Payment Incomplete"
@@ -374,7 +385,7 @@ export const OrdersPage = () => {
                   Re-order These Items
                 </button>
               </div>
-            ) : activeOrder.orderStatus !== "Cancelled" ? (
+            ) : !isCancelledOrReturned ? (
               <div className="relative pl-6 sm:pl-8 space-y-6 before:absolute before:left-3 sm:before:left-4 before:top-2 before:bottom-2 before:w-0.5 before:bg-stone-200 dark:before:bg-stone-800">
                 {/* Step 1: Placed */}
                 <div className="relative flex items-start gap-4">
@@ -463,12 +474,54 @@ export const OrdersPage = () => {
                 </div>
               </div>
             ) : (
-              <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/30 flex items-center gap-3 text-red-600 text-xs">
-                <XCircle className="w-5 h-5 shrink-0" />
-                <span>
-                  This order was cancelled. If paid online, a full refund has been initiated to your
-                  source account.
-                </span>
+              <div className="p-4 sm:p-5 rounded-xl bg-red-500/10 border border-red-500/30 space-y-3 text-xs">
+                <div className="flex items-start gap-3 text-red-600 dark:text-red-400">
+                  <XCircle className="w-5 h-5 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-bold text-sm">
+                      {isReturnedOrder ? "Order Returned by Delivery Team" : "Order Cancelled"}
+                    </p>
+                    <p className="text-stone-600 dark:text-stone-300 mt-0.5">
+                      {isReturnedOrder
+                        ? activeOrder.refundReason || "Shipment was returned to our facility (damaged in transit / undeliverable)."
+                        : "This order was cancelled before packing."}
+                    </p>
+                  </div>
+                </div>
+                {!isCodOrder ? (
+                  <div className="p-3 rounded-lg bg-white/80 dark:bg-stone-900/60 border border-red-500/20 space-y-1">
+                    <div className="flex items-center justify-between font-bold">
+                      <span className="text-stone-700 dark:text-stone-200">Online Refund Status:</span>
+                      <span
+                        className={
+                          activeOrder.paymentStatus === "REFUNDED"
+                            ? "text-emerald-600 dark:text-emerald-400"
+                            : "text-amber-600 dark:text-amber-400"
+                        }
+                      >
+                        {activeOrder.paymentStatus === "REFUNDED"
+                          ? "Refund Completed"
+                          : activeOrder.paymentStatus === "REFUND_INITIATED"
+                          ? "Refund Initiated"
+                          : activeOrder.paymentStatus === "REFUND_PENDING_MANUAL"
+                          ? "Refund Processing (Support Team)"
+                          : "Refund Pending"}
+                      </span>
+                    </div>
+                    <p className="text-stone-600 dark:text-stone-400">
+                      Amount: <strong>₹{activeOrder.refundAmount || activeOrder.total}</strong> • Reversed via PhonePe to original UPI / Bank Account (2–24 hrs UPI, 3–5 days cards).
+                    </p>
+                    {(activeOrder.phonepeRefundId || activeOrder.refundMerchantId) && (
+                      <p className="font-mono text-[11px] text-stone-500">
+                        Refund Ref: {activeOrder.phonepeRefundId || activeOrder.refundMerchantId}
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-stone-600 dark:text-stone-400">
+                    Cash on Delivery (COD) collection has been voided.
+                  </p>
+                )}
               </div>
             )}
           </div>
@@ -611,6 +664,10 @@ export const OrdersPage = () => {
                   <p className="text-[11px] text-stone-500 text-center">
                     {activeOrder.orderStatus === "Cancelled"
                       ? "Order cancelled."
+                      : activeOrder.orderStatus === "Returned"
+                      ? "Order returned to facility by delivery team."
+                      : activeOrder.orderStatus === "Delivered"
+                      ? "Order delivered. Need help with transit damage? Chat on WhatsApp."
                       : "Order is packed/handed over to Delhivery logistics. Cancellation is closed."}
                   </p>
                 )}
@@ -668,9 +725,9 @@ export const OrdersPage = () => {
           </div>
         </div>
 
-        {/* Status Filters (All, On the way, Delivered, Cancelled) */}
+        {/* Status Filters (All, On the way, Delivered, Returned, Cancelled) */}
         <div className="flex flex-wrap gap-2">
-          {["all", "In Transit", "Delivered", "Cancelled"].map((st) => (
+          {["all", "In Transit", "Delivered", "Returned", "Cancelled"].map((st) => (
             <button
               key={st}
               type="button"
@@ -713,6 +770,7 @@ export const OrdersPage = () => {
               const primaryItem = ord.items[0];
               const remainingCount = ord.items.length - 1;
               const isDelivered = ord.orderStatus === "Delivered";
+              const isReturned = ord.orderStatus === "Returned";
               const isCancelled = ord.orderStatus === "Cancelled";
               const isIncomplete = ord.orderStatus === "Payment Incomplete";
               const isExpired = ord.orderStatus === "Failed (Expired)";
@@ -780,7 +838,7 @@ export const OrdersPage = () => {
                           className={`w-2 h-2 rounded-full ${
                             isDelivered
                               ? "bg-emerald-500"
-                              : isCancelled || isExpired
+                              : isCancelled || isReturned || isExpired
                               ? "bg-red-500"
                               : isIncomplete
                               ? "bg-amber-500 animate-pulse"
@@ -791,7 +849,7 @@ export const OrdersPage = () => {
                           className={`text-xs font-bold ${
                             isDelivered
                               ? "text-emerald-700 dark:text-emerald-400"
-                              : isCancelled || isExpired
+                              : isCancelled || isReturned || isExpired
                               ? "text-red-600"
                               : isIncomplete
                               ? "text-amber-700 dark:text-amber-400"
@@ -800,6 +858,8 @@ export const OrdersPage = () => {
                         >
                           {isDelivered
                             ? "Delivered"
+                            : isReturned
+                            ? "Returned"
                             : isCancelled
                             ? "Cancelled"
                             : isIncomplete
@@ -816,8 +876,16 @@ export const OrdersPage = () => {
                       <p className="text-[10px] text-stone-400 mt-0.5">
                         {isDelivered
                           ? "Delivered to your address"
-                          : isCancelled
-                          ? "Refund processed"
+                          : isCancelled || isReturned
+                          ? ord.paymentStatus === "REFUNDED"
+                            ? `Refunded ₹${ord.refundAmount || ord.total}`
+                            : ord.paymentStatus === "REFUND_INITIATED"
+                            ? `Refund initiated (₹${ord.refundAmount || ord.total})`
+                            : ord.paymentMethod === "cod" || ord.paymentMode === "COD"
+                            ? isReturned
+                              ? "Returned to facility"
+                              : "COD order cancelled"
+                            : "Refund processing"
                           : isIncomplete
                           ? "Payment incomplete • Tap to retry or switch to COD"
                           : isExpired
