@@ -235,7 +235,11 @@ export default defineConfig(() => {
                   tokenExpiresAt = 0;
                   throw new Error("PhonePe Auth returned an empty access_token.");
                 }
-                cachedTokenType = String(d.token_type || "O-Bearer").trim() || "O-Bearer";
+                const rawTokenType = String(d.token_type || "O-Bearer").trim();
+                cachedTokenType =
+                  !rawTokenType || rawTokenType.toLowerCase() === "bearer"
+                    ? "O-Bearer"
+                    : rawTokenType;
                 const rawExpiresAt = Number(d.expires_at || d.session_expires_at || 0);
                 if (Number.isFinite(rawExpiresAt) && rawExpiresAt > 0) {
                   tokenExpiresAt = rawExpiresAt < 1e12 ? rawExpiresAt * 1000 : rawExpiresAt;

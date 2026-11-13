@@ -62,7 +62,11 @@ async function getOAuthToken(env, forceRefresh = false) {
     throw new Error("PhonePe Auth returned an empty access_token.");
   }
 
-  cachedTokenType = String(data.token_type || "O-Bearer").trim() || "O-Bearer";
+  const rawTokenType = String(data.token_type || "O-Bearer").trim();
+  cachedTokenType =
+    !rawTokenType || rawTokenType.toLowerCase() === "bearer"
+      ? "O-Bearer"
+      : rawTokenType;
   const rawExpiresAt = Number(data.expires_at || data.session_expires_at || 0);
   if (Number.isFinite(rawExpiresAt) && rawExpiresAt > 0) {
     tokenExpiresAt = rawExpiresAt < 1e12 ? rawExpiresAt * 1000 : rawExpiresAt;
@@ -574,14 +578,20 @@ export async function onRequest(context) {
         amount: amountInPaise,
       };
 
-      const executeRefundRequest = async (authToken) => {
+      const configuredMerchantId = String(env.PHONEPE_MERCHANT_ID || "").trim();
+
+      const executeRefundRequest = async (authToken, includeMerchantHeader = Boolean(configuredMerchantId)) => {
+        const headers = {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+          Authorization: buildPhonePeAuthHeader(authToken),
+        };
+        if (includeMerchantHeader && configuredMerchantId) {
+          headers["X-MERCHANT-ID"] = configuredMerchantId;
+        }
         const resp = await fetch(REFUND_URL, {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Accept: "application/json",
-            Authorization: buildPhonePeAuthHeader(authToken),
-          },
+          headers,
           body: JSON.stringify(refundPayload),
         });
         let parsed = {};
@@ -593,16 +603,23 @@ export async function onRequest(context) {
         return { resp, parsed };
       };
 
-      let { resp: refundResp, parsed: refundData } = await executeRefundRequest(token);
+      let { resp: refundResp, parsed: refundData } = await executeRefundRequest(token, Boolean(configuredMerchantId));
 
-      // Retry once with a brand-new OAuth token if PhonePe returns 401 Authorization failed
+      // Retry once with a brand-new OAuth token (and if X-MERCHANT-ID was sent, also try toggling it) if PhonePe returns 401
       if (
         refundResp.status === 401 ||
         String(refundData.message || "").toLowerCase().includes("authorization failed")
       ) {
         try {
           token = await getOAuthToken(env, true);
-          ({ resp: refundResp, parsed: refundData } = await executeRefundRequest(token));
+          ({ resp: refundResp, parsed: refundData } = await executeRefundRequest(token, false));
+          if (
+            configuredMerchantId &&
+            (refundResp.status === 401 ||
+              String(refundData.message || "").toLowerCase().includes("authorization failed"))
+          ) {
+            ({ resp: refundResp, parsed: refundData } = await executeRefundRequest(token, true));
+          }
         } catch (retryErr) {
           console.warn("PhonePe refund token retry failed:", retryErr);
         }
@@ -647,7 +664,7 @@ export async function onRequest(context) {
         } catch {}
 
         if (orderCheckOk) {
-          friendlyMessage = `${friendlyMessage}. Your PhonePe OAuth token is valid for order lookup, which means PhonePe rejected refund authorization on this Client ID at ${REFUND_URL}. Please check PhonePe Business Dashboard → Developer Settings to enable Refund API permission for your V2 Client ID (and ensure Cloudflare has no wrong PHONEPE_REFUND_URL override).`;
+          friendlyMessage = `${friendlyMessage}. Your PhonePe OAuth token works for order lookup, but PhonePe rejected API refunds on this Client ID at ${REFUND_URL}. PhonePe Business App manual refunds use your owner login, whereas automatic website refunds require PhonePe Merchant Support to enable the PG V2 Refund API scope on your Client ID.`;
         } else {
           friendlyMessage = `${friendlyMessage}. Please verify PHONEPE_CLIENT_ID, PHONEPE_CLIENT_SECRET, PHONEPE_CLIENT_VERSION, and PHONEPE_AUTH_URL in Cloudflare Pages environment variables.`;
         }
@@ -662,6 +679,8 @@ export async function onRequest(context) {
           state: refundState || (isSuccess ? "PENDING" : "FAILED"),
           message: friendlyMessage,
           endpointUsed: REFUND_URL,
+          authScheme: cachedTokenType,
+          hasMerchantIdEnv: Boolean(configuredMerchantId),
           orderRef,
           data: refundData,
         },
@@ -696,25 +715,31 @@ export async function onRequest(context) {
       }
 
       const statusEndpoint = `${REFUND_URL}/${encodeURIComponent(merchantRefundId)}/status`;
+      const configuredMerchantId = String(env.PHONEPE_MERCHANT_ID || "").trim();
+      const statusHeaders = {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+        Authorization: buildPhonePeAuthHeader(token),
+      };
+      if (configuredMerchantId) {
+        statusHeaders["X-MERCHANT-ID"] = configuredMerchantId;
+      }
       let statusResp = await fetch(statusEndpoint, {
         method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-          Accept: "application/json",
-          Authorization: buildPhonePeAuthHeader(token),
-        },
+        headers: statusHeaders,
       });
 
       if (statusResp.status === 401) {
         try {
           token = await getOAuthToken(env, true);
+          const retryHeaders = {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+            Authorization: buildPhonePeAuthHeader(token),
+          };
           statusResp = await fetch(statusEndpoint, {
             method: "GET",
-            headers: {
-              "Content-Type": "application/json",
-              Accept: "application/json",
-              Authorization: buildPhonePeAuthHeader(token),
-            },
+            headers: retryHeaders,
           });
         } catch {}
       }
