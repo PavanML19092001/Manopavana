@@ -75,7 +75,7 @@ export const PaymentFailedModal: React.FC = () => {
               <h2 id="failed-modal-title" className="text-base font-bold font-serif text-red-300">
                 Online Payment Incomplete
               </h2>
-              <p className="text-[11px] text-[#3F4F45]">
+              <p className="text-[11px] text-[#D8CFC0]">
                 Order Ref: <span className="font-mono font-bold text-[#F3D17A]">{paymentFailedOrder.orderRef}</span>
               </p>
             </div>
@@ -83,7 +83,7 @@ export const PaymentFailedModal: React.FC = () => {
           <button
             onClick={() => setPaymentFailedOrder(null)}
             aria-label="Close modal"
-            className="p-1.5 text-[#3F4F45] hover:text-[#FAF3E0] hover:bg-[#2C1D14] rounded-full transition-colors cursor-pointer"
+            className="p-1.5 text-[#D8CFC0] hover:text-[#FAF3E0] hover:bg-[#2C1D14] rounded-full transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
@@ -111,7 +111,7 @@ export const PaymentFailedModal: React.FC = () => {
                 <p className="font-bold text-xs text-red-300">
                   ❌ Payment window expired (10 mins passed). Order marked as Failed.
                 </p>
-                <p className="text-[11px] text-[#3F4F45] mt-0.5">
+                <p className="text-[11px] text-[#D8CFC0] mt-0.5">
                   Reserved inventory has been released. Please re-add items to your bag.
                 </p>
               </div>
@@ -126,7 +126,7 @@ export const PaymentFailedModal: React.FC = () => {
             </div>
             <div className="space-y-1.5 max-h-36 overflow-y-auto pr-1">
               {paymentFailedOrder.items.map((i) => (
-                <div key={i.id} className="flex items-center justify-between text-[11px] text-[#3F4F45]">
+                <div key={i.id} className="flex items-center justify-between text-[11px] text-[#FAF3E0]">
                   <span className="truncate max-w-[220px]">
                     {i.title} ({i.variant}) x {i.quantity}
                   </span>
@@ -136,7 +136,7 @@ export const PaymentFailedModal: React.FC = () => {
             </div>
           </div>
 
-          <p className="text-[11px] text-[#3F4F45] leading-relaxed">
+          <p className="text-xs text-[#E8DFCE] leading-relaxed">
             The online payment transaction was cancelled or not confirmed by your bank. You can instantly retry with a fresh online payment session, or switch this order directly to Cash on Delivery.
           </p>
 
@@ -181,7 +181,7 @@ export const PaymentFailedModal: React.FC = () => {
             <button
               type="button"
               onClick={() => setPaymentFailedOrder(null)}
-              className="text-xs text-[#3F4F45] hover:text-[#FAF3E0] text-center pt-1 cursor-pointer transition-colors"
+              className="text-xs font-medium text-[#D8CFC0] hover:text-[#FAF3E0] text-center pt-1.5 cursor-pointer transition-colors"
             >
               Dismiss
             </button>
