@@ -625,6 +625,7 @@ export const AdminPage: React.FC = () => {
           orderRef: order.orderRef,
           customerName: addr.fullName?.trim() || "Customer",
           phone: (addr.phone || "").replace(/\D/g, "").slice(-10),
+          alternatePhone: ((addr as any).alternatePhone || (addr as any).altPhone || "").replace(/\D/g, "").slice(-10),
           address: fullStreetAddress,
           pincode: (addr.pincode || "560058").replace(/\D/g, "").slice(0, 6),
           city: addr.city || addr.district || "Bengaluru",

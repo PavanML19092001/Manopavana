@@ -1433,6 +1433,7 @@ export async function onRequest(context) {
         ekartUsername,
         ekartPassword,
         ekartToken,
+        alternatePhone,
         lat,
         lng,
         mapsUrl,
@@ -1476,7 +1477,17 @@ export async function onRequest(context) {
         );
       }
 
-      const cleanPhone = String(phone).replace(/\D/g, "").slice(-10);
+      const rawDigits = String(phone).replace(/\D/g, "").slice(-10);
+      const cleanPhone = rawDigits.length === 10 && !rawDigits.startsWith("0")
+        ? rawDigits
+        : "9999999999";
+      const rawAltDigits = String(alternatePhone || "").replace(/\D/g, "").slice(-10);
+      const cleanAltPhone =
+        rawAltDigits.length === 10 && !rawAltDigits.startsWith("0") && rawAltDigits !== cleanPhone
+          ? rawAltDigits
+          : cleanPhone !== "6361509415"
+          ? "6361509415"
+          : "9999999999";
       const cleanPin = parseInt(String(pincode).replace(/\D/g, "").slice(0, 6), 10);
       const isCod = String(paymentMode || "").toUpperCase() === "COD";
       const totalNum = Math.max(1, Math.round(Number(totalAmount) || 1));
@@ -1525,7 +1536,7 @@ export async function onRequest(context) {
         document_number: `DOC-${orderRef}`,
         document_date: todayIso,
         consignee_name: String(customerName || "Customer"),
-        consignee_alternate_phone: cleanPhone.padStart(10, "0"),
+        consignee_alternate_phone: cleanAltPhone,
         payment_mode: isCod ? "COD" : "Prepaid",
         category_of_goods: "Edible Cooking Oils",
         products_desc: String(
@@ -1554,7 +1565,7 @@ export async function onRequest(context) {
         },
         pickup_location: {
           name: "Manopavana_B2C",
-          phone: 9180301917,
+          phone: 8970831829,
           address:
             "118, Raghavendra Layout, Thigalarapalya main road, Peenya 2nd stage",
           city: "Bengaluru",
@@ -1564,7 +1575,7 @@ export async function onRequest(context) {
         },
         return_location: {
           name: "Manopavana_B2C",
-          phone: 9180301917,
+          phone: 8970831829,
           address:
             "118, Raghavendra Layout, Thigalarapalya main road, Peenya 2nd stage",
           city: "Bengaluru",
