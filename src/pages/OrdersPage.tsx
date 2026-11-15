@@ -46,6 +46,8 @@ export const OrdersPage = () => {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [isInvoiceOpen, setIsInvoiceOpen] = useState(false);
   const [selectedOrderForInvoice, setSelectedOrderForInvoice] = useState<Order | null>(null);
+  const [confirmCancelRef, setConfirmCancelRef] = useState<string | null>(null);
+  const [cancellingRef, setCancellingRef] = useState<string | null>(null);
 
   // Filter orders strictly belonging to this authenticated user
   const userOrders = useMemo(() => {
@@ -153,13 +155,12 @@ export const OrdersPage = () => {
   // --------------------------------------------------------------------------
   if (activeOrder) {
     const addr = (activeOrder.shippingAddress || {}) as any;
-    const isPackedOrPickedUp =
-      activeOrder.orderStatus === "Packed" ||
+    const isPickedUpOrDelivered =
       activeOrder.orderStatus === "Dispatched" ||
-      activeOrder.orderStatus === "Delivered" ||
-      Boolean(activeOrder.trackingNumber);
+      activeOrder.orderStatus === "Delivered";
 
-    const canCancel = activeOrder.orderStatus === "Placed" && !activeOrder.trackingNumber;
+    const canCancel =
+      activeOrder.orderStatus === "Placed" || activeOrder.orderStatus === "Packed";
     const isCodOrder = activeOrder.paymentMethod === "cod" || activeOrder.paymentMode === "COD";
     const isReturnedOrder = activeOrder.orderStatus === "Returned";
     const isCancelledOrReturned = activeOrder.orderStatus === "Cancelled" || isReturnedOrder;
@@ -274,9 +275,9 @@ export const OrdersPage = () => {
                       : activeOrder.orderStatus === "Failed (Expired)"
                       ? "Payment Window Expired"
                       : activeOrder.orderStatus === "Dispatched"
-                      ? "Dispatched with Delhivery Carrier"
+                      ? `Picked Up • In Transit via ${activeOrder.courier || "Delivery Partner"}`
                       : activeOrder.orderStatus === "Packed"
-                      ? "Packed & Ready at Facility"
+                      ? "Packed & Awaiting Pickup"
                       : "Order Confirmed & Placed"}
                   </h2>
                 </div>
@@ -449,11 +450,15 @@ export const OrdersPage = () => {
                   </div>
                   <div>
                     <p className="text-xs font-bold text-stone-900 dark:text-stone-100">
-                      Packed & Picked Up by Delhivery
+                      {isPickedUpOrDelivered
+                        ? `Packed & Picked Up by ${activeOrder.courier || "Carrier"}`
+                        : "Packed at Facility (Awaiting Pickup)"}
                     </p>
                     <p className="text-[11px] text-stone-500">
-                      {isPackedOrPickedUp
-                        ? `Handed over to carrier • Peenya 2nd Stage Hub`
+                      {isPickedUpOrDelivered
+                        ? "Handed over to delivery partner • Peenya 2nd Stage Hub"
+                        : activeOrder.orderStatus === "Packed"
+                        ? "Shipment manifested & ready for rider pickup (Cancellation open until pickup)"
                         : "Cold-pressing fresh batch & bubble pack packaging"}
                     </p>
                   </div>
@@ -674,20 +679,55 @@ export const OrdersPage = () => {
                 </div>
               </div>
 
-              {/* Cancel Button (Strictly removed once picked up / packed) */}
+              {/* Cancel Button (Available until courier actually picks up the parcel) */}
               <div className="pt-3 border-t border-stone-200 dark:border-stone-800">
                 {canCancel ? (
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      if (window.confirm(`Are you sure you want to cancel Order #${activeOrder.orderRef}?`)) {
-                        await cancelOrderWithinWindow(activeOrder.orderRef);
-                      }
-                    }}
-                    className="w-full py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-bold transition-colors cursor-pointer"
-                  >
-                    Cancel Order
-                  </button>
+                  confirmCancelRef === activeOrder.orderRef ? (
+                    <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 space-y-2.5">
+                      <p className="text-xs font-semibold text-red-600 dark:text-red-300 text-center">
+                        Cancel Order #{activeOrder.orderRef}?{" "}
+                        {!isCodOrder
+                          ? "Online payment will be auto-refunded."
+                          : "Shipment will be cancelled immediately."}
+                      </p>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          disabled={cancellingRef === activeOrder.orderRef}
+                          onClick={async () => {
+                            setCancellingRef(activeOrder.orderRef);
+                            try {
+                              await cancelOrderWithinWindow(activeOrder.orderRef);
+                            } finally {
+                              setCancellingRef(null);
+                              setConfirmCancelRef(null);
+                            }
+                          }}
+                          className="flex-1 py-2 rounded-lg bg-red-600 hover:bg-red-700 disabled:opacity-60 text-white text-xs font-bold transition-colors cursor-pointer"
+                        >
+                          {cancellingRef === activeOrder.orderRef
+                            ? "Cancelling..."
+                            : "Yes, Cancel Order"}
+                        </button>
+                        <button
+                          type="button"
+                          disabled={cancellingRef === activeOrder.orderRef}
+                          onClick={() => setConfirmCancelRef(null)}
+                          className="px-3 py-2 rounded-lg border border-stone-300 dark:border-stone-700 text-xs font-bold hover:bg-stone-100 dark:hover:bg-stone-800 transition-colors cursor-pointer"
+                        >
+                          Keep
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setConfirmCancelRef(activeOrder.orderRef)}
+                      className="w-full py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-bold transition-colors cursor-pointer"
+                    >
+                      Cancel Order
+                    </button>
+                  )
                 ) : (
                   <p className="text-[11px] text-stone-500 text-center">
                     {activeOrder.orderStatus === "Cancelled"
@@ -696,7 +736,10 @@ export const OrdersPage = () => {
                       ? "Order returned to facility by delivery team."
                       : activeOrder.orderStatus === "Delivered"
                       ? "Order delivered. Need help with transit damage? Chat on WhatsApp."
-                      : "Order is packed/handed over to Delhivery logistics. Cancellation is closed."}
+                      : activeOrder.orderStatus === "Payment Incomplete" ||
+                        activeOrder.orderStatus === "Failed (Expired)"
+                      ? "Payment did not complete for this order."
+                      : "Order has been picked up by the delivery partner and is in transit. Cancellation is closed."}
                   </p>
                 )}
               </div>
@@ -894,43 +937,91 @@ export const OrdersPage = () => {
                             ? "Payment Incomplete"
                             : isExpired
                             ? "Payment Expired"
-                            : ord.orderStatus === "Dispatched"
-                            ? "In Transit"
-                            : ord.orderStatus === "Packed"
-                            ? "Packed & Picked up"
-                            : "Order Placed"}
-                        </span>
+                              : ord.orderStatus === "Dispatched"
+                              ? "In Transit"
+                              : ord.orderStatus === "Packed"
+                              ? "Packed • Awaiting Pickup"
+                              : "Order Placed"}
+                          </span>
+                        </div>
+                        <p className="text-[10px] text-stone-400 mt-0.5">
+                          {isDelivered
+                            ? "Delivered to your address"
+                            : isCancelled || isReturned
+                            ? ord.paymentStatus === "REFUNDED"
+                              ? `Refunded ₹${ord.refundAmount || ord.total}`
+                              : ord.paymentStatus === "REFUND_INITIATED"
+                              ? `Refund initiated (₹${ord.refundAmount || ord.total})`
+                              : ord.paymentMethod === "cod" || ord.paymentMode === "COD"
+                              ? isReturned
+                                ? "Returned to facility"
+                                : "COD order cancelled"
+                              : "Refund processing"
+                            : isIncomplete
+                            ? "Payment incomplete • Tap to retry or switch to COD"
+                            : isExpired
+                            ? "Payment window expired after 10 mins"
+                            : ord.trackingNumber
+                            ? ord.courier?.toLowerCase().includes("shadowfax") ||
+                              ord.trackingNumber.startsWith("SF")
+                              ? `Shadowfax 360 AWB #${ord.trackingNumber}`
+                              : ord.courier?.toLowerCase().includes("ekart") ||
+                                ord.trackingNumber.startsWith("FMP")
+                              ? `Ekart Logistics AWB #${ord.trackingNumber}`
+                              : `Delhivery AWB #${ord.trackingNumber}`
+                            : "Preparing your shipment"}
+                        </p>
                       </div>
-                      <p className="text-[10px] text-stone-400 mt-0.5">
-                        {isDelivered
-                          ? "Delivered to your address"
-                          : isCancelled || isReturned
-                          ? ord.paymentStatus === "REFUNDED"
-                            ? `Refunded ₹${ord.refundAmount || ord.total}`
-                            : ord.paymentStatus === "REFUND_INITIATED"
-                            ? `Refund initiated (₹${ord.refundAmount || ord.total})`
-                            : ord.paymentMethod === "cod" || ord.paymentMode === "COD"
-                            ? isReturned
-                              ? "Returned to facility"
-                              : "COD order cancelled"
-                            : "Refund processing"
-                          : isIncomplete
-                          ? "Payment incomplete • Tap to retry or switch to COD"
-                          : isExpired
-                          ? "Payment window expired after 10 mins"
-                          : ord.trackingNumber
-                          ? ord.courier?.toLowerCase().includes("shadowfax") ||
-                            ord.trackingNumber.startsWith("SF")
-                            ? `Shadowfax 360 AWB #${ord.trackingNumber}`
-                            : ord.courier?.toLowerCase().includes("ekart") ||
-                              ord.trackingNumber.startsWith("FMP")
-                            ? `Ekart Logistics AWB #${ord.trackingNumber}`
-                            : `Delhivery AWB #${ord.trackingNumber}`
-                          : "Preparing your shipment"}
-                      </p>
+                      {(ord.orderStatus === "Placed" || ord.orderStatus === "Packed") && (
+                        confirmCancelRef === ord.orderRef ? (
+                          <div
+                            onClick={(e) => e.stopPropagation()}
+                            className="flex items-center gap-1.5"
+                          >
+                            <button
+                              type="button"
+                              disabled={cancellingRef === ord.orderRef}
+                              onClick={async (e) => {
+                                e.stopPropagation();
+                                setCancellingRef(ord.orderRef);
+                                try {
+                                  await cancelOrderWithinWindow(ord.orderRef);
+                                } finally {
+                                  setCancellingRef(null);
+                                  setConfirmCancelRef(null);
+                                }
+                              }}
+                              className="px-2.5 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 disabled:opacity-60 text-white text-[11px] font-bold transition-colors cursor-pointer"
+                            >
+                              {cancellingRef === ord.orderRef ? "Cancelling..." : "Confirm Cancel"}
+                            </button>
+                            <button
+                              type="button"
+                              disabled={cancellingRef === ord.orderRef}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setConfirmCancelRef(null);
+                              }}
+                              className="px-2 py-1.5 rounded-lg border border-stone-300 dark:border-stone-700 text-[11px] font-bold hover:bg-stone-100 dark:hover:bg-stone-800 transition-colors cursor-pointer"
+                            >
+                              Keep
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setConfirmCancelRef(ord.orderRef);
+                            }}
+                            className="px-2.5 py-1.5 rounded-lg border border-red-500/40 bg-red-500/10 hover:bg-red-600 text-red-600 dark:text-red-300 hover:text-white text-[11px] font-bold transition-colors cursor-pointer"
+                          >
+                            Cancel Order
+                          </button>
+                        )
+                      )}
+                      <ChevronRight className="w-4 h-4 text-stone-400" />
                     </div>
-                    <ChevronRight className="w-4 h-4 text-stone-400" />
-                  </div>
                 </div>
               );
             })}

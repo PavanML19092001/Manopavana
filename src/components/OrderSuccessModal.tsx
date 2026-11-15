@@ -35,7 +35,7 @@ export const OrderSuccessModal: React.FC = () => {
               <h2 id="success-modal-title" className="text-base font-bold font-serif text-emerald-300">
                 Payment Confirmed!
               </h2>
-              <p className="text-[11px] text-[#3F4F45]">
+              <p className="text-[11px] text-[#D8CFC0]">
                 Order #{orderSuccessRef} Placed Successfully
               </p>
             </div>
@@ -43,7 +43,7 @@ export const OrderSuccessModal: React.FC = () => {
           <button
             onClick={() => setOrderSuccessRef(null)}
             aria-label="Close modal"
-            className="p-1.5 text-[#3F4F45] hover:text-[#FAF3E0] hover:bg-[#2C1D14] rounded-full transition-colors cursor-pointer"
+            className="p-1.5 text-[#D8CFC0] hover:text-[#FAF3E0] hover:bg-[#2C1D14] rounded-full transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
@@ -60,11 +60,11 @@ export const OrderSuccessModal: React.FC = () => {
             </div>
             {order && (
               <>
-                <div className="flex items-center justify-between text-[#3F4F45]">
+                <div className="flex items-center justify-between text-[#D8CFC0]">
                   <span>Total Amount Paid:</span>
                   <span className="font-extrabold text-[#F3D17A] font-serif text-sm">₹{order.total}</span>
                 </div>
-                <div className="flex items-center justify-between text-[#3F4F45]">
+                <div className="flex items-center justify-between text-[#D8CFC0]">
                   <span>Delivering to:</span>
                   <span className="truncate max-w-[180px] text-[#FAF3E0]">{order.shippingAddress.addressLine1}</span>
                 </div>
@@ -92,7 +92,7 @@ export const OrderSuccessModal: React.FC = () => {
             <button
               type="button"
               onClick={() => setOrderSuccessRef(null)}
-              className="text-xs text-[#3F4F45] hover:text-[#FAF3E0] text-center pt-1 cursor-pointer transition-colors"
+              className="text-xs text-[#D8CFC0] hover:text-[#FAF3E0] text-center pt-1 cursor-pointer transition-colors"
             >
               Continue Shopping
             </button>

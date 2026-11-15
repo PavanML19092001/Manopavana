@@ -52,6 +52,8 @@ export const LiveOrderTracker = ({
 
   // Edit Delivery Details Modal State
   const [isEditingAddress, setIsEditingAddress] = useState(false);
+  const [isConfirmingCancel, setIsConfirmingCancel] = useState(false);
+  const [isCancelling, setIsCancelling] = useState(false);
   const [editName, setEditName] = useState(order.shippingAddress?.fullName || "");
   const [editPhone, setEditPhone] = useState(order.shippingAddress?.phone || "");
   const [editAddressLine, setEditAddressLine] = useState(order.shippingAddress?.addressLine1 || "");
@@ -63,16 +65,35 @@ export const LiveOrderTracker = ({
   const isReturned = (order.orderStatus as string) === "Returned";
   const isTerminated = isCancelled || isReturned;
 
-  // Allowed to edit or cancel ONLY while order is in initial "Placed" status and before carrier pickup/AWB manifestation
-  const canModifyOrCancel =
-    order.orderStatus === "Placed" && (!order.trackingNumber || order.trackingNumber.length === 0);
+  const awbTrimmed = (order.trackingNumber || "").trim();
+  const awbUpper = awbTrimmed.toUpperCase();
+  const courierLower = (order.courier || "").toLowerCase();
+  const isShadowfax = courierLower.includes("shadowfax") || awbUpper.startsWith("SF");
+  const isEkart = courierLower.includes("ekart") || awbUpper.startsWith("FMP");
+  const carrierDisplayName = isShadowfax
+    ? "Shadowfax 360"
+    : isEkart
+    ? "Ekart Logistics"
+    : order.courier || "Delhivery Express";
 
-  // Universal: Poll Delhivery tracking for any order with a waybill regardless of pincode
+  // Address edits allowed before AWB manifest; customer cancellation allowed right up until carrier pickup ("Dispatched")
+  const canEditAddress =
+    order.orderStatus === "Placed" && (!awbTrimmed || awbTrimmed.length === 0);
+  const canCancel =
+    order.orderStatus === "Placed" || order.orderStatus === "Packed";
+
+  // Poll Delhivery tracking only for Delhivery shipments
   useEffect(() => {
-    if (order.trackingNumber && order.trackingNumber.length > 5 && !isTerminated) {
-      fetchDelhiveryTracking(order.trackingNumber);
+    if (
+      awbTrimmed &&
+      awbTrimmed.length > 5 &&
+      !isTerminated &&
+      !isShadowfax &&
+      !isEkart
+    ) {
+      fetchDelhiveryTracking(awbTrimmed);
     }
-  }, [order.trackingNumber, isTerminated]);
+  }, [awbTrimmed, isTerminated, isShadowfax, isEkart]);
 
   const fetchDelhiveryTracking = async (waybill: string) => {
     setDelhiveryLoading(true);
@@ -88,8 +109,8 @@ export const LiveOrderTracker = ({
         if (statusStr.includes("delivered") && order.orderStatus !== "Delivered") {
           updateOrderDetails(order.orderRef, { orderStatus: "Delivered" });
         } else if (
-          (statusStr.includes("transit") || statusStr.includes("out for delivery") || statusStr.includes("dispatched")) &&
-          order.orderStatus === "Placed"
+          (statusStr.includes("transit") || statusStr.includes("out for delivery") || statusStr.includes("dispatched") || statusStr.includes("picked")) &&
+          (order.orderStatus === "Placed" || order.orderStatus === "Packed")
         ) {
           updateOrderDetails(order.orderRef, { orderStatus: "Dispatched" });
         }
@@ -166,7 +187,7 @@ export const LiveOrderTracker = ({
     if (order.orderStatus === "Delivered") {
       return "Delivered Safely to Doorstep";
     }
-    return "Expected Doorstep Delivery: In 1-4 Business Days (Delhivery Express)";
+    return `Expected Doorstep Delivery: In 1-4 Business Days (${carrierDisplayName})`;
   };
 
   return (
@@ -212,7 +233,7 @@ export const LiveOrderTracker = ({
               )}
 
               <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-blue-500/10 text-blue-700 dark:text-blue-300 border border-blue-500/20">
-                Delhivery Express
+                {carrierDisplayName}
               </span>
             </div>
 
@@ -270,40 +291,75 @@ export const LiveOrderTracker = ({
         </div>
 
         {/* 2. Cancellation & Edit Address Action Bar */}
-        {canModifyOrCancel && (
+        {(canCancel || canEditAddress) && (
           <div className="px-6 py-3.5 bg-amber-500/10 border-b border-amber-500/20 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
             <div className="flex items-center gap-2 text-amber-800 dark:text-amber-300">
               <Clock className="w-4 h-4 shrink-0 text-[#E0B04A]" />
               <span>
-                You can edit your delivery address or cancel this order any time before it leaves our facility.
+                {canEditAddress
+                  ? "You can edit your delivery address or cancel this order any time before carrier pickup."
+                  : "Your shipment is packed and awaiting pickup. You can still cancel before the delivery partner picks it up."}
               </span>
             </div>
 
             <div className="flex flex-wrap items-center gap-2 shrink-0">
-              <button
-                type="button"
-                onClick={() => setIsEditingAddress(true)}
-                className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border text-xs font-bold transition-colors cursor-pointer ${
-                  isDark
-                    ? "border-[#1F3D2B] text-[#FAF3E0] hover:bg-[#2A1A0F]"
-                    : "border-[#F2E8CC] text-[#5C4230] hover:bg-[#FAF3E0]"
-                }`}
-              >
-                <Edit3 className="w-3.5 h-3.5 text-[#E0B04A]" />
-                <span>Edit Address</span>
-              </button>
+              {canEditAddress && (
+                <button
+                  type="button"
+                  onClick={() => setIsEditingAddress(true)}
+                  className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border text-xs font-bold transition-colors cursor-pointer ${
+                    isDark
+                      ? "border-[#1F3D2B] text-[#FAF3E0] hover:bg-[#2A1A0F]"
+                      : "border-[#F2E8CC] text-[#5C4230] hover:bg-[#FAF3E0]"
+                  }`}
+                >
+                  <Edit3 className="w-3.5 h-3.5 text-[#E0B04A]" />
+                  <span>Edit Address</span>
+                </button>
+              )}
 
-              <button
-                type="button"
-                onClick={async () => {
-                  if (window.confirm("Are you sure you want to cancel this order?")) {
-                    await cancelOrderWithinWindow(order.orderRef);
-                  }
-                }}
-                className="px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs font-bold transition-colors cursor-pointer shadow-xs"
-              >
-                Cancel Order
-              </button>
+              {canCancel && (
+                isConfirmingCancel ? (
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      disabled={isCancelling}
+                      onClick={async () => {
+                        setIsCancelling(true);
+                        try {
+                          await cancelOrderWithinWindow(order.orderRef);
+                        } finally {
+                          setIsCancelling(false);
+                          setIsConfirmingCancel(false);
+                        }
+                      }}
+                      className="px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 disabled:opacity-60 text-white text-xs font-bold transition-colors cursor-pointer shadow-xs"
+                    >
+                      {isCancelling ? "Cancelling..." : "Confirm Cancel"}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={isCancelling}
+                      onClick={() => setIsConfirmingCancel(false)}
+                      className={`px-3 py-1.5 rounded-lg border text-xs font-bold transition-colors cursor-pointer ${
+                        isDark
+                          ? "border-[#1F3D2B] text-[#FAF3E0] hover:bg-[#2A1A0F]"
+                          : "border-[#F2E8CC] text-[#5C4230] hover:bg-[#FAF3E0]"
+                      }`}
+                    >
+                      Keep
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setIsConfirmingCancel(true)}
+                    className="px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs font-bold transition-colors cursor-pointer shadow-xs"
+                  >
+                    Cancel Order
+                  </button>
+                )
+              )}
             </div>
           </div>
         )}
@@ -482,7 +538,7 @@ export const LiveOrderTracker = ({
                   </div>
                   <div className="space-y-1 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
-                      <h4 className="text-sm font-bold">Dispatched via Delhivery Express</h4>
+                      <h4 className="text-sm font-bold">Dispatched via {carrierDisplayName}</h4>
                       {currentStep >= 3 && (
                         <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-blue-500/10 text-blue-600">
                           In Transit
@@ -491,16 +547,42 @@ export const LiveOrderTracker = ({
                     </div>
 
                     <p className={`text-xs ${isDark ? "text-[#E0B04A]" : "text-[#5C4230]"}`}>
-                      Carrier: <span className="font-semibold text-blue-600">Delhivery Express Surface</span>
+                      Carrier: <span className="font-semibold text-blue-600">{carrierDisplayName}</span>
                       {order.trackingNumber && (
                         <span className="block mt-0.5 font-mono text-[11px] text-[#E0B04A]">
-                          Delhivery Waybill / AWB: #{order.trackingNumber}
+                          {carrierDisplayName} Waybill / AWB: #{order.trackingNumber}
                         </span>
                       )}
                     </p>
 
-                    {/* Live Delhivery Transit Scans */}
-                    {order.trackingNumber && (
+                    {/* Live Transit Checkpoints */}
+                    {order.trackingNumber && (isShadowfax || isEkart) && (
+                      <div
+                        className={`mt-3 p-3.5 rounded-2xl border text-xs flex flex-wrap items-center justify-between gap-2 ${
+                          isDark ? "bg-[#14291D] border-[#1F3D2B]" : "bg-[#FAF3E0] border-[#F2E8CC]"
+                        }`}
+                      >
+                        <div className="flex items-center gap-2 font-bold text-xs">
+                          <Truck className="w-3.5 h-3.5 text-[#E0B04A]" />
+                          <span>Track live on {carrierDisplayName}</span>
+                        </div>
+                        <a
+                          href={
+                            isShadowfax
+                              ? `https://tracker.shadowfax.in/?order_id=${encodeURIComponent(order.trackingNumber)}`
+                              : `https://ekartlogistics.com/shipmenttrack/${encodeURIComponent(order.trackingNumber)}`
+                          }
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-[11px] font-bold text-[#E0B04A] hover:underline"
+                        >
+                          <span>Open Tracker</span>
+                          <ExternalLink className="w-3 h-3" />
+                        </a>
+                      </div>
+                    )}
+
+                    {order.trackingNumber && !isShadowfax && !isEkart && (
                       <div
                         className={`mt-3 p-3.5 rounded-2xl border text-xs space-y-2.5 ${
                           isDark ? "bg-[#14291D] border-[#1F3D2B]" : "bg-[#FAF3E0] border-[#F2E8CC]"
@@ -637,7 +719,7 @@ export const LiveOrderTracker = ({
                   <MapPin className="w-4 h-4 text-[#E0B04A]" />
                   <span>Delivery Address</span>
                 </div>
-                {canModifyOrCancel && (
+                {canEditAddress && (
                   <button
                     type="button"
                     onClick={() => setIsEditingAddress(true)}
@@ -676,8 +758,8 @@ export const LiveOrderTracker = ({
                       <span className="inline-flex items-center gap-1 font-medium text-emerald-700 dark:text-emerald-400">
                         <MapPin className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
                         {lat && lng
-                          ? "GPS Map Location shared with Delhivery carrier"
-                          : "Delivery address geolocated with Delhivery"}
+                          ? `GPS Map Location shared with ${carrierDisplayName}`
+                          : `Delivery address geolocated with ${carrierDisplayName}`}
                       </span>
                       <a
                         href={mapUrl}

@@ -1290,17 +1290,115 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     if (!target) return false;
 
-    // Immediately disallow customer cancellation once packed, picked up, dispatched, delivered, returned, cancelled, or assigned an AWB
-    if (
-      target.orderStatus === "Packed" ||
-      target.orderStatus === "Dispatched" ||
-      target.orderStatus === "Delivered" ||
-      target.orderStatus === "Returned" ||
-      target.orderStatus === "Cancelled" ||
-      Boolean(target.trackingNumber)
-    ) {
-      showToast("This order cannot be cancelled because it has already been packed, dispatched, or closed.");
+    // Disallow customer cancellation only once actually picked up / dispatched, delivered, returned, cancelled, or payment-failed
+    if (target.orderStatus !== "Placed" && target.orderStatus !== "Packed") {
+      showToast(
+        target.orderStatus === "Dispatched"
+          ? "This order has already been picked up by the delivery partner and is in transit."
+          : `This order cannot be cancelled because it is already ${target.orderStatus}.`
+      );
       return false;
+    }
+
+    const awb = (target.trackingNumber || "").trim();
+    const courierLower = (target.courier || "").toLowerCase();
+    const isShadowfax =
+      courierLower.includes("shadowfax") || awb.toUpperCase().startsWith("SF");
+    const isEkart =
+      courierLower.includes("ekart") || awb.toUpperCase().startsWith("FMP");
+
+    // If an AWB was already manifested, cancel it directly with the delivery partner first
+    if (awb && awb.toUpperCase() !== "PENDING") {
+      try {
+        if (isShadowfax) {
+          showToast("Cancelling shipment on Shadowfax 360...");
+          const cancelRes = await fetch("/api?action=shadowfax_cancel_order", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              waybill: awb,
+              orderRef: target.orderRef,
+              reason: "Cancelled by customer before pickup",
+            }),
+          });
+          const cancelData = await cancelRes.json().catch(() => ({}));
+
+          if (cancelData?.alreadyPickedUp) {
+            await updateOrderDetails(target.orderRef, { orderStatus: "Dispatched" });
+            showToast(
+              "Shadowfax rider has already picked up this parcel. Order cancellation is closed."
+            );
+            return false;
+          }
+
+          if (!cancelRes.ok || cancelData?.status !== "SUCCESS") {
+            const errMsg =
+              typeof cancelData?.message === "string"
+                ? cancelData.message
+                : "Shadowfax rejected cancellation";
+            showToast(`Could not cancel on Shadowfax: ${errMsg}`);
+            return false;
+          }
+          showToast("Shadowfax shipment cancelled successfully.");
+        } else if (isEkart) {
+          showToast("Cancelling shipment on Ekart Logistics...");
+          let ekartCreds: Record<string, string> = {};
+          try {
+            ekartCreds = {
+              ekartUsername: localStorage.getItem("ekart_username") || "",
+              ekartPassword: localStorage.getItem("ekart_password") || "",
+              ekartToken: localStorage.getItem("ekart_token") || "",
+            };
+          } catch {
+            ekartCreds = {};
+          }
+          const cancelRes = await fetch("/api?action=ekart_cancel_shipment", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              waybill: awb,
+              ...ekartCreds,
+            }),
+          });
+          const cancelData = await cancelRes.json().catch(() => ({}));
+          if (!cancelRes.ok && cancelData?.alreadyPickedUp) {
+            await updateOrderDetails(target.orderRef, { orderStatus: "Dispatched" });
+            showToast(
+              "Ekart has already picked up this parcel. Order cancellation is closed."
+            );
+            return false;
+          }
+        } else {
+          showToast("Cancelling shipment on Delhivery...");
+          const cancelRes = await fetch("/api?action=delhivery_cancel_order", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ waybill: awb }),
+          });
+          const cancelData = await cancelRes.json().catch(() => ({}));
+          const delMsg = String(
+            cancelData?.data?.rmk || cancelData?.message || ""
+          ).toLowerCase();
+          if (
+            delMsg.includes("picked") ||
+            delMsg.includes("transit") ||
+            delMsg.includes("dispatched") ||
+            delMsg.includes("delivered")
+          ) {
+            await updateOrderDetails(target.orderRef, { orderStatus: "Dispatched" });
+            showToast(
+              "Delhivery has already picked up this parcel. Order cancellation is closed."
+            );
+            return false;
+          }
+        }
+      } catch (err) {
+        console.warn("Carrier cancellation error:", err);
+        if (isShadowfax) {
+          showToast("Network error contacting Shadowfax to cancel shipment. Please try again.");
+          return false;
+        }
+      }
     }
 
     const isCod =
@@ -1310,8 +1408,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       target.paymentStatus === "REFUNDED";
     const isOnlinePaid =
       !isCod &&
-      target.orderStatus !== "Payment Incomplete" &&
-      target.orderStatus !== "Failed (Expired)" &&
       target.paymentStatus !== "PENDING" &&
       target.paymentStatus !== "FAILED" &&
       (target.paymentMethod === "phonepe" ||
@@ -1320,6 +1416,10 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         Boolean(target.paymentMode?.includes("ONLINE")) ||
         target.paymentStatus === "COMPLETED" ||
         target.paymentStatus === "PHONEPE_PAID");
+
+    const cancelReasonBase = awb
+      ? "Cancelled by customer before pickup"
+      : "Cancelled by customer before packing";
 
     const orderUpdates: Partial<Order> = {
       orderStatus: "Cancelled",
@@ -1354,7 +1454,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             orderUpdates.phonepeRefundId = result.phonepeRefundId;
           }
           orderUpdates.refundAmount = target.total;
-          orderUpdates.refundReason = "Cancelled by customer before packing";
+          orderUpdates.refundReason = cancelReasonBase;
           orderUpdates.refundedAt = Date.now();
           showToast(
             `Online refund of ₹${target.total} ${isCompleted ? "completed" : "initiated"} via PhonePe! Ref: ${result.refundMerchantId}`
@@ -1362,7 +1462,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         } else {
           orderUpdates.paymentStatus = "REFUND_PENDING_MANUAL";
           orderUpdates.refundAmount = target.total;
-          orderUpdates.refundReason = `Cancelled before packing (Auto-refund pending: ${result.message || "Gateway error"})`;
+          orderUpdates.refundReason = `${cancelReasonBase} (Auto-refund pending: ${result.message || "Gateway error"})`;
           orderUpdates.refundedAt = Date.now();
           showToast("Order cancelled. Refund queued for admin retry.");
         }
@@ -1370,7 +1470,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         console.warn("PhonePe refund trigger error:", err);
         orderUpdates.paymentStatus = "REFUND_PENDING_MANUAL";
         orderUpdates.refundAmount = target.total;
-        orderUpdates.refundReason = "Cancelled before packing (Network error during auto-refund)";
+        orderUpdates.refundReason = `${cancelReasonBase} (Network error during auto-refund)`;
         orderUpdates.refundedAt = Date.now();
         showToast("Order cancelled. Refund queued for admin verification.");
       }

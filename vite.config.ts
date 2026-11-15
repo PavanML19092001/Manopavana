@@ -997,6 +997,9 @@ export default defineConfig(() => {
                       weightGrams = 1000,
                       productsDesc = "Wood-Pressed Cooking Oil Bottles",
                       quantity = 1,
+                      lat,
+                      lng,
+                      mapsUrl,
                     } = parsed;
 
                     if (!orderRef || !pincode || !phone || !customerName) {
@@ -1017,6 +1020,24 @@ export default defineConfig(() => {
                     if (cleanAddress.length > 240) {
                       cleanAddress = cleanAddress.slice(0, 240);
                     }
+
+                    const rawSfxLat = Number.isFinite(Number(lat)) && Number(lat) !== 0 ? Number(lat) : null;
+                    const rawSfxLng = Number.isFinite(Number(lng)) && Number(lng) !== 0 ? Number(lng) : null;
+                    const sfxPinStr = String(pincode || "").replace(/\D/g, "");
+                    const isSfxBlrPin = sfxPinStr.startsWith("560") || sfxPinStr.startsWith("562");
+                    const isDefaultSfxBlr =
+                      rawSfxLat &&
+                      rawSfxLng &&
+                      Math.abs(rawSfxLat - 12.9716) < 0.05 &&
+                      Math.abs(rawSfxLng - 77.5946) < 0.05;
+                    const validSfxLat = isDefaultSfxBlr && !isSfxBlrPin ? null : rawSfxLat;
+                    const validSfxLng = isDefaultSfxBlr && !isSfxBlrPin ? null : rawSfxLng;
+                    const sfxMapLink =
+                      validSfxLat && validSfxLng
+                        ? `https://maps.google.com/?q=${validSfxLat.toFixed(6)},${validSfxLng.toFixed(6)}`
+                        : mapsUrl && !String(mapsUrl).includes("12.9716,77.5946")
+                        ? String(mapsUrl)
+                        : null;
 
                     const rawItems = Array.isArray(parsed.items) ? parsed.items : [];
                     const productDetails =
@@ -1047,6 +1068,22 @@ export default defineConfig(() => {
                             },
                           ];
 
+                    const customerDetails: any = {
+                      name: String(customerName || "Customer").trim(),
+                      contact: cleanPhone,
+                      address_line_1: cleanAddress,
+                      city: String(city || "Bengaluru"),
+                      state: String(state || "Karnataka"),
+                      pincode: cleanPin,
+                    };
+                    if (validSfxLat && validSfxLng) {
+                      customerDetails.latitude = validSfxLat.toFixed(6);
+                      customerDetails.longitude = validSfxLng.toFixed(6);
+                    }
+                    if (sfxMapLink) {
+                      customerDetails.address_line_2 = `Map Pin: ${sfxMapLink}`.slice(0, 200);
+                    }
+
                     const shadowfaxPayload = {
                       order_details: {
                         client_order_id: String(orderRef),
@@ -1057,14 +1094,7 @@ export default defineConfig(() => {
                         cod_amount: codAmount,
                         order_service: "Regular",
                       },
-                      customer_details: {
-                        name: String(customerName || "Customer").trim(),
-                        contact: cleanPhone,
-                        address_line_1: cleanAddress,
-                        city: String(city || "Bengaluru"),
-                        state: String(state || "Karnataka"),
-                        pincode: cleanPin,
-                      },
+                      customer_details: customerDetails,
                       pickup_details: SHADOWFAX_PICKUP,
                       return_details: SHADOWFAX_RETURN,
                       product_details: productDetails,
@@ -1105,15 +1135,26 @@ export default defineConfig(() => {
                       sfxData = { rawText: sfxText };
                     }
 
+                    const sfxItem = Array.isArray(sfxData?.data) ? sfxData.data[0] : sfxData?.data;
                     const awbNumber =
-                      sfxData?.data?.awb_number ||
+                      sfxItem?.awb_number ||
+                      sfxItem?.order_details?.awb_number ||
+                      sfxItem?.waybill_number ||
+                      sfxItem?.waybill ||
+                      sfxItem?.tracking_id ||
+                      sfxData?.order_details?.awb_number ||
                       sfxData?.awb_number ||
-                      sfxData?.data?.tracking_id ||
                       sfxData?.tracking_id ||
-                      sfxData?.data?.sfx_order_id;
+                      sfxItem?.sfx_order_id ||
+                      sfxData?.sfx_order_id;
 
-                    if (sfxResp.ok && (sfxData.message === "Success" || awbNumber)) {
-                      const finalAwb = awbNumber || `SF${String(orderRef).replace(/[^0-9]/g, "")}F`;
+                    const msgLower = String(sfxData?.message || "").trim().toLowerCase();
+                    const isApiSuccess =
+                      (sfxResp.ok && (msgLower === "success" || Boolean(awbNumber))) ||
+                      (Boolean(awbNumber) && !sfxData?.errors);
+
+                    if (isApiSuccess) {
+                      const finalAwb = String(awbNumber || `SF${String(orderRef).replace(/[^0-9]/g, "")}F`).trim();
                       res.statusCode = 200;
                       res.end(JSON.stringify({
                         status: 'SUCCESS',
@@ -1152,6 +1193,65 @@ export default defineConfig(() => {
                   } catch (e: any) {
                     res.statusCode = 502;
                     res.end(JSON.stringify({ status: 'ERROR', message: e?.message || 'Server error manifesting on Shadowfax' }));
+                  }
+                });
+                return;
+              }
+
+              // 3b. Shadowfax Cancel Order
+              if (req.method === 'POST' && action === 'shadowfax_cancel_order') {
+                let bodyStr = '';
+                req.on('data', chunk => { bodyStr += chunk; });
+                req.on('end', async () => {
+                  try {
+                    const parsed = JSON.parse(bodyStr || '{}');
+                    const waybill = String(parsed.waybill || '').trim();
+                    const orderRef = String(parsed.orderRef || '').trim();
+                    const reason = String(parsed.reason || 'Order cancelled before pickup').trim();
+                    if (!waybill && !orderRef) {
+                      res.statusCode = 400;
+                      res.end(JSON.stringify({ status: 'FAILED', message: 'Missing Shadowfax AWB or orderRef' }));
+                      return;
+                    }
+                    const attemptCancel = async (requestId: string, scheme = 'Token') => {
+                      const resp = await fetch('https://dale.shadowfax.in/api/v3/clients/orders/cancel/', {
+                        method: 'POST',
+                        headers: {
+                          Authorization: `${scheme} ${SHADOWFAX_TOKEN}`,
+                          'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ request_id: requestId, cancel_remarks: reason }),
+                      });
+                      const text = await resp.text();
+                      let data: any = {};
+                      try { data = JSON.parse(text); } catch { data = { rawText: text }; }
+                      return { resp, data, text };
+                    };
+                    const primaryId = waybill || orderRef;
+                    let { resp, data, text } = await attemptCancel(primaryId, 'Token');
+                    if (resp.status === 401 || resp.status === 403) {
+                      ({ resp, data, text } = await attemptCancel(primaryId, 'Bearer'));
+                    }
+                    if (resp.status === 404 && waybill && orderRef && orderRef !== waybill) {
+                      ({ resp, data, text } = await attemptCancel(orderRef, 'Token'));
+                    }
+                    const msg = String(data?.responseMsg || data?.message || data?.detail || data?.errors || text || '');
+                    const msgLower = msg.toLowerCase();
+                    const isAlreadyCancelled = msgLower.includes('already cancel');
+                    const isPickedOrInTransit = !resp.ok && (
+                      msgLower.includes('picked') || msgLower.includes('transit') || msgLower.includes('arriving') ||
+                      msgLower.includes('delivered') || msgLower.includes('out for delivery') || msgLower.includes('dispatched')
+                    );
+                    if (resp.ok || data?.responseCode === 200 || isAlreadyCancelled) {
+                      res.statusCode = 200;
+                      res.end(JSON.stringify({ status: 'SUCCESS', carrier: 'Shadowfax 360', message: msg || 'Shadowfax shipment cancelled.', data }));
+                    } else {
+                      res.statusCode = isPickedOrInTransit ? 409 : resp.status || 400;
+                      res.end(JSON.stringify({ status: 'FAILED', carrier: 'Shadowfax 360', alreadyPickedUp: isPickedOrInTransit, message: msg || 'Shadowfax cancellation rejected', data }));
+                    }
+                  } catch (e: any) {
+                    res.statusCode = 502;
+                    res.end(JSON.stringify({ status: 'ERROR', message: e?.message || 'Shadowfax cancel error' }));
                   }
                 });
                 return;
@@ -1754,12 +1854,21 @@ export default defineConfig(() => {
                       trackingUrl: `https://app.elite.ekartlogistics.in/track/${simulatedWb}`,
                       portalUrl: "https://app.elite.ekartlogistics.in",
                       message: `Shipment manifested on Ekart Elite! Tracking ID: #${simulatedWb}`,
+                      lat: parsed.lat || null,
+                      lng: parsed.lng || null,
                     }));
                   } catch (e: any) {
                     res.statusCode = 400;
                     res.end(JSON.stringify({ status: 'FAILED', message: e?.message }));
                   }
                 });
+                return;
+              }
+
+              // 8b. Ekart Cancel Shipment
+              if (req.method === 'POST' && action === 'ekart_cancel_shipment') {
+                res.statusCode = 200;
+                res.end(JSON.stringify({ status: 'SUCCESS', message: 'Ekart shipment cancelled.' }));
                 return;
               }
 

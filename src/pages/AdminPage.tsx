@@ -613,6 +613,10 @@ export const AdminPage: React.FC = () => {
       .filter(Boolean)
       .join(", ");
 
+    const lat = Number.isFinite(Number(addr.lat)) && Number(addr.lat) !== 0 ? Number(addr.lat) : undefined;
+    const lng = Number.isFinite(Number(addr.lng)) && Number(addr.lng) !== 0 ? Number(addr.lng) : undefined;
+    const mapsUrl = (lat && lng) ? `https://maps.google.com/?q=${lat},${lng}` : null;
+
     try {
       const res = await fetch("/api?action=ekart_create_shipment", {
         method: "POST",
@@ -635,6 +639,9 @@ export const AdminPage: React.FC = () => {
             (acc: number, i: any) => acc + (Number(i?.quantity) || 1),
             0
           ),
+          lat,
+          lng,
+          mapsUrl,
           ekartUsername: storedUsername,
           ekartPassword: storedPassword,
           ekartToken: storedToken,
@@ -782,6 +789,10 @@ export const AdminPage: React.FC = () => {
       .filter(Boolean)
       .join(", ");
 
+    const lat = Number.isFinite(Number(addr.lat)) && Number(addr.lat) !== 0 ? Number(addr.lat) : undefined;
+    const lng = Number.isFinite(Number(addr.lng)) && Number(addr.lng) !== 0 ? Number(addr.lng) : undefined;
+    const mapsUrl = (lat && lng) ? `https://maps.google.com/?q=${lat},${lng}` : null;
+
     try {
       const res = await fetch("/api?action=shadowfax_create_shipment", {
         method: "POST",
@@ -804,6 +815,9 @@ export const AdminPage: React.FC = () => {
             (acc: number, i: any) => acc + (Number(i?.quantity) || 1),
             0
           ),
+          lat,
+          lng,
+          mapsUrl,
           items: items.map((i: any) => ({
             id: i.id,
             title: i.title,
@@ -1180,13 +1194,57 @@ export const AdminPage: React.FC = () => {
   };
 
   const cancelCarrierShipmentIfNeeded = async (ord: Order, targetStatus: OrderStatus) => {
-    if (targetStatus === "Cancelled" && ord.trackingNumber) {
-      try {
+    const awb = (ord.trackingNumber || "").trim();
+    if (targetStatus !== "Cancelled" || !awb || awb.toUpperCase() === "PENDING") return;
+
+    const courierLower = (ord.courier || "").toLowerCase();
+    const isShadowfax =
+      courierLower.includes("shadowfax") || awb.toUpperCase().startsWith("SF");
+    const isEkart =
+      courierLower.includes("ekart") || awb.toUpperCase().startsWith("FMP");
+
+    try {
+      if (isShadowfax) {
+        showToast("Notifying Shadowfax 360 of order cancellation...");
+        const res = await fetch("/api?action=shadowfax_cancel_order", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            waybill: awb,
+            orderRef: ord.orderRef,
+            reason: "Cancelled by store admin",
+          }),
+        });
+        const data = await res.json();
+        if (data.status === "SUCCESS") {
+          showToast("Shadowfax shipment cancelled & wallet refunded!");
+        } else {
+          showToast(`Shadowfax notice: ${data.message || "Failed to cancel on Shadowfax"}`);
+        }
+      } else if (isEkart) {
+        showToast("Notifying Ekart Logistics of order cancellation...");
+        const res = await fetch("/api?action=ekart_cancel_shipment", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            waybill: awb,
+            ekartUsername: localStorage.getItem("ekart_username") || ekartUsernameInput || "",
+            ekartPassword: localStorage.getItem("ekart_password") || ekartPasswordInput || "",
+            ekartToken: localStorage.getItem("ekart_token") || ekartTokenInput || "",
+          }),
+        });
+        const data = await res.json();
+        if (data.status === "SUCCESS") {
+          showToast("Ekart shipment cancelled!");
+        } else {
+          showToast(`Ekart notice: ${data.message || "Failed to cancel on Ekart"}`);
+        }
+      } else {
         showToast("Notifying Delhivery of order cancellation...");
         const res = await fetch("/api?action=delhivery_cancel_order", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ waybill: ord.trackingNumber }),
+          body: JSON.stringify({ waybill: awb }),
         });
         const data = await res.json();
         if (data.status === "SUCCESS") {
@@ -1194,9 +1252,9 @@ export const AdminPage: React.FC = () => {
         } else {
           showToast(`Delhivery notice: ${data.message || "Failed to cancel on carrier"}`);
         }
-      } catch (e) {
-        console.warn("Delhivery cancellation sync notice:", e);
       }
+    } catch (e) {
+      console.warn("Carrier cancellation sync notice:", e);
     }
   };
 
