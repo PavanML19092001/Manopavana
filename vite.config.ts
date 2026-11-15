@@ -898,6 +898,15 @@ export default defineConfig(() => {
                 state: "Karnataka",
                 pincode: 560058,
               };
+              const SHADOWFAX_RETURN = {
+                return_type: "seller",
+                name: "Manopavana",
+                contact: "8970831829",
+                address_line_1: "10A, Thigalarapalya Main Rd, 10A Thigalarapalya Main Road, Ragavendra Industrial Estate",
+                city: "Bengaluru",
+                state: "Karnataka",
+                pincode: 560058,
+              };
 
               // 1. Shadowfax Test Connection
               if (req.method === 'GET' && action === 'shadowfax_test_connection') {
@@ -1027,7 +1036,7 @@ export default defineConfig(() => {
                         pincode: cleanPin,
                       },
                       pickup_details: SHADOWFAX_PICKUP,
-                      return_details: SHADOWFAX_PICKUP,
+                      return_details: SHADOWFAX_RETURN,
                       product_details: [
                         {
                           product_name: String(productsDesc || "Pure Cold Pressed Cooking Oil").slice(0, 90),
