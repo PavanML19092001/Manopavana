@@ -1316,18 +1316,45 @@ export async function onRequest(context) {
     const EKART_PICKUP_NAME = "Manopavana_B2C";
     const EKART_ORIGIN_PINCODE = "560058"; // Peenya 2nd Stage Hub (Manopavana_B2C)
 
-    // 1. Ekart Live Connection Check
-    if (request.method === "GET" && action === "ekart_test_connection") {
+    // 1. Ekart Live Connection Check & Credential Verification (GET or POST — never creates a shipment)
+    if ((request.method === "GET" || request.method === "POST") && action === "ekart_test_connection") {
       const start = Date.now();
       try {
-        const masked = `${EKART_CLIENT_ID.slice(0, 10)}...${EKART_CLIENT_ID.slice(-4)}`;
-        let hasActiveToken = Boolean(cachedEkartToken && ekartTokenExpiresAt > Date.now());
-
-        if (!hasActiveToken) {
+        let reqCreds = {};
+        if (request.method === "POST") {
           try {
-            const token = await getEkartAuthToken(env);
-            if (token) hasActiveToken = true;
+            const b = await request.json();
+            reqCreds = {
+              username: b.ekartUsername,
+              password: b.ekartPassword,
+              token: b.ekartToken,
+            };
           } catch {}
+        }
+
+        const masked = `${EKART_CLIENT_ID.slice(0, 10)}...${EKART_CLIENT_ID.slice(-4)}`;
+        let hasActiveToken = request.method === "GET" && Boolean(cachedEkartToken && ekartTokenExpiresAt > Date.now());
+        let authErrorMsg = "";
+
+        if (!hasActiveToken || request.method === "POST") {
+          try {
+            const token = await getEkartAuthToken(env, reqCreds);
+            if (token) hasActiveToken = true;
+          } catch (authErr) {
+            authErrorMsg = authErr?.message || "Ekart authentication failed";
+          }
+        }
+
+        if (request.method === "POST" && !hasActiveToken) {
+          return jsonResponse(
+            {
+              status: "FAILED",
+              code: "EKART_AUTH_FAILED",
+              authenticated: false,
+              message: authErrorMsg || "Ekart authentication failed. Please check your password.",
+            },
+            401
+          );
         }
 
         return jsonResponse({
@@ -1341,7 +1368,6 @@ export async function onRequest(context) {
           portal: "app.elite.ekartlogistics.in",
           latencyMs: Date.now() - start,
           accountStatus: hasActiveToken ? "Manopavana_B2C Active & Connected" : "Manopavana_B2C Ready (Credentials Needed)",
-          walletBalance: "₹700.00",
           message: hasActiveToken
             ? "Ekart Elite API authenticated with live 24-hr Bearer Token."
             : "Ekart Client ID loaded. Enter password in CMS to enable 1-click manifests.",
@@ -1446,6 +1472,16 @@ export async function onRequest(context) {
         );
       }
 
+      if (String(orderRef).trim().toUpperCase() === "VERIFY_TEST") {
+        return jsonResponse(
+          {
+            status: "FAILED",
+            message: "Credential verification no longer creates shipments. Use ekart_test_connection.",
+          },
+          400
+        );
+      }
+
       // Obtain or renew 24h Bearer Access Token
       let token = null;
       try {
@@ -1478,16 +1514,18 @@ export async function onRequest(context) {
       }
 
       const rawDigits = String(phone).replace(/\D/g, "").slice(-10);
-      const cleanPhone = rawDigits.length === 10 && !rawDigits.startsWith("0")
-        ? rawDigits
-        : "9999999999";
+      if (rawDigits.length !== 10 || rawDigits.startsWith("0")) {
+        return jsonResponse(
+          { status: "FAILED", message: "Customer primary phone number must be a valid 10-digit mobile number" },
+          400
+        );
+      }
+      const cleanPhone = rawDigits;
       const rawAltDigits = String(alternatePhone || "").replace(/\D/g, "").slice(-10);
       const cleanAltPhone =
         rawAltDigits.length === 10 && !rawAltDigits.startsWith("0") && rawAltDigits !== cleanPhone
           ? rawAltDigits
-          : cleanPhone !== "6361509415"
-          ? "6361509415"
-          : "9999999999";
+          : "";
       const cleanPin = parseInt(String(pincode).replace(/\D/g, "").slice(0, 6), 10);
       const isCod = String(paymentMode || "").toUpperCase() === "COD";
       const totalNum = Math.max(1, Math.round(Number(totalAmount) || 1));
@@ -1586,24 +1624,39 @@ export async function onRequest(context) {
       };
 
       try {
-        const ekartResponse = await fetch(
-          "https://app.elite.ekartlogistics.in/api/v1/package/create",
-          {
-            method: "PUT",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${token}`,
-            },
-            body: JSON.stringify(ekartPayload),
+        const sendToEkart = async (payloadToSend) => {
+          const resp = await fetch(
+            "https://app.elite.ekartlogistics.in/api/v1/package/create",
+            {
+              method: "PUT",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`,
+              },
+              body: JSON.stringify(payloadToSend),
+            }
+          );
+          const text = await resp.text();
+          let parsed = null;
+          try {
+            parsed = JSON.parse(text);
+          } catch {
+            parsed = { rawText: text };
           }
-        );
+          return { resp, text, parsed };
+        };
 
-        const respText = await ekartResponse.text();
-        let ekartData = null;
-        try {
-          ekartData = JSON.parse(respText);
-        } catch {
-          ekartData = { rawText: respText };
+        let { resp: ekartResponse, text: respText, parsed: ekartData } = await sendToEkart(ekartPayload);
+
+        // If Ekart rejects empty consignee_alternate_phone string, retry once omitting the optional field
+        if (
+          !ekartResponse.ok &&
+          cleanAltPhone === "" &&
+          String(respText || "").toLowerCase().includes("alternate")
+        ) {
+          const payloadWithoutAlt = { ...ekartPayload };
+          delete payloadWithoutAlt.consignee_alternate_phone;
+          ({ resp: ekartResponse, text: respText, parsed: ekartData } = await sendToEkart(payloadWithoutAlt));
         }
 
         if (ekartResponse.ok && (ekartData.status === true || ekartData.tracking_id || ekartData.barcodes?.wbn)) {

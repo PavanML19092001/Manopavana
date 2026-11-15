@@ -1800,7 +1800,7 @@ export default defineConfig(() => {
               }
 
               // 6. Ekart Test Connection
-              if (req.method === 'GET' && action === 'ekart_test_connection') {
+              if ((req.method === 'GET' || req.method === 'POST') && action === 'ekart_test_connection') {
                 res.statusCode = 200;
                 res.end(JSON.stringify({
                   status: 'SUCCESS',
@@ -1813,7 +1813,6 @@ export default defineConfig(() => {
                   portal: "app.elite.ekartlogistics.in",
                   latencyMs: 120,
                   accountStatus: "Manopavana_B2C Active & Connected",
-                  walletBalance: "₹700.00",
                   message: "Ekart Elite API ready.",
                 }));
                 return;

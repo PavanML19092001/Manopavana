@@ -534,22 +534,19 @@ export const AdminPage: React.FC = () => {
       if (p) localStorage.setItem("ekart_password", p);
       if (t) localStorage.setItem("ekart_token", t);
 
-      // Verify credentials with backend
-      const res = await fetch("/api?action=ekart_create_shipment", {
+      // Verify credentials with backend without creating any shipment
+      const res = await fetch("/api?action=ekart_test_connection", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          orderRef: "VERIFY_TEST",
-          pincode: "560058",
-          phone: "9180301917",
           ekartUsername: u,
           ekartPassword: p,
           ekartToken: t,
         }),
       });
       const data = await res.json();
-      if (data.code === "EKART_AUTH_FAILED" || data.status === 401) {
-        showToast(`Ekart Auth Notice: ${data.message}`);
+      if (!res.ok || data.code === "EKART_AUTH_FAILED" || data.status === "FAILED") {
+        showToast(`Ekart Auth Notice: ${data.message || "Invalid Ekart credentials"}`);
       } else {
         showToast("Ekart Elite credentials verified & saved successfully!");
         setShowEkartAuthModal(false);
