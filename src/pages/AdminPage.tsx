@@ -656,7 +656,13 @@ export const AdminPage: React.FC = () => {
         ) {
           setShowEkartAuthModal(true);
         }
-        const errMsg = data.message || "Failed to manifest shipment with Ekart";
+        const rawMsg = data.message;
+        const errMsg =
+          typeof rawMsg === "string"
+            ? rawMsg
+            : rawMsg
+            ? JSON.stringify(rawMsg)
+            : "Failed to manifest shipment with Ekart";
         setEkartManifestError((p) => ({
           ...p,
           [order.orderRef]: errMsg,
@@ -798,6 +804,13 @@ export const AdminPage: React.FC = () => {
             (acc: number, i: any) => acc + (Number(i?.quantity) || 1),
             0
           ),
+          items: items.map((i: any) => ({
+            id: i.id,
+            title: i.title,
+            variant: i.variant,
+            price: i.price,
+            quantity: i.quantity,
+          })),
         }),
       });
 
@@ -810,7 +823,13 @@ export const AdminPage: React.FC = () => {
         });
         showToast(`Shadowfax Shipment Manifested! AWB: #${data.waybill}`);
       } else {
-        const errMsg = data.message || "Failed to manifest shipment with Shadowfax";
+        const rawMsg = data.message;
+        const errMsg =
+          typeof rawMsg === "string"
+            ? rawMsg
+            : rawMsg
+            ? JSON.stringify(rawMsg)
+            : "Failed to manifest shipment with Shadowfax";
         setShadowfaxManifestError((p) => ({
           ...p,
           [order.orderRef]: errMsg,
@@ -3158,7 +3177,11 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                                     <AlertCircle className="w-3.5 h-3.5 shrink-0" />
                                     <span>Shadowfax Manifest Notice:</span>
                                   </div>
-                                  <p className="opacity-90">{shadowfaxManifestError[ord.orderRef]}</p>
+                                  <p className="opacity-90">
+                                    {typeof shadowfaxManifestError[ord.orderRef] === "string"
+                                      ? shadowfaxManifestError[ord.orderRef]
+                                      : JSON.stringify(shadowfaxManifestError[ord.orderRef])}
+                                  </p>
                                   <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-red-500/20">
                                     <a
                                       href="https://erp.shadowfax.in"
@@ -3240,7 +3263,11 @@ Total: ₹${order.total} (${order.paymentMethod?.toUpperCase()})`;
                                     <AlertCircle className="w-3.5 h-3.5 shrink-0" />
                                     <span>Ekart Manifest Notice:</span>
                                   </div>
-                                  <p className="opacity-90">{ekartManifestError[ord.orderRef]}</p>
+                                  <p className="opacity-90">
+                                    {typeof ekartManifestError[ord.orderRef] === "string"
+                                      ? ekartManifestError[ord.orderRef]
+                                      : JSON.stringify(ekartManifestError[ord.orderRef])}
+                                  </p>
                                   <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-red-500/20">
                                     <button
                                       type="button"

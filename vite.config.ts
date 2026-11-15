@@ -1018,11 +1018,41 @@ export default defineConfig(() => {
                       cleanAddress = cleanAddress.slice(0, 240);
                     }
 
+                    const rawItems = Array.isArray(parsed.items) ? parsed.items : [];
+                    const productDetails =
+                      rawItems.length > 0
+                        ? rawItems.map((it: any, idx: number) => ({
+                            sku_name: String(
+                              `${it?.title || "Pure Cold Pressed Cooking Oil"}${
+                                it?.variant ? ` (${it.variant})` : ""
+                              }`
+                            ).slice(0, 90),
+                            sku_id: String(
+                              it?.id ||
+                                `MANO-${String(orderRef).replace(/[^a-zA-Z0-9]/g, "").slice(-8) || "OIL"}-${idx + 1}`
+                            ).slice(0, 80),
+                            hsn_code: "1512",
+                            price: Math.max(1, Math.round(Number(it?.price) || totalNum)),
+                            quantity: Math.max(1, Math.round(Number(it?.quantity) || 1)),
+                            category: "Cooking Essentials",
+                          }))
+                        : [
+                            {
+                              sku_name: String(productsDesc || "Pure Cold Pressed Cooking Oil").slice(0, 90),
+                              sku_id: `MANO-${String(orderRef).replace(/[^a-zA-Z0-9]/g, "").slice(-8) || "OIL"}`,
+                              hsn_code: "1512",
+                              price: totalNum,
+                              quantity: qtyNum,
+                              category: "Cooking Essentials",
+                            },
+                          ];
+
                     const shadowfaxPayload = {
                       order_details: {
                         client_order_id: String(orderRef),
                         actual_weight: weightInKg,
                         product_value: totalNum,
+                        total_amount: totalNum,
                         payment_mode: isCod ? "cod" : "prepaid",
                         cod_amount: codAmount,
                         order_service: "Regular",
@@ -1037,15 +1067,25 @@ export default defineConfig(() => {
                       },
                       pickup_details: SHADOWFAX_PICKUP,
                       return_details: SHADOWFAX_RETURN,
-                      product_details: [
-                        {
-                          product_name: String(productsDesc || "Pure Cold Pressed Cooking Oil").slice(0, 90),
-                          product_id: `MANO-${String(orderRef).replace(/[^a-zA-Z0-9]/g, "").slice(-8) || "OIL"}`,
-                          price: totalNum,
-                          quantity: qtyNum,
-                          category: "Cooking Essentials",
-                        },
-                      ],
+                      product_details: productDetails,
+                    };
+
+                    const formatShadowfaxError = (val: any): string => {
+                      if (!val) return "";
+                      if (typeof val === "string") return val;
+                      if (Array.isArray(val)) {
+                        return val.map((v) => formatShadowfaxError(v)).filter(Boolean).join("; ");
+                      }
+                      if (typeof val === "object") {
+                        return Object.entries(val)
+                          .map(([k, v]) => {
+                            const nested = formatShadowfaxError(v);
+                            return nested ? `${k}: ${nested}` : "";
+                          })
+                          .filter(Boolean)
+                          .join(" | ");
+                      }
+                      return String(val);
                     };
 
                     const sfxResp = await fetch("https://dale.shadowfax.in/api/v3/clients/orders/", {
@@ -1058,7 +1098,7 @@ export default defineConfig(() => {
                     });
 
                     const sfxText = await sfxResp.text();
-                    let sfxData = null;
+                    let sfxData: any = null;
                     try {
                       sfxData = JSON.parse(sfxText);
                     } catch {
@@ -1088,11 +1128,10 @@ export default defineConfig(() => {
                     }
 
                     const errMsg =
-                      sfxData?.errors ||
-                      sfxData?.message ||
-                      sfxData?.detail ||
-                      sfxText ||
-                      `Shadowfax error (${sfxResp.status})`;
+                      formatShadowfaxError(sfxData?.errors) ||
+                      formatShadowfaxError(sfxData?.message) ||
+                      formatShadowfaxError(sfxData?.detail) ||
+                      String(sfxText || `Shadowfax error (${sfxResp.status})`);
 
                     const isInsufficientBalance =
                       String(errMsg).toLowerCase().includes("insufficient") ||
